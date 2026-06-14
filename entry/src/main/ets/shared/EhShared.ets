@@ -1173,6 +1173,15 @@ export function nextFloatingToolbarVisible(scrollOffset: number, contentOffset: 
   return currentVisible;
 }
 
+export function nextFloatingToolbarOffset(currentOffset: number, scrollOffset: number, contentOffset: number,
+  barHeight: number): number {
+  if (contentOffset <= 4) {
+    return 0;
+  }
+  const nextOffset = currentOffset - scrollOffset;
+  return Math.max(-barHeight, Math.min(0, nextOffset));
+}
+
 export function downloadProgressText(item: DownloadInfo): string {
   const total = item.total > 0 ? item.total : item.pages;
   if (total <= 0) {
@@ -1394,7 +1403,7 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
       staticSettingsRow('latest_release', 'Latest release', 'GitHub releases URL from original settings', 'Link', 'url'),
       staticSettingsRow('issue_help', 'Issue help', 'Issue guide URL from original settings', 'Link', 'url'),
       staticSettingsRow('license', 'License', 'Open-source license view', 'GPL', 'activity'),
-      staticSettingsRow('version', 'Version', 'HarmonyOS port workspace version', '0.1.21', 'version'),
+      staticSettingsRow('version', 'Version', 'HarmonyOS port workspace version', '0.1.22', 'version'),
       staticSettingsRow('check_for_updates', 'Check for updates', 'Original AppUpdater entry', 'Open', 'action'),
       optionSettingsRow('close_auto_updates', 'Close automatic updates', 'Disable startup update check', entries, ON_OFF_OPTIONS),
       staticSettingsRow('donate', 'Donate', 'Original donation entry', 'Not migrated', 'url')

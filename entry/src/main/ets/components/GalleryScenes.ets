@@ -18,7 +18,7 @@ import { CacheClearResult, readerImageCache } from '../services/ReaderImageCache
 import { ehSpiderInfoStore } from '../services/EhSpiderInfoStore';
 import { MigrationTask, migrationTasks } from '../services/MigrationStatus';
 import { FilterRule, FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, FILTER_MODE_TAG_NAMESPACE, ehFilterStore } from '../services/EhFilterStore';
-import { nextFloatingToolbarVisible } from '../shared/EhShared';
+import { nextFloatingToolbarOffset } from '../shared/EhShared';
 import { FloatingToolbar } from './NavigationComponents';
 import { APP_THEME_COLOR, LANGUAGE_REVISION_KEY, themeSurfaceColor } from '../shared/EhShared';
 import { EhBackupBundle, DrawerItem, SettingsHeaderItem, SettingsRowItem, SessionMode, SettingsPanel, DRAWER_ITEMS, SETTINGS_HEADERS, STATUS_BAR_HEIGHT_KEY, ON_OFF_OPTIONS, shouldUseChineseUi, uiText, uiValue, uiStatusText, uiPageText, zhText, setActiveBackHandler, runActiveBackHandler, createEmptyGallery, createEmptyDownloadInfo, createDetailFromGallery, createEmptyDetail, createEmptyPreview, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneStringArray, cloneRequiredStringArray, cloneGalleryInfo, cloneGalleryInfos, padTwo, applyGalleryFilters, cloneGalleryTagGroups, cloneGalleryComments, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListItem, cloneTopListBucket, cloneTopListInfo, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, saveDownloadsQuietly, filterDownloadItems, downloadItemMatches, sortDownloadItems, nextDownloadStatusFilter, nextDownloadLabelFilter, nextDownloadSortMode, nextStringOption, nextDownloadState, nextDownloadLabel, downloadLabelName, downloadStateLabel, downloadStateColor, downloadProgressText, downloadSizeText, downloadImageUrlForPage, downloadThreadLimit, downloadPageIndexes, downloadQueueSummary, parseHistoryMaxSize, routeTitle, routeSubtitle, launchRouteFromSetting, settingsPanelTitle, settingsRowsForPanel, optionSettingsRow, textSettingsRow, staticSettingsRow, settingEntryValue, cloneStringOptions, settingMigrationMessage, nextOption, isValidProxyPortText, formatNetworkDiagnostics, listModeForRoute, routeUsesKeyword, usesGallerySearchToolbar, usesEmbeddedToolbar, defaultKeywordForRoute, gallerySearchTitle, currentGallerySite, effectiveListSite, gallerySiteName, galleryListFailureMessage, shouldRetryGalleryListOnE, withGalleryListMessage, readerPageReferer, readerDisplayImageUrl, cacheReaderImageForPage, cacheThumbnailImage, cloneGalleryPageWithCache, readerLocalImageSource, readerZoomSize, readerFullImageWidth, readerFullImageHeight, readerImageFit, readerShortUrl, readerPreloadCount, readerIsRightToLeft, categoryName, categoryColor, ratingText, galleryDisplayTitle, showGalleryPages, galleryListMode, galleryThumbWidth, galleryThumbHeight, galleryRowHeight, galleryTagPreview, detailTitleFontSize, detailTitleMaxLines, detailHeadingFontSize, readerShowProgress, readerShowClock, readerClockText, padTimeNumber, topListChipColor } from '../shared/EhShared';
@@ -717,10 +717,9 @@ export struct GalleryListContent {
   onSelectGallery: (gallery: GalleryInfo) => void = () => {};
   initialScrollOffset: number = 0;
   onScrollUpdate: (offset: number) => void = () => {};
-  @State toolbarVisible: boolean = true;
+  @State toolbarOffsetY: number = 0;
   private listScroller: Scroller = new Scroller();
   private loadMorePending: boolean = false;
-  private lastListContentOffset: number = 0;
 
   private triggerLoadMoreIfNear(last: number): void {
     if (this.isLoadingMore || this.loadMorePending) {
@@ -735,13 +734,8 @@ export struct GalleryListContent {
   }
 
   private updateToolbarForScroll(scrollOffset: number): void {
-    this.toolbarVisible = nextFloatingToolbarVisible(scrollOffset, this.listScroller.currentOffset().yOffset, this.toolbarVisible);
-  }
-
-  private updateToolbarFromCurrentOffset(): void {
     const offset = this.listScroller.currentOffset().yOffset;
-    this.toolbarVisible = nextFloatingToolbarVisible(offset - this.lastListContentOffset, offset, this.toolbarVisible);
-    this.lastListContentOffset = offset;
+    this.toolbarOffsetY = nextFloatingToolbarOffset(this.toolbarOffsetY, scrollOffset, offset, this.requestUrl.length > 0 ? 88 : 62);
   }
 
   build() {
@@ -782,7 +776,6 @@ export struct GalleryListContent {
           .onAppear(() => {
             if (this.initialScrollOffset > 0) {
               this.listScroller.scrollTo({ xOffset: 0, yOffset: this.initialScrollOffset });
-              this.lastListContentOffset = this.initialScrollOffset;
             }
           })
           .onDidScroll((scrollOffset: number, scrollState: ScrollState) => {
@@ -790,16 +783,17 @@ export struct GalleryListContent {
           })
           .onScrollStop(() => {
             const offset = this.listScroller.currentOffset().yOffset;
-            this.toolbarVisible = nextFloatingToolbarVisible(0, offset, this.toolbarVisible);
+            if (offset <= 4) {
+              this.toolbarOffsetY = 0;
+            }
             this.onScrollUpdate(offset);
           })
           .onScrollIndex((first: number, last: number) => {
-            this.updateToolbarFromCurrentOffset();
             this.triggerLoadMoreIfNear(last);
           })
         }
 
-        FloatingToolbar({ visible: this.toolbarVisible, barHeight: this.requestUrl.length > 0 ? 88 : 62 }) {
+        FloatingToolbar({ offsetY: this.toolbarOffsetY, barHeight: this.requestUrl.length > 0 ? 88 : 62 }) {
           SearchBarCard({
             keyword: this.keyword,
             title: this.searchTitle,

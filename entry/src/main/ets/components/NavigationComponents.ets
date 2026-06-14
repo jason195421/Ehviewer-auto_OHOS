@@ -106,10 +106,18 @@ export struct AppTopBar {
 export struct FloatingToolbar {
   @Prop visible: boolean = true;
   @Prop barHeight: number = 62;
+  @Prop offsetY: number = 0;
   @BuilderParam content: () => void = this.EmptyContent;
 
   @Builder
   private EmptyContent() {
+  }
+
+  private toolbarOffset(): number {
+    if (this.offsetY !== 0) {
+      return this.offsetY;
+    }
+    return this.visible ? 0 : -this.barHeight;
   }
 
   build() {
@@ -117,8 +125,7 @@ export struct FloatingToolbar {
       this.content()
     }
     .width('100%')
-    .translate({ y: this.visible ? 0 : -this.barHeight })
-    .animation({ duration: 180, curve: Curve.EaseOut })
+    .translate({ y: this.toolbarOffset() })
     .zIndex(10)
   }
 }
