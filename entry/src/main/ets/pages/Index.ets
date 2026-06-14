@@ -88,20 +88,12 @@ struct Index {
       clearTimeout(this.routeCleanupTimer);
       this.routeCleanupTimer = -1;
     }
-    this.outgoingRoute = this.activeRoute;
     this.activeRoute = route;
     if (drawerOpen !== undefined) {
       this.drawerOpen = drawerOpen;
     }
-    this.outgoingRouteVisible = true;
-    this.outgoingRouteOpacity = 1;
-    this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseInOut }, () => {
-      this.outgoingRouteOpacity = 0;
-    });
-    this.routeCleanupTimer = setTimeout(() => {
-      this.outgoingRouteVisible = false;
-      this.routeCleanupTimer = -1;
-    }, 220);
+    this.outgoingRouteVisible = false;
+    this.outgoingRouteOpacity = 0;
   }
 
   private toggleDrawer(): void {

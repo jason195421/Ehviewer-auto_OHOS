@@ -754,25 +754,36 @@ export struct GalleryListContent {
           .height('100%')
           .padding({ top: this.requestUrl.length > 0 ? 88 : 62 })
         } else {
-          Grid(this.listScroller) {
-            ForEach(this.galleries, (gallery: GalleryInfo) => {
-              GridItem() {
-                if (galleryListMode() === 'Thumb') {
-                  GalleryThumbCard({ gallery: gallery })
-                    .onClick(() => { this.onSelectGallery(gallery); })
-                } else {
-                  GalleryListRow({ gallery: gallery })
-                    .onClick(() => { this.onSelectGallery(gallery); })
-                }
+          Scroll(this.listScroller) {
+            Column() {
+              Blank()
+                .width('100%')
+                .height((this.requestUrl.length > 0 ? 88 : 62) + 8)
+
+              Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
+                ForEach(this.galleries, (gallery: GalleryInfo) => {
+                  if (galleryListMode() === 'Thumb') {
+                    GalleryThumbCard({ gallery: gallery })
+                      .width(120)
+                      .margin({ right: 6, bottom: 6 })
+                      .onClick(() => { this.onSelectGallery(gallery); })
+                  } else {
+                    GalleryListRow({ gallery: gallery })
+                      .width('100%')
+                      .margin({ bottom: 8 })
+                      .onClick(() => { this.onSelectGallery(gallery); })
+                  }
+                }, (gallery: GalleryInfo) => gallery.gid.toString() + ':' + this.renderVersion.toString())
               }
-            }, (gallery: GalleryInfo) => gallery.gid.toString() + ':' + this.renderVersion.toString())
+              .width('100%')
+              .padding({ left: 8, right: 8, bottom: 0 })
+            }
+            .width('100%')
           }
-          .columnsTemplate(galleryListMode() === 'Thumb' ? 'repeat(auto-fit, 120vp)' : 'repeat(auto-fit, 320vp)')
-          .columnsGap(galleryListMode() === 'Thumb' ? 6 : 8)
-          .rowsGap(galleryListMode() === 'Thumb' ? 6 : 8)
+          .scrollable(ScrollDirection.Vertical)
+          .scrollBar(BarState.Off)
           .width('100%')
           .height('100%')
-          .padding({ left: 8, right: 8, top: 0, bottom: 0 })
           .onAppear(() => {
             if (this.initialScrollOffset > 0) {
               this.listScroller.scrollTo({ xOffset: 0, yOffset: this.initialScrollOffset });
@@ -788,8 +799,8 @@ export struct GalleryListContent {
             }
             this.onScrollUpdate(offset);
           })
-          .onScrollIndex((first: number, last: number) => {
-            this.triggerLoadMoreIfNear(last);
+          .onReachEnd(() => {
+            this.triggerLoadMoreIfNear(this.galleries.length);
           })
         }
 
