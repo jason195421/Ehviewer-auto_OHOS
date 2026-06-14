@@ -60,14 +60,21 @@ function splitTableRows(body: string): string[] {
   const tableStart = findItgTableStart(body);
   const tableEnd = tableStart < 0 ? -1 : body.indexOf('</table>', tableStart);
   const source = tableStart >= 0 && tableEnd > tableStart ? body.substring(tableStart, tableEnd + 8) : body;
-  const pattern = /<tr[\s\S]*?<\/tr>/gi;
-  let match: RegExpExecArray | null = pattern.exec(source);
-  while (match !== null) {
-    const row = match[0];
+  let index = 0;
+  while (index < source.length) {
+    const start = source.substring(index).search(/<tr\b/i);
+    if (start < 0) {
+      break;
+    }
+    const absoluteStart = index + start;
+    const row = findFirstTagBlock(source.substring(absoluteStart), 'tr');
+    if (row.length === 0) {
+      break;
+    }
     if (row.indexOf('/g/') >= 0 && row.indexOf('<th') < 0) {
       rows.push(row);
     }
-    match = pattern.exec(source);
+    index = absoluteStart + row.length;
   }
   return rows;
 }

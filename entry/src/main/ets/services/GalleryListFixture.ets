@@ -106,7 +106,7 @@ export const favoritesListFixture: string = `
       <tr>
         <td class="gl2m">
           <div class="glthumb">
-            <div><img data-src="https://ehgt.org/fav/thumb.jpg" style="height:120px;width:90px" /></div>
+            <table><tr><td><img data-src="https://ehgt.org/fav/thumb.jpg" style="height:120px;width:90px" /></td></tr></table>
             <div><div></div><div><div>31 pages</div></div></div>
           </div>
           <div id="posted_4392268" style="background-color:rgba(240,160,0,0.25)">2026-06-08 07:15</div>

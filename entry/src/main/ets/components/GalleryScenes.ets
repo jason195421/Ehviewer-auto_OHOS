@@ -738,7 +738,6 @@ export struct GalleryListContent {
           title: this.searchTitle,
           searchActive: this.searchActive,
           filterActive: this.filterActive,
-          statusText: this.statusText,
           requestUrl: this.requestUrl,
           onKeywordChange: this.onKeywordChange,
           onMenu: this.onMenu,
@@ -746,36 +745,45 @@ export struct GalleryListContent {
           onSearch: this.onSearch
         })
 
-        Grid(this.listScroller) {
-          ForEach(this.galleries, (gallery: GalleryInfo) => {
-            GridItem() {
-              if (galleryListMode() === 'Thumb') {
-                GalleryThumbCard({ gallery: gallery })
-                  .onClick(() => { this.onSelectGallery(gallery); })
-              } else {
-                GalleryListRow({ gallery: gallery })
-                  .onClick(() => { this.onSelectGallery(gallery); })
+        if (this.galleries.length === 0) {
+          GalleryListStateView({
+            statusText: this.statusText,
+            requestUrl: this.requestUrl,
+            onRefresh: this.onRefresh
+          })
+            .layoutWeight(1)
+        } else {
+          Grid(this.listScroller) {
+            ForEach(this.galleries, (gallery: GalleryInfo) => {
+              GridItem() {
+                if (galleryListMode() === 'Thumb') {
+                  GalleryThumbCard({ gallery: gallery })
+                    .onClick(() => { this.onSelectGallery(gallery); })
+                } else {
+                  GalleryListRow({ gallery: gallery })
+                    .onClick(() => { this.onSelectGallery(gallery); })
+                }
               }
-            }
-          }, (gallery: GalleryInfo) => gallery.gid.toString() + ':' + this.renderVersion.toString())
-        }
-        .columnsTemplate(galleryListMode() === 'Thumb' ? 'repeat(auto-fit, 120vp)' : 'repeat(auto-fit, 320vp)')
-        .columnsGap(galleryListMode() === 'Thumb' ? 6 : 8)
-        .rowsGap(galleryListMode() === 'Thumb' ? 6 : 8)
-        .width('100%')
-        .layoutWeight(1)
-        .padding({ left: 8, right: 8, top: 8, bottom: 0 })
-        .onAppear(() => {
-          if (this.initialScrollOffset > 0) {
-            this.listScroller.scrollTo({ xOffset: 0, yOffset: this.initialScrollOffset });
+            }, (gallery: GalleryInfo) => gallery.gid.toString() + ':' + this.renderVersion.toString())
           }
-        })
-        .onScrollStop(() => {
-          this.onScrollUpdate(this.listScroller.currentOffset().yOffset);
-        })
-        .onScrollIndex((first: number, last: number) => {
-          this.triggerLoadMoreIfNear(last);
-        })
+          .columnsTemplate(galleryListMode() === 'Thumb' ? 'repeat(auto-fit, 120vp)' : 'repeat(auto-fit, 320vp)')
+          .columnsGap(galleryListMode() === 'Thumb' ? 6 : 8)
+          .rowsGap(galleryListMode() === 'Thumb' ? 6 : 8)
+          .width('100%')
+          .layoutWeight(1)
+          .padding({ left: 8, right: 8, top: 8, bottom: 0 })
+          .onAppear(() => {
+            if (this.initialScrollOffset > 0) {
+              this.listScroller.scrollTo({ xOffset: 0, yOffset: this.initialScrollOffset });
+            }
+          })
+          .onScrollStop(() => {
+            this.onScrollUpdate(this.listScroller.currentOffset().yOffset);
+          })
+          .onScrollIndex((first: number, last: number) => {
+            this.triggerLoadMoreIfNear(last);
+          })
+        }
 
         if (this.isLoadingMore) {
           Row() {
@@ -816,7 +824,6 @@ export struct SearchBarCard {
   @Prop title: string = '';
   @Prop searchActive: boolean = false;
   @Prop filterActive: boolean = false;
-  @Prop statusText: string = '';
   @Prop requestUrl: string = '';
   onKeywordChange: (value: string) => void = () => {};
   onMenu: () => void = () => {};
@@ -885,23 +892,98 @@ export struct SearchBarCard {
       .padding({ left: 14, right: 14 })
       .alignItems(VerticalAlign.Center)
 
-      if (this.statusText.length > 0) {
-        Row() {
-          Text(uiStatusText(this.statusText))
-            .fontSize(11)
-            .fontColor('rgba(255,255,255,0.75)')
-            .layoutWeight(1)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-        .width('100%')
-        .height(26)
-        .padding({ left: 16, right: 14 })
-        .backgroundColor('rgba(0,0,0,0.12)')
-      }
     }
     .width('100%')
     .backgroundColor('#2F6F8F')
+  }
+}
+
+@Component
+export struct GalleryListStateView {
+  @Prop statusText: string = '';
+  @Prop requestUrl: string = '';
+  onRefresh: () => void = () => {};
+
+  private isLoading(): boolean {
+    const lower = this.statusText.toLowerCase();
+    return lower.indexOf('loading') >= 0 || lower.indexOf('加载') >= 0;
+  }
+
+  private isError(): boolean {
+    const lower = this.statusText.toLowerCase();
+    return lower.indexOf('failed') >= 0 || lower.indexOf('error') >= 0 ||
+      lower.indexOf('blocked') >= 0 || lower.indexOf('banned') >= 0 ||
+      lower.indexOf('required') >= 0 || lower.indexOf('失败') >= 0;
+  }
+
+  private titleText(): string {
+    if (this.isLoading()) {
+      return 'Loading...';
+    }
+    if (this.isError()) {
+      return 'Load failed';
+    }
+    return 'No galleries';
+  }
+
+  build() {
+    Column() {
+      if (this.isLoading()) {
+        LoadingProgress()
+          .width(48)
+          .height(48)
+          .color('#2F6F8F')
+      } else {
+        SymbolGlyph(this.isError() ? $r('sys.symbol.exclamationmark_triangle') : $r('sys.symbol.magnifyingglass'))
+          .fontSize(48)
+          .fontColor([this.isError() ? '#B42318' : '#8AA4B5'])
+      }
+
+      Text(uiText(this.titleText()))
+        .fontSize(18)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#17202A')
+        .margin({ top: 14 })
+
+      if (this.statusText.length > 0) {
+        Text(uiStatusText(this.statusText))
+          .fontSize(13)
+          .fontColor('#667085')
+          .lineHeight(20)
+          .textAlign(TextAlign.Center)
+          .margin({ top: 8 })
+          .width('82%')
+      }
+
+      if (this.requestUrl.length > 0 && this.isError()) {
+        Text(this.requestUrl)
+          .fontSize(11)
+          .fontColor('#98A2B3')
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .textAlign(TextAlign.Center)
+          .margin({ top: 8 })
+          .width('82%')
+      }
+
+      if (!this.isLoading()) {
+        Button(uiText('Refresh'))
+          .height(38)
+          .fontSize(13)
+          .fontColor(Color.White)
+          .backgroundColor('#2F6F8F')
+          .margin({ top: 16 })
+          .onClick(() => {
+            this.onRefresh();
+          })
+      }
+    }
+    .width('100%')
+    .height('100%')
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+    .padding({ left: 24, right: 24, bottom: 48 })
+    .backgroundColor('#F3F5F7')
   }
 }
 
