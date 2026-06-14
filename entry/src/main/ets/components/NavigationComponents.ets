@@ -28,9 +28,42 @@ export struct AppToolbar {
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
 
   build() {
+    AppTopBar({
+      title: this.title,
+      subtitle: this.subtitle,
+      symbol: $r('sys.symbol.open_sidebar'),
+      onAction: this.onMenu
+    })
+  }
+}
+
+@Component
+export struct AppSubToolbar {
+  title: string = '';
+  onBack: () => void = () => {};
+  @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
+
+  build() {
+    AppTopBar({
+      title: this.title,
+      subtitle: '',
+      symbol: $r('sys.symbol.chevron_left'),
+      onAction: this.onBack
+    })
+  }
+}
+
+@Component
+export struct AppTopBar {
+  title: string = '';
+  subtitle: string = '';
+  symbol: Resource = $r('sys.symbol.open_sidebar');
+  onAction: () => void = () => {};
+
+  build() {
     Row() {
       Button({ type: ButtonType.Circle, stateEffect: true }) {
-        SymbolGlyph($r('sys.symbol.open_sidebar'))
+        SymbolGlyph(this.symbol)
           .fontSize(20)
           .fontColor([Color.White])
       }
@@ -38,7 +71,7 @@ export struct AppToolbar {
       .height(38)
       .backgroundColor('rgba(255,255,255,0.15)')
       .onClick(() => {
-        this.onMenu();
+        this.onAction();
       })
 
       Column() {
@@ -64,6 +97,7 @@ export struct AppToolbar {
     .width('100%')
     .height(60)
     .padding({ left: 14, right: 16 })
+    .alignItems(VerticalAlign.Center)
     .backgroundColor('#2F6F8F')
   }
 }

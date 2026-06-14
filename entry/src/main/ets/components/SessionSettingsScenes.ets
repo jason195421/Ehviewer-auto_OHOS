@@ -20,7 +20,10 @@ import { MigrationTask, migrationTasks } from '../services/MigrationStatus';
 import { FilterRule, FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, FILTER_MODE_TAG_NAMESPACE, ehFilterStore } from '../services/EhFilterStore';
 import { applyWindowPrivacyMode } from '../services/EhWindowPrivacy';
 import { LANGUAGE_REVISION_KEY, notifyLanguageChanged } from '../shared/EhShared';
-import { EhBackupBundle, DrawerItem, SettingsHeaderItem, SettingsRowItem, SessionMode, SettingsPanel, DRAWER_ITEMS, SETTINGS_HEADERS, STATUS_BAR_HEIGHT_KEY, ON_OFF_OPTIONS, shouldUseChineseUi, uiText, uiValue, uiStatusText, uiPageText, zhText, setActiveBackHandler, runActiveBackHandler, createEmptyGallery, createEmptyDownloadInfo, createDetailFromGallery, createEmptyDetail, createEmptyPreview, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneStringArray, cloneRequiredStringArray, cloneGalleryInfo, cloneGalleryInfos, padTwo, applyGalleryFilters, cloneGalleryTagGroups, cloneGalleryComments, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListItem, cloneTopListBucket, cloneTopListInfo, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, saveDownloadsQuietly, filterDownloadItems, downloadItemMatches, sortDownloadItems, nextDownloadStatusFilter, nextDownloadLabelFilter, nextDownloadSortMode, nextStringOption, nextDownloadState, nextDownloadLabel, downloadLabelName, downloadStateLabel, downloadStateColor, downloadProgressText, downloadSizeText, downloadImageUrlForPage, downloadThreadLimit, downloadPageIndexes, downloadQueueSummary, parseHistoryMaxSize, routeTitle, routeSubtitle, launchRouteFromSetting, settingsPanelTitle, settingsRowsForPanel, optionSettingsRow, textSettingsRow, staticSettingsRow, settingEntryValue, cloneStringOptions, settingMigrationMessage, nextOption, isValidProxyPortText, formatNetworkDiagnostics, listModeForRoute, routeUsesKeyword, usesGallerySearchToolbar, usesEmbeddedToolbar, defaultKeywordForRoute, gallerySearchTitle, currentGallerySite, effectiveListSite, gallerySiteName, galleryListFailureMessage, shouldRetryGalleryListOnE, withGalleryListMessage, readerPageReferer, readerDisplayImageUrl, cacheReaderImageForPage, cacheThumbnailImage, cloneGalleryPageWithCache, readerLocalImageSource, readerZoomSize, readerFullImageWidth, readerFullImageHeight, readerImageFit, readerShortUrl, readerPreloadCount, readerIsRightToLeft, categoryName, categoryColor, ratingText, galleryDisplayTitle, showGalleryPages, galleryListMode, galleryThumbWidth, galleryThumbHeight, galleryRowHeight, galleryTagPreview, detailTitleFontSize, detailTitleMaxLines, detailHeadingFontSize, readerShowProgress, readerShowClock, readerClockText, padTimeNumber, topListChipColor } from '../shared/EhShared';import { FilterPanel, MigrationScene } from './DownloadMigrationScenes';
+import { EhBackupBundle, DrawerItem, SettingsHeaderItem, SettingsRowItem, SessionMode, SettingsPanel, DRAWER_ITEMS, SETTINGS_HEADERS, STATUS_BAR_HEIGHT_KEY, ON_OFF_OPTIONS, shouldUseChineseUi, uiText, uiValue, uiStatusText, uiPageText, zhText, setActiveBackHandler, runActiveBackHandler, createEmptyGallery, createEmptyDownloadInfo, createDetailFromGallery, createEmptyDetail, createEmptyPreview, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneStringArray, cloneRequiredStringArray, cloneGalleryInfo, cloneGalleryInfos, padTwo, applyGalleryFilters, cloneGalleryTagGroups, cloneGalleryComments, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListItem, cloneTopListBucket, cloneTopListInfo, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, saveDownloadsQuietly, filterDownloadItems, downloadItemMatches, sortDownloadItems, nextDownloadStatusFilter, nextDownloadLabelFilter, nextDownloadSortMode, nextStringOption, nextDownloadState, nextDownloadLabel, downloadLabelName, downloadStateLabel, downloadStateColor, downloadProgressText, downloadSizeText, downloadImageUrlForPage, downloadThreadLimit, downloadPageIndexes, downloadQueueSummary, parseHistoryMaxSize, routeTitle, routeSubtitle, launchRouteFromSetting, settingsPanelTitle, settingsRowsForPanel, optionSettingsRow, textSettingsRow, staticSettingsRow, settingEntryValue, cloneStringOptions, settingMigrationMessage, nextOption, isValidProxyPortText, formatNetworkDiagnostics, listModeForRoute, routeUsesKeyword, usesGallerySearchToolbar, usesEmbeddedToolbar, defaultKeywordForRoute, gallerySearchTitle, currentGallerySite, effectiveListSite, gallerySiteName, galleryListFailureMessage, shouldRetryGalleryListOnE, withGalleryListMessage, readerPageReferer, readerDisplayImageUrl, cacheReaderImageForPage, cacheThumbnailImage, cloneGalleryPageWithCache, readerLocalImageSource, readerZoomSize, readerFullImageWidth, readerFullImageHeight, readerImageFit, readerShortUrl, readerPreloadCount, readerIsRightToLeft, categoryName, categoryColor, ratingText, galleryDisplayTitle, showGalleryPages, galleryListMode, galleryThumbWidth, galleryThumbHeight, galleryRowHeight, galleryTagPreview, detailTitleFontSize, detailTitleMaxLines, detailHeadingFontSize, readerShowProgress, readerShowClock, readerClockText, padTimeNumber, topListChipColor } from '../shared/EhShared';
+import { FilterPanel, MigrationScene } from './DownloadMigrationScenes';
+import { AppSubToolbar, AppToolbar } from './NavigationComponents';
+
 @Component
 export struct SessionScene {
   private client: EhHttpClient = new EhHttpClient();
@@ -750,7 +753,7 @@ export struct SettingsScene {
       return true;
     }
     if (key === 'version') {
-      this.statusText = 'Version: HarmonyOS port target 6.1.0 / API 6.1.1 (24), app version 0.1.9.';
+      this.statusText = 'Version: HarmonyOS port target 6.1.0 / API 6.1.1 (24), app version 0.1.10.';
       return true;
     }
     if (key === 'check_for_updates') {
@@ -1292,34 +1295,11 @@ export struct SettingsHomePanel {
 
   build() {
     Column() {
-      Row() {
-        Button({ type: ButtonType.Circle, stateEffect: true }) {
-          SymbolGlyph($r('sys.symbol.open_sidebar'))
-            .fontSize(20)
-            .fontColor([Color.White])
-        }
-        .width(38)
-        .height(38)
-        .backgroundColor('rgba(255,255,255,0.15)')
-        .onClick(() => {
-          this.onMenu();
-        })
-        Text(uiText('Settings'))
-          .fontSize(18)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(Color.White)
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .height(38)
-          .padding({ top: 7 })
-        .layoutWeight(1)
-        .margin({ left: 12 })
-      }
-      .width('100%')
-      .height(60)
-      .padding({ left: 14, right: 16 })
-      .alignItems(VerticalAlign.Center)
-      .backgroundColor('#2F6F8F')
+      AppToolbar({
+        title: 'Settings',
+        subtitle: '',
+        onMenu: this.onMenu
+      })
 
       List({ space: 8 }) {
         if (this.statusText.length > 0) {
@@ -1348,25 +1328,26 @@ export struct SettingsHomePanel {
 }
 
 @Component
+export struct SettingsSubToolbar {
+  title: string = '';
+  onBack: () => void = () => {};
+
+  build() {
+    AppSubToolbar({
+      title: this.title,
+      onBack: this.onBack
+    })
+  }
+}
+
+@Component
 export struct SettingsHeaderRow {
   item: SettingsHeaderItem = { panel: SettingsPanel.Eh, title: '', icon: '', summary: '' };
   onTap: () => void = () => {};
 
   build() {
     Row() {
-      Column() {
-        Text(uiText(this.item.title))
-          .fontSize(15)
-          .fontWeight(FontWeight.Medium)
-          .fontColor('#17202A')
-        Text(uiText(this.item.summary))
-          .fontSize(12)
-          .fontColor('#667085')
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .margin({ top: 3 })
-      }
-      .alignItems(HorizontalAlign.Start)
+      SettingsTextBlock({ title: uiText(this.item.title), summary: uiText(this.item.summary) })
       .layoutWeight(1)
       Text('>')
         .fontSize(16)
@@ -1406,6 +1387,30 @@ export struct SettingsStatusBlock {
 }
 
 @Component
+export struct SettingsTextBlock {
+  title: string = '';
+  summary: string = '';
+  isEnabled: boolean = true;
+
+  build() {
+    Column() {
+      Text(this.title)
+        .fontSize(15)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(this.isEnabled ? '#17202A' : '#98A2B3')
+      Text(this.summary)
+        .fontSize(12)
+        .fontColor('#667085')
+        .lineHeight(18)
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .margin({ top: 4 })
+    }
+    .alignItems(HorizontalAlign.Start)
+  }
+}
+
+@Component
 export struct SettingsDetailPanel {
   panel: SettingsPanel = SettingsPanel.Eh;
   @Prop signedIn: boolean = false;
@@ -1422,7 +1427,7 @@ export struct SettingsDetailPanel {
 
   build() {
     Column() {
-      SettingsSubToolbar({
+      AppSubToolbar({
         title: uiText(settingsPanelTitle(this.panel)),
         onBack: this.onBack
       })
@@ -1550,7 +1555,7 @@ export struct SettingsOptionPanel {
 
   build() {
     Column() {
-      SettingsSubToolbar({
+      AppSubToolbar({
         title: this.title,
         onBack: this.onBack
       })
@@ -1600,38 +1605,6 @@ export struct SettingsOptionPanel {
 }
 
 @Component
-export struct SettingsSubToolbar {
-  title: string = '';
-  onBack: () => void = () => {};
-
-  build() {
-    Row() {
-      Button({ type: ButtonType.Circle, stateEffect: true }) {
-        SymbolGlyph($r('sys.symbol.chevron_left'))
-          .fontSize(20)
-          .fontColor([Color.White])
-      }
-      .width(38)
-      .height(38)
-      .backgroundColor('rgba(255,255,255,0.15)')
-      .onClick(() => {
-        this.onBack();
-      })
-      Text(uiText(this.title))
-        .fontSize(18)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(Color.White)
-        .margin({ left: 12 })
-        .layoutWeight(1)
-    }
-    .width('100%')
-    .height(60)
-    .padding({ left: 14, right: 14 })
-    .backgroundColor('#2F6F8F')
-  }
-}
-
-@Component
 export struct SettingsActionRow {
   title: string = '';
   summary: string = '';
@@ -1641,18 +1614,11 @@ export struct SettingsActionRow {
 
   build() {
     Row() {
-      Column() {
-        Text(this.title)
-          .fontSize(15)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(this.isEnabled ? '#17202A' : '#98A2B3')
-        Text(this.summary)
-          .fontSize(12)
-          .fontColor('#667085')
-          .lineHeight(18)
-          .margin({ top: 4 })
-      }
-      .alignItems(HorizontalAlign.Start)
+      SettingsTextBlock({
+        title: this.title,
+        summary: this.summary,
+        isEnabled: this.isEnabled
+      })
       .layoutWeight(1)
       Text(this.value)
         .fontSize(12)
@@ -1681,18 +1647,10 @@ export struct SettingsStaticRow {
 
   build() {
     Row() {
-      Column() {
-        Text(uiText(this.row.title))
-          .fontSize(15)
-          .fontWeight(FontWeight.Medium)
-          .fontColor('#17202A')
-        Text(uiText(this.row.summary))
-          .fontSize(12)
-          .fontColor('#667085')
-          .lineHeight(18)
-          .margin({ top: 4 })
-      }
-      .alignItems(HorizontalAlign.Start)
+      SettingsTextBlock({
+        title: uiText(this.row.title),
+        summary: uiText(this.row.summary)
+      })
       .layoutWeight(1)
       if (this.row.type === 'input') {
         TextInput({ text: this.row.value, placeholder: this.row.summary })
