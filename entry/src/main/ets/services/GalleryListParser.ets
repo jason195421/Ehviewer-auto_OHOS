@@ -10,9 +10,23 @@ export interface GalleryListParseResult {
 
 const DETAIL_LINK_PATTERN: RegExp = /(?:https?:\/\/(?:e-hentai\.org|exhentai\.org))?\/g\/(\d+)\/([A-Za-z0-9]+)\//;
 const PAGE_COUNT_PATTERN: RegExp = /(\d+)\s+pages?/i;
-const RATING_PATTERN: RegExp = /(?:title|alt)=["'](?:Average:|Rating:)?\s*([0-5](?:\.\d+)?)["']/i;
+const RATING_TEXT_PATTERN: RegExp = /(?:title|alt)=["'](?:Average:|Rating:)?\s*([0-5](?:\.\d+)?)["']/i;
+const RATING_STYLE_PATTERN: RegExp = /-?(\d+)px/g;
+const FAVORITE_SLOT_PATTERN: RegExp = /background-color:\s*rgba\((\d+),\s*(\d+),\s*(\d+),/i;
 const RESULT_COUNT_PATTERN: RegExp = /(?:Found|Showing)\s+([^<]+?)\s+results/i;
 const NEXT_PAGE_PATTERN: RegExp = /[?&](?:page|next)=(\d+)/;
+const FAVORITE_SLOT_RGB: string[][] = [
+  ['0', '0', '0'],
+  ['240', '0', '0'],
+  ['240', '160', '0'],
+  ['208', '208', '0'],
+  ['0', '128', '0'],
+  ['144', '240', '64'],
+  ['64', '176', '240'],
+  ['0', '0', '240'],
+  ['80', '0', '128'],
+  ['224', '128', '224']
+];
 
 export function parseGalleryList(body: string): GalleryListParseResult {
   const galleries: GalleryInfo[] = [];
@@ -100,21 +114,22 @@ function parseGalleryInfo(row: string): GalleryInfo | null {
     return null;
   }
 
+  const posted = parsePosted(row, gid);
   return {
     gid: gid,
     token: link[2],
     title: parseTitle(row),
     thumb: parseThumb(row),
     category: parseCategory(row),
-    posted: parseById(row, 'posted_' + gid.toString()),
+    posted: posted.text,
     uploader: parseUploader(row),
     rating: parseRating(row),
-    rated: false,
+    rated: parseRated(row),
     simpleTags: parseSimpleTags(row),
     pages: parseItemPages(row),
     thumbWidth: parseThumbWidth(row),
     thumbHeight: parseThumbHeight(row),
-    favoriteSlot: -2,
+    favoriteSlot: posted.favoriteSlot,
     tagList: parseTagList(row)
   };
 }
@@ -162,12 +177,59 @@ function parseCategory(row: string): number {
 
 function parseUploader(row: string): string {
   const uploader = /\/uploader\/[^"']+["'][^>]*>([\s\S]*?)<\/a>/i.exec(row);
-  return uploader === null ? '' : cleanText(uploader[1]);
+  if (uploader !== null) {
+    return cleanText(uploader[1]);
+  }
+
+  const glhide = findClassBlock(row, 'glhide');
+  const fromGlhide = parseFirstLinkText(glhide);
+  if (fromGlhide.length > 0) {
+    return fromGlhide;
+  }
+
+  const gl3e = findClassBlock(row, 'gl3e');
+  const gl3eChildren = childDivs(gl3e);
+  if (gl3eChildren.length > 3) {
+    return parseFirstLinkText(gl3eChildren[3]);
+  }
+  return '';
 }
 
 function parseRating(row: string): number {
-  const rating = RATING_PATTERN.exec(row);
-  return rating === null ? -1 : parseFloatSafe(rating[1], -1);
+  const ir = findClassBlock(row, 'ir');
+  const source = ir.length > 0 ? ir : row;
+  const rating = RATING_TEXT_PATTERN.exec(source);
+  if (rating !== null) {
+    return parseFloatSafe(rating[1], -1);
+  }
+
+  const style = parseAttribute(source, 'style');
+  if (style.length === 0) {
+    return -1;
+  }
+  const numbers: number[] = [];
+  let match: RegExpExecArray | null = RATING_STYLE_PATTERN.exec(style);
+  while (match !== null) {
+    numbers.push(parseIntSafe(match[1], -1));
+    match = RATING_STYLE_PATTERN.exec(style);
+  }
+  if (numbers.length < 2 || numbers[0] < 0 || numbers[1] < 0) {
+    return -1;
+  }
+
+  let value = 5 - Math.floor(numbers[0] / 16);
+  if (numbers[1] === 21) {
+    value -= 0.5;
+  }
+  if (value < 0 || value > 5) {
+    return -1;
+  }
+  return value;
+}
+
+function parseRated(row: string): boolean {
+  const ir = findClassBlock(row, 'ir');
+  return /\b(?:irr|irg|irb)\b/i.test(ir);
 }
 
 function parseSimpleTags(row: string): string[] {
@@ -193,24 +255,193 @@ function parseTagList(row: string): string[] {
 }
 
 function parseItemPages(row: string): number {
+  const glhide = findClassBlock(row, 'glhide');
+  const glhidePages = PAGE_COUNT_PATTERN.exec(glhide);
+  if (glhidePages !== null) {
+    return parseIntSafe(glhidePages[1], 0);
+  }
+
+  const gl3e = findClassBlock(row, 'gl3e');
+  const gl3eChildren = childDivs(gl3e);
+  if (gl3eChildren.length > 4) {
+    const pages = PAGE_COUNT_PATTERN.exec(gl3eChildren[4]);
+    if (pages !== null) {
+      return parseIntSafe(pages[1], 0);
+    }
+  }
+
+  const gl5t = findClassBlock(row, 'gl5t');
+  const gl5tPages = PAGE_COUNT_PATTERN.exec(gl5t);
+  if (gl5tPages !== null) {
+    return parseIntSafe(gl5tPages[1], 0);
+  }
+
   const pages = PAGE_COUNT_PATTERN.exec(row);
   return pages === null ? 0 : parseIntSafe(pages[1], 0);
 }
 
 function parseThumbWidth(row: string): number {
-  const size = /height:(\d+)px;width:(\d+)px/i.exec(row);
+  const size = parseThumbSize(row);
   return size === null ? 0 : parseIntSafe(size[2], 0);
 }
 
 function parseThumbHeight(row: string): number {
-  const size = /height:(\d+)px;width:(\d+)px/i.exec(row);
+  const size = parseThumbSize(row);
   return size === null ? 0 : parseIntSafe(size[1], 0);
+}
+
+function parseThumbSize(row: string): RegExpExecArray | null {
+  const img = /<img[^>]+style=["']([^"']+)["']/i.exec(row);
+  if (img !== null) {
+    const imgSize = /height:\s*(\d+)px;\s*width:\s*(\d+)px/i.exec(img[1]);
+    if (imgSize !== null) {
+      return imgSize;
+    }
+  }
+  return /height:\s*(\d+)px;\s*width:\s*(\d+)px/i.exec(row);
+}
+
+interface PostedInfo {
+  text: string;
+  favoriteSlot: number;
+}
+
+function parsePosted(row: string, gid: number): PostedInfo {
+  const id = 'posted_' + gid.toString();
+  const blockPattern = new RegExp("<[^>]+id=[\"']" + escapeRegExp(id) + "[\"'][^>]*>[\\s\\S]*?<\\/[^>]+>", 'i');
+  const block = blockPattern.exec(row);
+  if (block === null) {
+    return { text: '', favoriteSlot: -2 };
+  }
+
+  return {
+    text: cleanText(block[0]),
+    favoriteSlot: parseFavoriteSlot(parseAttribute(block[0], 'style'))
+  };
+}
+
+function parseFavoriteSlot(style: string): number {
+  const match = FAVORITE_SLOT_PATTERN.exec(style);
+  if (match === null) {
+    return -2;
+  }
+
+  for (let i = 0; i < FAVORITE_SLOT_RGB.length; i++) {
+    const rgb = FAVORITE_SLOT_RGB[i];
+    if (match[1] === rgb[0] && match[2] === rgb[1] && match[3] === rgb[2]) {
+      return i;
+    }
+  }
+  return -2;
 }
 
 function parseById(row: string, id: string): string {
   const pattern = new RegExp("<[^>]+id=[\"']" + escapeRegExp(id) + "[\"'][^>]*>([\\s\\S]*?)<\\/[^>]+>", 'i');
   const match = pattern.exec(row);
   return match === null ? '' : cleanText(match[1]);
+}
+
+function findClassBlock(source: string, className: string): string {
+  const startPattern = new RegExp("<[^>]+class=[\"'][^\"']*\\b" + escapeRegExp(className) + "\\b[^\"']*[\"'][^>]*>", 'i');
+  const start = startPattern.exec(source);
+  if (start === null) {
+    return '';
+  }
+
+  const openTag = start[0];
+  const tagMatch = /^<([a-z0-9]+)/i.exec(openTag);
+  if (tagMatch === null) {
+    return openTag;
+  }
+
+  const tag = tagMatch[1].toLowerCase();
+  if (isVoidTag(tag)) {
+    return openTag;
+  }
+
+  const startIndex = start.index;
+  const afterStart = start.index + openTag.length;
+  const tagPattern = new RegExp("<\\/?" + tag + "\\b[^>]*>", 'gi');
+  tagPattern.lastIndex = afterStart;
+  let depth = 1;
+  let match: RegExpExecArray | null = tagPattern.exec(source);
+  while (match !== null) {
+    if (match[0].indexOf('</') === 0) {
+      depth--;
+      if (depth === 0) {
+        return source.substring(startIndex, match.index + match[0].length);
+      }
+    } else if (!/\/>$/.test(match[0])) {
+      depth++;
+    }
+    match = tagPattern.exec(source);
+  }
+  return source.substring(startIndex);
+}
+
+function childDivs(source: string): string[] {
+  const result: string[] = [];
+  if (source.length === 0) {
+    return result;
+  }
+
+  const outerStart = source.indexOf('>');
+  const outerEnd = source.lastIndexOf('</');
+  const inner = outerStart >= 0 && outerEnd > outerStart ? source.substring(outerStart + 1, outerEnd) : source;
+  let index = 0;
+  while (index < inner.length) {
+    const start = inner.substring(index).search(/<div\b/i);
+    if (start < 0) {
+      break;
+    }
+    const absoluteStart = index + start;
+    const block = findFirstTagBlock(inner.substring(absoluteStart), 'div');
+    if (block.length === 0) {
+      break;
+    }
+    result.push(block);
+    index = absoluteStart + block.length;
+  }
+  return result;
+}
+
+function findFirstTagBlock(source: string, tag: string): string {
+  const start = new RegExp("<" + tag + "\\b[^>]*>", 'i').exec(source);
+  if (start === null) {
+    return '';
+  }
+
+  const tagPattern = new RegExp("<\\/" + tag + "\\b[^>]*>|<" + tag + "\\b[^>]*>", 'gi');
+  tagPattern.lastIndex = start.index + start[0].length;
+  let depth = 1;
+  let match: RegExpExecArray | null = tagPattern.exec(source);
+  while (match !== null) {
+    if (match[0].indexOf('</') === 0) {
+      depth--;
+      if (depth === 0) {
+        return source.substring(start.index, match.index + match[0].length);
+      }
+    } else if (!/\/>$/.test(match[0])) {
+      depth++;
+    }
+    match = tagPattern.exec(source);
+  }
+  return source.substring(start.index);
+}
+
+function parseFirstLinkText(source: string): string {
+  const link = /<a\b[^>]*>([\s\S]*?)<\/a>/i.exec(source);
+  return link === null ? '' : cleanText(link[1]);
+}
+
+function parseAttribute(source: string, name: string): string {
+  const pattern = new RegExp("\\b" + escapeRegExp(name) + "=[\"']([^\"']*)[\"']", 'i');
+  const match = pattern.exec(source);
+  return match === null ? '' : decodeHtml(match[1]);
+}
+
+function isVoidTag(tag: string): boolean {
+  return tag === 'img' || tag === 'br' || tag === 'hr' || tag === 'input' || tag === 'meta' || tag === 'link';
 }
 
 function parsePages(body: string): number {

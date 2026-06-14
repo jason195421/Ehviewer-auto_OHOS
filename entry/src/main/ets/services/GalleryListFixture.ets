@@ -86,10 +86,52 @@ export const thumbnailListFixture: string = `
   </body>
 </html>`;
 
+export const favoritesListFixture: string = `
+<html>
+  <body>
+    <div class="ido">
+      <div class="fp"><div>1</div><div></div><div>Fav 0</div></div>
+      <div class="fp"><div>0</div><div></div><div>Fav 1</div></div>
+      <div class="fp"><div>0</div><div></div><div>Fav 2</div></div>
+      <div class="fp"><div>0</div><div></div><div>Fav 3</div></div>
+      <div class="fp"><div>0</div><div></div><div>Fav 4</div></div>
+      <div class="fp"><div>0</div><div></div><div>Fav 5</div></div>
+      <div class="fp"><div>0</div><div></div><div>Fav 6</div></div>
+      <div class="fp"><div>0</div><div></div><div>Fav 7</div></div>
+      <div class="fp"><div>0</div><div></div><div>Fav 8</div></div>
+      <div class="fp"><div>0</div><div></div><div>Fav 9</div></div>
+      <div class="fp fps"></div>
+    </div>
+    <table class="itg gltm">
+      <tr>
+        <td class="gl2m">
+          <div class="glthumb">
+            <div><img data-src="https://ehgt.org/fav/thumb.jpg" style="height:120px;width:90px" /></div>
+            <div><div></div><div><div>31 pages</div></div></div>
+          </div>
+          <div id="posted_4392268" style="background-color:rgba(240,160,0,0.25)">2026-06-08 07:15</div>
+        </td>
+        <td class="gl3m glname">
+          <a href="https://e-hentai.org/g/4392268/aff56437fd/"><div class="glink">Favorite Fixture Gallery</div></a>
+        </td>
+        <td class="gl4m">
+          <div class="cn ct3">Artist CG</div>
+          <div class="glhide">
+            <div><a href="https://e-hentai.org/uploader/favorite-user">favorite-user</a></div>
+            <div>31 pages</div>
+          </div>
+          <div class="ir irg" style="background-position:-16px -21px"></div>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
 export const galleryListFixtures: GalleryListFixtureCase[] = [
   { name: 'minimal', html: minimalListFixture, expectedCount: 1 },
   { name: 'extended', html: extendedListFixture, expectedCount: 1 },
-  { name: 'thumbnail', html: thumbnailListFixture, expectedCount: 1 }
+  { name: 'thumbnail', html: thumbnailListFixture, expectedCount: 1 },
+  { name: 'favorites', html: favoritesListFixture, expectedCount: 1 }
 ];
 
 export const galleryListFixture: string = minimalListFixture;
