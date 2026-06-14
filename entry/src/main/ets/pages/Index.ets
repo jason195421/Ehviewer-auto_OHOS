@@ -16,8 +16,10 @@ import { LANGUAGE_REVISION_KEY, STATUS_BAR_HEIGHT_KEY, getAbilityContext, launch
 struct Index {
   @State activeRoute: GalleryRoute = GalleryRoute.Session;
   @State drawerOpen: boolean = false;
+  @State routeVisible: boolean = true;
   @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeight: number = 0;
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
+  private routeSwitchTimer: number = -1;
 
   onBackPress(): boolean {
     if (runActiveBackHandler()) {
@@ -50,6 +52,13 @@ struct Index {
     });
   }
 
+  aboutToDisappear(): void {
+    if (this.routeSwitchTimer >= 0) {
+      clearTimeout(this.routeSwitchTimer);
+      this.routeSwitchTimer = -1;
+    }
+  }
+
   private loadSessionRoute(context: common.UIAbilityContext): void {
     ehCookieStore.load(context).then(() => {
       const signedIn = ehCookieStore.hasCookies();
@@ -69,9 +78,23 @@ struct Index {
     if (this.activeRoute === route) {
       return;
     }
-    this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseInOut }, () => {
+    this.fadeToRoute(route);
+  }
+
+  private fadeToRoute(route: GalleryRoute, drawerOpen?: boolean): void {
+    if (this.routeSwitchTimer >= 0) {
+      clearTimeout(this.routeSwitchTimer);
+      this.routeSwitchTimer = -1;
+    }
+    this.routeVisible = false;
+    this.routeSwitchTimer = setTimeout(() => {
       this.activeRoute = route;
-    });
+      if (drawerOpen !== undefined) {
+        this.drawerOpen = drawerOpen;
+      }
+      this.routeVisible = true;
+      this.routeSwitchTimer = -1;
+    }, 180);
   }
 
   private toggleDrawer(): void {
@@ -101,92 +124,87 @@ struct Index {
         }
 
         Stack() {
-          Column() {
-            if (!usesEmbeddedToolbar(this.activeRoute)) {
-              AppToolbar({
-                title: routeTitle(this.activeRoute),
-                subtitle: routeSubtitle(this.activeRoute),
-                onMenu: () => {
-                  this.toggleDrawer();
-                }
-              })
-            }
-
+          if (this.routeVisible) {
             Column() {
-              if (this.activeRoute === GalleryRoute.Home) {
-                HomeGalleryScene({
+              if (!usesEmbeddedToolbar(this.activeRoute)) {
+                AppToolbar({
+                  title: routeTitle(this.activeRoute),
+                  subtitle: routeSubtitle(this.activeRoute),
                   onMenu: () => {
                     this.toggleDrawer();
-                  }
-                })
-              } else if (this.activeRoute === GalleryRoute.Subscription) {
-                SubscriptionGalleryScene({
-                  onMenu: () => {
-                    this.toggleDrawer();
-                  }
-                })
-              } else if (this.activeRoute === GalleryRoute.WhatsHot) {
-                HotGalleryScene({
-                  onMenu: () => {
-                    this.toggleDrawer();
-                  }
-                })
-              } else if (this.activeRoute === GalleryRoute.TopLists) {
-                TopListScene({
-                  onMenu: () => {
-                    this.toggleDrawer();
-                  }
-                })
-              } else if (this.activeRoute === GalleryRoute.Favorites) {
-                FavoriteGalleryScene({
-                  onMenu: () => {
-                    this.toggleDrawer();
-                  }
-                })
-              } else if (this.activeRoute === GalleryRoute.History) {
-                HistoryScene({
-                  onMenu: () => {
-                    this.toggleDrawer();
-                  }
-                })
-              } else if (this.activeRoute === GalleryRoute.Downloads) {
-                DownloadScene({
-                  onMenu: () => {
-                    this.toggleDrawer();
-                  }
-                })
-              } else if (this.activeRoute === GalleryRoute.Session) {
-                SessionScene({
-                  onSignedIn: () => {
-                    this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseInOut }, () => {
-                      this.activeRoute = this.routeAfterSignIn();
-                      this.drawerOpen = true;
-                    });
-                  }
-                })
-              } else if (this.activeRoute === GalleryRoute.Migration) {
-                MigrationScene()
-              } else {
-                SettingsScene({
-                  onMenu: () => {
-                    this.toggleDrawer();
-                  },
-                  onSignedIn: () => {
-                    this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseInOut }, () => {
-                      this.activeRoute = this.routeAfterSignIn();
-                      this.drawerOpen = false;
-                    });
                   }
                 })
               }
+
+              Column() {
+                if (this.activeRoute === GalleryRoute.Home) {
+                  HomeGalleryScene({
+                    onMenu: () => {
+                      this.toggleDrawer();
+                    }
+                  })
+                } else if (this.activeRoute === GalleryRoute.Subscription) {
+                  SubscriptionGalleryScene({
+                    onMenu: () => {
+                      this.toggleDrawer();
+                    }
+                  })
+                } else if (this.activeRoute === GalleryRoute.WhatsHot) {
+                  HotGalleryScene({
+                    onMenu: () => {
+                      this.toggleDrawer();
+                    }
+                  })
+                } else if (this.activeRoute === GalleryRoute.TopLists) {
+                  TopListScene({
+                    onMenu: () => {
+                      this.toggleDrawer();
+                    }
+                  })
+                } else if (this.activeRoute === GalleryRoute.Favorites) {
+                  FavoriteGalleryScene({
+                    onMenu: () => {
+                      this.toggleDrawer();
+                    }
+                  })
+                } else if (this.activeRoute === GalleryRoute.History) {
+                  HistoryScene({
+                    onMenu: () => {
+                      this.toggleDrawer();
+                    }
+                  })
+                } else if (this.activeRoute === GalleryRoute.Downloads) {
+                  DownloadScene({
+                    onMenu: () => {
+                      this.toggleDrawer();
+                    }
+                  })
+                } else if (this.activeRoute === GalleryRoute.Session) {
+                  SessionScene({
+                    onSignedIn: () => {
+                      this.fadeToRoute(this.routeAfterSignIn(), true);
+                    }
+                  })
+                } else if (this.activeRoute === GalleryRoute.Migration) {
+                  MigrationScene()
+                } else {
+                  SettingsScene({
+                    onMenu: () => {
+                      this.toggleDrawer();
+                    },
+                    onSignedIn: () => {
+                      this.fadeToRoute(this.routeAfterSignIn(), false);
+                    }
+                  })
+                }
+              }
+              .layoutWeight(1)
+              .width('100%')
             }
-            .layoutWeight(1)
             .width('100%')
+            .height('100%')
+            .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
           }
-          .id('route-' + this.activeRoute)
-          .width('100%')
-          .height('100%')
-          .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
         }
         .layoutWeight(1)
         .height('100%')
