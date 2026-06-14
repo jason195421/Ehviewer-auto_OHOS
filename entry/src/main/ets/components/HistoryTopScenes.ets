@@ -18,9 +18,10 @@ import { CacheClearResult, readerImageCache } from '../services/ReaderImageCache
 import { ehSpiderInfoStore } from '../services/EhSpiderInfoStore';
 import { MigrationTask, migrationTasks } from '../services/MigrationStatus';
 import { FilterRule, FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, FILTER_MODE_TAG_NAMESPACE, ehFilterStore } from '../services/EhFilterStore';
-import { APP_THEME_COLOR, LANGUAGE_REVISION_KEY } from '../shared/EhShared';
+import { APP_THEME_COLOR, LANGUAGE_REVISION_KEY, nextFloatingToolbarVisible } from '../shared/EhShared';
 import { EhBackupBundle, DrawerItem, SettingsHeaderItem, SettingsRowItem, SessionMode, SettingsPanel, DRAWER_ITEMS, SETTINGS_HEADERS, STATUS_BAR_HEIGHT_KEY, ON_OFF_OPTIONS, shouldUseChineseUi, uiText, uiValue, uiStatusText, uiPageText, zhText, setActiveBackHandler, runActiveBackHandler, createEmptyGallery, createEmptyDownloadInfo, createDetailFromGallery, createEmptyDetail, createEmptyPreview, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneStringArray, cloneRequiredStringArray, cloneGalleryInfo, cloneGalleryInfos, padTwo, applyGalleryFilters, cloneGalleryTagGroups, cloneGalleryComments, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListItem, cloneTopListBucket, cloneTopListInfo, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, saveDownloadsQuietly, filterDownloadItems, downloadItemMatches, sortDownloadItems, nextDownloadStatusFilter, nextDownloadLabelFilter, nextDownloadSortMode, nextStringOption, nextDownloadState, nextDownloadLabel, downloadLabelName, downloadStateLabel, downloadStateColor, downloadProgressText, downloadSizeText, downloadImageUrlForPage, downloadThreadLimit, downloadPageIndexes, downloadQueueSummary, parseHistoryMaxSize, routeTitle, routeSubtitle, launchRouteFromSetting, settingsPanelTitle, settingsRowsForPanel, optionSettingsRow, textSettingsRow, staticSettingsRow, settingEntryValue, cloneStringOptions, settingMigrationMessage, nextOption, isValidProxyPortText, formatNetworkDiagnostics, listModeForRoute, routeUsesKeyword, usesGallerySearchToolbar, usesEmbeddedToolbar, defaultKeywordForRoute, gallerySearchTitle, currentGallerySite, effectiveListSite, gallerySiteName, galleryListFailureMessage, shouldRetryGalleryListOnE, withGalleryListMessage, readerPageReferer, readerDisplayImageUrl, cacheReaderImageForPage, cacheThumbnailImage, cloneGalleryPageWithCache, readerLocalImageSource, readerZoomSize, readerFullImageWidth, readerFullImageHeight, readerImageFit, readerShortUrl, readerPreloadCount, readerIsRightToLeft, categoryName, categoryColor, ratingText, galleryDisplayTitle, showGalleryPages, galleryListMode, galleryThumbWidth, galleryThumbHeight, galleryRowHeight, galleryTagPreview, detailTitleFontSize, detailTitleMaxLines, detailHeadingFontSize, readerShowProgress, readerShowClock, readerClockText, padTimeNumber, topListChipColor } from '../shared/EhShared';
-import { CommentsScene, FloatingToolbar, GalleryDetailScene, GalleryListRow, GalleryListScene, GalleryListStateView, PlaceholderScene, ReaderScene } from './GalleryScenes';
+import { CommentsScene, GalleryDetailScene, GalleryListRow, GalleryListScene, GalleryListStateView, PlaceholderScene, ReaderScene } from './GalleryScenes';
+import { FloatingToolbar } from './NavigationComponents';
 @Component
 export struct HistoryScene {
   private client: EhHttpClient = new EhHttpClient();
@@ -43,7 +44,6 @@ export struct HistoryScene {
   @State toolbarVisible: boolean = true;
   private historyScroller: Scroller = new Scroller();
   private historyScrollOffset: number = 0;
-  private lastHistoryScrollOffset: number = 0;
   private detailScrollOffset: number = 0;
 
   aboutToAppear(): void {
@@ -213,15 +213,8 @@ export struct HistoryScene {
     });
   }
 
-  private updateToolbarForScroll(offset: number): void {
-    if (offset <= 4) {
-      this.toolbarVisible = true;
-    } else if (offset > this.lastHistoryScrollOffset + 8) {
-      this.toolbarVisible = false;
-    } else if (offset < this.lastHistoryScrollOffset - 8) {
-      this.toolbarVisible = true;
-    }
-    this.lastHistoryScrollOffset = Math.max(0, offset);
+  private updateToolbarForScroll(scrollOffset: number): void {
+    this.toolbarVisible = nextFloatingToolbarVisible(scrollOffset, this.historyScroller.currentOffset().yOffset, this.toolbarVisible);
   }
 
   private cacheReaderImage(index: number, page: GalleryPage): void {
@@ -469,12 +462,14 @@ export struct HistoryScene {
           .onAppear(() => {
             if (this.historyScrollOffset > 0) {
               this.historyScroller.scrollTo({ xOffset: 0, yOffset: this.historyScrollOffset });
-              this.lastHistoryScrollOffset = this.historyScrollOffset;
             }
+          })
+          .onDidScroll((scrollOffset: number, scrollState: ScrollState) => {
+            this.updateToolbarForScroll(scrollOffset);
           })
           .onScrollStop(() => {
             const offset = this.historyScroller.currentOffset().yOffset;
-            this.updateToolbarForScroll(offset);
+            this.toolbarVisible = nextFloatingToolbarVisible(0, offset, this.toolbarVisible);
             this.historyScrollOffset = offset;
           })
         }
@@ -534,7 +529,6 @@ export struct TopListScene {
   @State toolbarVisible: boolean = true;
   private topListScroller: Scroller = new Scroller();
   private topListScrollOffset: number = 0;
-  private lastTopListScrollOffset: number = 0;
   private detailScrollOffset: number = 0;
 
   aboutToAppear(): void {
@@ -856,15 +850,8 @@ export struct TopListScene {
     return this.topList.lists[this.selectedIndex];
   }
 
-  private updateToolbarForScroll(offset: number): void {
-    if (offset <= 4) {
-      this.toolbarVisible = true;
-    } else if (offset > this.lastTopListScrollOffset + 8) {
-      this.toolbarVisible = false;
-    } else if (offset < this.lastTopListScrollOffset - 8) {
-      this.toolbarVisible = true;
-    }
-    this.lastTopListScrollOffset = Math.max(0, offset);
+  private updateToolbarForScroll(scrollOffset: number, contentOffset: number): void {
+    this.toolbarVisible = nextFloatingToolbarVisible(scrollOffset, contentOffset, this.toolbarVisible);
   }
 
   build() {
@@ -1016,8 +1003,8 @@ export struct TopListScene {
                 this.openTopListItem(item, info);
               },
               initialScrollOffset: this.topListScrollOffset,
-              onScrollUpdate: (offset: number) => {
-                this.updateToolbarForScroll(offset);
+              onScrollUpdate: (offset: number, scrollOffset: number) => {
+                this.updateToolbarForScroll(scrollOffset, offset);
                 this.topListScrollOffset = offset;
               }
             })
@@ -1180,7 +1167,7 @@ export struct TopListBoard {
   onOpenBucket: (bucket: TopListBucket) => void = () => {};
   onOpenItem: (item: TopListItem, info: TopListInfo) => void = () => {};
   initialScrollOffset: number = 0;
-  onScrollUpdate: (offset: number) => void = () => {};
+  onScrollUpdate: (offset: number, scrollOffset: number) => void = () => {};
   private boardScroller: Scroller = new Scroller();
 
   build() {
@@ -1205,8 +1192,11 @@ export struct TopListBoard {
         this.boardScroller.scrollTo({ xOffset: 0, yOffset: this.initialScrollOffset });
       }
     })
+    .onDidScroll((scrollOffset: number, scrollState: ScrollState) => {
+      this.onScrollUpdate(this.boardScroller.currentOffset().yOffset, scrollOffset);
+    })
     .onScrollStop(() => {
-      this.onScrollUpdate(this.boardScroller.currentOffset().yOffset);
+      this.onScrollUpdate(this.boardScroller.currentOffset().yOffset, 0);
     })
   }
 }

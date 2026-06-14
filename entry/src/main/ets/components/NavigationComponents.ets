@@ -103,6 +103,27 @@ export struct AppTopBar {
 }
 
 @Component
+export struct FloatingToolbar {
+  visible: boolean = true;
+  barHeight: number = 62;
+  @BuilderParam content: () => void = this.EmptyContent;
+
+  @Builder
+  private EmptyContent() {
+  }
+
+  build() {
+    Column() {
+      this.content()
+    }
+    .width('100%')
+    .translate({ y: this.visible ? 0 : -this.barHeight })
+    .animation({ duration: 180, curve: Curve.EaseOut })
+    .zIndex(10)
+  }
+}
+
+@Component
 export struct DrawerPanel {
   @Prop activeRoute: GalleryRoute = GalleryRoute.Home;
   onSelect: (route: GalleryRoute) => void = () => {};
