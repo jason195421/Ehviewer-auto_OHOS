@@ -75,18 +75,33 @@ export struct DrawerPanel {
   @State signedIn: boolean = false;
   @State downloadSummary: string = 'Downloads: idle';
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
+  private downloadRefreshTimer: number = -1;
 
   aboutToAppear(): void {
     this.signedIn = ehCookieStore.hasCookies();
-    this.downloadSummary = 'Downloads: ' + downloadQueueSummary(ehDownloadStore.getItems());
+    this.refreshDownloadSummary();
     const context = getAbilityContext();
     if (context !== undefined) {
       ehDownloadStore.load(context).then(() => {
-        this.downloadSummary = 'Downloads: ' + downloadQueueSummary(ehDownloadStore.getItems());
+        this.refreshDownloadSummary();
       }).catch(() => {
         this.downloadSummary = 'Downloads: unavailable';
       });
     }
+    this.downloadRefreshTimer = setInterval(() => {
+      this.refreshDownloadSummary();
+    }, 1000);
+  }
+
+  aboutToDisappear(): void {
+    if (this.downloadRefreshTimer >= 0) {
+      clearInterval(this.downloadRefreshTimer);
+      this.downloadRefreshTimer = -1;
+    }
+  }
+
+  private refreshDownloadSummary(): void {
+    this.downloadSummary = 'Downloads: ' + downloadQueueSummary(ehDownloadStore.getItems());
   }
 
   build() {
@@ -110,21 +125,19 @@ export struct DrawerPanel {
       .width('100%')
 
       Column() {
-        Text(this.signedIn ? uiText('Session') : uiText('Guest mode'))
+        Text(uiText('Downloads'))
           .fontSize(12)
           .fontColor('#667085')
-        Text(this.signedIn ? uiText('Cookie session active') : uiText('Open Settings to sign in'))
-          .fontSize(11)
-          .fontColor('#98A2B3')
-          .margin({ top: 4 })
         Text(uiStatusText(this.downloadSummary))
           .fontSize(11)
           .fontColor('#98A2B3')
-          .margin({ top: 4 })
+          .margin({ top: 2 })
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
       .alignItems(HorizontalAlign.Start)
       .width('100%')
-      .padding(14)
+      .padding({ left: 14, right: 14, top: 8, bottom: 8 })
       .backgroundColor('#F8FAFC')
     }
     .width(248)

@@ -750,7 +750,7 @@ export struct SettingsScene {
       return true;
     }
     if (key === 'version') {
-      this.statusText = 'Version: HarmonyOS port target 6.1.0 / API 6.1.1 (24), app version 0.1.7.';
+      this.statusText = 'Version: HarmonyOS port target 6.1.0 / API 6.1.1 (24), app version 0.1.8.';
       return true;
     }
     if (key === 'check_for_updates') {
@@ -1304,32 +1304,20 @@ export struct SettingsHomePanel {
         .onClick(() => {
           this.onMenu();
         })
-        Column() {
-          Text(uiText('Settings'))
-            .fontSize(18)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(Color.White)
-          Text(this.signedIn ? uiText('Signed in') : uiText('Guest mode'))
-            .fontSize(11)
-            .fontColor('rgba(255,255,255,0.7)')
-            .margin({ top: 2 })
-        }
-        .alignItems(HorizontalAlign.Start)
+        Text(uiText('Settings'))
+          .fontSize(18)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Color.White)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .height(38)
+          .padding({ top: 7 })
         .layoutWeight(1)
         .margin({ left: 12 })
-        Text(this.signedIn ? 'EH' : '?')
-          .fontSize(14)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#2F6F8F')
-          .textAlign(TextAlign.Center)
-          .width(36)
-          .height(36)
-          .backgroundColor(Color.White)
-          .borderRadius(18)
       }
       .width('100%')
       .height(60)
-      .padding({ left: 14, right: 14 })
+      .padding({ left: 14, right: 16 })
       .alignItems(VerticalAlign.Center)
       .backgroundColor('#2F6F8F')
 
@@ -1366,16 +1354,6 @@ export struct SettingsHeaderRow {
 
   build() {
     Row() {
-      Text(this.item.icon)
-        .fontSize(14)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(Color.White)
-        .textAlign(TextAlign.Center)
-        .width(36)
-        .height(36)
-        .backgroundColor('#2F6F8F')
-        .borderRadius(18)
-        .padding({ top: 9 })
       Column() {
         Text(uiText(this.item.title))
           .fontSize(15)
@@ -1390,7 +1368,6 @@ export struct SettingsHeaderRow {
       }
       .alignItems(HorizontalAlign.Start)
       .layoutWeight(1)
-      .margin({ left: 12 })
       Text('>')
         .fontSize(16)
         .fontColor('#98A2B3')
