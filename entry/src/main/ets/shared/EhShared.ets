@@ -1130,6 +1130,36 @@ export function downloadStateColor(state: DownloadState): string {
   return '#667085';
 }
 
+export const APP_THEME_COLOR: string = '#2F6F8F';
+
+function clampColorChannel(value: number): number {
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function hexChannel(value: number): string {
+  const hex = clampColorChannel(value).toString(16).toUpperCase();
+  return hex.length === 1 ? '0' + hex : hex;
+}
+
+function parseHexChannel(color: string, start: number): number {
+  const parsed = Number.parseInt(color.substring(start, start + 2), 16);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+export function mixHexColor(from: string, to: string, amount: number): string {
+  const source = from.length >= 7 && from.charAt(0) === '#' ? from : APP_THEME_COLOR;
+  const target = to.length >= 7 && to.charAt(0) === '#' ? to : '#FFFFFF';
+  const ratio = Math.max(0, Math.min(1, amount));
+  const r = parseHexChannel(source, 1) + (parseHexChannel(target, 1) - parseHexChannel(source, 1)) * ratio;
+  const g = parseHexChannel(source, 3) + (parseHexChannel(target, 3) - parseHexChannel(source, 3)) * ratio;
+  const b = parseHexChannel(source, 5) + (parseHexChannel(target, 5) - parseHexChannel(source, 5)) * ratio;
+  return '#' + hexChannel(r) + hexChannel(g) + hexChannel(b);
+}
+
+export function themeSurfaceColor(amount: number = 0.88): string {
+  return mixHexColor(APP_THEME_COLOR, '#FFFFFF', amount);
+}
+
 export function downloadProgressText(item: DownloadInfo): string {
   const total = item.total > 0 ? item.total : item.pages;
   if (total <= 0) {
@@ -1351,7 +1381,7 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
       staticSettingsRow('latest_release', 'Latest release', 'GitHub releases URL from original settings', 'Link', 'url'),
       staticSettingsRow('issue_help', 'Issue help', 'Issue guide URL from original settings', 'Link', 'url'),
       staticSettingsRow('license', 'License', 'Open-source license view', 'GPL', 'activity'),
-      staticSettingsRow('version', 'Version', 'HarmonyOS port workspace version', '0.1.11', 'version'),
+      staticSettingsRow('version', 'Version', 'HarmonyOS port workspace version', '0.1.12', 'version'),
       staticSettingsRow('check_for_updates', 'Check for updates', 'Original AppUpdater entry', 'Open', 'action'),
       optionSettingsRow('close_auto_updates', 'Close automatic updates', 'Disable startup update check', entries, ON_OFF_OPTIONS),
       staticSettingsRow('donate', 'Donate', 'Original donation entry', 'Not migrated', 'url')
