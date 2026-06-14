@@ -104,8 +104,8 @@ export struct AppTopBar {
 
 @Component
 export struct FloatingToolbar {
-  visible: boolean = true;
-  barHeight: number = 62;
+  @Prop visible: boolean = true;
+  @Prop barHeight: number = 62;
   @BuilderParam content: () => void = this.EmptyContent;
 
   @Builder

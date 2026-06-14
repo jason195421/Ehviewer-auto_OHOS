@@ -720,6 +720,7 @@ export struct GalleryListContent {
   @State toolbarVisible: boolean = true;
   private listScroller: Scroller = new Scroller();
   private loadMorePending: boolean = false;
+  private lastListContentOffset: number = 0;
 
   private triggerLoadMoreIfNear(last: number): void {
     if (this.isLoadingMore || this.loadMorePending) {
@@ -735,6 +736,12 @@ export struct GalleryListContent {
 
   private updateToolbarForScroll(scrollOffset: number): void {
     this.toolbarVisible = nextFloatingToolbarVisible(scrollOffset, this.listScroller.currentOffset().yOffset, this.toolbarVisible);
+  }
+
+  private updateToolbarFromCurrentOffset(): void {
+    const offset = this.listScroller.currentOffset().yOffset;
+    this.toolbarVisible = nextFloatingToolbarVisible(offset - this.lastListContentOffset, offset, this.toolbarVisible);
+    this.lastListContentOffset = offset;
   }
 
   build() {
@@ -775,6 +782,7 @@ export struct GalleryListContent {
           .onAppear(() => {
             if (this.initialScrollOffset > 0) {
               this.listScroller.scrollTo({ xOffset: 0, yOffset: this.initialScrollOffset });
+              this.lastListContentOffset = this.initialScrollOffset;
             }
           })
           .onDidScroll((scrollOffset: number, scrollState: ScrollState) => {
@@ -786,6 +794,7 @@ export struct GalleryListContent {
             this.onScrollUpdate(offset);
           })
           .onScrollIndex((first: number, last: number) => {
+            this.updateToolbarFromCurrentOffset();
             this.triggerLoadMoreIfNear(last);
           })
         }

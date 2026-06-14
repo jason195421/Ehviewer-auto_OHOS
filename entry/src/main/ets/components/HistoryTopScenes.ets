@@ -44,6 +44,7 @@ export struct HistoryScene {
   @State toolbarVisible: boolean = true;
   private historyScroller: Scroller = new Scroller();
   private historyScrollOffset: number = 0;
+  private lastHistoryContentOffset: number = 0;
   private detailScrollOffset: number = 0;
 
   aboutToAppear(): void {
@@ -215,6 +216,12 @@ export struct HistoryScene {
 
   private updateToolbarForScroll(scrollOffset: number): void {
     this.toolbarVisible = nextFloatingToolbarVisible(scrollOffset, this.historyScroller.currentOffset().yOffset, this.toolbarVisible);
+  }
+
+  private updateToolbarFromHistoryOffset(): void {
+    const offset = this.historyScroller.currentOffset().yOffset;
+    this.toolbarVisible = nextFloatingToolbarVisible(offset - this.lastHistoryContentOffset, offset, this.toolbarVisible);
+    this.lastHistoryContentOffset = offset;
   }
 
   private cacheReaderImage(index: number, page: GalleryPage): void {
@@ -462,6 +469,7 @@ export struct HistoryScene {
           .onAppear(() => {
             if (this.historyScrollOffset > 0) {
               this.historyScroller.scrollTo({ xOffset: 0, yOffset: this.historyScrollOffset });
+              this.lastHistoryContentOffset = this.historyScrollOffset;
             }
           })
           .onDidScroll((scrollOffset: number, scrollState: ScrollState) => {
@@ -469,7 +477,7 @@ export struct HistoryScene {
           })
           .onScrollStop(() => {
             const offset = this.historyScroller.currentOffset().yOffset;
-            this.toolbarVisible = nextFloatingToolbarVisible(0, offset, this.toolbarVisible);
+            this.updateToolbarFromHistoryOffset();
             this.historyScrollOffset = offset;
           })
         }
