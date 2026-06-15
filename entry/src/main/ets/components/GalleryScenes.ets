@@ -1251,7 +1251,11 @@ export struct GalleryListRow {
   }
 
   private cardGap(): number {
-    return 7;
+    return 6;
+  }
+
+  private metaGap(): number {
+    return 2;
   }
 
   private titleMaxLines(): number {
@@ -1259,14 +1263,24 @@ export struct GalleryListRow {
   }
 
   private hasTags(): boolean {
-    return galleryListMode() === 'Extended' && this.gallery.simpleTags !== undefined && this.gallery.simpleTags.length > 0;
+    return galleryListMode() === 'Extended' && this.previewTags().length > 0;
   }
 
   private previewTags(): string[] {
     if (this.gallery.simpleTags === undefined) {
       return [];
     }
-    return this.gallery.simpleTags.slice(0, 6);
+    const tags: string[] = [];
+    for (let i = 0; i < this.gallery.simpleTags.length; i++) {
+      const normalized = this.gallery.simpleTags[i].toLowerCase();
+      if (normalized.indexOf('language:') !== 0) {
+        tags.push(this.gallery.simpleTags[i]);
+      }
+      if (tags.length >= 6) {
+        break;
+      }
+    }
+    return tags;
   }
 
   private readPageText(): string {
@@ -1311,71 +1325,71 @@ export struct GalleryListRow {
         .height('100%')
 
       Column() {
+        Column() {
+          Text(galleryDisplayTitle(this.gallery))
+            .fontSize(15)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#17202A')
+            .maxLines(this.titleMaxLines())
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .width('100%')
+
+          Text(this.gallery.uploader === undefined || this.gallery.uploader.length === 0 ? uiText('unknown uploader') :
+            this.gallery.uploader)
+            .fontSize(12)
+            .fontColor('#667085')
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .margin({ top: 3 })
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+
         Row() {
           Column() {
-            Text(galleryDisplayTitle(this.gallery))
-              .fontSize(15)
-              .fontWeight(FontWeight.Medium)
-              .fontColor('#17202A')
-              .maxLines(this.titleMaxLines())
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-              .width('100%')
+            Row() {
+              Text(this.languageText())
+                .fontSize(13)
+                .fontColor('#40566F')
+                .fontWeight(FontWeight.Medium)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+              if (showGalleryPages()) {
+                Text(this.readPageText())
+                  .fontSize(13)
+                  .fontColor('#40566F')
+                  .fontWeight(FontWeight.Medium)
+                  .margin({ left: 8 })
+              }
+            }
+            .width('100%')
 
-            Text(this.gallery.uploader === undefined || this.gallery.uploader.length === 0 ? uiText('unknown uploader') :
-              this.gallery.uploader)
-              .fontSize(12)
-              .fontColor('#667085')
+            Text(this.gallery.posted === undefined ? '' : this.gallery.posted)
+              .fontSize(13)
+              .fontColor('#98A2B3')
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
-              .margin({ top: 3 })
+              .margin({ top: this.metaGap() })
           }
-          .layoutWeight(1)
           .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
 
           Column() {
             Rating({ rating: this.gallery.rating, indicator: true })
               .stars(5)
               .stepSize(0.5)
-              .height(16)
-              .width(82)
+              .height(14)
+              .width(74)
+            CategoryBadge({ category: this.gallery.category })
+              .margin({ top: 1 })
           }
           .alignItems(HorizontalAlign.End)
           .margin({ left: 8 })
         }
         .width('100%')
-        .layoutWeight(1)
-
-        Row() {
-          Text(this.languageText())
-            .fontSize(13)
-            .fontColor('#40566F')
-            .fontWeight(FontWeight.Medium)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-          if (showGalleryPages()) {
-            Text(this.readPageText())
-              .fontSize(13)
-              .fontColor('#40566F')
-              .fontWeight(FontWeight.Medium)
-              .margin({ left: 8 })
-          }
-        }
-        .width('100%')
-        .margin({ top: this.cardGap() })
-
-        Row() {
-          Text(this.gallery.posted === undefined ? '' : this.gallery.posted)
-            .fontSize(13)
-            .fontColor('#98A2B3')
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .layoutWeight(1)
-          CategoryBadge({ category: this.gallery.category })
-            .margin({ left: 8 })
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Center)
-        .margin({ top: this.cardGap() })
+        .alignItems(VerticalAlign.Bottom)
+        .margin({ top: this.metaGap() })
 
         if (this.hasTags()) {
           Flex({ wrap: FlexWrap.Wrap }) {
@@ -1391,7 +1405,7 @@ export struct GalleryListRow {
           .width('100%')
           .height(21)
           .clip(true)
-          .margin({ top: this.cardGap() })
+          .margin({ top: this.metaGap() })
         }
       }
       .height('100%')
