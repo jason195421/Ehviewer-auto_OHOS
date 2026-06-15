@@ -761,10 +761,36 @@ export struct GalleryListContent {
     if (availableWidth <= 0 || Number.isNaN(availableWidth)) {
       return this.galleryCardPreferredWidth();
     }
+    const columns = this.galleryColumnCount();
+    const gap = this.galleryCardGap();
+    return Math.floor((availableWidth - gap * (columns - 1)) / columns);
+  }
+
+  private galleryColumnCount(): number {
+    const availableWidth = Math.max(0, this.contentWidth - this.galleryContentPadding() * 2);
+    if (availableWidth <= 0 || Number.isNaN(availableWidth)) {
+      return 1;
+    }
     const preferred = this.galleryCardPreferredWidth();
     const gap = this.galleryCardGap();
-    const columns = Math.max(1, Math.floor((availableWidth + gap) / (preferred + gap)));
-    return Math.floor((availableWidth - gap * columns) / columns);
+    return Math.max(1, Math.floor((availableWidth + gap) / (preferred + gap)));
+  }
+
+  private galleryCardRightMargin(index: number): number {
+    return (index + 1) % this.galleryColumnCount() === 0 ? 0 : this.galleryCardGap();
+  }
+
+  private updateContentWidth(width: number): void {
+    if (width <= 0 || Number.isNaN(width) || this.contentWidth === width) {
+      return;
+    }
+    if (this.contentWidth <= 0) {
+      this.contentWidth = width;
+      return;
+    }
+    this.getUIContext().animateTo({ duration: 220, curve: Curve.EaseInOut }, () => {
+      this.contentWidth = width;
+    });
   }
 
   build() {
@@ -798,16 +824,18 @@ export struct GalleryListContent {
           Scroll(this.listScroller) {
             Column() {
               Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
-                ForEach(this.galleries, (gallery: GalleryInfo) => {
+                ForEach(this.galleries, (gallery: GalleryInfo, index: number) => {
                   if (galleryListMode() === 'Thumb') {
                     GalleryThumbCard({ gallery: gallery })
                       .width(this.galleryCardWidth())
-                      .margin({ right: this.galleryCardGap(), bottom: this.galleryCardGap() })
+                      .margin({ right: this.galleryCardRightMargin(index), bottom: this.galleryCardGap() })
+                      .animation({ duration: 220, curve: Curve.EaseInOut })
                       .onClick(() => { this.onSelectGallery(gallery); })
                   } else {
                     GalleryListRow({ gallery: gallery })
                       .width(this.galleryCardWidth())
-                      .margin({ right: this.galleryCardGap(), bottom: this.galleryCardGap() })
+                      .margin({ right: this.galleryCardRightMargin(index), bottom: this.galleryCardGap() })
+                      .animation({ duration: 220, curve: Curve.EaseInOut })
                       .onClick(() => { this.onSelectGallery(gallery); })
                   }
                 }, (gallery: GalleryInfo) => gallery.gid.toString() + ':' + this.renderVersion.toString())
@@ -842,7 +870,7 @@ export struct GalleryListContent {
         .width('100%')
         .height('100%')
         .onAreaChange((oldArea: Area, newArea: Area) => {
-          this.contentWidth = newArea.width as number;
+          this.updateContentWidth(newArea.width as number);
         })
       }
 
