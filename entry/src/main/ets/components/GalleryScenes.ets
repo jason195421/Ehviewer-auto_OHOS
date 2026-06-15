@@ -845,7 +845,7 @@ export struct GalleryListContent {
     if (this.isLoadingMore || this.loadMorePending) {
       return;
     }
-    if (this.galleries.length > 0 && last >= this.galleries.length - 8) {
+    if (this.galleries.length > 0 && last >= this.galleries.length - 12) {
       this.loadMorePending = true;
       this.onLoadMore();
       // Reset local guard after one frame so rapid scroll events don't queue duplicates
@@ -858,7 +858,8 @@ export struct GalleryListContent {
     const rows = Math.ceil(this.galleries.length / columns);
     const cardHeight = galleryListMode() === 'Thumb' ? Math.max(0, this.galleryCardWidth() / 0.75 + 54) :
       galleryThumbHeight();
-    return this.toolbarHeight() + rows * (cardHeight + this.galleryCardGap()) + this.galleryContentPadding();
+    return this.toolbarHeight() + rows * cardHeight + Math.max(0, rows - 1) * this.galleryCardGap() +
+      this.galleryContentPadding();
   }
 
   private triggerLoadMoreByOffset(offset: number): void {
@@ -866,7 +867,7 @@ export struct GalleryListContent {
       return;
     }
     const remaining = this.estimateContentHeight() - offset - this.viewportHeight;
-    if (remaining <= Math.max(420, this.viewportHeight * 0.8)) {
+    if (remaining <= Math.max(720, this.viewportHeight * 1.3)) {
       this.triggerLoadMoreIfNear(this.galleries.length);
     }
   }
@@ -1040,7 +1041,7 @@ export struct GalleryListContent {
               this.triggerLoadMoreIfNear(this.galleries.length);
             })
           }
-          .refreshOffset(this.toolbarHeight())
+          .refreshOffset(36)
           .pullToRefresh(true)
           .onRefreshing(() => {
             this.refreshFromPull();
@@ -1073,14 +1074,14 @@ export struct GalleryListContent {
 
       if (this.refreshHintVisible) {
         Row() {
-          LoadingProgress().width(18).height(18).color('#2F6F8F')
+          LoadingProgress().width(20).height(20).color('#2F6F8F')
           Text(uiText('Refreshing')).fontSize(12).fontColor('#2F6F8F').margin({ left: 6 })
         }
-        .height(32)
+        .height(34)
         .padding({ left: 12, right: 12 })
         .backgroundColor('#E6F0F5')
         .borderRadius(16)
-        .margin({ bottom: 56, right: 18 })
+        .position({ x: 14, y: Math.max(8, this.toolbarHeight() + this.toolbarOffsetY + 8) })
       }
 
       QuickActionColumn({
