@@ -938,7 +938,8 @@ export struct GalleryListContent {
   }
 
   build() {
-    Refresh({ refreshing: $$this.refreshing }) {
+    HdsNavigation() {
+      Refresh({ refreshing: $$this.refreshing }) {
       Scroll(this.listScroller) {
         Column() {
           Column() {
@@ -1051,6 +1052,26 @@ export struct GalleryListContent {
   }
 })
 .backgroundColor('#F3F5F7')
+    }
+    .titleBar({
+      content: {
+        bottomBuilder: {
+          builder: (): void => this.SearchToolbarContent(),
+          height: 62,
+          showType: BottomBuilderShowType.DIRECTLY_SHOW
+        }
+      },
+      enableComponentSafeArea: true,
+    })
+    .hideBackButton(true)
+    .titleMode(HdsNavigationTitleMode.MINI)
+    .bindToScrollable([this.listScroller])
+    .dynamicHideTitleBar({
+      hideTitleArea: true,
+      hideBottomBuilder: true,
+      hideStatusBar: false,
+      mode: HideMode.SCROLL_UP_TO
+    })
   }
   @Builder
   private SearchToolbarContent() {
