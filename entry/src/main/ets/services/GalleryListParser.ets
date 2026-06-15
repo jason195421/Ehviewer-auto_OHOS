@@ -215,17 +215,20 @@ function parseGalleryInfo(row: string, displayMode: GalleryListDisplayMode): Gal
   }
 
   const posted = parsePosted(row, gid);
+  const title = parseTitle(row);
+  const simpleTags = parseSimpleTags(row);
   return {
     gid: gid,
     token: link[2],
-    title: parseTitle(row),
+    title: title,
     thumb: parseThumb(row),
     category: parseCategory(row),
     posted: posted.text,
     uploader: parseUploader(row, displayMode),
     rating: parseRating(row),
     rated: parseRated(row),
-    simpleTags: parseSimpleTags(row),
+    simpleLanguage: parseSimpleLanguage(simpleTags, title),
+    simpleTags: simpleTags,
     pages: parseItemPages(row),
     thumbWidth: parseThumbWidth(row),
     thumbHeight: parseThumbHeight(row),
@@ -366,6 +369,39 @@ function parseSimpleTags(row: string): string[] {
     match = pattern.exec(row);
   }
   return tags;
+}
+
+function parseSimpleLanguage(tags: string[], title: string): string | undefined {
+  const knownLanguages: string[] = [
+    'english',
+    'chinese',
+    'spanish',
+    'korean',
+    'russian',
+    'french',
+    'portuguese',
+    'thai',
+    'german',
+    'italian',
+    'vietnamese',
+    'polish',
+    'hungarian',
+    'dutch'
+  ];
+  for (let i = 0; i < tags.length; i++) {
+    const tag = tags[i].toLowerCase();
+    if (tag.indexOf('language:') === 0) {
+      return tags[i].substring(tags[i].indexOf(':') + 1);
+    }
+  }
+
+  const titleText = title.toLowerCase();
+  for (let i = 0; i < knownLanguages.length; i++) {
+    if (titleText.indexOf(knownLanguages[i]) >= 0) {
+      return knownLanguages[i];
+    }
+  }
+  return undefined;
 }
 
 function parseTagList(row: string): string[] {

@@ -1120,6 +1120,25 @@ export struct GalleryListRow {
     return galleryThumbHeight();
   }
 
+  private cardGap(): number {
+    return 7;
+  }
+
+  private titleMaxLines(): number {
+    return galleryListMode() === 'Extended' ? 2 : 3;
+  }
+
+  private hasTags(): boolean {
+    return galleryListMode() === 'Extended' && this.gallery.simpleTags !== undefined && this.gallery.simpleTags.length > 0;
+  }
+
+  private previewTags(): string[] {
+    if (this.gallery.simpleTags === undefined) {
+      return [];
+    }
+    return this.gallery.simpleTags.slice(0, 6);
+  }
+
   private readPageText(): string {
     const readIndex = ehHistoryStore.getReadPage(this.gallery.gid);
     const readPages = readIndex >= 0 ? Math.min(this.gallery.pages, readIndex + 1) : 0;
@@ -1143,6 +1162,14 @@ export struct GalleryListRow {
     return colors[index % colors.length];
   }
 
+  private tagDisplayText(tag: string): string {
+    const colon = tag.indexOf(':');
+    if (colon >= 0 && colon < tag.length - 1) {
+      return tag.substring(colon + 1);
+    }
+    return tag;
+  }
+
   build() {
     Row() {
       GalleryThumb({
@@ -1160,7 +1187,7 @@ export struct GalleryListRow {
               .fontSize(15)
               .fontWeight(FontWeight.Medium)
               .fontColor('#17202A')
-              .maxLines(galleryListMode() === 'Extended' ? 1 : 2)
+              .maxLines(this.titleMaxLines())
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .width('100%')
 
@@ -1171,31 +1198,6 @@ export struct GalleryListRow {
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .margin({ top: 3 })
-
-            Row() {
-              Text(this.languageText())
-                .fontSize(13)
-                .fontColor('#40566F')
-                .fontWeight(FontWeight.Medium)
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-              if (showGalleryPages()) {
-                Text(this.readPageText())
-                  .fontSize(13)
-                  .fontColor('#40566F')
-                  .fontWeight(FontWeight.Medium)
-                  .margin({ left: 8 })
-              }
-            }
-            .width('100%')
-            .margin({ top: 5 })
-
-            Text(this.gallery.posted === undefined ? '' : this.gallery.posted)
-              .fontSize(13)
-              .fontColor('#98A2B3')
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-              .margin({ top: 2 })
           }
           .layoutWeight(1)
           .alignItems(HorizontalAlign.Start)
@@ -1206,8 +1208,6 @@ export struct GalleryListRow {
               .stepSize(0.5)
               .height(16)
               .width(82)
-            CategoryBadge({ category: this.gallery.category })
-              .margin({ top: 6 })
           }
           .alignItems(HorizontalAlign.End)
           .margin({ left: 8 })
@@ -1215,25 +1215,58 @@ export struct GalleryListRow {
         .width('100%')
         .layoutWeight(1)
 
-        if (galleryListMode() === 'Extended' && this.gallery.simpleTags !== undefined && this.gallery.simpleTags.length > 0) {
+        Row() {
+          Text(this.languageText())
+            .fontSize(13)
+            .fontColor('#40566F')
+            .fontWeight(FontWeight.Medium)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          if (showGalleryPages()) {
+            Text(this.readPageText())
+              .fontSize(13)
+              .fontColor('#40566F')
+              .fontWeight(FontWeight.Medium)
+              .margin({ left: 8 })
+          }
+        }
+        .width('100%')
+        .margin({ top: this.cardGap() })
+
+        Row() {
+          Text(this.gallery.posted === undefined ? '' : this.gallery.posted)
+            .fontSize(13)
+            .fontColor('#98A2B3')
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .layoutWeight(1)
+          CategoryBadge({ category: this.gallery.category })
+            .margin({ left: 8 })
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Center)
+        .margin({ top: this.cardGap() })
+
+        if (this.hasTags()) {
           Flex({ wrap: FlexWrap.Wrap }) {
-            ForEach(this.gallery.simpleTags.slice(0, 6), (tag: string, index: number) => {
+            ForEach(this.previewTags(), (tag: string, index: number) => {
               GalleryTagChip({
-                text: tag,
+                text: this.tagDisplayText(tag),
                 backgroundColorValue: this.tagColor(index),
                 color: this.tagTextColor(index)
               })
-                .margin({ right: 4, top: 4 })
+                .margin({ right: 4 })
             }, (tag: string, index: number) => tag + ':' + index.toString())
           }
           .width('100%')
-          .height(25)
+          .height(21)
           .clip(true)
+          .margin({ top: this.cardGap() })
         }
       }
       .height('100%')
       .layoutWeight(1)
-      .padding({ left: 10, right: 8, top: 7, bottom: 7 })
+      .padding({ left: 10, right: 8, top: this.cardGap(), bottom: this.cardGap() })
       .alignItems(HorizontalAlign.Start)
     }
     .width('100%')
