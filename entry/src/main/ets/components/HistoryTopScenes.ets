@@ -44,6 +44,7 @@ export struct HistoryScene {
   @State toolbarOffsetY: number = 0;
   private historyScroller: Scroller = new Scroller();
   private historyScrollOffset: number = 0;
+  private historyToolbarScrollOffset: number = 0;
   private detailScrollOffset: number = 0;
 
   aboutToAppear(): void {
@@ -213,9 +214,11 @@ export struct HistoryScene {
     });
   }
 
-  private updateToolbarForScroll(scrollOffset: number): void {
+  private updateToolbarForScroll(): void {
     const offset = this.historyScroller.currentOffset().yOffset;
-    this.toolbarOffsetY = nextFloatingToolbarOffset(this.toolbarOffsetY, scrollOffset, offset, 62);
+    const delta = offset - this.historyToolbarScrollOffset;
+    this.toolbarOffsetY = nextFloatingToolbarOffset(this.toolbarOffsetY, delta, offset, 62);
+    this.historyToolbarScrollOffset = offset;
   }
 
   private cacheReaderImage(index: number, page: GalleryPage): void {
@@ -466,7 +469,7 @@ export struct HistoryScene {
             }
           })
           .onDidScroll((scrollOffset: number, scrollState: ScrollState) => {
-            this.updateToolbarForScroll(scrollOffset);
+            this.updateToolbarForScroll();
           })
           .onScrollStop(() => {
             const offset = this.historyScroller.currentOffset().yOffset;
@@ -474,6 +477,7 @@ export struct HistoryScene {
               this.toolbarOffsetY = 0;
             }
             this.historyScrollOffset = offset;
+            this.historyToolbarScrollOffset = offset;
           })
         }
 
@@ -532,6 +536,7 @@ export struct TopListScene {
   @State toolbarOffsetY: number = 0;
   private topListScroller: Scroller = new Scroller();
   private topListScrollOffset: number = 0;
+  private topListToolbarScrollOffset: number = 0;
   private detailScrollOffset: number = 0;
 
   aboutToAppear(): void {
@@ -853,8 +858,10 @@ export struct TopListScene {
     return this.topList.lists[this.selectedIndex];
   }
 
-  private updateToolbarForScroll(scrollOffset: number, contentOffset: number): void {
-    this.toolbarOffsetY = nextFloatingToolbarOffset(this.toolbarOffsetY, scrollOffset, contentOffset, 62);
+  private updateToolbarForScroll(contentOffset: number): void {
+    const delta = contentOffset - this.topListToolbarScrollOffset;
+    this.toolbarOffsetY = nextFloatingToolbarOffset(this.toolbarOffsetY, delta, contentOffset, 62);
+    this.topListToolbarScrollOffset = contentOffset;
   }
 
   build() {
@@ -1000,6 +1007,8 @@ export struct TopListScene {
                 }
                 this.selectedIndex = index;
                 this.topListScrollOffset = 0;
+                this.topListToolbarScrollOffset = 0;
+                this.toolbarOffsetY = 0;
                 this.renderVersion++;
               },
               onOpenBucket: (bucket: TopListBucket) => {
@@ -1010,7 +1019,7 @@ export struct TopListScene {
               },
               initialScrollOffset: this.topListScrollOffset,
               onScrollUpdate: (offset: number, scrollOffset: number) => {
-                this.updateToolbarForScroll(scrollOffset, offset);
+                this.updateToolbarForScroll(offset);
                 this.topListScrollOffset = offset;
               }
             })

@@ -19,7 +19,7 @@ import { ehSpiderInfoStore } from '../services/EhSpiderInfoStore';
 import { MigrationTask, migrationTasks } from '../services/MigrationStatus';
 import { FilterRule, FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, FILTER_MODE_TAG_NAMESPACE, ehFilterStore } from '../services/EhFilterStore';
 import { FloatingToolbar } from './NavigationComponents';
-import { APP_THEME_COLOR, LANGUAGE_REVISION_KEY, themeSurfaceColor } from '../shared/EhShared';
+import { APP_THEME_COLOR, LANGUAGE_REVISION_KEY, nextFloatingToolbarOffset, themeSurfaceColor } from '../shared/EhShared';
 import { EhBackupBundle, DrawerItem, SettingsHeaderItem, SettingsRowItem, SessionMode, SettingsPanel, DRAWER_ITEMS, SETTINGS_HEADERS, STATUS_BAR_HEIGHT_KEY, ON_OFF_OPTIONS, shouldUseChineseUi, uiText, uiValue, uiStatusText, uiPageText, zhText, setActiveBackHandler, runActiveBackHandler, createEmptyGallery, createEmptyDownloadInfo, createDetailFromGallery, createEmptyDetail, createEmptyPreview, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneStringArray, cloneRequiredStringArray, cloneGalleryInfo, cloneGalleryInfos, padTwo, applyGalleryFilters, cloneGalleryTagGroups, cloneGalleryComments, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListItem, cloneTopListBucket, cloneTopListInfo, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, saveDownloadsQuietly, filterDownloadItems, downloadItemMatches, sortDownloadItems, nextDownloadStatusFilter, nextDownloadLabelFilter, nextDownloadSortMode, nextStringOption, nextDownloadState, nextDownloadLabel, downloadLabelName, downloadStateLabel, downloadStateColor, downloadProgressText, downloadSizeText, downloadImageUrlForPage, downloadThreadLimit, downloadPageIndexes, downloadQueueSummary, parseHistoryMaxSize, routeTitle, routeSubtitle, launchRouteFromSetting, settingsPanelTitle, settingsRowsForPanel, optionSettingsRow, textSettingsRow, staticSettingsRow, settingEntryValue, cloneStringOptions, settingMigrationMessage, nextOption, isValidProxyPortText, formatNetworkDiagnostics, listModeForRoute, routeUsesKeyword, usesGallerySearchToolbar, usesEmbeddedToolbar, defaultKeywordForRoute, gallerySearchTitle, currentGallerySite, effectiveListSite, gallerySiteName, galleryListFailureMessage, shouldRetryGalleryListOnE, withGalleryListMessage, readerPageReferer, readerDisplayImageUrl, cacheReaderImageForPage, cacheThumbnailImage, cloneGalleryPageWithCache, readerLocalImageSource, readerZoomSize, readerFullImageWidth, readerFullImageHeight, readerImageFit, readerShortUrl, readerPreloadCount, readerIsRightToLeft, categoryName, categoryColor, ratingText, galleryDisplayTitle, showGalleryPages, galleryListMode, galleryThumbWidth, galleryThumbHeight, galleryRowHeight, galleryTagPreview, detailTitleFontSize, detailTitleMaxLines, detailHeadingFontSize, readerShowProgress, readerShowClock, readerClockText, padTimeNumber, topListChipColor } from '../shared/EhShared';
 @Component
 export struct HomeGalleryScene {
@@ -115,9 +115,17 @@ export struct GalleryListScene {
   @State readerPreviewIndex: number = 0;
   @State renderVersion: number = 0;
   @State isLoadingMore: boolean = false;
+  @State toolbarOffsetY: number = 0;
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
   private listScrollOffset: number = 0;
   private detailScrollOffset: number = 0;
+
+  private updateToolbarForScroll(offset: number): void {
+    const delta = offset - this.listScrollOffset;
+    this.toolbarOffsetY = nextFloatingToolbarOffset(this.toolbarOffsetY, delta, offset,
+      this.requestUrl.length > 0 ? 88 : 62);
+    this.listScrollOffset = offset;
+  }
 
   aboutToAppear(): void {
     this.keyword = this.initialKeyword.length > 0 ? this.initialKeyword : defaultKeywordForRoute(this.sourceRoute);
@@ -641,6 +649,7 @@ export struct GalleryListScene {
           statusText: this.statusText,
           requestUrl: this.requestUrl,
           isLoadingMore: this.isLoadingMore,
+          toolbarOffsetY: this.toolbarOffsetY,
           galleries: this.galleries,
           onKeywordChange: (value: string) => {
             this.keyword = value;
@@ -677,7 +686,7 @@ export struct GalleryListScene {
           },
           initialScrollOffset: this.listScrollOffset,
           onScrollUpdate: (offset: number) => {
-            this.listScrollOffset = offset;
+            this.updateToolbarForScroll(offset);
           }
         })
       }
@@ -702,6 +711,7 @@ export struct GalleryListContent {
   @Prop statusText: string = '';
   @Prop requestUrl: string = '';
   @Prop isLoadingMore: boolean = false;
+  @Prop toolbarOffsetY: number = 0;
   @Prop galleries: GalleryInfo[] = [];
   onKeywordChange: (value: string) => void = () => {};
   onMenu: () => void = () => {};
@@ -731,6 +741,10 @@ export struct GalleryListContent {
     }
   }
 
+  private toolbarHeight(): number {
+    return this.requestUrl.length > 0 ? 88 : 62;
+  }
+
   build() {
     Stack({ alignContent: Alignment.BottomEnd }) {
       Stack({ alignContent: Alignment.TopStart }) {
@@ -745,24 +759,10 @@ export struct GalleryListContent {
           }
           .width('100%')
           .height('100%')
-          .padding({ top: this.requestUrl.length > 0 ? 88 : 62 })
+          .padding({ top: this.toolbarHeight() })
         } else {
           Scroll(this.listScroller) {
             Column() {
-              SearchBarCard({
-                keyword: this.keyword,
-                title: this.searchTitle,
-                searchActive: this.searchActive,
-                filterActive: this.filterActive,
-                requestUrl: this.requestUrl,
-                onKeywordChange: this.onKeywordChange,
-                onMenu: this.onMenu,
-                onToggleSearch: this.onToggleSearch,
-                onSearch: this.onSearch
-              })
-                .width('100%')
-                .margin({ bottom: 8 })
-
               Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
                 ForEach(this.galleries, (gallery: GalleryInfo) => {
                   if (galleryListMode() === 'Thumb') {
@@ -782,6 +782,7 @@ export struct GalleryListContent {
               .padding({ left: 8, right: 8, bottom: 0 })
             }
             .width('100%')
+            .padding({ top: this.toolbarHeight() + 8 })
           }
           .scrollable(ScrollDirection.Vertical)
           .scrollBar(BarState.Off)
@@ -796,25 +797,26 @@ export struct GalleryListContent {
             const offset = this.listScroller.currentOffset().yOffset;
             this.onScrollUpdate(offset);
           })
+          .onDidScroll((scrollOffset: number, scrollState: ScrollState) => {
+            this.onScrollUpdate(this.listScroller.currentOffset().yOffset);
+          })
           .onReachEnd(() => {
             this.triggerLoadMoreIfNear(this.galleries.length);
           })
         }
 
-        if (this.galleries.length === 0) {
-          FloatingToolbar({ barHeight: this.requestUrl.length > 0 ? 88 : 62 }) {
-            SearchBarCard({
-              keyword: this.keyword,
-              title: this.searchTitle,
-              searchActive: this.searchActive,
-              filterActive: this.filterActive,
-              requestUrl: this.requestUrl,
-              onKeywordChange: this.onKeywordChange,
-              onMenu: this.onMenu,
-              onToggleSearch: this.onToggleSearch,
-              onSearch: this.onSearch
-            })
-          }
+        FloatingToolbar({ offsetY: this.toolbarOffsetY, barHeight: this.toolbarHeight() }) {
+          SearchBarCard({
+            keyword: this.keyword,
+            title: this.searchTitle,
+            searchActive: this.searchActive,
+            filterActive: this.filterActive,
+            requestUrl: this.requestUrl,
+            onKeywordChange: this.onKeywordChange,
+            onMenu: this.onMenu,
+            onToggleSearch: this.onToggleSearch,
+            onSearch: this.onSearch
+          })
         }
       }
       .width('100%')
