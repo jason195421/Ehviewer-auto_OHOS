@@ -1013,7 +1013,7 @@ export struct TopListScene {
               lists: this.topList.lists,
               selectedIndex: this.selectedIndex,
               info: this.currentInfo(),
-              toolbarVisibleHeight: Math.max(0, 62 + this.toolbarOffsetY),
+              toolbarOffsetY: this.toolbarOffsetY,
               renderVersion: this.renderVersion,
               onSelectList: (index: number) => {
                 if (this.selectedIndex === index) {
@@ -1086,7 +1086,7 @@ export struct TopListBoard {
   @Prop lists: TopListInfo[] = [];
   @Prop selectedIndex: number = 0;
   @Prop info: TopListInfo = createEmptyTopListInfo();
-  @Prop toolbarVisibleHeight: number = 62;
+  @Prop toolbarOffsetY: number = 0;
   @Prop renderVersion: number = 0;
   onSelectList: (index: number) => void = () => {};
   onOpenBucket: (bucket: TopListBucket) => void = () => {};
@@ -1097,14 +1097,20 @@ export struct TopListBoard {
 
   @Builder
   private TabsHeader() {
-    TopListTabs({
-      lists: this.lists,
-      selectedIndex: this.selectedIndex,
-      onSelect: this.onSelectList
-    })
+    Column() {
+      TopListTabs({
+        lists: this.lists,
+        selectedIndex: this.selectedIndex,
+        onSelect: this.onSelectList
+      })
+        .width('100%')
+        .padding({ top: 8, bottom: 8 })
+        .backgroundColor('#F3F5F7')
+    }
       .width('100%')
-      .padding({ left: 0, right: 0, top: this.toolbarVisibleHeight, bottom: 8 })
+      .padding({ left: 0, right: 0, top: 62 })
       .backgroundColor('#F3F5F7')
+      .translate({ y: this.toolbarOffsetY })
   }
 
   build() {
