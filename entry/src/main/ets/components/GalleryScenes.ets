@@ -938,140 +938,119 @@ export struct GalleryListContent {
   }
 
   build() {
-    HdsNavigation() {
-      Refresh({ refreshing: $$this.refreshing }) {
-        Scroll(this.listScroller) {
+    Refresh({ refreshing: $$this.refreshing }) {
+      Scroll(this.listScroller) {
+        Column() {
           Column() {
-            Column() {
-            if (this.galleries.length === 0) {
-            Column() {
-              GalleryListStateView({
-                statusText: this.statusText,
-                requestUrl: this.requestUrl,
-                onRefresh: this.onRefresh
-              })
-                .layoutWeight(1)
-            }
-            .width('100%')
-            .height('100%')
-            .padding({ top: this.contentTopPadding() })
-          } else {
-                Column() {
-                  Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
-                    ForEach(this.galleries, (gallery: GalleryInfo, index: number) => {
-                      if (galleryListMode() === 'Thumb') {
-                        GalleryThumbCard({ gallery: gallery })
-                          .width(this.galleryCardWidth())
-                          .margin({ right: this.galleryCardRightMargin(index), bottom: this.galleryCardGap() })
-                          .animation({ duration: 220, curve: Curve.EaseInOut })
-                          .onClick(() => { this.onSelectGallery(gallery); })
-                      } else {
-                        GalleryListRow({ gallery: gallery })
-                          .width(this.galleryCardWidth())
-                          .margin({ right: this.galleryCardRightMargin(index), bottom: this.galleryCardGap() })
-                          .animation({ duration: 220, curve: Curve.EaseInOut })
-                          .onClick(() => { this.onSelectGallery(gallery); })
-                      }
-                    }, (gallery: GalleryInfo) => gallery.gid.toString())
-                  }
-                  .width('100%')
-                  .padding({ left: this.galleryContentPadding(), right: this.galleryContentPadding(), bottom: 0 })
-                }
-                .width('100%')
-                .padding({ top: this.contentTopPadding() })
-            }
-
+          if (this.galleries.length === 0) {
+          Column() {
+            GalleryListStateView({
+              statusText: this.statusText,
+              requestUrl: this.requestUrl,
+              onRefresh: this.onRefresh
+            })
+              .layoutWeight(1)
           }
           .width('100%')
           .height('100%')
-
-        if (this.isLoadingMore) {
-          Row() {
-            LoadingProgress().width(20).height(20).color('#9BB8CB')
-            Text(uiText('Loading...')).fontSize(12).fontColor('#9BB8CB').margin({ left: 6 })
+          .padding({ top: this.contentTopPadding() })
+        } else {
+              Column() {
+                Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
+                  ForEach(this.galleries, (gallery: GalleryInfo, index: number) => {
+                    if (galleryListMode() === 'Thumb') {
+                      GalleryThumbCard({ gallery: gallery })
+                        .width(this.galleryCardWidth())
+                        .margin({ right: this.galleryCardRightMargin(index), bottom: this.galleryCardGap() })
+                        .animation({ duration: 220, curve: Curve.EaseInOut })
+                        .onClick(() => { this.onSelectGallery(gallery); })
+                    } else {
+                      GalleryListRow({ gallery: gallery })
+                        .width(this.galleryCardWidth())
+                        .margin({ right: this.galleryCardRightMargin(index), bottom: this.galleryCardGap() })
+                        .animation({ duration: 220, curve: Curve.EaseInOut })
+                        .onClick(() => { this.onSelectGallery(gallery); })
+                    }
+                  }, (gallery: GalleryInfo) => gallery.gid.toString())
+                }
+                .width('100%')
+                .padding({ left: this.galleryContentPadding(), right: this.galleryContentPadding(), bottom: 0 })
+              }
+              .width('100%')
+              .padding({ top: this.contentTopPadding() })
           }
-          .width('100%')
-          .height(36)
-          .justifyContent(FlexAlign.Center)
-          .backgroundColor('#F3F5F7')
-        }
 
-        QuickActionColumn({
-          expanded: this.actionsExpanded,
-          filterActive: this.filterActive,
-          canJump: this.canJump,
-          canRandom: this.canRandom,
-          onToggle: this.onToggleActions,
-          onFilter: this.onFilter,
-          onJump: this.onJump,
-          onRefresh: this.onRefresh,
-          onRandom: this.onRandom
-        })
+        }
+        .width('100%')
+        .height('100%')
+
+      if (this.isLoadingMore) {
+        Row() {
+          LoadingProgress().width(20).height(20).color('#9BB8CB')
+          Text(uiText('Loading...')).fontSize(12).fontColor('#9BB8CB').margin({ left: 6 })
+        }
+        .width('100%')
+        .height(36)
+        .justifyContent(FlexAlign.Center)
+        .backgroundColor('#F3F5F7')
       }
-      .width('100%')
+
+      QuickActionColumn({
+        expanded: this.actionsExpanded,
+        filterActive: this.filterActive,
+        canJump: this.canJump,
+        canRandom: this.canRandom,
+        onToggle: this.onToggleActions,
+        onFilter: this.onFilter,
+        onJump: this.onJump,
+        onRefresh: this.onRefresh,
+        onRandom: this.onRandom
+      })
     }
-    .scrollable(ScrollDirection.Vertical)
-    .scrollBar(BarState.Off)
-    .edgeEffect(EdgeEffect.Spring)
     .width('100%')
-    .height('100%')
-    .onAppear(() => {
-      if (!this.restoredScroll && this.initialScrollOffset > 0) {
-        this.restoredScroll = true;
-        setTimeout(() => {
-          this.listScroller.scrollTo({ xOffset: 0, yOffset: this.initialScrollOffset });
-        }, 0);
-      }
-    })
-    .onScrollStop(() => {
-      const offset = this.listScroller.currentOffset().yOffset;
-      this.onScrollUpdate(offset);
-      this.triggerLoadMoreByOffset(offset);
-    })
-    .onDidScroll((scrollOffset: number, scrollState: ScrollState) => {
-      const offset = this.listScroller.currentOffset().yOffset;
-      this.onScrollUpdate(offset);
-      this.triggerLoadMoreByOffset(offset);
-    })
-    .onReachEnd(() => {
-      this.triggerLoadMoreIfNear(this.galleries.length);
-    })
   }
-  .refreshOffset(64)
-  .pullToRefresh(true)
-  .onRefreshing(() => {
-    this.refreshFromPull();
-  })
+  .scrollable(ScrollDirection.Vertical)
+  .scrollBar(BarState.Off)
+  .edgeEffect(EdgeEffect.Spring)
   .width('100%')
   .height('100%')
+  .onAppear(() => {
+    if (!this.restoredScroll && this.initialScrollOffset > 0) {
+      this.restoredScroll = true;
+      setTimeout(() => {
+        this.listScroller.scrollTo({ xOffset: 0, yOffset: this.initialScrollOffset });
+      }, 0);
+    }
+  })
+  .onScrollStop(() => {
+    const offset = this.listScroller.currentOffset().yOffset;
+    this.onScrollUpdate(offset);
+    this.triggerLoadMoreByOffset(offset);
+  })
+  .onDidScroll((scrollOffset: number, scrollState: ScrollState) => {
+    const offset = this.listScroller.currentOffset().yOffset;
+    this.onScrollUpdate(offset);
+    this.triggerLoadMoreByOffset(offset);
+  })
+  .onReachEnd(() => {
+    this.triggerLoadMoreIfNear(this.galleries.length);
+  })
 }
-.titleBar({
-      content: {
-        bottomBuilder: {
-          builder: (): void => this.SearchToolbarContent(),
-          height: 62,
-          showType: BottomBuilderShowType.DIRECTLY_SHOW
-        }
-      },
-      enableComponentSafeArea: true,
-    })
-    .hideBackButton(true)
-    .titleMode(HdsNavigationTitleMode.MINI)
-    .bindToScrollable([this.listScroller])
-    .dynamicHideTitleBar({
-      hideTitleArea: true,
-      hideBottomBuilder: true,
-      hideStatusBar: false,
-      mode: HideMode.SCROLL_UP_TO
-    })
-    .onAreaChange((oldArea: Area, newArea: Area) => {
-      this.updateContentWidth(newArea.width as number);
-      const height = newArea.height as number;
-      if (height > 0 && !Number.isNaN(height)) {
-        this.viewportHeight = height;
-      }
-    })
-    .backgroundColor('#F3F5F7')
+.refreshOffset(64)
+.pullToRefresh(true)
+.onRefreshing(() => {
+  this.refreshFromPull();
+})
+.width('100%')
+.height('100%')
+.onAreaChange((oldArea: Area, newArea: Area) => {
+  this.updateContentWidth(newArea.width as number);
+  const height = newArea.height as number;
+  if (height > 0 && !Number.isNaN(height)) {
+    this.viewportHeight = height;
+  }
+})
+.backgroundColor('#F3F5F7')
   }
   @Builder
   private SearchToolbarContent() {
