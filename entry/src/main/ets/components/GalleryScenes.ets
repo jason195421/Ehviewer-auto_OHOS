@@ -21,6 +21,23 @@ import { FilterRule, FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, F
 import { FloatingToolbarHost } from './NavigationComponents';
 import { LANGUAGE_REVISION_KEY, nextFloatingToolbarOffset } from '../shared/EhShared';
 import { EhBackupBundle, DrawerItem, SettingsHeaderItem, SettingsRowItem, SessionMode, SettingsPanel, DRAWER_ITEMS, SETTINGS_HEADERS, STATUS_BAR_HEIGHT_KEY, ON_OFF_OPTIONS, shouldUseChineseUi, uiText, uiValue, uiStatusText, uiPageText, zhText, setActiveBackHandler, runActiveBackHandler, createEmptyGallery, createEmptyDownloadInfo, createDetailFromGallery, createEmptyDetail, createEmptyPreview, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneStringArray, cloneRequiredStringArray, cloneGalleryInfo, cloneGalleryInfos, padTwo, applyGalleryFilters, cloneGalleryTagGroups, cloneGalleryComments, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListItem, cloneTopListBucket, cloneTopListInfo, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, saveDownloadsQuietly, filterDownloadItems, downloadItemMatches, sortDownloadItems, nextDownloadStatusFilter, nextDownloadLabelFilter, nextDownloadSortMode, nextStringOption, nextDownloadState, nextDownloadLabel, downloadLabelName, downloadStateLabel, downloadStateColor, downloadProgressText, downloadSizeText, downloadImageUrlForPage, downloadThreadLimit, downloadPageIndexes, downloadQueueSummary, parseHistoryMaxSize, routeTitle, routeSubtitle, launchRouteFromSetting, settingsPanelTitle, settingsRowsForPanel, optionSettingsRow, textSettingsRow, staticSettingsRow, settingEntryValue, cloneStringOptions, settingMigrationMessage, nextOption, isValidProxyPortText, formatNetworkDiagnostics, listModeForRoute, routeUsesKeyword, usesGallerySearchToolbar, usesEmbeddedToolbar, defaultKeywordForRoute, gallerySearchTitle, currentGallerySite, effectiveListSite, gallerySiteName, galleryListFailureMessage, shouldRetryGalleryListOnE, withGalleryListMessage, readerPageReferer, readerDisplayImageUrl, cacheReaderImageForPage, cacheThumbnailImage, cloneGalleryPageWithCache, readerLocalImageSource, readerZoomSize, readerFullImageWidth, readerFullImageHeight, readerImageFit, readerShortUrl, readerPreloadCount, readerIsRightToLeft, categoryName, categoryColor, ratingText, galleryDisplayTitle, showGalleryPages, galleryListMode, galleryThumbWidth, galleryThumbHeight, galleryRowHeight, galleryTagPreview, detailTitleFontSize, detailTitleMaxLines, detailHeadingFontSize, readerShowProgress, readerShowClock, readerClockText, padTimeNumber, topListChipColor } from '../shared/EhShared';
+
+interface GalleryListSceneCache {
+  keyword: string;
+  statusText: string;
+  requestUrl: string;
+  activeSite: GallerySite;
+  pageIndex: number;
+  totalPages: number;
+  resultCount: string;
+  galleries: GalleryInfo[];
+  hasFirstRefresh: boolean;
+  filterActive: boolean;
+  toolbarOffsetY: number;
+  listScrollOffset: number;
+}
+
+const galleryListSceneCache: Map<string, GalleryListSceneCache> = new Map();
 @Component
 export struct HomeGalleryScene {
   onMenu: () => void = () => {};
@@ -119,15 +136,66 @@ export struct GalleryListScene {
   private listScrollOffset: number = 0;
   private detailScrollOffset: number = 0;
 
+  private cacheKey(): string {
+    const mode = this.useForcedMode ? this.forcedMode.toString() : listModeForRoute(this.sourceRoute).toString();
+    return this.sourceRoute.toString() + '|' + mode + '|' + this.follow + '|' + this.initialKeyword;
+  }
+
+  private restoreListCache(): boolean {
+    const cache = galleryListSceneCache.get(this.cacheKey());
+    if (cache === undefined) {
+      return false;
+    }
+    this.keyword = cache.keyword;
+    this.statusText = cache.statusText;
+    this.requestUrl = cache.requestUrl;
+    this.activeSite = cache.activeSite;
+    this.pageIndex = cache.pageIndex;
+    this.totalPages = cache.totalPages;
+    this.resultCount = cache.resultCount;
+    this.galleries = cloneGalleryInfos(cache.galleries);
+    this.hasFirstRefresh = cache.hasFirstRefresh;
+    this.filterActive = cache.filterActive;
+    this.toolbarOffsetY = cache.toolbarOffsetY;
+    this.listScrollOffset = cache.listScrollOffset;
+    return true;
+  }
+
+  private saveListCache(): void {
+    galleryListSceneCache.set(this.cacheKey(), {
+      keyword: this.keyword,
+      statusText: this.statusText,
+      requestUrl: this.requestUrl,
+      activeSite: this.activeSite,
+      pageIndex: this.pageIndex,
+      totalPages: this.totalPages,
+      resultCount: this.resultCount,
+      galleries: cloneGalleryInfos(this.galleries),
+      hasFirstRefresh: this.hasFirstRefresh,
+      filterActive: this.filterActive,
+      toolbarOffsetY: this.toolbarOffsetY,
+      listScrollOffset: this.listScrollOffset
+    });
+  }
+
+  private resetListScroll(): void {
+    this.listScrollOffset = 0;
+    this.toolbarOffsetY = 0;
+    this.saveListCache();
+  }
+
   private updateToolbarForScroll(offset: number): void {
     const delta = offset - this.listScrollOffset;
     this.toolbarOffsetY = nextFloatingToolbarOffset(this.toolbarOffsetY, delta, offset,
       this.requestUrl.length > 0 ? 88 : 62);
     this.listScrollOffset = offset;
+    this.saveListCache();
   }
 
   aboutToAppear(): void {
-    this.keyword = this.initialKeyword.length > 0 ? this.initialKeyword : defaultKeywordForRoute(this.sourceRoute);
+    if (!this.restoreListCache()) {
+      this.keyword = this.initialKeyword.length > 0 ? this.initialKeyword : defaultKeywordForRoute(this.sourceRoute);
+    }
     const context = getAbilityContext();
     if (context !== undefined) {
       ehCookieStore.load(context).catch((error: Error) => {
@@ -140,6 +208,7 @@ export struct GalleryListScene {
   }
 
   aboutToDisappear(): void {
+    this.saveListCache();
     setActiveBackHandler(null);
   }
 
@@ -173,8 +242,12 @@ export struct GalleryListScene {
     this.resultCount = '';
     this.galleries = [];
     this.isLoadingMore = false;
+    if (pageIndex === 0) {
+      this.resetListScroll();
+    }
     this.renderVersion++;
     this.closeDetail();
+    this.saveListCache();
     const request = this.loadRoutePageWithFallback(pageIndex);
 
     request.then((result: GalleryListLoadResult) => {
@@ -184,10 +257,12 @@ export struct GalleryListScene {
       this.totalPages = result.pages;
       this.resultCount = result.resultCount;
       this.renderVersion++;
+      this.saveListCache();
     }).catch((error: Error) => {
       this.statusText = 'Load failed: ' + error.message;
       this.galleries = [];
       this.renderVersion++;
+      this.saveListCache();
     });
   }
 
@@ -203,6 +278,7 @@ export struct GalleryListScene {
     const nextPage = this.pageIndex + 1;
     this.isLoadingMore = true;
     this.renderVersion++;
+    this.saveListCache();
 
     this.loadRoutePageWithFallback(nextPage).then((result: GalleryListLoadResult) => {
       this.requestUrl = result.url;
@@ -212,6 +288,7 @@ export struct GalleryListScene {
         this.statusText = uiText('All pages loaded');
         this.isLoadingMore = false;
         this.renderVersion++;
+        this.saveListCache();
         return;
       }
       const existingGids: Set<number> = new Set(this.galleries.map((g: GalleryInfo) => g.gid));
@@ -225,10 +302,12 @@ export struct GalleryListScene {
       this.statusText = result.ok ? result.message : galleryListFailureMessage(result, this.activeSite);
       this.isLoadingMore = false;
       this.renderVersion++;
+      this.saveListCache();
     }).catch((error: Error) => {
       this.statusText = 'Load more failed: ' + error.message;
       this.isLoadingMore = false;
       this.renderVersion++;
+      this.saveListCache();
     });
   }
 
@@ -290,6 +369,7 @@ export struct GalleryListScene {
 
   private applySearch(): void {
     this.fabExpanded = false;
+    this.resetListScroll();
     this.loadRemote(0);
   }
 
@@ -301,6 +381,7 @@ export struct GalleryListScene {
       return;
     }
     this.statusText = this.filterActive ? 'Filter mode is on; enter a keyword to apply it' : 'Filter mode is off';
+    this.saveListCache();
   }
 
   private jumpGalleryPage(): void {
@@ -715,19 +796,49 @@ export struct GalleryListContent {
   initialScrollOffset: number = 0;
   onScrollUpdate: (offset: number) => void = () => {};
   @State contentWidth: number = 0;
+  @State refreshing: boolean = false;
+  @State viewportHeight: number = 0;
   private listScroller: Scroller = new Scroller();
   private loadMorePending: boolean = false;
+  private restoredScroll: boolean = false;
 
   private triggerLoadMoreIfNear(last: number): void {
     if (this.isLoadingMore || this.loadMorePending) {
       return;
     }
-    if (this.galleries.length > 0 && last >= this.galleries.length - 6) {
+    if (this.galleries.length > 0 && last >= this.galleries.length - 8) {
       this.loadMorePending = true;
       this.onLoadMore();
       // Reset local guard after one frame so rapid scroll events don't queue duplicates
       setTimeout(() => { this.loadMorePending = false; }, 500);
     }
+  }
+
+  private estimateContentHeight(): number {
+    const columns = Math.max(1, this.galleryColumnCount());
+    const rows = Math.ceil(this.galleries.length / columns);
+    const cardHeight = galleryListMode() === 'Thumb' ? Math.max(0, this.galleryCardWidth() / 0.75 + 54) :
+      galleryThumbHeight();
+    return this.toolbarHeight() + rows * (cardHeight + this.galleryCardGap()) + this.galleryContentPadding();
+  }
+
+  private triggerLoadMoreByOffset(offset: number): void {
+    if (this.viewportHeight <= 0) {
+      return;
+    }
+    const remaining = this.estimateContentHeight() - offset - this.viewportHeight;
+    if (remaining <= Math.max(420, this.viewportHeight * 0.8)) {
+      this.triggerLoadMoreIfNear(this.galleries.length);
+    }
+  }
+
+  private refreshFromPull(): void {
+    if (this.refreshing) {
+      return;
+    }
+    this.refreshing = true;
+    this.onRefresh();
+    setTimeout(() => { this.refreshing = false; }, 900);
   }
 
   private toolbarHeight(): number {
@@ -834,56 +945,75 @@ export struct GalleryListContent {
           .height('100%')
           .padding({ top: this.toolbarHeight() })
         } else {
-          Scroll(this.listScroller) {
-            Column() {
-              Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
-                ForEach(this.galleries, (gallery: GalleryInfo, index: number) => {
-                  if (galleryListMode() === 'Thumb') {
-                    GalleryThumbCard({ gallery: gallery })
-                      .width(this.galleryCardWidth())
-                      .margin({ right: this.galleryCardRightMargin(index), bottom: this.galleryCardGap() })
-                      .animation({ duration: 220, curve: Curve.EaseInOut })
-                      .onClick(() => { this.onSelectGallery(gallery); })
-                  } else {
-                    GalleryListRow({ gallery: gallery })
-                      .width(this.galleryCardWidth())
-                      .margin({ right: this.galleryCardRightMargin(index), bottom: this.galleryCardGap() })
-                      .animation({ duration: 220, curve: Curve.EaseInOut })
-                      .onClick(() => { this.onSelectGallery(gallery); })
-                  }
-                }, (gallery: GalleryInfo) => gallery.gid.toString() + ':' + this.renderVersion.toString())
+          Refresh({ refreshing: this.refreshing }) {
+            Scroll(this.listScroller) {
+              Column() {
+                Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
+                  ForEach(this.galleries, (gallery: GalleryInfo, index: number) => {
+                    if (galleryListMode() === 'Thumb') {
+                      GalleryThumbCard({ gallery: gallery })
+                        .width(this.galleryCardWidth())
+                        .margin({ right: this.galleryCardRightMargin(index), bottom: this.galleryCardGap() })
+                        .animation({ duration: 220, curve: Curve.EaseInOut })
+                        .onClick(() => { this.onSelectGallery(gallery); })
+                    } else {
+                      GalleryListRow({ gallery: gallery })
+                        .width(this.galleryCardWidth())
+                        .margin({ right: this.galleryCardRightMargin(index), bottom: this.galleryCardGap() })
+                        .animation({ duration: 220, curve: Curve.EaseInOut })
+                        .onClick(() => { this.onSelectGallery(gallery); })
+                    }
+                  }, (gallery: GalleryInfo) => gallery.gid.toString() + ':' + this.renderVersion.toString())
+                }
+                .width('100%')
+                .padding({ left: this.galleryContentPadding(), right: this.galleryContentPadding(), bottom: 0 })
               }
               .width('100%')
-              .padding({ left: this.galleryContentPadding(), right: this.galleryContentPadding(), bottom: 0 })
+              .padding({ top: this.toolbarHeight() })
             }
+            .scrollable(ScrollDirection.Vertical)
+            .scrollBar(BarState.Off)
             .width('100%')
-            .padding({ top: this.toolbarHeight() })
+            .height('100%')
+            .onAppear(() => {
+              if (!this.restoredScroll && this.initialScrollOffset > 0) {
+                this.restoredScroll = true;
+                setTimeout(() => {
+                  this.listScroller.scrollTo({ xOffset: 0, yOffset: this.initialScrollOffset });
+                }, 0);
+              }
+            })
+            .onScrollStop(() => {
+              const offset = this.listScroller.currentOffset().yOffset;
+              this.onScrollUpdate(offset);
+              this.triggerLoadMoreByOffset(offset);
+            })
+            .onDidScroll((scrollOffset: number, scrollState: ScrollState) => {
+              const offset = this.listScroller.currentOffset().yOffset;
+              this.onScrollUpdate(offset);
+              this.triggerLoadMoreByOffset(offset);
+            })
+            .onReachEnd(() => {
+              this.triggerLoadMoreIfNear(this.galleries.length);
+            })
           }
-          .scrollable(ScrollDirection.Vertical)
-          .scrollBar(BarState.Off)
+          .refreshOffset(this.toolbarHeight())
+          .pullToRefresh(true)
+          .onRefreshing(() => {
+            this.refreshFromPull();
+          })
           .width('100%')
           .height('100%')
-          .onAppear(() => {
-            if (this.initialScrollOffset > 0) {
-              this.listScroller.scrollTo({ xOffset: 0, yOffset: this.initialScrollOffset });
-            }
-          })
-          .onScrollStop(() => {
-            const offset = this.listScroller.currentOffset().yOffset;
-            this.onScrollUpdate(offset);
-          })
-          .onDidScroll((scrollOffset: number, scrollState: ScrollState) => {
-            this.onScrollUpdate(this.listScroller.currentOffset().yOffset);
-          })
-          .onReachEnd(() => {
-            this.triggerLoadMoreIfNear(this.galleries.length);
-          })
         }
         }
         .width('100%')
         .height('100%')
         .onAreaChange((oldArea: Area, newArea: Area) => {
           this.updateContentWidth(newArea.width as number);
+          const height = newArea.height as number;
+          if (height > 0 && !Number.isNaN(height)) {
+            this.viewportHeight = height;
+          }
         })
       }
 
