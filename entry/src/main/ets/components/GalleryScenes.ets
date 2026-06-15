@@ -18,8 +18,8 @@ import { CacheClearResult, readerImageCache } from '../services/ReaderImageCache
 import { ehSpiderInfoStore } from '../services/EhSpiderInfoStore';
 import { MigrationTask, migrationTasks } from '../services/MigrationStatus';
 import { FilterRule, FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, FILTER_MODE_TAG_NAMESPACE, ehFilterStore } from '../services/EhFilterStore';
-import { FloatingToolbar } from './NavigationComponents';
-import { APP_THEME_COLOR, LANGUAGE_REVISION_KEY, nextFloatingToolbarOffset, themeSurfaceColor } from '../shared/EhShared';
+import { FloatingToolbarHost } from './NavigationComponents';
+import { LANGUAGE_REVISION_KEY, nextFloatingToolbarOffset } from '../shared/EhShared';
 import { EhBackupBundle, DrawerItem, SettingsHeaderItem, SettingsRowItem, SessionMode, SettingsPanel, DRAWER_ITEMS, SETTINGS_HEADERS, STATUS_BAR_HEIGHT_KEY, ON_OFF_OPTIONS, shouldUseChineseUi, uiText, uiValue, uiStatusText, uiPageText, zhText, setActiveBackHandler, runActiveBackHandler, createEmptyGallery, createEmptyDownloadInfo, createDetailFromGallery, createEmptyDetail, createEmptyPreview, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneStringArray, cloneRequiredStringArray, cloneGalleryInfo, cloneGalleryInfos, padTwo, applyGalleryFilters, cloneGalleryTagGroups, cloneGalleryComments, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListItem, cloneTopListBucket, cloneTopListInfo, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, saveDownloadsQuietly, filterDownloadItems, downloadItemMatches, sortDownloadItems, nextDownloadStatusFilter, nextDownloadLabelFilter, nextDownloadSortMode, nextStringOption, nextDownloadState, nextDownloadLabel, downloadLabelName, downloadStateLabel, downloadStateColor, downloadProgressText, downloadSizeText, downloadImageUrlForPage, downloadThreadLimit, downloadPageIndexes, downloadQueueSummary, parseHistoryMaxSize, routeTitle, routeSubtitle, launchRouteFromSetting, settingsPanelTitle, settingsRowsForPanel, optionSettingsRow, textSettingsRow, staticSettingsRow, settingEntryValue, cloneStringOptions, settingMigrationMessage, nextOption, isValidProxyPortText, formatNetworkDiagnostics, listModeForRoute, routeUsesKeyword, usesGallerySearchToolbar, usesEmbeddedToolbar, defaultKeywordForRoute, gallerySearchTitle, currentGallerySite, effectiveListSite, gallerySiteName, galleryListFailureMessage, shouldRetryGalleryListOnE, withGalleryListMessage, readerPageReferer, readerDisplayImageUrl, cacheReaderImageForPage, cacheThumbnailImage, cloneGalleryPageWithCache, readerLocalImageSource, readerZoomSize, readerFullImageWidth, readerFullImageHeight, readerImageFit, readerShortUrl, readerPreloadCount, readerIsRightToLeft, categoryName, categoryColor, ratingText, galleryDisplayTitle, showGalleryPages, galleryListMode, galleryThumbWidth, galleryThumbHeight, galleryRowHeight, galleryTagPreview, detailTitleFontSize, detailTitleMaxLines, detailHeadingFontSize, readerShowProgress, readerShowClock, readerClockText, padTimeNumber, topListChipColor } from '../shared/EhShared';
 @Component
 export struct HomeGalleryScene {
@@ -100,7 +100,6 @@ export struct GalleryListScene {
   @State resultCount: string = '';
   @State galleries: GalleryInfo[] = [];
   @State hasFirstRefresh: boolean = false;
-  @State searchActive: boolean = false;
   @State fabExpanded: boolean = false;
   @State filterActive: boolean = false;
   @State showDetail: boolean = false;
@@ -289,12 +288,7 @@ export struct GalleryListScene {
     }
   }
 
-  private toggleSearchBar(): void {
-    this.searchActive = !this.searchActive;
-  }
-
   private applySearch(): void {
-    this.searchActive = false;
     this.fabExpanded = false;
     this.loadRemote(0);
   }
@@ -641,7 +635,6 @@ export struct GalleryListScene {
           listMode: this.listMode,
           keyword: this.keyword,
           searchTitle: gallerySearchTitle(this.sourceRoute, this.keyword, this.filterActive),
-          searchActive: this.searchActive,
           actionsExpanded: this.fabExpanded,
           filterActive: this.filterActive,
           canJump: this.totalPages > 1,
@@ -656,9 +649,6 @@ export struct GalleryListScene {
           },
           onMenu: () => {
             this.onMenu();
-          },
-          onToggleSearch: () => {
-            this.toggleSearchBar();
           },
           onSearch: () => {
             this.applySearch();
@@ -703,7 +693,6 @@ export struct GalleryListContent {
   @Prop listMode: string = '';
   @Prop keyword: string = '';
   @Prop searchTitle: string = '';
-  @Prop searchActive: boolean = false;
   @Prop actionsExpanded: boolean = false;
   @Prop filterActive: boolean = false;
   @Prop canJump: boolean = false;
@@ -715,7 +704,6 @@ export struct GalleryListContent {
   @Prop galleries: GalleryInfo[] = [];
   onKeywordChange: (value: string) => void = () => {};
   onMenu: () => void = () => {};
-  onToggleSearch: () => void = () => {};
   onSearch: () => void = () => {};
   onRefresh: () => void = () => {};
   onLoadMore: () => void = () => {};
@@ -747,7 +735,19 @@ export struct GalleryListContent {
 
   build() {
     Stack({ alignContent: Alignment.BottomEnd }) {
-      Stack({ alignContent: Alignment.TopStart }) {
+      FloatingToolbarHost({
+        kind: 'search',
+        title: this.searchTitle,
+        keyword: this.keyword,
+        filterActive: this.filterActive,
+        requestUrl: this.requestUrl,
+        toolbarOffsetY: this.toolbarOffsetY,
+        toolbarHeight: this.toolbarHeight(),
+        onKeywordChange: this.onKeywordChange,
+        onMenu: this.onMenu,
+        onSearch: this.onSearch
+      }) {
+        Column() {
         if (this.galleries.length === 0) {
           Column() {
             GalleryListStateView({
@@ -782,7 +782,7 @@ export struct GalleryListContent {
               .padding({ left: 8, right: 8, bottom: 0 })
             }
             .width('100%')
-            .padding({ top: this.toolbarHeight() + 8 })
+            .padding({ top: this.toolbarHeight() })
           }
           .scrollable(ScrollDirection.Vertical)
           .scrollBar(BarState.Off)
@@ -804,23 +804,10 @@ export struct GalleryListContent {
             this.triggerLoadMoreIfNear(this.galleries.length);
           })
         }
-
-        FloatingToolbar({ offsetY: this.toolbarOffsetY, barHeight: this.toolbarHeight() }) {
-          SearchBarCard({
-            keyword: this.keyword,
-            title: this.searchTitle,
-            searchActive: this.searchActive,
-            filterActive: this.filterActive,
-            requestUrl: this.requestUrl,
-            onKeywordChange: this.onKeywordChange,
-            onMenu: this.onMenu,
-            onToggleSearch: this.onToggleSearch,
-            onSearch: this.onSearch
-          })
         }
+        .width('100%')
+        .height('100%')
       }
-      .width('100%')
-      .height('100%')
 
       if (this.isLoadingMore) {
         Row() {
@@ -849,86 +836,6 @@ export struct GalleryListContent {
     .width('100%')
     .height('100%')
     .backgroundColor('#F3F5F7')
-  }
-}
-
-@Component
-export struct SearchBarCard {
-  @Prop keyword: string = '';
-  @Prop title: string = '';
-  @Prop searchActive: boolean = false;
-  @Prop filterActive: boolean = false;
-  @Prop requestUrl: string = '';
-  onKeywordChange: (value: string) => void = () => {};
-  onMenu: () => void = () => {};
-  onToggleSearch: () => void = () => {};
-  onSearch: () => void = () => {};
-
-  build() {
-    Column() {
-      Row() {
-        Button({ type: ButtonType.Circle, stateEffect: true }) {
-          SymbolGlyph($r('sys.symbol.open_sidebar'))
-            .fontSize(20)
-            .fontColor([Color.White])
-        }
-        .width(38)
-        .height(38)
-        .backgroundColor('rgba(255,255,255,0.15)')
-        .flexShrink(0)
-        .onClick(() => {
-          this.onMenu();
-        })
-
-        Stack({ alignContent: Alignment.BottomStart }) {
-          TextInput({ text: this.keyword, placeholder: this.title.length === 0 ? uiText('Search galleries') : uiText(this.title) })
-            .height(38)
-            .width('100%')
-            .backgroundColor(themeSurfaceColor())
-            .borderRadius(19)
-            .placeholderColor('rgba(47,111,143,0.5)')
-            .fontColor('#17202A')
-            .caretColor(APP_THEME_COLOR)
-            .padding({ left: 16, right: 16 })
-            .onChange((value: string) => {
-              this.onKeywordChange(value);
-            })
-          if (this.filterActive) {
-            Text(uiText('Filter mode'))
-              .fontSize(9)
-              .fontColor(Color.White)
-              .backgroundColor('rgba(255,255,255,0.3)')
-              .padding({ left: 5, right: 5, top: 2, bottom: 2 })
-              .borderRadius(4)
-              .margin({ left: 10, bottom: 6 })
-          }
-        }
-        .height(38)
-        .layoutWeight(1)
-        .margin({ left: 10 })
-
-        Button({ type: ButtonType.Circle, stateEffect: true }) {
-          SymbolGlyph($r('sys.symbol.magnifyingglass'))
-            .fontSize(18)
-            .fontColor([Color.White])
-        }
-        .width(38)
-        .height(38)
-        .backgroundColor('rgba(255,255,255,0.15)')
-        .flexShrink(0)
-        .margin({ left: 10 })
-        .onClick(() => {
-          this.onSearch();
-        })
-      }
-      .width('100%')
-      .height(62)
-      .padding({ left: 14, right: 14 })
-      .alignItems(VerticalAlign.Center)
-
-    }
-    .width('100%')
-    .backgroundColor(APP_THEME_COLOR)
   }
 }
 

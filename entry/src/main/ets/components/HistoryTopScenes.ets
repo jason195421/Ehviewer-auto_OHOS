@@ -21,7 +21,7 @@ import { FilterRule, FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, F
 import { APP_THEME_COLOR, LANGUAGE_REVISION_KEY, nextFloatingToolbarOffset } from '../shared/EhShared';
 import { EhBackupBundle, DrawerItem, SettingsHeaderItem, SettingsRowItem, SessionMode, SettingsPanel, DRAWER_ITEMS, SETTINGS_HEADERS, STATUS_BAR_HEIGHT_KEY, ON_OFF_OPTIONS, shouldUseChineseUi, uiText, uiValue, uiStatusText, uiPageText, zhText, setActiveBackHandler, runActiveBackHandler, createEmptyGallery, createEmptyDownloadInfo, createDetailFromGallery, createEmptyDetail, createEmptyPreview, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneStringArray, cloneRequiredStringArray, cloneGalleryInfo, cloneGalleryInfos, padTwo, applyGalleryFilters, cloneGalleryTagGroups, cloneGalleryComments, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListItem, cloneTopListBucket, cloneTopListInfo, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, saveDownloadsQuietly, filterDownloadItems, downloadItemMatches, sortDownloadItems, nextDownloadStatusFilter, nextDownloadLabelFilter, nextDownloadSortMode, nextStringOption, nextDownloadState, nextDownloadLabel, downloadLabelName, downloadStateLabel, downloadStateColor, downloadProgressText, downloadSizeText, downloadImageUrlForPage, downloadThreadLimit, downloadPageIndexes, downloadQueueSummary, parseHistoryMaxSize, routeTitle, routeSubtitle, launchRouteFromSetting, settingsPanelTitle, settingsRowsForPanel, optionSettingsRow, textSettingsRow, staticSettingsRow, settingEntryValue, cloneStringOptions, settingMigrationMessage, nextOption, isValidProxyPortText, formatNetworkDiagnostics, listModeForRoute, routeUsesKeyword, usesGallerySearchToolbar, usesEmbeddedToolbar, defaultKeywordForRoute, gallerySearchTitle, currentGallerySite, effectiveListSite, gallerySiteName, galleryListFailureMessage, shouldRetryGalleryListOnE, withGalleryListMessage, readerPageReferer, readerDisplayImageUrl, cacheReaderImageForPage, cacheThumbnailImage, cloneGalleryPageWithCache, readerLocalImageSource, readerZoomSize, readerFullImageWidth, readerFullImageHeight, readerImageFit, readerShortUrl, readerPreloadCount, readerIsRightToLeft, categoryName, categoryColor, ratingText, galleryDisplayTitle, showGalleryPages, galleryListMode, galleryThumbWidth, galleryThumbHeight, galleryRowHeight, galleryTagPreview, detailTitleFontSize, detailTitleMaxLines, detailHeadingFontSize, readerShowProgress, readerShowClock, readerClockText, padTimeNumber, topListChipColor } from '../shared/EhShared';
 import { CommentsScene, GalleryDetailScene, GalleryListRow, GalleryListScene, GalleryListStateView, PlaceholderScene, ReaderScene } from './GalleryScenes';
-import { FloatingToolbar } from './NavigationComponents';
+import { FloatingToolbarHost } from './NavigationComponents';
 @Component
 export struct HistoryScene {
   private client: EhHttpClient = new EhHttpClient();
@@ -422,7 +422,23 @@ export struct HistoryScene {
         .transition(TransitionEffect.move(TransitionEdge.END)
           .animation({ duration: 300, curve: Curve.EaseOut }))
     } else {
-      Stack({ alignContent: Alignment.TopStart }) {
+      FloatingToolbarHost({
+        kind: 'title',
+        title: 'History',
+        requestUrl: '',
+        showClear: true,
+        canClear: this.histories.length > 0,
+        toolbarOffsetY: this.toolbarOffsetY,
+        toolbarHeight: 62,
+        onMenu: this.onMenu,
+        onRefresh: () => {
+          this.loadHistory();
+        },
+        onClear: () => {
+          this.clearHistory();
+        }
+      }) {
+        Column() {
         if (this.histories.length === 0) {
           Column() {
             PlaceholderScene({
@@ -462,7 +478,8 @@ export struct HistoryScene {
           }
           .width('100%')
           .height('100%')
-          .padding({ left: 8, right: 8, top: 70, bottom: 12 })
+          .padding({ left: 8, right: 8, top: 62, bottom: 12 })
+          .backgroundColor('#F3F5F7')
           .onAppear(() => {
             if (this.historyScrollOffset > 0) {
               this.historyScroller.scrollTo({ xOffset: 0, yOffset: this.historyScrollOffset });
@@ -481,25 +498,11 @@ export struct HistoryScene {
           })
         }
 
-        FloatingToolbar({ offsetY: this.toolbarOffsetY, barHeight: 62 }) {
-          TopListHeader({
-            title: 'History',
-            statusText: this.statusText,
-            requestUrl: '',
-            showClear: true,
-            canClear: this.histories.length > 0,
-            onMenu: this.onMenu,
-            onRefresh: () => {
-              this.loadHistory();
-            },
-            onClear: () => {
-              this.clearHistory();
-            }
-          })
-        }
       }
       .width('100%')
       .height('100%')
+      .backgroundColor('#F3F5F7')
+      }
     }
   }
 }
@@ -978,7 +981,18 @@ export struct TopListScene {
       .transition(TransitionEffect.move(TransitionEdge.END)
         .animation({ duration: 300, curve: Curve.EaseOut }))
     } else {
-      Stack({ alignContent: Alignment.TopStart }) {
+      FloatingToolbarHost({
+        kind: 'title',
+        title: '排行',
+        requestUrl: '',
+        toolbarOffsetY: this.toolbarOffsetY,
+        toolbarHeight: 62,
+        onMenu: this.onMenu,
+        onRefresh: () => {
+          this.loadTopList();
+        }
+      }) {
+        Column() {
         if (this.topList.lists.length === 0) {
           Column() {
             GalleryListStateView({
@@ -992,7 +1006,7 @@ export struct TopListScene {
           }
           .width('100%')
           .height('100%')
-          .padding({ top: this.requestUrl.length > 0 ? 88 : 62 })
+          .padding({ top: 62 })
         } else {
           Column() {
             TopListBoard({
@@ -1029,119 +1043,12 @@ export struct TopListScene {
           .height('100%')
         }
 
-        FloatingToolbar({ offsetY: this.toolbarOffsetY, barHeight: 62 }) {
-          TopListHeader({
-            title: '排行',
-            requestUrl: '',
-            onMenu: this.onMenu,
-            onRefresh: () => {
-              this.loadTopList();
-            }
-          })
-        }
       }
       .width('100%')
       .height('100%')
-    }
-  }
-}
-
-@Component
-export struct TopListHeader {
-  @Prop title: string = '';
-  @Prop statusText: string = '';
-  @Prop requestUrl: string = '';
-  @Prop showClear: boolean = false;
-  @Prop canClear: boolean = false;
-  onMenu: () => void = () => {};
-  onRefresh: () => void = () => {};
-  onClear: () => void = () => {};
-
-  build() {
-    Column() {
-      Row() {
-        Button({ type: ButtonType.Circle, stateEffect: true }) {
-          SymbolGlyph($r('sys.symbol.open_sidebar'))
-            .fontSize(20)
-            .fontColor([Color.White])
-        }
-        .width(38)
-        .height(38)
-        .backgroundColor('rgba(255,255,255,0.15)')
-        .flexShrink(0)
-        .onClick(() => {
-          this.onMenu();
-        })
-
-        Column() {
-          Text(uiText(this.title))
-            .fontSize(15)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(Color.White)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-        .height(38)
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        .padding({ left: 2, right: 10 })
-        .margin({ left: 10 })
-        .backgroundColor('rgba(255,255,255,0)')
-
-        Button({ type: ButtonType.Circle, stateEffect: true }) {
-          SymbolGlyph($r('sys.symbol.play_arrow_triangle_2_circlepath'))
-            .fontSize(18)
-            .fontColor([Color.White])
-        }
-        .width(38)
-        .height(38)
-        .backgroundColor('rgba(255,255,255,0.15)')
-        .flexShrink(0)
-        .margin({ left: 10 })
-        .onClick(() => {
-          this.onRefresh();
-        })
-
-        if (this.showClear) {
-          Button({ type: ButtonType.Circle, stateEffect: true }) {
-            SymbolGlyph($r('sys.symbol.trash'))
-              .fontSize(17)
-              .fontColor([Color.White])
-          }
-          .width(38)
-          .height(38)
-          .backgroundColor(this.canClear ? 'rgba(220,60,50,0.78)' : 'rgba(255,255,255,0.1)')
-          .flexShrink(0)
-          .margin({ left: 8 })
-          .enabled(this.canClear)
-          .onClick(() => {
-            this.onClear();
-          })
-        }
-      }
-      .width('100%')
-      .height(62)
-      .padding({ left: 14, right: 14 })
-      .alignItems(VerticalAlign.Center)
-
-      if (this.requestUrl.length > 0) {
-        Row() {
-          Text(this.requestUrl)
-            .fontSize(11)
-            .fontColor('rgba(255,255,255,0.75)')
-            .layoutWeight(1)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-        .width('100%')
-        .height(26)
-        .padding({ left: 16, right: 14 })
-        .backgroundColor('rgba(0,0,0,0.12)')
+      .backgroundColor('#F3F5F7')
       }
     }
-    .width('100%')
-    .backgroundColor(APP_THEME_COLOR)
   }
 }
 
