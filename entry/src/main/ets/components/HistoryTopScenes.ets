@@ -505,7 +505,6 @@ export struct HistoryScene {
               }
               .width('100%')
               .padding({ left: 8, right: 8, top: this.historyContentTopPadding(), bottom: 0 })
-              .translate({ y: this.toolbarOffsetY })
             }
             .scrollable(ScrollDirection.Vertical)
             .scrollBar(BarState.Off)
@@ -1150,7 +1149,6 @@ export struct TopListBoard {
       .width('100%')
       .padding({ left: 0, right: 0, top: 74 })
       .backgroundColor('#F3F5F7')
-      .translate({ y: this.toolbarOffsetY })
   }
 
   build() {

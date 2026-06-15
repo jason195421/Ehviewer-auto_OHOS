@@ -74,6 +74,12 @@ $env:Path='D:\Program Files\Huawei\DevEco Studio\jbr\bin;' + $env:Path
 
 本仓库的版本号从 `0.1.0` 开始递增。只有在实现新功能、用户明确要求发布，或需要交付可安装包时才创建 GitHub Release；普通 bug 修复不默认发布 Release。
 
+### v0.1.49
+
+- 参考 HarmonyOS 多设备布局最佳实践的沉浸式浏览思路重建标题栏滑动隐藏。
+- 标题栏改为独立覆盖层滑出/滑入，列表内容不再跟随标题栏位移。
+- 修正画廊、历史、排行内容滚动与标题栏隐藏互相拖拽的问题。
+
 ### v0.1.48
 
 - 按 HarmonyOS `Refresh` 推荐结构重做历史页下拉刷新。

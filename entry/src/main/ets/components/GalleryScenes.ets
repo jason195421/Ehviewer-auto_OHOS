@@ -1020,7 +1020,6 @@ export struct GalleryListContent {
               }
               .width('100%')
               .padding({ top: this.contentTopPadding() })
-              .translate({ y: this.toolbarOffsetY })
             }
             .scrollable(ScrollDirection.Vertical)
             .scrollBar(BarState.Off)
