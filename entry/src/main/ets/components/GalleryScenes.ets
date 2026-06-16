@@ -55,6 +55,17 @@ function normalizeGalleryListScrollOffset(offset: number): number {
   return offset;
 }
 
+function mergeLoadedGalleryDetail(loaded: GalleryDetail, previous: GalleryDetail): GalleryDetail {
+  const next = cloneGalleryDetail(loaded);
+  if ((next.thumb === undefined || next.thumb.length === 0) && previous.thumb !== undefined && previous.thumb.length > 0) {
+    next.thumb = previous.thumb;
+  }
+  if ((next.thumb === undefined || next.thumb.length === 0) && next.previewSet.length > 0) {
+    next.thumb = next.previewSet[0].imageUrl;
+  }
+  return next;
+}
+
 @Component
 export struct HomeGalleryScene {
   onMenu: () => void = () => {};
@@ -446,7 +457,7 @@ export struct GalleryListScene {
       }
 
       this.detailStatus = 'Detail loaded';
-      this.detail = cloneGalleryDetail(result.detail);
+      this.detail = mergeLoadedGalleryDetail(result.detail, this.detail);
       this.detailDownloadText = downloadButtonText(result.detail.gid);
       this.detailLoaded = true;
       this.renderVersion++;
@@ -2229,7 +2240,7 @@ export struct DetailActions {
       Scroll() {
         Row() {
           DetailActionItem({
-            symbolIcon: $r('sys.symbol.heart'),
+            symbolIcon: this.isFavorited ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'),
             label: this.isFavorited ? uiText('Favorited') : uiText('Favorite'),
             isActive: this.detail.gid > 0,
             isFilled: this.isFavorited,

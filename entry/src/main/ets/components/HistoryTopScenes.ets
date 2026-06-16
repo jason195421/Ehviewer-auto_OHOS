@@ -30,6 +30,17 @@ function normalizeSceneScrollOffset(offset: number): number {
   return offset;
 }
 
+function mergeLoadedSceneDetail(loaded: GalleryDetail, previous: GalleryDetail): GalleryDetail {
+  const next = cloneGalleryDetail(loaded);
+  if ((next.thumb === undefined || next.thumb.length === 0) && previous.thumb !== undefined && previous.thumb.length > 0) {
+    next.thumb = previous.thumb;
+  }
+  if ((next.thumb === undefined || next.thumb.length === 0) && next.previewSet.length > 0) {
+    next.thumb = next.previewSet[0].imageUrl;
+  }
+  return next;
+}
+
 @Component
 export struct HistoryScene {
   private client: EhHttpClient = new EhHttpClient();
@@ -44,6 +55,7 @@ export struct HistoryScene {
   @State detailStatus: string = 'Tap a history item to load detail';
   @State detailRequestUrl: string = '';
   @State detailDownloadText: string = 'Download';
+  @State detailLoaded: boolean = false;
   @State readerStatus: string = 'Reader is ready';
   @State readerPage: GalleryPage = createEmptyPage();
   @State readerPreviewIndex: number = 0;
@@ -133,6 +145,7 @@ export struct HistoryScene {
     this.detailStatus = 'Loading detail for gid ' + gallery.gid.toString() + '...';
     this.detailRequestUrl = '';
     this.detailDownloadText = downloadButtonText(gallery.gid);
+    this.detailLoaded = false;
     this.renderVersion++;
 
     this.client.loadGalleryDetail(gallery.gid, gallery.token, 0, currentGallerySite(), '').then((result: GalleryDetailLoadResult) => {
@@ -144,8 +157,9 @@ export struct HistoryScene {
       }
 
       this.detailStatus = 'Detail loaded';
-      this.detail = cloneGalleryDetail(result.detail);
+      this.detail = mergeLoadedSceneDetail(result.detail, this.detail);
       this.detailDownloadText = downloadButtonText(result.detail.gid);
+      this.detailLoaded = true;
       this.renderVersion++;
       saveGalleryToHistory(result.detail);
       this.loadHistory();
@@ -164,6 +178,7 @@ export struct HistoryScene {
     this.detailStatus = 'Tap a history item to load detail';
     this.detailRequestUrl = '';
     this.detailDownloadText = 'Download';
+    this.detailLoaded = false;
     this.readerStatus = 'Reader is ready';
     this.readerPage = createEmptyPage();
     this.readerPreviewIndex = 0;
@@ -417,7 +432,10 @@ export struct HistoryScene {
       GallerySite.E).then((result: ToggleFavoriteResult) => {
       this.detailStatus = result.message;
       if (result.ok) {
-        this.detail.isFavorited = result.nowFavorited;
+        const nextDetail = cloneGalleryDetail(this.detail);
+        nextDetail.isFavorited = result.nowFavorited;
+        nextDetail.favoriteSlot = result.nowFavorited ? Math.max(-1, nextDetail.favoriteSlot) : -2;
+        this.detail = nextDetail;
       }
       this.renderVersion++;
     }).catch((error: Error) => {
@@ -545,6 +563,7 @@ export struct HistoryScene {
       GalleryDetailScene({
         renderVersion: this.renderVersion,
         detail: this.detail,
+        isDetailLoaded: this.detailLoaded,
         isFavorited: this.detail.isFavorited,
         statusText: this.detailStatus,
         requestUrl: this.detailRequestUrl,
@@ -751,6 +770,7 @@ export struct TopListScene {
   @State detailStatus: string = 'Tap a ranking item to load detail';
   @State detailRequestUrl: string = '';
   @State detailDownloadText: string = 'Download';
+  @State detailLoaded: boolean = false;
   @State readerStatus: string = 'Reader is ready';
   @State readerPage: GalleryPage = createEmptyPage();
   @State readerPreviewIndex: number = 0;
@@ -851,6 +871,7 @@ export struct TopListScene {
     this.detailStatus = 'Loading detail for gid ' + item.gid + '...';
     this.detailRequestUrl = '';
     this.detailDownloadText = downloadButtonText(gid);
+    this.detailLoaded = false;
     this.renderVersion++;
 
     this.client.loadGalleryDetail(gid, item.token, 0, GallerySite.E, this.requestUrl).then((result: GalleryDetailLoadResult) => {
@@ -861,8 +882,9 @@ export struct TopListScene {
         return;
       }
       this.detailStatus = 'Detail loaded';
-      this.detail = cloneGalleryDetail(result.detail);
+      this.detail = mergeLoadedSceneDetail(result.detail, this.detail);
       this.detailDownloadText = downloadButtonText(result.detail.gid);
+      this.detailLoaded = true;
       this.renderVersion++;
       saveGalleryToHistory(result.detail);
       this.prewarmReader();
@@ -880,6 +902,7 @@ export struct TopListScene {
     this.detailStatus = 'Tap a ranking item to load detail';
     this.detailRequestUrl = '';
     this.detailDownloadText = 'Download';
+    this.detailLoaded = false;
     this.readerStatus = 'Reader is ready';
     this.readerPage = createEmptyPage();
     this.readerPreviewIndex = 0;
@@ -1051,7 +1074,10 @@ export struct TopListScene {
       GallerySite.E).then((result: ToggleFavoriteResult) => {
       this.detailStatus = result.message;
       if (result.ok) {
-        this.detail.isFavorited = result.nowFavorited;
+        const nextDetail = cloneGalleryDetail(this.detail);
+        nextDetail.isFavorited = result.nowFavorited;
+        nextDetail.favoriteSlot = result.nowFavorited ? Math.max(-1, nextDetail.favoriteSlot) : -2;
+        this.detail = nextDetail;
       }
       this.renderVersion++;
     }).catch((error: Error) => {
@@ -1172,6 +1198,7 @@ export struct TopListScene {
       GalleryDetailScene({
         renderVersion: this.renderVersion,
         detail: this.detail,
+        isDetailLoaded: this.detailLoaded,
         isFavorited: this.detail.isFavorited,
         statusText: this.detailStatus,
         requestUrl: this.detailRequestUrl,
