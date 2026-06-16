@@ -848,6 +848,7 @@ export struct GalleryListContent {
   private loadMorePending: boolean = false;
   private restoredScroll: boolean = false;
   private snapTopAfterRefresh: boolean = false;
+  private suppressScrollCache: boolean = false;
   @State toolbarOffsetY: number = 0;
   private lastScrollY: number = 0;
   private barHeight: number = 56; // matches EhNavBar body height
@@ -972,6 +973,32 @@ export struct GalleryListContent {
     this.toolbarOffsetY = 0;
     this.lastScrollY = 0;
     this.onScrollUpdate(0);
+  }
+
+  private rememberListOffset(yOffset: number): void {
+    if (this.suppressScrollCache || this.refreshing || this.snapTopAfterRefresh) {
+      return;
+    }
+    this.onScrollUpdate(yOffset);
+  }
+
+  private finishRefreshAtTop(): void {
+    this.suppressScrollCache = true;
+    this.snapTopAfterRefresh = true;
+    this.refreshing = false;
+    this.refreshShowLogo = true;
+    this.refreshMsg = '';
+    this.refreshScaleNum = 0;
+    this.refreshPullOffset = 0;
+    this.snapListToTop();
+    setTimeout(() => {
+      this.snapListToTop();
+      setTimeout(() => {
+        this.snapListToTop();
+        this.snapTopAfterRefresh = false;
+        this.suppressScrollCache = false;
+      }, 80);
+    }, 80);
   }
 
   private galleryCardWidth(): number {
@@ -1136,12 +1163,12 @@ export struct GalleryListContent {
         .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) => {
           const yOff = normalizeGalleryListScrollOffset(this.listScroller.currentOffset().yOffset);
           this.handleScrollMove(yOff);
-          this.onScrollUpdate(yOff);
+          this.rememberListOffset(yOff);
           this.triggerLoadMoreByOffset(yOff);
         })
         .onScrollStop(() => {
           const yOff = normalizeGalleryListScrollOffset(this.listScroller.currentOffset().yOffset);
-          this.onScrollUpdate(yOff);
+          this.rememberListOffset(yOff);
           if (this.snapTopAfterRefresh && yOff === 0) {
             this.snapTopAfterRefresh = false;
             this.snapListToTop();
@@ -1166,6 +1193,7 @@ export struct GalleryListContent {
         this.refreshPullOffset = Math.max(0, value);
         if (value > 0) {
           this.snapTopAfterRefresh = true;
+          this.suppressScrollCache = true;
         }
         if (value < this.REFRESH_OFFSET) {
           this.refreshShowLogo = true;
@@ -1183,6 +1211,7 @@ export struct GalleryListContent {
         } else if (refreshStatus === RefreshStatus.Inactive && this.snapTopAfterRefresh) {
           setTimeout(() => {
             this.snapTopAfterRefresh = false;
+            this.suppressScrollCache = false;
             this.refreshPullOffset = 0;
             this.snapListToTop();
           }, 80);
@@ -1191,17 +1220,10 @@ export struct GalleryListContent {
       .onRefreshing(() => {
         this.refreshPullOffset = this.REFRESH_OFFSET;
         this.snapTopAfterRefresh = true;
+        this.suppressScrollCache = true;
         this.snapListToTop();
         this.onRefreshPull(() => {
-          this.refreshing = false;
-          this.refreshShowLogo = true;
-          this.refreshMsg = '';
-          this.refreshScaleNum = 0;
-          this.refreshPullOffset = 0;
-          setTimeout(() => {
-            this.snapTopAfterRefresh = false;
-            this.snapListToTop();
-          }, 80);
+          this.finishRefreshAtTop();
         });
       })
       .width('100%')
