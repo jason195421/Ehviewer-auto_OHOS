@@ -90,21 +90,6 @@ export struct HistoryScene {
     });
   }
 
-  private refreshHistoryFromPull(): void {
-    if (this.historyRefreshing) {
-      return;
-    }
-    this.historyRefreshShowLogo = false;
-    this.historyRefreshMsg = uiText('Refreshing...');
-    this.historyRefreshing = true;
-    this.loadHistory();
-    setTimeout(() => {
-      this.historyRefreshing = false;
-      this.historyRefreshShowLogo = true;
-      this.historyRefreshMsg = '';
-      this.historyRefreshScaleNum = 0;
-    }, 800);
-  }
 
   private clearHistory(): void {
     ehHistoryStore.clear();
@@ -488,7 +473,10 @@ export struct HistoryScene {
         toolbarHeight: 62,
         onMenu: this.onMenu,
         onRefresh: () => {
-          this.refreshHistoryFromPull();
+          this.historyRefreshShowLogo = false;
+            this.historyRefreshMsg = uiText('Refreshing...');
+            this.historyRefreshing = true;
+            this.loadHistory();
         },
         onClear: () => {
           this.clearHistory();
@@ -578,7 +566,10 @@ export struct HistoryScene {
           })
           .onRefreshing(() => {
             this.historyRefreshScaleNum = 0;
-            this.refreshHistoryFromPull();
+            this.historyRefreshShowLogo = false;
+            this.historyRefreshMsg = uiText('Refreshing...');
+            this.historyRefreshing = true;
+            this.loadHistory();
           })
           .width('100%')
           .height('100%')
