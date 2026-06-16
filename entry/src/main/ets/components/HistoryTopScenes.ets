@@ -428,15 +428,50 @@ export struct HistoryScene {
   private shareDetail(): void {
     if (this.detail.gid <= 0) {
       this.detailStatus = 'No gallery loaded';
+      this.renderVersion++;
       return;
     }
     const url = EhUrl.getGalleryDetailUrl(this.detail.gid, this.detail.token, 0, false, GallerySite.E);
+    this.copyDetailLink(url, 'Gallery URL');
+  }
+
+  private rateDetail(rating: number): void {
+    if (this.detail.gid <= 0 || this.detail.apiUid < 0 || this.detail.apiKey.length === 0) {
+      this.detailStatus = 'Rating needs a loaded gallery session';
+      this.renderVersion++;
+      return;
+    }
+    this.detailStatus = 'Submitting rating...';
+    this.renderVersion++;
+    this.client.rateGallery(this.detail.gid, this.detail.token, this.detail.apiUid, this.detail.apiKey, rating,
+      GallerySite.E).then((result: RateGalleryResult) => {
+      this.detailStatus = result.message;
+      if (result.ok) {
+        const nextDetail = cloneGalleryDetail(this.detail);
+        nextDetail.rating = result.rating;
+        nextDetail.ratingCount = result.ratingCount > 0 ? result.ratingCount : nextDetail.ratingCount;
+        nextDetail.rated = true;
+        this.detail = nextDetail;
+      }
+      this.renderVersion++;
+    }).catch((error: Error) => {
+      this.detailStatus = 'Rating failed: ' + error.message;
+      this.renderVersion++;
+    });
+  }
+
+  private copyDetailLink(url: string, label: string): void {
+    if (url.length === 0) {
+      this.detailStatus = label + ' link is unavailable';
+      this.renderVersion++;
+      return;
+    }
     try {
       const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, url);
       pasteboard.getSystemPasteboard().setData(data);
-      this.detailStatus = 'Gallery URL copied to clipboard';
+      this.detailStatus = label + ' link copied to clipboard';
     } catch (error) {
-      this.detailStatus = 'Copy failed: ' + String(error);
+      this.detailStatus = label + ' copy failed: ' + String(error);
     }
     this.renderVersion++;
   }
@@ -534,6 +569,15 @@ export struct HistoryScene {
         },
         onShare: () => {
           this.shareDetail();
+        },
+        onRate: (rating: number) => {
+          this.rateDetail(rating);
+        },
+        onTorrent: () => {
+          this.copyDetailLink(this.detail.torrentUrl, 'Torrent');
+        },
+        onArchive: () => {
+          this.copyDetailLink(this.detail.archiveUrl, 'Archive');
         },
         initialDetailScrollOffset: this.detailScrollOffset,
         onDetailScrollUpdate: (offset: number) => {
@@ -1018,15 +1062,50 @@ export struct TopListScene {
   private shareDetail(): void {
     if (this.detail.gid <= 0) {
       this.detailStatus = 'No gallery loaded';
+      this.renderVersion++;
       return;
     }
     const url = EhUrl.getGalleryDetailUrl(this.detail.gid, this.detail.token, 0, false, GallerySite.E);
+    this.copyDetailLink(url, 'Gallery URL');
+  }
+
+  private rateDetail(rating: number): void {
+    if (this.detail.gid <= 0 || this.detail.apiUid < 0 || this.detail.apiKey.length === 0) {
+      this.detailStatus = 'Rating needs a loaded gallery session';
+      this.renderVersion++;
+      return;
+    }
+    this.detailStatus = 'Submitting rating...';
+    this.renderVersion++;
+    this.client.rateGallery(this.detail.gid, this.detail.token, this.detail.apiUid, this.detail.apiKey, rating,
+      GallerySite.E).then((result: RateGalleryResult) => {
+      this.detailStatus = result.message;
+      if (result.ok) {
+        const nextDetail = cloneGalleryDetail(this.detail);
+        nextDetail.rating = result.rating;
+        nextDetail.ratingCount = result.ratingCount > 0 ? result.ratingCount : nextDetail.ratingCount;
+        nextDetail.rated = true;
+        this.detail = nextDetail;
+      }
+      this.renderVersion++;
+    }).catch((error: Error) => {
+      this.detailStatus = 'Rating failed: ' + error.message;
+      this.renderVersion++;
+    });
+  }
+
+  private copyDetailLink(url: string, label: string): void {
+    if (url.length === 0) {
+      this.detailStatus = label + ' link is unavailable';
+      this.renderVersion++;
+      return;
+    }
     try {
       const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, url);
       pasteboard.getSystemPasteboard().setData(data);
-      this.detailStatus = 'Gallery URL copied to clipboard';
+      this.detailStatus = label + ' link copied to clipboard';
     } catch (error) {
-      this.detailStatus = 'Copy failed: ' + String(error);
+      this.detailStatus = label + ' copy failed: ' + String(error);
     }
     this.renderVersion++;
   }
@@ -1117,6 +1196,15 @@ export struct TopListScene {
         },
         onShare: () => {
           this.shareDetail();
+        },
+        onRate: (rating: number) => {
+          this.rateDetail(rating);
+        },
+        onTorrent: () => {
+          this.copyDetailLink(this.detail.torrentUrl, 'Torrent');
+        },
+        onArchive: () => {
+          this.copyDetailLink(this.detail.archiveUrl, 'Archive');
         },
         initialDetailScrollOffset: this.detailScrollOffset,
         onDetailScrollUpdate: (offset: number) => {

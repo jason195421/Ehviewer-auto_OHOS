@@ -659,20 +659,55 @@ export struct GalleryListScene {
     });
   }
 
-  private shareDetail(): void {
-    if (this.detail.gid <= 0) {
-      this.detailStatus = 'No gallery loaded';
+  private rateDetail(rating: number): void {
+    if (this.detail.gid <= 0 || this.detail.apiUid < 0 || this.detail.apiKey.length === 0) {
+      this.detailStatus = 'Rating needs a loaded gallery session';
+      this.renderVersion++;
       return;
     }
-    const url = EhUrl.getGalleryDetailUrl(this.detail.gid, this.detail.token, 0, false, this.activeSite);
+    this.detailStatus = 'Submitting rating...';
+    this.renderVersion++;
+    this.client.rateGallery(this.detail.gid, this.detail.token, this.detail.apiUid, this.detail.apiKey, rating,
+      this.activeSite).then((result: RateGalleryResult) => {
+      this.detailStatus = result.message;
+      if (result.ok) {
+        const nextDetail = cloneGalleryDetail(this.detail);
+        nextDetail.rating = result.rating;
+        nextDetail.ratingCount = result.ratingCount > 0 ? result.ratingCount : nextDetail.ratingCount;
+        nextDetail.rated = true;
+        this.detail = nextDetail;
+      }
+      this.renderVersion++;
+    }).catch((error: Error) => {
+      this.detailStatus = 'Rating failed: ' + error.message;
+      this.renderVersion++;
+    });
+  }
+
+  private copyDetailLink(url: string, label: string): void {
+    if (url.length === 0) {
+      this.detailStatus = label + ' link is unavailable';
+      this.renderVersion++;
+      return;
+    }
     try {
       const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, url);
       pasteboard.getSystemPasteboard().setData(data);
-      this.detailStatus = 'Gallery URL copied to clipboard';
+      this.detailStatus = label + ' link copied to clipboard';
     } catch (error) {
-      this.detailStatus = 'Copy failed: ' + String(error);
+      this.detailStatus = label + ' copy failed: ' + String(error);
     }
     this.renderVersion++;
+  }
+
+  private shareDetail(): void {
+    if (this.detail.gid <= 0) {
+      this.detailStatus = 'No gallery loaded';
+      this.renderVersion++;
+      return;
+    }
+    const url = EhUrl.getGalleryDetailUrl(this.detail.gid, this.detail.token, 0, false, this.activeSite);
+    this.copyDetailLink(url, 'Gallery URL');
   }
 
   build() {
@@ -742,6 +777,15 @@ export struct GalleryListScene {
           },
           onShare: () => {
             this.shareDetail();
+          },
+          onRate: (rating: number) => {
+            this.rateDetail(rating);
+          },
+          onTorrent: () => {
+            this.copyDetailLink(this.detail.torrentUrl, 'Torrent');
+          },
+          onArchive: () => {
+            this.copyDetailLink(this.detail.archiveUrl, 'Archive');
           },
           initialDetailScrollOffset: this.detailScrollOffset,
           onDetailScrollUpdate: (offset: number) => {
@@ -847,7 +891,6 @@ export struct GalleryListContent {
   @State refreshMsg: string = '';
   private readonly REFRESH_OFFSET: number = 64;
   private readonly REFRESH_HEADER_HEIGHT: number = 96;
-  private readonly LIST_BOTTOM_SPACER: number = 80;
   @State viewportHeight: number = 0;
   private listScroller: Scroller = new Scroller();
   private loadMorePending: boolean = false;
@@ -901,7 +944,7 @@ export struct GalleryListContent {
     const cardHeight = galleryListMode() === 'Thumb' ? Math.max(0, this.galleryCardWidth() / 0.75 + 54) :
       galleryThumbHeight();
     return this.totalBarHeight() + rows * cardHeight + Math.max(0, rows - 1) * this.galleryCardGap() +
-      this.galleryContentPadding() + this.LIST_BOTTOM_SPACER;
+      this.galleryContentPadding();
   }
 
   private triggerLoadMoreByOffset(offset: number): void {
@@ -1114,11 +1157,6 @@ export struct GalleryListContent {
                 }
               }
 
-              ListItem() {
-                Column()
-                  .width('100%')
-                  .height(this.LIST_BOTTOM_SPACER)
-              }
             }
           }
           .contentStartOffset(this.contentStartOffset())
@@ -1821,109 +1859,151 @@ export struct GalleryDetailScene {
   onComments: () => void = () => {};
   onFavorite: () => void = () => {};
   onShare: () => void = () => {};
+  onRate: (rating: number) => void = (_rating: number) => {};
+  onTorrent: () => void = () => {};
+  onArchive: () => void = () => {};
   initialDetailScrollOffset: number = 0;
   onDetailScrollUpdate: (offset: number) => void = () => {};
   private detailScroller: Scroller = new Scroller();
-  private client: EhHttpClient = new EhHttpClient();
   @State showRatingDialog: boolean = false;
   @State pendingRating: number = 0;
 
+  private startRating(): void {
+    if (!this.isDetailLoaded || this.detail.apiUid < 0 || this.detail.apiKey.length === 0) {
+      return;
+    }
+    const current = this.detail.rated && this.detail.rating > 0 ? Math.round(this.detail.rating) : 5;
+    this.pendingRating = Math.max(1, Math.min(5, current));
+    this.showRatingDialog = true;
+  }
+
   build() {
-    Column() {
-      Row() {
-        Button({ type: ButtonType.Circle, stateEffect: true }) {
-          SymbolGlyph($r('sys.symbol.chevron_left'))
-            .fontSize(20)
-            .fontColor([Color.White])
-        }
-        .width(36)
-        .height(36)
-        .backgroundColor('#2F6F8F')
-        .onClick(() => {
-          this.onBack();
-        })
-        Text(galleryDisplayTitle(this.detail))
-          .fontSize(15)
-          .fontWeight(FontWeight.Medium)
-          .fontColor('#17202A')
-          .margin({ left: 12 })
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .layoutWeight(1)
-      }
-      .width('100%')
-      .padding({ left: 12, right: 12, top: 10, bottom: 8 })
-
-      if (this.statusText.length > 0) {
-        Text(uiStatusText(this.statusText))
-          .fontSize(12)
-          .fontColor('#0A6B45')
-          .width('100%')
-          .padding({ left: 14, right: 14, top: 6, bottom: 6 })
-          .backgroundColor('#F0FBF6')
-      }
-
-      List({ space: 0, scroller: this.detailScroller }) {
-        ListItem() {
-          DetailHeader({
-            detail: this.detail,
-            downloadText: this.downloadText,
-            onDownload: this.onDownload,
-            onRead: this.onRead
+    Stack({ alignContent: Alignment.Center }) {
+      Column() {
+        Row() {
+          Button({ type: ButtonType.Circle, stateEffect: true }) {
+            SymbolGlyph($r('sys.symbol.chevron_left'))
+              .fontSize(20)
+              .fontColor([Color.White])
+          }
+          .width(36)
+          .height(36)
+          .backgroundColor('#2F6F8F')
+          .onClick(() => {
+            this.onBack();
           })
+          Text(galleryDisplayTitle(this.detail))
+            .fontSize(15)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#17202A')
+            .margin({ left: 12 })
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .layoutWeight(1)
         }
-        if (this.statusText.length > 0 && (!this.isDetailLoaded || this.statusText.indexOf('failed') >= 0 ||
-          this.statusText.indexOf('Failed') >= 0)) {
+        .width('100%')
+        .padding({ left: 12, right: 12, top: 10, bottom: 8 })
+
+        if (this.statusText.length > 0) {
+          Text(uiStatusText(this.statusText))
+            .fontSize(12)
+            .fontColor('#0A6B45')
+            .width('100%')
+            .padding({ left: 14, right: 14, top: 6, bottom: 6 })
+            .backgroundColor('#F0FBF6')
+        }
+
+        List({ space: 0, scroller: this.detailScroller }) {
           ListItem() {
-            DetailLoadStatus({
-              statusText: this.statusText,
-              isError: this.statusText.indexOf('failed') >= 0 || this.statusText.indexOf('Failed') >= 0
+            DetailHeader({
+              detail: this.detail,
+              downloadText: this.downloadText,
+              onDownload: this.onDownload,
+              onRead: this.onRead
+            })
+          }
+          if (this.statusText.length > 0 && (!this.isDetailLoaded || this.statusText.indexOf('failed') >= 0 ||
+            this.statusText.indexOf('Failed') >= 0)) {
+            ListItem() {
+              DetailLoadStatus({
+                statusText: this.statusText,
+                isError: this.statusText.indexOf('failed') >= 0 || this.statusText.indexOf('Failed') >= 0
+              })
+            }
+          }
+          ListItem() {
+            DetailInfoBlock({ detail: this.detail, requestUrl: this.requestUrl, isDetailLoaded: this.isDetailLoaded })
+          }
+          ListItem() {
+            DetailActions({
+              detail: this.detail,
+              isDetailLoaded: this.isDetailLoaded,
+              isFavorited: this.isFavorited,
+              onFavorite: this.onFavorite,
+              onShare: this.onShare,
+              onRate: () => {
+                this.startRating();
+              },
+              onTorrent: this.onTorrent,
+              onArchive: this.onArchive
+            })
+          }
+          ListItem() {
+            DetailTags({ tags: this.detail.tags, isDetailLoaded: this.isDetailLoaded })
+          }
+          ListItem() {
+            DetailPreviews({
+              previews: this.detail.previewSet,
+              previewPages: this.detail.previewPages,
+              isDetailLoaded: this.isDetailLoaded,
+              onSelectPreview: this.onSelectPreview
+            })
+          }
+          ListItem() {
+            DetailComments({
+              comments: this.detail.comments,
+              isDetailLoaded: this.isDetailLoaded,
+              onComments: this.onComments
             })
           }
         }
-        ListItem() {
-          DetailInfoBlock({ detail: this.detail, requestUrl: this.requestUrl, isDetailLoaded: this.isDetailLoaded })
-        }
-        ListItem() {
-          DetailActions({
-            detail: this.detail,
-            isDetailLoaded: this.isDetailLoaded,
-            isFavorited: this.isFavorited,
-            onFavorite: this.onFavorite,
-            onShare: this.onShare,
-            onTorrent: () => {},
-            onArchive: () => {}
-          })
-        }
-        ListItem() {
-          DetailTags({ tags: this.detail.tags, isDetailLoaded: this.isDetailLoaded })
-        }
-        ListItem() {
-          DetailPreviews({
-            previews: this.detail.previewSet,
-            previewPages: this.detail.previewPages,
-            isDetailLoaded: this.isDetailLoaded,
-            onSelectPreview: this.onSelectPreview
-          })
-        }
-        ListItem() {
-          DetailComments({
-            comments: this.detail.comments,
-            isDetailLoaded: this.isDetailLoaded,
-            onComments: this.onComments
-          })
-        }
+        .width('100%')
+        .layoutWeight(1)
+        .onAppear(() => {
+          if (this.initialDetailScrollOffset > 0) {
+            this.detailScroller.scrollTo({ xOffset: 0, yOffset: this.initialDetailScrollOffset });
+          }
+        })
+        .onScrollStop(() => {
+          this.onDetailScrollUpdate(this.detailScroller.currentOffset().yOffset);
+        })
       }
       .width('100%')
-      .layoutWeight(1)
-      .onAppear(() => {
-        if (this.initialDetailScrollOffset > 0) {
-          this.detailScroller.scrollTo({ xOffset: 0, yOffset: this.initialDetailScrollOffset });
+      .height('100%')
+
+      if (this.showRatingDialog) {
+        Column() {
+          RatingPanel({
+            rating: this.pendingRating,
+            onChange: (rating: number) => {
+              this.pendingRating = rating;
+            },
+            onCancel: () => {
+              this.showRatingDialog = false;
+            },
+            onSubmit: () => {
+              this.showRatingDialog = false;
+              this.onRate(this.pendingRating);
+            }
+          })
         }
-      })
-      .onScrollStop(() => {
-        this.onDetailScrollUpdate(this.detailScroller.currentOffset().yOffset);
-      })
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .padding(24)
+        .backgroundColor('#66000000')
+      }
     }
     .width('100%')
     .height('100%')
@@ -2164,6 +2244,7 @@ export struct DetailActions {
   @Prop isFavorited: boolean = false;
   onFavorite: () => void = () => {};
   onShare: () => void = () => {};
+  onRate: () => void = () => {};
   onTorrent: () => void = () => {};
   onArchive: () => void = () => {};
 
@@ -2181,8 +2262,9 @@ export struct DetailActions {
           DetailActionItem({
             symbolIcon: $r('sys.symbol.star'),
             label: uiText('Rate'),
-            isActive: this.isDetailLoaded && this.detail.apiUid >= 0,
-            onTap: () => {}
+            isActive: this.isDetailLoaded && this.detail.apiUid >= 0 && this.detail.apiKey.length > 0,
+            isFilled: this.detail.rated,
+            onTap: this.onRate
           })
           DetailActionItem({
             symbolIcon: $r('sys.symbol.share'),
@@ -2253,6 +2335,73 @@ export struct RatingSummary {
     .width('100%')
   }
 }
+
+@Component
+export struct RatingPanel {
+  @Prop rating: number = 5;
+  onChange: (rating: number) => void = (_rating: number) => {};
+  onCancel: () => void = () => {};
+  onSubmit: () => void = () => {};
+
+  build() {
+    Column() {
+      Text(uiText('Rate'))
+        .fontSize(18)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#17202A')
+        .width('100%')
+      Text(this.rating.toString() + ' / 5')
+        .fontSize(13)
+        .fontColor('#667085')
+        .width('100%')
+        .margin({ top: 4, bottom: 14 })
+      Row({ space: 8 }) {
+        ForEach([1, 2, 3, 4, 5], (value: number) => {
+          SymbolGlyph($r('sys.symbol.star_fill'))
+            .fontSize(32)
+            .fontColor([this.rating >= value ? '#F7C948' : '#D0D5DD'])
+            .onClick(() => {
+              this.onChange(value);
+            })
+        }, (value: number) => value.toString())
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.Center)
+
+      Row({ space: 10 }) {
+        Button(uiText('Cancel'))
+          .type(ButtonType.Normal)
+          .height(38)
+          .fontSize(13)
+          .fontColor('#40566F')
+          .backgroundColor('#EEF2F6')
+          .borderRadius(4)
+          .layoutWeight(1)
+          .onClick(() => {
+            this.onCancel();
+          })
+        Button(uiText('Submit'))
+          .type(ButtonType.Normal)
+          .height(38)
+          .fontSize(13)
+          .fontColor(Color.White)
+          .backgroundColor('#2F6F8F')
+          .borderRadius(4)
+          .layoutWeight(1)
+          .onClick(() => {
+            this.onSubmit();
+          })
+      }
+      .width('100%')
+      .margin({ top: 18 })
+    }
+    .width('100%')
+    .padding(18)
+    .backgroundColor(Color.White)
+    .borderRadius(8)
+  }
+}
+
 @Component
 export struct DetailActionItem {
   symbolIcon: Resource = $r('sys.symbol.heart');
