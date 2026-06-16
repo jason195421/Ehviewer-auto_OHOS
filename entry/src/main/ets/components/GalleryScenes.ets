@@ -1,4 +1,4 @@
-import { common } from '@kit.AbilityKit';
+﻿import { common } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { pasteboard } from '@kit.BasicServicesKit';
 import { picker } from '@kit.CoreFileKit';
@@ -45,7 +45,14 @@ function updateGalleryListScrollCache(key: string, offset: number): void {
   if (cache === undefined) {
     return;
   }
-  cache.listScrollOffset = offset;
+  cache.listScrollOffset = normalizeGalleryListScrollOffset(offset);
+}
+
+function normalizeGalleryListScrollOffset(offset: number): number {
+  if (offset <= 1 || Number.isNaN(offset)) {
+    return 0;
+  }
+  return offset;
 }
 
 @Component
@@ -834,11 +841,13 @@ export struct GalleryListContent {
   @State refreshScaleNum: number = 0;
   @State refreshShowLogo: boolean = true;
   @State refreshMsg: string = '';
-  private readonly REFRESH_OFFSET: number = 60;
+  @State refreshPullOffset: number = 0;
+  private readonly REFRESH_OFFSET: number = 64;
   @State viewportHeight: number = 0;
   private listScroller: Scroller = new Scroller();
   private loadMorePending: boolean = false;
   private restoredScroll: boolean = false;
+  private snapTopAfterRefresh: boolean = false;
   @State toolbarOffsetY: number = 0;
   private lastScrollY: number = 0;
   private barHeight: number = 56; // matches EhNavBar body height
@@ -846,9 +855,7 @@ export struct GalleryListContent {
   
   onScrollReset(): void {
     // scrollResetVersion 变化时滚回顶部
-    this.listScroller.scrollTo({ xOffset: 0, yOffset: 0 });
-    this.toolbarOffsetY = 0;
-    this.lastScrollY = 0;
+    this.snapListToTop();
   }
 
   private statusBarVp(): number {
@@ -933,6 +940,40 @@ export struct GalleryListContent {
     return 8;
   }
 
+  private refreshIndicatorScale(): number {
+    if (this.refreshing) {
+      return 1;
+    }
+    if (this.refreshPullOffset <= 0) {
+      return 0;
+    }
+    return Math.min(1, Math.max(0.62, this.refreshPullOffset / this.REFRESH_OFFSET));
+  }
+
+  private refreshIndicatorOpacity(): number {
+    if (this.refreshing) {
+      return 1;
+    }
+    if (this.refreshPullOffset <= 0) {
+      return 0;
+    }
+    return Math.min(1, Math.max(0.45, this.refreshPullOffset / this.REFRESH_OFFSET));
+  }
+
+  private refreshIndicatorTop(): number {
+    const pull = this.refreshing ? this.REFRESH_OFFSET : Math.min(this.refreshPullOffset, this.REFRESH_OFFSET);
+    const firstCardTop = this.contentTopPadding() + pull;
+    const indicatorHeight = this.refreshMsg.length > 0 ? 58 : 40;
+    return Math.max(this.totalBarHeight() + 4, firstCardTop - indicatorHeight);
+  }
+
+  private snapListToTop(): void {
+    this.listScroller.scrollTo({ xOffset: 0, yOffset: 0 });
+    this.toolbarOffsetY = 0;
+    this.lastScrollY = 0;
+    this.onScrollUpdate(0);
+  }
+
   private galleryCardWidth(): number {
     const availableWidth = Math.max(0, this.contentWidth - this.galleryContentPadding() * 2);
     if (availableWidth <= 0 || Number.isNaN(availableWidth)) {
@@ -983,31 +1024,37 @@ export struct GalleryListContent {
 
   @Builder
   private customRefreshComponent() {
-    Stack() {
-      Column({ space: 6 }) {
-        // Logo icon: visible while dragging (before refresh triggers)
-        Image($r('app.media.app_icon'))
-          .width(28)
-          .height(28)
-          .scale({ x: this.refreshScaleNum, y: this.refreshScaleNum })
-          .visibility(this.refreshShowLogo ? Visibility.Visible : Visibility.None)
-        // LoadingProgress: visible once refresh is triggered
-        LoadingProgress()
-          .width(32)
-          .height(32)
-          .color(APP_THEME_COLOR)
-          .visibility(this.refreshShowLogo ? Visibility.None : Visibility.Visible)
-        if (this.refreshMsg.length > 0) {
-          Text(this.refreshMsg)
-            .fontSize(13)
-            .fontColor($r('app.color.secondary_text'))
-        }
+    Blank()
+      .height(1)
+      .width('100%')
+  }
+
+  @Builder
+  private refreshIndicatorOverlay() {
+    Column({ space: 6 }) {
+      // Logo icon: visible while dragging (before refresh triggers)
+      Image($r('app.media.app_icon'))
+        .width(32)
+        .height(32)
+        .scale({ x: this.refreshIndicatorScale(), y: this.refreshIndicatorScale() })
+        .visibility(this.refreshShowLogo ? Visibility.Visible : Visibility.None)
+      // LoadingProgress: visible once refresh is triggered
+      LoadingProgress()
+        .width(28)
+        .height(28)
+        .color(APP_THEME_COLOR)
+        .visibility(this.refreshShowLogo ? Visibility.None : Visibility.Visible)
+      if (this.refreshMsg.length > 0) {
+        Text(this.refreshMsg)
+          .fontSize(12)
+          .fontColor($r('app.color.secondary_text'))
       }
-      .alignItems(HorizontalAlign.Center)
     }
+    .alignItems(HorizontalAlign.Center)
     .width('100%')
-    .height(100)
-    .align(Alignment.Center)
+    .height(64)
+    .opacity(this.refreshIndicatorOpacity())
+    .translate({ y: this.refreshIndicatorTop() })
   }
 
   build() {
@@ -1087,14 +1134,18 @@ export struct GalleryListContent {
           }
         })
         .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) => {
-          const yOff = this.listScroller.currentOffset().yOffset;
+          const yOff = normalizeGalleryListScrollOffset(this.listScroller.currentOffset().yOffset);
           this.handleScrollMove(yOff);
           this.onScrollUpdate(yOff);
           this.triggerLoadMoreByOffset(yOff);
         })
         .onScrollStop(() => {
-          const yOff = this.listScroller.currentOffset().yOffset;
+          const yOff = normalizeGalleryListScrollOffset(this.listScroller.currentOffset().yOffset);
           this.onScrollUpdate(yOff);
+          if (this.snapTopAfterRefresh && yOff === 0) {
+            this.snapTopAfterRefresh = false;
+            this.snapListToTop();
+          }
           if (this.toolbarOffsetY < -this.totalBarHeight() / 2) {
             this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
               this.toolbarOffsetY = -this.totalBarHeight();
@@ -1112,30 +1163,45 @@ export struct GalleryListContent {
       .refreshOffset(this.REFRESH_OFFSET)
       .pullToRefresh(true)
       .onOffsetChange((value: number) => {
+        this.refreshPullOffset = Math.max(0, value);
+        if (value > 0) {
+          this.snapTopAfterRefresh = true;
+        }
         if (value < this.REFRESH_OFFSET) {
           this.refreshShowLogo = true;
           this.refreshMsg = uiText('Pull down to refresh');
-          this.refreshScaleNum = value / this.REFRESH_OFFSET;
+          this.refreshScaleNum = this.refreshIndicatorScale();
         } else {
           this.refreshMsg = uiText('Release to refresh');
-          this.refreshScaleNum = this.REFRESH_OFFSET / value;
+          this.refreshScaleNum = this.refreshIndicatorScale();
         }
       })
       .onStateChange((refreshStatus: RefreshStatus) => {
         if (refreshStatus === RefreshStatus.Refresh) {
           this.refreshShowLogo = false;
           this.refreshMsg = uiText('Refreshing...');
+        } else if (refreshStatus === RefreshStatus.Inactive && this.snapTopAfterRefresh) {
+          setTimeout(() => {
+            this.snapTopAfterRefresh = false;
+            this.refreshPullOffset = 0;
+            this.snapListToTop();
+          }, 80);
         }
       })
       .onRefreshing(() => {
-        this.listScroller.scrollTo({ xOffset: 0, yOffset: 0 });
-        this.lastScrollY = 0;
-        this.toolbarOffsetY = 0;
+        this.refreshPullOffset = this.REFRESH_OFFSET;
+        this.snapTopAfterRefresh = true;
+        this.snapListToTop();
         this.onRefreshPull(() => {
           this.refreshing = false;
           this.refreshShowLogo = true;
           this.refreshMsg = '';
           this.refreshScaleNum = 0;
+          this.refreshPullOffset = 0;
+          setTimeout(() => {
+            this.snapTopAfterRefresh = false;
+            this.snapListToTop();
+          }, 80);
         });
       })
       .width('100%')
@@ -1148,6 +1214,10 @@ export struct GalleryListContent {
         }
       })
       .backgroundColor($r('app.color.page_background'))
+
+      if (this.refreshPullOffset > 0 || this.refreshing) {
+        this.refreshIndicatorOverlay()
+      }
 
       // FAB 悬浮按钮
       Column() {
