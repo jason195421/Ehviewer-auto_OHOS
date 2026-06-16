@@ -439,9 +439,13 @@ export struct AppToolbar {
   @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeight: number = 0;
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
 
+  private statusBarVp(): number {
+    return this.getUIContext().px2vp(this.statusBarHeight);
+  }
+
   build() {
     EhNavBar({
-      statusBarHeight: 0,
+      statusBarHeight: this.statusBarVp(),
       title: this.title,
       subtitle: this.subtitle,
       onMenu: this.onMenu,
@@ -457,9 +461,13 @@ export struct AppSubToolbar {
   @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeight: number = 0;
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
 
+  private statusBarVp(): number {
+    return this.getUIContext().px2vp(this.statusBarHeight);
+  }
+
   build() {
     EhSubNavBar({
-      statusBarHeight: 0,
+      statusBarHeight: this.statusBarVp(),
       title: this.title,
       onBack: this.onBack
     })

@@ -1192,6 +1192,7 @@ export struct TopListScene {
                 info: this.currentInfo(),
                 toolbarOffsetY: this.toolbarOffsetY,
                 topPadding: this.floatingToolbarHeight() + 4,
+                statusBarHeight: this.statusBarVp(),
                 renderVersion: this.renderVersion,
                 onSelectList: (index: number) => {
                   if (this.selectedIndex === index) {
@@ -1265,6 +1266,7 @@ export struct TopListBoard {
   @Prop info: TopListInfo = createEmptyTopListInfo();
   @Prop toolbarOffsetY: number = 0;
   @Prop topPadding: number = 74;
+  @Prop statusBarHeight: number = 0;
   @Prop renderVersion: number = 0;
   onSelectList: (index: number) => void = () => {};
   onOpenBucket: (bucket: TopListBucket) => void = () => {};
@@ -1272,13 +1274,14 @@ export struct TopListBoard {
   initialScrollOffset: number = 0;
   onScrollUpdate: (offset: number, scrollOffset: number) => void = () => {};
   private boardScroller: Scroller = new Scroller();
+  private readonly TABS_BAR_HEIGHT: number = 44;
 
-  private stickyTabsTopPadding(): number {
-    return Math.max(0, this.topPadding + this.toolbarOffsetY);
+  private tabsVisualTop(): number {
+    return Math.max(this.statusBarHeight, this.topPadding + this.toolbarOffsetY);
   }
 
   @Builder
-  private TabsHeader() {
+  private TabsBar() {
     Column() {
       TopListTabs({
         lists: this.lists,
@@ -1290,13 +1293,13 @@ export struct TopListBoard {
         .backgroundColor('#F3F5F7')
     }
       .width('100%')
-      .padding({ left: 0, right: 0, top: this.stickyTabsTopPadding() })
+      .height(this.TABS_BAR_HEIGHT)
       .backgroundColor('#F3F5F7')
   }
 
   build() {
-    List({ space: 10, scroller: this.boardScroller }) {
-      ListItemGroup({ header: this.TabsHeader() }) {
+    Stack({ alignContent: Alignment.TopStart }) {
+      List({ space: 10, scroller: this.boardScroller }) {
         ForEach(this.info.buckets, (bucket: TopListBucket) => {
           ListItem() {
             TopListBucketCard({
@@ -1309,22 +1312,31 @@ export struct TopListBoard {
           }
         }, (bucket: TopListBucket) => this.selectedIndex.toString() + ':' + bucket.title)
       }
+      .width('100%')
+      .height('100%')
+      .padding({ left: 12, right: 12, top: this.topPadding + this.TABS_BAR_HEIGHT + 8, bottom: 0 })
+      .onAppear(() => {
+        if (this.initialScrollOffset > 0) {
+          this.boardScroller.scrollTo({ xOffset: 0, yOffset: this.initialScrollOffset });
+        }
+      })
+      .onDidScroll((scrollOffset: number, scrollState: ScrollState) => {
+        this.onScrollUpdate(this.boardScroller.currentOffset().yOffset, scrollOffset);
+      })
+      .onScrollStop(() => {
+        this.onScrollUpdate(this.boardScroller.currentOffset().yOffset, 0);
+      })
+
+      Column() {
+        this.TabsBar()
+      }
+      .width('100%')
+      .padding({ left: 12, right: 12, top: this.tabsVisualTop() })
+      .backgroundColor('#F3F5F7')
+      .zIndex(8)
     }
     .width('100%')
     .height('100%')
-    .padding({ left: 12, right: 12, bottom: 0 })
-    .sticky(StickyStyle.Header)
-    .onAppear(() => {
-      if (this.initialScrollOffset > 0) {
-        this.boardScroller.scrollTo({ xOffset: 0, yOffset: this.initialScrollOffset });
-      }
-    })
-    .onDidScroll((scrollOffset: number, scrollState: ScrollState) => {
-      this.onScrollUpdate(this.boardScroller.currentOffset().yOffset, scrollOffset);
-    })
-    .onScrollStop(() => {
-      this.onScrollUpdate(this.boardScroller.currentOffset().yOffset, 0);
-    })
   }
 }
 

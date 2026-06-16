@@ -39,6 +39,11 @@ export struct DownloadScene {
   @State statusText: string = 'Download queue is ready';
   @State isProcessing: boolean = false;
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
+  @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeightPx: number = 0;
+
+  private statusBarVp(): number {
+    return this.getUIContext().px2vp(this.statusBarHeightPx);
+  }
 
   aboutToAppear(): void {
     this.loadDownloads();
@@ -318,7 +323,7 @@ export struct DownloadScene {
         })
       }
       .width('100%')
-      .height(62)
+      .height(this.statusBarVp() + 62)
       .padding({ left: 14, right: 14 })
       .alignItems(VerticalAlign.Center)
       .backgroundColor(APP_THEME_COLOR)
