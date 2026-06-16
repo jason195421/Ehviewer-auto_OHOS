@@ -864,6 +864,10 @@ export struct GalleryListContent {
   private totalBarHeight(): number {
     return this.statusBarVp() + this.barHeight;
   }
+
+  private visibleBarHeight(): number {
+    return Math.max(0, this.totalBarHeight() + this.toolbarOffsetY);
+  }
   
   private handleScrollMove(yOffset: number): void {
     const delta = yOffset - this.lastScrollY;
@@ -1038,7 +1042,7 @@ export struct GalleryListContent {
     Stack({ alignContent: Alignment.TopStart }) {
       Column() {
         Blank()
-          .height(this.totalBarHeight())
+          .height(this.visibleBarHeight())
           .width('100%')
 
         Refresh({ refreshing: $$this.refreshing, builder: this.customRefreshComponent() }) {
