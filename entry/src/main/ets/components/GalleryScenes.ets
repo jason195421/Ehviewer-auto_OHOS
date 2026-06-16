@@ -866,6 +866,10 @@ export struct GalleryListContent {
     return this.statusBarVp() + this.barHeight;
   }
 
+  private visibleBarHeight(): number {
+    return Math.max(0, this.totalBarHeight() + this.toolbarOffsetY);
+  }
+  
   private handleScrollMove(yOffset: number): void {
     const delta = yOffset - this.lastScrollY;
     this.lastScrollY = yOffset;
@@ -912,7 +916,7 @@ export struct GalleryListContent {
 
 
   private contentStartOffset(): number {
-    return this.totalBarHeight() + this.galleryContentPadding();
+    return this.galleryContentPadding();
   }
 
   private galleryCardPreferredWidth(): number {
@@ -1037,144 +1041,153 @@ export struct GalleryListContent {
 
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
-      Refresh({ refreshing: $$this.refreshing, builder: this.customRefreshComponent() }) {
-        List({ space: 0, scroller: this.listScroller }) {
-          // 空状态或画廊列表
-          if (this.galleries.length === 0) {
-            ListItem() {
-              GalleryListStateView({
-                statusText: this.statusText,
-                requestUrl: this.requestUrl,
-                onRefresh: this.onRefresh
-              })
-              .width('100%')
-              .height('100%')
-            }
-          } else {
-            // 画廊卡片按行分组，每行 galleryColumnCount() 张
-            ForEach(this.buildRows(), (row: GalleryInfo[], rowIndex: number) => {
-              ListItem() {
-                Row() {
-                  ForEach(row, (gallery: GalleryInfo, colIndex: number) => {
-                    if (galleryListMode() === 'Thumb') {
-                      GalleryThumbCard({ gallery: gallery })
-                        .width(this.galleryCardWidth())
-                        .margin({
-                          right: colIndex < row.length - 1 ? this.galleryCardGap() : 0
-                        })
-                        .onClick(() => { this.onSelectGallery(gallery); })
-                    } else {
-                      GalleryListRow({ gallery: gallery })
-                        .width(this.galleryCardWidth())
-                        .margin({
-                          right: colIndex < row.length - 1 ? this.galleryCardGap() : 0
-                        })
-                        .onClick(() => { this.onSelectGallery(gallery); })
-                    }
-                  }, (gallery: GalleryInfo) => gallery.gid.toString())
-                }
-                .width('100%')
-                .padding({ left: this.galleryContentPadding(), right: this.galleryContentPadding() })
-                .justifyContent(FlexAlign.Start)
-              }
-              .margin({ bottom: this.galleryCardGap() })
-            }, (_row: GalleryInfo[], rowIndex: number) => rowIndex.toString() + ':' + this.renderVersion.toString())
+      Column() {
+        Blank()
+          .height(this.visibleBarHeight())
+          .width('100%')
 
-            // 加载更多指示器
-            if (this.isLoadingMore) {
+        Refresh({ refreshing: $$this.refreshing, builder: this.customRefreshComponent() }) {
+          List({ space: 0, scroller: this.listScroller }) {
+            // 空状态或画廊列表
+            if (this.galleries.length === 0) {
               ListItem() {
-                Row() {
-                  LoadingProgress().width(20).height(20).color('#9BB8CB')
-                  Text(uiText('Loading...')).fontSize(12).fontColor('#9BB8CB').margin({ left: 6 })
-                }
+                GalleryListStateView({
+                  statusText: this.statusText,
+                  requestUrl: this.requestUrl,
+                  onRefresh: this.onRefresh
+                })
                 .width('100%')
-                .height(40)
-                .justifyContent(FlexAlign.Center)
+                .height('100%')
+              }
+            } else {
+              // 画廊卡片按行分组，每行 galleryColumnCount() 张
+              ForEach(this.buildRows(), (row: GalleryInfo[], rowIndex: number) => {
+                ListItem() {
+                  Row() {
+                    ForEach(row, (gallery: GalleryInfo, colIndex: number) => {
+                      if (galleryListMode() === 'Thumb') {
+                        GalleryThumbCard({ gallery: gallery })
+                          .width(this.galleryCardWidth())
+                          .margin({
+                            right: colIndex < row.length - 1 ? this.galleryCardGap() : 0
+                          })
+                          .onClick(() => { this.onSelectGallery(gallery); })
+                      } else {
+                        GalleryListRow({ gallery: gallery })
+                          .width(this.galleryCardWidth())
+                          .margin({
+                            right: colIndex < row.length - 1 ? this.galleryCardGap() : 0
+                          })
+                          .onClick(() => { this.onSelectGallery(gallery); })
+                      }
+                    }, (gallery: GalleryInfo) => gallery.gid.toString())
+                  }
+                  .width('100%')
+                  .padding({ left: this.galleryContentPadding(), right: this.galleryContentPadding() })
+                  .justifyContent(FlexAlign.Start)
+                }
+                .margin({ bottom: this.galleryCardGap() })
+              }, (_row: GalleryInfo[], rowIndex: number) => rowIndex.toString() + ':' + this.renderVersion.toString())
+
+              // 加载更多指示器
+              if (this.isLoadingMore) {
+                ListItem() {
+                  Row() {
+                    LoadingProgress().width(20).height(20).color('#9BB8CB')
+                    Text(uiText('Loading...')).fontSize(12).fontColor('#9BB8CB').margin({ left: 6 })
+                  }
+                  .width('100%')
+                  .height(40)
+                  .justifyContent(FlexAlign.Center)
+                }
+              }
+
+              ListItem() {
+                Column()
+                  .width('100%')
+                  .height(this.LIST_BOTTOM_SPACER)
               }
             }
-
-            ListItem() {
-              Column()
-                .width('100%')
-                .height(this.LIST_BOTTOM_SPACER)
+          }
+          .contentStartOffset(this.contentStartOffset())
+          .scrollBar(BarState.Off)
+          .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
+          .width('100%')
+          .height('100%')
+          .onAppear(() => {
+            if (!this.restoredScroll && this.initialScrollOffset > 0) {
+              this.restoredScroll = true;
+              setTimeout(() => {
+                this.listScroller.scrollTo({ xOffset: 0, yOffset: this.initialScrollOffset });
+              }, 80);
             }
-          }
+          })
+          .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) => {
+            const yOff = normalizeGalleryListScrollOffset(this.listScroller.currentOffset().yOffset);
+            this.handleScrollMove(yOff);
+            this.rememberListOffset(yOff);
+            this.triggerLoadMoreByOffset(yOff);
+          })
+          .onScrollStop(() => {
+            const yOff = normalizeGalleryListScrollOffset(this.listScroller.currentOffset().yOffset);
+            this.rememberListOffset(yOff);
+            if (this.toolbarOffsetY < -this.totalBarHeight() / 2) {
+              this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
+                this.toolbarOffsetY = -this.totalBarHeight();
+              });
+            } else {
+              this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
+                this.toolbarOffsetY = 0;
+              });
+            }
+          })
+          .onReachEnd(() => {
+            this.triggerLoadMoreIfNear(this.galleries.length);
+          })
         }
-        .contentStartOffset(this.contentStartOffset())
-        .scrollBar(BarState.Off)
-        .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
-        .width('100%')
-        .height('100%')
-        .onAppear(() => {
-          if (!this.restoredScroll && this.initialScrollOffset > 0) {
-            this.restoredScroll = true;
-            setTimeout(() => {
-              this.listScroller.scrollTo({ xOffset: 0, yOffset: this.initialScrollOffset });
-            }, 80);
+        .refreshOffset(this.REFRESH_OFFSET)
+        .pullToRefresh(true)
+        .onOffsetChange((value: number) => {
+          const offset = Math.max(0, value);
+          if (this.refreshing) {
+            return;
           }
-        })
-        .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) => {
-          const yOff = normalizeGalleryListScrollOffset(this.listScroller.currentOffset().yOffset);
-          this.handleScrollMove(yOff);
-          this.rememberListOffset(yOff);
-          this.triggerLoadMoreByOffset(yOff);
-        })
-        .onScrollStop(() => {
-          const yOff = normalizeGalleryListScrollOffset(this.listScroller.currentOffset().yOffset);
-          this.rememberListOffset(yOff);
-          if (this.toolbarOffsetY < -this.totalBarHeight() / 2) {
-            this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
-              this.toolbarOffsetY = -this.totalBarHeight();
-            });
+          if (offset <= 0) {
+            this.resetRefreshVisual();
+          } else if (offset < this.REFRESH_OFFSET) {
+            this.refreshShowLogo = true;
+            this.refreshMsg = uiText('Pull down to refresh');
+            this.refreshScaleNum = offset / this.REFRESH_OFFSET;
           } else {
-            this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
-              this.toolbarOffsetY = 0;
-            });
+            this.refreshShowLogo = true;
+            this.refreshMsg = uiText('Release to refresh');
+            this.refreshScaleNum = Math.max(0.5, this.REFRESH_OFFSET / offset);
           }
         })
-        .onReachEnd(() => {
-          this.triggerLoadMoreIfNear(this.galleries.length);
+        .onStateChange((refreshStatus: RefreshStatus) => {
+          if (refreshStatus === RefreshStatus.Refresh) {
+            this.refreshShowLogo = false;
+            this.refreshMsg = uiText('Refreshing...');
+            this.refreshScaleNum = 1;
+          } else if (!this.refreshing && (refreshStatus === RefreshStatus.Inactive || refreshStatus === RefreshStatus.Done)) {
+            this.resetRefreshVisual();
+          }
         })
-      }
-      .refreshOffset(this.REFRESH_OFFSET)
-      .pullToRefresh(true)
-      .onOffsetChange((value: number) => {
-        const offset = Math.max(0, value);
-        if (this.refreshing) {
-          return;
-        }
-        if (offset <= 0) {
-          this.resetRefreshVisual();
-        } else if (offset < this.REFRESH_OFFSET) {
-          this.refreshShowLogo = true;
-          this.refreshMsg = uiText('Pull down to refresh');
-          this.refreshScaleNum = offset / this.REFRESH_OFFSET;
-        } else {
-          this.refreshShowLogo = true;
-          this.refreshMsg = uiText('Release to refresh');
-          this.refreshScaleNum = Math.max(0.5, this.REFRESH_OFFSET / offset);
-        }
-      })
-      .onStateChange((refreshStatus: RefreshStatus) => {
-        if (refreshStatus === RefreshStatus.Refresh) {
+        .onRefreshing(() => {
           this.refreshShowLogo = false;
           this.refreshMsg = uiText('Refreshing...');
           this.refreshScaleNum = 1;
-        } else if (!this.refreshing && (refreshStatus === RefreshStatus.Inactive || refreshStatus === RefreshStatus.Done)) {
-          this.resetRefreshVisual();
-        }
-      })
-      .onRefreshing(() => {
-        this.refreshShowLogo = false;
-        this.refreshMsg = uiText('Refreshing...');
-        this.refreshScaleNum = 1;
-        this.onRefreshPull(() => {
-          this.refreshing = false;
-          setTimeout(() => {
-            this.resetRefreshVisual();
-          }, 120);
-        });
-      })
+          this.onRefreshPull(() => {
+            this.refreshing = false;
+            setTimeout(() => {
+              this.resetRefreshVisual();
+            }, 120);
+          });
+        })
+        .width('100%')
+        .layoutWeight(1)
+        .backgroundColor($r('app.color.page_background'))
+      }
       .width('100%')
       .height('100%')
       .onAreaChange((_oldArea: Area, newArea: Area) => {
@@ -1185,7 +1198,6 @@ export struct GalleryListContent {
         }
       })
       .backgroundColor($r('app.color.page_background'))
-      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
 
       // FAB 悬浮按钮
       Column() {
