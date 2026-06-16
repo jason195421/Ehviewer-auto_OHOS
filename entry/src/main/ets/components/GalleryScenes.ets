@@ -20,8 +20,8 @@ import { ehSpiderInfoStore } from '../services/EhSpiderInfoStore';
 import { MigrationTask, migrationTasks } from '../services/MigrationStatus';
 import { FilterRule, FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, FILTER_MODE_TAG_NAMESPACE, ehFilterStore } from '../services/EhFilterStore';
 import { LANGUAGE_REVISION_KEY, APP_THEME_COLOR, themeSurfaceColor } from '../shared/EhShared';
-import { EhNavBar } from '../components/NavigationComponents';
-import { EhBackupBundle, DrawerItem, SettingsHeaderItem, SettingsRowItem, SessionMode, SettingsPanel, DRAWER_ITEMS, SETTINGS_HEADERS, STATUS_BAR_HEIGHT_KEY, ON_OFF_OPTIONS, shouldUseChineseUi, uiText, uiValue, uiStatusText, uiPageText, zhText, setActiveBackHandler, runActiveBackHandler, createEmptyGallery, createEmptyDownloadInfo, createDetailFromGallery, createEmptyDetail, createEmptyPreview, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneStringArray, cloneRequiredStringArray, cloneGalleryInfo, cloneGalleryInfos, padTwo, applyGalleryFilters, cloneGalleryTagGroups, cloneGalleryComments, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListItem, cloneTopListBucket, cloneTopListInfo, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, saveDownloadsQuietly, filterDownloadItems, downloadItemMatches, sortDownloadItems, nextDownloadStatusFilter, nextDownloadLabelFilter, nextDownloadSortMode, nextStringOption, nextDownloadState, nextDownloadLabel, downloadLabelName, downloadStateLabel, downloadStateColor, downloadProgressText, downloadSizeText, downloadImageUrlForPage, downloadThreadLimit, downloadPageIndexes, downloadQueueSummary, parseHistoryMaxSize, routeTitle, routeSubtitle, launchRouteFromSetting, settingsPanelTitle, settingsRowsForPanel, optionSettingsRow, textSettingsRow, staticSettingsRow, settingEntryValue, cloneStringOptions, settingMigrationMessage, nextOption, isValidProxyPortText, formatNetworkDiagnostics, listModeForRoute, routeUsesKeyword, usesGallerySearchToolbar, usesEmbeddedToolbar, defaultKeywordForRoute, gallerySearchTitle, currentGallerySite, effectiveListSite, gallerySiteName, galleryListFailureMessage, shouldRetryGalleryListOnE, withGalleryListMessage, readerPageReferer, readerDisplayImageUrl, cacheReaderImageForPage, cacheThumbnailImage, cloneGalleryPageWithCache, readerLocalImageSource, readerZoomSize, readerFullImageWidth, readerFullImageHeight, readerImageFit, readerShortUrl, readerPreloadCount, readerIsRightToLeft, categoryName, categoryColor, ratingText, galleryDisplayTitle, showGalleryPages, galleryListMode, galleryThumbWidth, galleryThumbHeight, galleryRowHeight, galleryTagPreview, detailTitleFontSize, detailTitleMaxLines, detailHeadingFontSize, readerShowProgress, readerShowClock, readerClockText, padTimeNumber, topListChipColor } from '../shared/EhShared';
+import { EhNavBar, EhSubNavBar } from '../components/NavigationComponents';
+import { EhBackupBundle, DrawerItem, SettingsHeaderItem, SettingsRowItem, SessionMode, SettingsPanel, DRAWER_ITEMS, SETTINGS_HEADERS, STATUS_BAR_HEIGHT_KEY, ON_OFF_OPTIONS, shouldUseChineseUi, uiText, uiValue, uiStatusText, uiPageText, zhText, setActiveBackHandler, runActiveBackHandler, createEmptyGallery, createEmptyDownloadInfo, createDetailFromGallery, createEmptyDetail, createEmptyPreview, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneStringArray, cloneRequiredStringArray, cloneGalleryInfo, cloneGalleryInfos, padTwo, applyGalleryFilters, cloneGalleryTagGroups, cloneGalleryComments, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListItem, cloneTopListBucket, cloneTopListInfo, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, saveDownloadsQuietly, filterDownloadItems, downloadItemMatches, sortDownloadItems, nextDownloadStatusFilter, nextDownloadLabelFilter, nextDownloadSortMode, nextStringOption, nextDownloadState, nextDownloadLabel, downloadLabelName, downloadStateLabel, downloadStateColor, downloadProgressText, downloadSizeText, downloadImageUrlForPage, downloadThreadLimit, downloadPageIndexes, downloadQueueSummary, parseHistoryMaxSize, routeTitle, routeSubtitle, launchRouteFromSetting, settingsPanelTitle, settingsRowsForPanel, optionSettingsRow, textSettingsRow, staticSettingsRow, settingEntryValue, cloneStringOptions, settingMigrationMessage, nextOption, isValidProxyPortText, formatNetworkDiagnostics, listModeForRoute, routeUsesKeyword, usesGallerySearchToolbar, usesEmbeddedToolbar, defaultKeywordForRoute, gallerySearchTitle, currentGallerySite, effectiveListSite, gallerySiteName, galleryListFailureMessage, readerPageReferer, readerDisplayImageUrl, cacheReaderImageForPage, cacheThumbnailImage, cloneGalleryPageWithCache, readerLocalImageSource, readerZoomSize, readerFullImageWidth, readerFullImageHeight, readerImageFit, readerShortUrl, readerPreloadCount, readerIsRightToLeft, categoryName, categoryColor, ratingText, galleryDisplayTitle, showGalleryPages, galleryListMode, galleryThumbWidth, galleryThumbHeight, galleryRowHeight, galleryTagPreview, detailTitleFontSize, detailTitleMaxLines, detailHeadingFontSize, readerShowProgress, readerShowClock, readerClockText, padTimeNumber, topListChipColor } from '../shared/EhShared';
 
 interface GalleryListSceneCache {
   keyword: string;
@@ -209,12 +209,17 @@ export struct GalleryListScene {
     }
     const context = getAbilityContext();
     if (context !== undefined) {
-      ehCookieStore.load(context).catch((error: Error) => {
+      Promise.all([
+        ehCookieStore.load(context),
+        ehFilterStore.load(context)
+      ]).catch((error: Error) => {
         this.statusText = 'Cookie load failed, using current session: ' + error.message;
+      }).finally(() => {
+        this.firstRefresh();
       });
-      ehFilterStore.load(context).catch(() => {});
+    } else {
+      this.firstRefresh();
     }
-    this.firstRefresh();
     setActiveBackHandler(() => this.handleSystemBack());
   }
 
@@ -349,25 +354,9 @@ export struct GalleryListScene {
   private loadRoutePageWithFallback(pageIndex: number): Promise<GalleryListLoadResult> {
     const primarySite = effectiveListSite(this.sourceRoute);
     this.activeSite = primarySite;
-    return this.loadRoutePage(pageIndex, primarySite).then((primary: GalleryListLoadResult) => {
-      if (!shouldRetryGalleryListOnE(primary, primarySite, this.sourceRoute)) {
-        this.activeSite = primarySite;
-        return primary;
-      }
-
-      return this.loadRoutePage(pageIndex, GallerySite.E).then((fallback: GalleryListLoadResult) => {
-        if (fallback.ok || fallback.galleries.length > 0) {
-          this.activeSite = GallerySite.E;
-          return withGalleryListMessage(fallback,
-            fallback.message + ' (ExHentai returned an empty list, retried on E-Hentai)');
-        }
-
-        this.activeSite = primarySite;
-        return withGalleryListMessage(primary, primary.message + '; E-Hentai fallback: ' + fallback.message);
-      }).catch((error: Error) => {
-        this.activeSite = primarySite;
-        return withGalleryListMessage(primary, primary.message + '; E-Hentai fallback failed: ' + error.message);
-      });
+    return this.loadRoutePage(pageIndex, primarySite).then((result: GalleryListLoadResult) => {
+      this.activeSite = primarySite;
+      return result;
     });
   }
 
@@ -1867,6 +1856,11 @@ export struct GalleryDetailScene {
   private detailScroller: Scroller = new Scroller();
   @State showRatingDialog: boolean = false;
   @State pendingRating: number = 0;
+  @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeightPx: number = 0;
+
+  private statusBarVp(): number {
+    return this.getUIContext().px2vp(this.statusBarHeightPx);
+  }
 
   private startRating(): void {
     if (!this.isDetailLoaded || this.detail.apiUid < 0 || this.detail.apiKey.length === 0) {
@@ -1880,29 +1874,11 @@ export struct GalleryDetailScene {
   build() {
     Stack({ alignContent: Alignment.Center }) {
       Column() {
-        Row() {
-          Button({ type: ButtonType.Circle, stateEffect: true }) {
-            SymbolGlyph($r('sys.symbol.chevron_left'))
-              .fontSize(20)
-              .fontColor([Color.White])
-          }
-          .width(36)
-          .height(36)
-          .backgroundColor('#2F6F8F')
-          .onClick(() => {
-            this.onBack();
-          })
-          Text(galleryDisplayTitle(this.detail))
-            .fontSize(15)
-            .fontWeight(FontWeight.Medium)
-            .fontColor('#17202A')
-            .margin({ left: 12 })
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .layoutWeight(1)
-        }
-        .width('100%')
-        .padding({ left: 12, right: 12, top: 10, bottom: 8 })
+        EhSubNavBar({
+          statusBarHeight: this.statusBarVp(),
+          title: galleryDisplayTitle(this.detail),
+          onBack: this.onBack
+        })
 
         if (this.statusText.length > 0) {
           Text(uiStatusText(this.statusText))

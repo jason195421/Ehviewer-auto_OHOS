@@ -1404,7 +1404,7 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
       staticSettingsRow('latest_release', 'Latest release', 'GitHub releases URL from original settings', 'Link', 'url'),
       staticSettingsRow('issue_help', 'Issue help', 'Issue guide URL from original settings', 'Link', 'url'),
       staticSettingsRow('license', 'License', 'Open-source license view', 'GPL', 'activity'),
-      staticSettingsRow('version', 'Version', 'HarmonyOS port workspace version', '0.1.79', 'version'),
+      staticSettingsRow('version', 'Version', 'HarmonyOS port workspace version', '0.1.80', 'version'),
       staticSettingsRow('check_for_updates', 'Check for updates', 'Original AppUpdater entry', 'Open', 'action'),
       optionSettingsRow('close_auto_updates', 'Close automatic updates', 'Disable startup update check', entries, ON_OFF_OPTIONS),
       staticSettingsRow('donate', 'Donate', 'Original donation entry', 'Not migrated', 'url')
@@ -1574,10 +1574,6 @@ export function currentGallerySite(): GallerySite {
 
 export function effectiveListSite(route: GalleryRoute): GallerySite {
   const site = currentGallerySite();
-  if (site === GallerySite.Ex && !ehCookieStore.hasCookies() && route !== GalleryRoute.Favorites &&
-    route !== GalleryRoute.Subscription) {
-    return GallerySite.E;
-  }
   return site;
 }
 
@@ -1589,20 +1585,6 @@ export function galleryListFailureMessage(result: GalleryListLoadResult, site: G
   const status = result.statusCode > 0 ? 'HTTP ' + result.statusCode.toString() + ', ' : '';
   const url = result.url.length > 0 ? ', ' + result.url : '';
   return 'Load failed: ' + gallerySiteName(site) + ', ' + status + result.message + url;
-}
-
-export function shouldRetryGalleryListOnE(result: GalleryListLoadResult, site: GallerySite, route: GalleryRoute): boolean {
-  if (site !== GallerySite.Ex || result.galleries.length > 0 || route === GalleryRoute.TopLists) {
-    return false;
-  }
-  if (route === GalleryRoute.Subscription || route === GalleryRoute.Favorites || route === GalleryRoute.WhatsHot) {
-    return true;
-  }
-
-  const message = result.message.toLowerCase();
-  return message.indexOf('links 0') >= 0 || message.indexOf('blocked') >= 0 ||
-    message.indexOf('login') >= 0 || message.indexOf('cookie') >= 0 ||
-    message.indexOf('cloudflare') >= 0;
 }
 
 export function withGalleryListMessage(result: GalleryListLoadResult, message: string): GalleryListLoadResult {

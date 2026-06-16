@@ -545,7 +545,7 @@ export struct FloatingToolbarHost {
   }
 
   private totalToolbarHeight(): number {
-    return this.statusBarVp() + this.toolbarHeight;
+    return this.statusBarVp() + 56;
   }
 
   @Builder
@@ -555,29 +555,20 @@ export struct FloatingToolbarHost {
     Stack({ alignContent: Alignment.TopStart }) {
       this.content()
       FloatingToolbar({ offsetY: this.toolbarOffsetY, barHeight: this.totalToolbarHeight() }) {
-        Column()
-          .width('100%')
-          .height(this.statusBarVp())
-          .backgroundColor(APP_THEME_COLOR)
-        if (this.kind === 'search') {
-          LegacySearchBar({
-            keyword: this.keyword,
-            title: this.title,
-            filterActive: this.filterActive,
-            onKeywordChange: this.onKeywordChange,
-            onMenu: this.onMenu,
-            onSearch: this.onSearch
-          })
-        } else {
-          LegacyActionBar({
-            title: this.title,
-            showClear: this.showClear,
-            canClear: this.canClear,
-            onMenu: this.onMenu,
-            onRefresh: this.onRefresh,
-            onClear: this.onClear
-          })
-        }
+        EhNavBar({
+          statusBarHeight: this.statusBarVp(),
+          title: this.title,
+          searchMode: this.kind === 'search',
+          keyword: this.keyword,
+          filterActive: this.filterActive,
+          showClear: this.showClear,
+          canClear: this.canClear,
+          onKeywordChange: this.onKeywordChange,
+          onMenu: this.onMenu,
+          onSearch: this.onSearch,
+          onRefresh: this.onRefresh,
+          onClear: this.onClear
+        })
       }
     }
     .width('100%')
