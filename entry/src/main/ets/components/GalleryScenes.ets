@@ -843,6 +843,7 @@ export struct GalleryListContent {
   @State refreshMsg: string = '';
   private readonly REFRESH_OFFSET: number = 64;
   private readonly REFRESH_HEADER_HEIGHT: number = 96;
+  private readonly LIST_BOTTOM_SPACER: number = 80;
   @State viewportHeight: number = 0;
   private listScroller: Scroller = new Scroller();
   private loadMorePending: boolean = false;
@@ -1099,6 +1100,12 @@ export struct GalleryListContent {
                   .height(40)
                   .justifyContent(FlexAlign.Center)
                 }
+              }
+
+              ListItem() {
+                Column()
+                  .width('100%')
+                  .height(this.LIST_BOTTOM_SPACER)
               }
             }
           }
