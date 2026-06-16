@@ -869,10 +869,6 @@ export struct GalleryListContent {
   private totalBarHeight(): number {
     return this.statusBarVp() + this.barHeight;
   }
-
-  private visibleBarHeight(): number {
-    return Math.max(0, this.totalBarHeight() + this.toolbarOffsetY);
-  }
   
   private handleScrollMove(yOffset: number): void {
     const delta = yOffset - this.lastScrollY;
@@ -904,8 +900,8 @@ export struct GalleryListContent {
     const rows = Math.ceil(this.galleries.length / columns);
     const cardHeight = galleryListMode() === 'Thumb' ? Math.max(0, this.galleryCardWidth() / 0.75 + 54) :
       galleryThumbHeight();
-    return 62 + rows * cardHeight + Math.max(0, rows - 1) * this.galleryCardGap() +
-      this.galleryContentPadding();
+    return this.totalBarHeight() + rows * cardHeight + Math.max(0, rows - 1) * this.galleryCardGap() +
+      this.galleryContentPadding() + this.LIST_BOTTOM_SPACER;
   }
 
   private triggerLoadMoreByOffset(offset: number): void {
@@ -1048,12 +1044,17 @@ export struct GalleryListContent {
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       Column() {
-        Blank()
-          .height(this.visibleBarHeight())
-          .width('100%')
-
         Refresh({ refreshing: $$this.refreshing, builder: this.customRefreshComponent() }) {
           List({ space: 0, scroller: this.listScroller }) {
+            ListItem() {
+              Column() {
+                Blank()
+                  .width('100%')
+                  .height(this.totalBarHeight())
+              }
+                .width('100%')
+            }
+
             // 空状态或画廊列表
             if (this.galleries.length === 0) {
               ListItem() {
@@ -1122,7 +1123,7 @@ export struct GalleryListContent {
           }
           .contentStartOffset(this.contentStartOffset())
           .scrollBar(BarState.Off)
-          .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
+          .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: false, effectEdge: EffectEdge.START })
           .width('100%')
           .height('100%')
           .onAppear(() => {

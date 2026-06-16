@@ -22,6 +22,14 @@ import { APP_THEME_COLOR, LANGUAGE_REVISION_KEY, nextFloatingToolbarOffset } fro
 import { EhBackupBundle, DrawerItem, SettingsHeaderItem, SettingsRowItem, SessionMode, SettingsPanel, DRAWER_ITEMS, SETTINGS_HEADERS, STATUS_BAR_HEIGHT_KEY, ON_OFF_OPTIONS, shouldUseChineseUi, uiText, uiValue, uiStatusText, uiPageText, zhText, setActiveBackHandler, runActiveBackHandler, createEmptyGallery, createEmptyDownloadInfo, createDetailFromGallery, createEmptyDetail, createEmptyPreview, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneStringArray, cloneRequiredStringArray, cloneGalleryInfo, cloneGalleryInfos, padTwo, applyGalleryFilters, cloneGalleryTagGroups, cloneGalleryComments, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListItem, cloneTopListBucket, cloneTopListInfo, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, saveDownloadsQuietly, filterDownloadItems, downloadItemMatches, sortDownloadItems, nextDownloadStatusFilter, nextDownloadLabelFilter, nextDownloadSortMode, nextStringOption, nextDownloadState, nextDownloadLabel, downloadLabelName, downloadStateLabel, downloadStateColor, downloadProgressText, downloadSizeText, downloadImageUrlForPage, downloadThreadLimit, downloadPageIndexes, downloadQueueSummary, parseHistoryMaxSize, routeTitle, routeSubtitle, launchRouteFromSetting, settingsPanelTitle, settingsRowsForPanel, optionSettingsRow, textSettingsRow, staticSettingsRow, settingEntryValue, cloneStringOptions, settingMigrationMessage, nextOption, isValidProxyPortText, formatNetworkDiagnostics, listModeForRoute, routeUsesKeyword, usesGallerySearchToolbar, usesEmbeddedToolbar, defaultKeywordForRoute, gallerySearchTitle, currentGallerySite, effectiveListSite, gallerySiteName, galleryListFailureMessage, shouldRetryGalleryListOnE, withGalleryListMessage, readerPageReferer, readerDisplayImageUrl, cacheReaderImageForPage, cacheThumbnailImage, cloneGalleryPageWithCache, readerLocalImageSource, readerZoomSize, readerFullImageWidth, readerFullImageHeight, readerImageFit, readerShortUrl, readerPreloadCount, readerIsRightToLeft, categoryName, categoryColor, ratingText, galleryDisplayTitle, showGalleryPages, galleryListMode, galleryThumbWidth, galleryThumbHeight, galleryRowHeight, galleryTagPreview, detailTitleFontSize, detailTitleMaxLines, detailHeadingFontSize, readerShowProgress, readerShowClock, readerClockText, padTimeNumber, topListChipColor } from '../shared/EhShared';
 import { CommentsScene, GalleryDetailScene, GalleryListRow, GalleryListScene, GalleryListStateView, PlaceholderScene, ReaderScene } from './GalleryScenes';
 import { FloatingToolbarHost } from './NavigationComponents';
+
+function normalizeSceneScrollOffset(offset: number): number {
+  if (offset <= 1 || Number.isNaN(offset)) {
+    return 0;
+  }
+  return offset;
+}
+
 @Component
 export struct HistoryScene {
   private client: EhHttpClient = new EhHttpClient();
@@ -226,7 +234,7 @@ export struct HistoryScene {
   }
 
   private updateToolbarForScroll(): void {
-    const offset = this.historyScroller.currentOffset().yOffset;
+    const offset = normalizeSceneScrollOffset(this.historyScroller.currentOffset().yOffset);
     const delta = offset - this.historyToolbarScrollOffset;
     this.toolbarOffsetY = nextFloatingToolbarOffset(this.toolbarOffsetY, delta, offset, this.floatingToolbarHeight());
     this.historyToolbarScrollOffset = offset;
@@ -617,7 +625,7 @@ export struct HistoryScene {
             }
             .scrollable(ScrollDirection.Vertical)
             .scrollBar(BarState.Off)
-            .edgeEffect(EdgeEffect.Spring)
+            .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: false, effectEdge: EffectEdge.START })
             .width('100%')
             .height('100%')
             .onAppear(() => {
@@ -631,7 +639,7 @@ export struct HistoryScene {
               this.updateToolbarForScroll();
             })
             .onScrollStop(() => {
-              const offset = this.historyScroller.currentOffset().yOffset;
+              const offset = normalizeSceneScrollOffset(this.historyScroller.currentOffset().yOffset);
               if (offset <= 4) {
                 this.toolbarOffsetY = 0;
               }
@@ -1322,16 +1330,17 @@ export struct TopListBoard {
       .height('100%')
       .padding({ left: 12, right: 12, top: this.contentTopPadding(), bottom: 0 })
       .backgroundColor('#F3F5F7')
+      .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: false, effectEdge: EffectEdge.START })
       .onAppear(() => {
         if (this.initialScrollOffset > 0) {
           this.boardScroller.scrollTo({ xOffset: 0, yOffset: this.initialScrollOffset });
         }
       })
       .onDidScroll((scrollOffset: number, scrollState: ScrollState) => {
-        this.onScrollUpdate(this.boardScroller.currentOffset().yOffset, scrollOffset);
+        this.onScrollUpdate(normalizeSceneScrollOffset(this.boardScroller.currentOffset().yOffset), scrollOffset);
       })
       .onScrollStop(() => {
-        this.onScrollUpdate(this.boardScroller.currentOffset().yOffset, 0);
+        this.onScrollUpdate(normalizeSceneScrollOffset(this.boardScroller.currentOffset().yOffset), 0);
       })
 
       Column() {
