@@ -68,7 +68,7 @@ export struct HistoryScene {
   @State historyRefreshScaleNum: number = 0;
   @State historyRefreshShowLogo: boolean = true;
   @State historyRefreshMsg: string = '';
-  private readonly HISTORY_REFRESH_OFFSET: number = 64;
+  private readonly HISTORY_REFRESH_OFFSET: number = 42;
   @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeightPx: number = 0;
   @State historyContentWidth: number = 0;
   private historyScroller: Scroller = new Scroller();
@@ -525,29 +525,30 @@ export struct HistoryScene {
 
   @Builder
   private historyRefreshComponent() {
-    Stack() {
-      Column({ space: 6 }) {
+    Stack({ alignContent: Alignment.Bottom }) {
+      Column({ space: 2 }) {
         Image($r('app.media.app_icon'))
-          .width(28)
-          .height(28)
+          .width(26)
+          .height(26)
           .scale({ x: this.historyRefreshScaleNum, y: this.historyRefreshScaleNum })
           .visibility(this.historyRefreshShowLogo ? Visibility.Visible : Visibility.None)
         LoadingProgress()
-          .width(32)
-          .height(32)
+          .width(26)
+          .height(26)
           .color(APP_THEME_COLOR)
           .visibility(this.historyRefreshShowLogo ? Visibility.None : Visibility.Visible)
         if (this.historyRefreshMsg.length > 0) {
           Text(this.historyRefreshMsg)
-            .fontSize(13)
+            .fontSize(10)
             .fontColor($r('app.color.secondary_text'))
         }
       }
       .alignItems(HorizontalAlign.Center)
+      .margin({ bottom: 4 })
     }
     .width('100%')
-    .height(80)
-    .align(Alignment.Center)
+    .height(52)
+    .clip(true)
   }
 
   build() {

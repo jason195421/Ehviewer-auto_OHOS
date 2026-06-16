@@ -918,8 +918,8 @@ export struct GalleryListContent {
   @State refreshScaleNum: number = 0;
   @State refreshShowLogo: boolean = true;
   @State refreshMsg: string = '';
-  private readonly REFRESH_OFFSET: number = 64;
-  private readonly REFRESH_HEADER_HEIGHT: number = 96;
+  private readonly REFRESH_OFFSET: number = 42;
+  private readonly REFRESH_HEADER_HEIGHT: number = 52;
   @State viewportHeight: number = 0;
   private listScroller: Scroller = new Scroller();
   private loadMorePending: boolean = false;
@@ -1088,25 +1088,26 @@ export struct GalleryListContent {
 
   @Builder
   private customRefreshComponent() {
-    Stack({ alignContent: Alignment.Center }) {
-      Column({ space: 6 }) {
+    Stack({ alignContent: Alignment.Bottom }) {
+      Column({ space: 2 }) {
         Image($r('app.media.app_icon'))
-          .width(32)
-          .height(32)
+          .width(26)
+          .height(26)
           .scale({ x: this.refreshScaleNum, y: this.refreshScaleNum })
           .visibility(this.refreshShowLogo ? Visibility.Visible : Visibility.None)
         LoadingProgress()
-          .width(30)
-          .height(30)
+          .width(26)
+          .height(26)
           .color(APP_THEME_COLOR)
           .visibility(this.refreshShowLogo ? Visibility.None : Visibility.Visible)
         if (this.refreshMsg.length > 0) {
           Text(this.refreshMsg)
-            .fontSize(12)
+            .fontSize(10)
             .fontColor($r('app.color.secondary_text'))
         }
       }
       .alignItems(HorizontalAlign.Center)
+      .margin({ bottom: 4 })
     }
     .width('100%')
     .height(this.REFRESH_HEADER_HEIGHT)
@@ -2551,6 +2552,35 @@ export struct DetailPreviews {
   @Prop previewPages: number = 0;
   @Prop isDetailLoaded: boolean = false;
   onSelectPreview: (preview: GalleryPreview) => void = () => {};
+  @State contentWidth: number = 0;
+
+  private previewGap(): number {
+    return 8;
+  }
+
+  private previewColumns(): number {
+    const available = Math.max(0, this.contentWidth - 32);
+    if (available <= 0 || Number.isNaN(available)) {
+      return 2;
+    }
+    const preferred = 132;
+    const gap = this.previewGap();
+    return Math.max(2, Math.floor((available + gap) / (preferred + gap)));
+  }
+
+  private previewTileWidth(): number {
+    const available = Math.max(0, this.contentWidth - 32);
+    const columns = this.previewColumns();
+    const gap = this.previewGap();
+    if (available <= 0 || Number.isNaN(available)) {
+      return 132;
+    }
+    return Math.max(112, Math.floor((available - gap * (columns - 1)) / columns));
+  }
+
+  private previewTileHeight(): number {
+    return Math.round(this.previewTileWidth() * 0.72);
+  }
 
   build() {
     Column() {
@@ -2575,19 +2605,29 @@ export struct DetailPreviews {
           ForEach(this.previews.slice(0, 24), (preview: GalleryPreview) => {
             PreviewTile({
               preview: preview,
+              tileWidth: this.previewTileWidth(),
+              imageHeight: this.previewTileHeight(),
               onSelectPreview: (selected: GalleryPreview) => {
                 this.onSelectPreview(selected);
               }
             })
+              .margin({ right: this.previewGap(), bottom: 12 })
           }, (preview: GalleryPreview) => preview.index.toString())
         }
         .width('100%')
+        .animation({ duration: 220, curve: Curve.EaseOut })
       }
     }
     .alignItems(HorizontalAlign.Start)
     .width('100%')
     .padding(16)
     .backgroundColor(Color.White)
+    .onAreaChange((_oldArea: Area, newArea: Area) => {
+      const width = newArea.width as number;
+      if (width > 0 && !Number.isNaN(width) && this.contentWidth !== width) {
+        this.contentWidth = width;
+      }
+    })
   }
 }
 
@@ -2630,23 +2670,25 @@ export struct PreviewRow {
 @Component
 export struct PreviewTile {
   preview: GalleryPreview = createEmptyPreview();
+  tileWidth: number = 132;
+  imageHeight: number = 96;
   onSelectPreview: (preview: GalleryPreview) => void = () => {};
 
   build() {
     Column() {
       GalleryThumb({
         url: this.preview.imageUrl,
-        widthValue: 86,
-        heightValue: 62,
+        widthValue: this.tileWidth,
+        heightValue: this.imageHeight,
         radiusValue: 4
       })
       Text((this.preview.index + 1).toString())
         .fontSize(11)
         .fontColor('#40566F')
-        .margin({ top: 4 })
+        .margin({ top: 6 })
     }
-    .width(94)
-    .padding({ right: 8, bottom: 10 })
+    .width(this.tileWidth)
+    .padding({ bottom: 2 })
     .alignItems(HorizontalAlign.Center)
     .onClick(() => {
       this.onSelectPreview(this.preview);
