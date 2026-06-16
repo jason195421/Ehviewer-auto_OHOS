@@ -832,7 +832,6 @@ export struct GalleryListContent {
   initialScrollOffset: number = 0;
   onScrollUpdate: (offset: number) => void = () => {};
   @State contentWidth: number = 0;
-  @State layoutVersion: number = 0;
   @State refreshing: boolean = false;
   onRefreshPull: (done: () => void) => void = (done: () => void) => { done(); };
   // 下拉刷新自定义 builder 状态
@@ -973,7 +972,11 @@ export struct GalleryListContent {
   }
 
   private galleryColumnCount(): number {
-    const availableWidth = Math.max(0, this.contentWidth - this.galleryContentPadding() * 2);
+    return this.galleryColumnCountForWidth(this.contentWidth);
+  }
+
+  private galleryColumnCountForWidth(width: number): number {
+    const availableWidth = Math.max(0, width - this.galleryContentPadding() * 2);
     if (availableWidth <= 0 || Number.isNaN(availableWidth)) {
       return 1;
     }
@@ -996,8 +999,15 @@ export struct GalleryListContent {
     if (width <= 0 || Number.isNaN(width) || this.contentWidth === width) {
       return;
     }
-    this.contentWidth = width;
-    this.layoutVersion++;
+    const oldColumns = this.galleryColumnCount();
+    const nextColumns = this.galleryColumnCountForWidth(width);
+    if (this.contentWidth <= 0 || oldColumns === nextColumns) {
+      this.contentWidth = width;
+      return;
+    }
+    this.getUIContext().animateTo({ duration: 220, curve: Curve.EaseOut }, () => {
+      this.contentWidth = width;
+    });
   }
 
 
@@ -1060,6 +1070,7 @@ export struct GalleryListContent {
                           .margin({
                             right: colIndex < row.length - 1 ? this.galleryCardGap() : 0
                           })
+                          .animation({ duration: 220, curve: Curve.EaseOut })
                           .onClick(() => { this.onSelectGallery(gallery); })
                       } else {
                         GalleryListRow({ gallery: gallery })
@@ -1067,6 +1078,7 @@ export struct GalleryListContent {
                           .margin({
                             right: colIndex < row.length - 1 ? this.galleryCardGap() : 0
                           })
+                          .animation({ duration: 220, curve: Curve.EaseOut })
                           .onClick(() => { this.onSelectGallery(gallery); })
                       }
                     }, (gallery: GalleryInfo) => gallery.gid.toString())
@@ -1074,6 +1086,7 @@ export struct GalleryListContent {
                   .width('100%')
                   .padding({ left: this.galleryContentPadding(), right: this.galleryContentPadding() })
                   .justifyContent(FlexAlign.Start)
+                  .animation({ duration: 220, curve: Curve.EaseOut })
                 }
               .margin({ bottom: this.galleryCardGap() })
               }, (_row: GalleryInfo[], rowIndex: number) => {

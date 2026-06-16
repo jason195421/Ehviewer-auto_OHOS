@@ -48,6 +48,7 @@ export struct HistoryScene {
   @State historyRefreshMsg: string = '';
   private readonly HISTORY_REFRESH_OFFSET: number = 64;
   @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeightPx: number = 0;
+  @State historyContentWidth: number = 0;
   private historyScroller: Scroller = new Scroller();
   private historyScrollOffset: number = 0;
   private historyToolbarScrollOffset: number = 0;
@@ -241,6 +242,68 @@ export struct HistoryScene {
 
   private historyContentTopPadding(): number {
     return this.floatingToolbarHeight() + 8;
+  }
+
+  private historyCardPreferredWidth(): number {
+    return 340;
+  }
+
+  private historyCardGap(): number {
+    return 8;
+  }
+
+  private historyContentHorizontalPadding(): number {
+    return 8;
+  }
+
+  private historyColumnCount(): number {
+    return this.historyColumnCountForWidth(this.historyContentWidth);
+  }
+
+  private historyColumnCountForWidth(width: number): number {
+    const availableWidth = Math.max(0, width - this.historyContentHorizontalPadding() * 2);
+    if (availableWidth <= 0 || Number.isNaN(availableWidth)) {
+      return 1;
+    }
+    return Math.max(1, Math.floor((availableWidth + this.historyCardGap()) /
+      (this.historyCardPreferredWidth() + this.historyCardGap())));
+  }
+
+  private historyCardWidth(): number {
+    const availableWidth = Math.max(0, this.historyContentWidth - this.historyContentHorizontalPadding() * 2);
+    if (availableWidth <= 0 || Number.isNaN(availableWidth)) {
+      return this.historyCardPreferredWidth();
+    }
+    const columns = this.historyColumnCount();
+    return Math.max(300, Math.floor((availableWidth - this.historyCardGap() * (columns - 1)) / columns));
+  }
+
+  private updateHistoryContentWidth(width: number): void {
+    if (width <= 0 || Number.isNaN(width) || this.historyContentWidth === width) {
+      return;
+    }
+    const oldColumns = this.historyColumnCount();
+    const nextColumns = this.historyColumnCountForWidth(width);
+    if (this.historyContentWidth <= 0 || oldColumns === nextColumns) {
+      this.historyContentWidth = width;
+      return;
+    }
+    this.getUIContext().animateTo({ duration: 220, curve: Curve.EaseOut }, () => {
+      this.historyContentWidth = width;
+    });
+  }
+
+  private buildHistoryRows(): GalleryInfo[][] {
+    const columns = this.historyColumnCount();
+    const rows: GalleryInfo[][] = [];
+    for (let i = 0; i < this.histories.length; i += columns) {
+      rows.push(this.histories.slice(i, i + columns));
+    }
+    return rows;
+  }
+
+  private historyRowKey(row: GalleryInfo[]): string {
+    return row.map((gallery: GalleryInfo) => gallery.gid.toString()).join('-');
   }
 
   private cacheReaderImage(index: number, page: GalleryPage): void {
@@ -495,7 +558,6 @@ export struct HistoryScene {
           Refresh({ refreshing: $$this.historyRefreshing, builder: this.historyRefreshComponent() }) {
             Scroll(this.historyScroller) {
               Column({ space: 8 }) {
-
                 if (this.histories.length === 0) {
                   PlaceholderScene({
                     title: 'History',
@@ -503,36 +565,55 @@ export struct HistoryScene {
                   })
                     .layoutWeight(1)
                 } else {
-                  ForEach(this.histories, (gallery: GalleryInfo) => {
-                    Column() {
-                      GalleryListRow({ gallery: gallery })
-                        .onClick(() => {
-                          this.loadDetail(gallery);
-                        })
-                      Row() {
-                        Text(uiText('Remove'))
-                          .fontSize(12)
-                          .fontColor('#C33A2C')
-                          .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-                          .onClick(() => {
-                            this.removeHistory(gallery);
-                          })
-                        Blank()
-                      }
-                      .width('100%')
-                      .padding({ right: 8, bottom: 6 })
-                      .backgroundColor(Color.White)
+                  ForEach(this.buildHistoryRows(), (row: GalleryInfo[], rowIndex: number) => {
+                    Row() {
+                      ForEach(row, (gallery: GalleryInfo, colIndex: number) => {
+                        Column() {
+                          GalleryListRow({ gallery: gallery })
+                            .onClick(() => {
+                              this.loadDetail(gallery);
+                            })
+                          Row() {
+                            Text(uiText('Remove'))
+                              .fontSize(12)
+                              .fontColor('#C33A2C')
+                              .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+                              .onClick(() => {
+                                this.removeHistory(gallery);
+                              })
+                            Blank()
+                          }
+                          .width('100%')
+                          .padding({ right: 8, bottom: 6 })
+                          .backgroundColor(Color.White)
+                        }
+                        .width(this.historyCardWidth())
+                        .borderRadius(6)
+                        .margin({ right: colIndex < row.length - 1 ? this.historyCardGap() : 0 })
+                        .animation({ duration: 220, curve: Curve.EaseOut })
+                      }, (gallery: GalleryInfo) => gallery.gid.toString())
                     }
                     .width('100%')
-                    .borderRadius(6)
-                  }, (gallery: GalleryInfo) => gallery.gid.toString() + ':' + this.renderVersion.toString())
+                    .justifyContent(FlexAlign.Start)
+                    .animation({ duration: 220, curve: Curve.EaseOut })
+                  }, (row: GalleryInfo[], rowIndex: number) => {
+                    return this.historyColumnCount().toString() + ':' + rowIndex.toString() + ':' + this.historyRowKey(row);
+                  })
                 }
               }
               .width('100%')
               .height('100%')
               .justifyContent(FlexAlign.Start)
               .alignItems(HorizontalAlign.Start)
-              .padding({ left: 8, right: 8, top: this.historyContentTopPadding(), bottom: 0 })
+              .padding({
+                left: this.historyContentHorizontalPadding(),
+                right: this.historyContentHorizontalPadding(),
+                top: this.historyContentTopPadding(),
+                bottom: 0
+              })
+              .onAreaChange((_oldArea: Area, newArea: Area) => {
+                this.updateHistoryContentWidth(newArea.width as number);
+              })
             }
             .scrollable(ScrollDirection.Vertical)
             .scrollBar(BarState.Off)
@@ -1110,7 +1191,7 @@ export struct TopListScene {
                 selectedIndex: this.selectedIndex,
                 info: this.currentInfo(),
                 toolbarOffsetY: this.toolbarOffsetY,
-                topPadding: this.floatingToolbarHeight() + 12,
+                topPadding: this.floatingToolbarHeight() + 4,
                 renderVersion: this.renderVersion,
                 onSelectList: (index: number) => {
                   if (this.selectedIndex === index) {
@@ -1192,6 +1273,10 @@ export struct TopListBoard {
   onScrollUpdate: (offset: number, scrollOffset: number) => void = () => {};
   private boardScroller: Scroller = new Scroller();
 
+  private stickyTabsTopPadding(): number {
+    return Math.max(0, this.topPadding + this.toolbarOffsetY);
+  }
+
   @Builder
   private TabsHeader() {
     Column() {
@@ -1201,11 +1286,11 @@ export struct TopListBoard {
         onSelect: this.onSelectList
       })
         .width('100%')
-        .padding({ top: 8, bottom: 8 })
+        .padding({ top: 4, bottom: 6 })
         .backgroundColor('#F3F5F7')
     }
       .width('100%')
-      .padding({ left: 0, right: 0, top: this.topPadding })
+      .padding({ left: 0, right: 0, top: this.stickyTabsTopPadding() })
       .backgroundColor('#F3F5F7')
   }
 
