@@ -1,4 +1,4 @@
-﻿import { common } from '@kit.AbilityKit';
+import { common } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { pasteboard } from '@kit.BasicServicesKit';
 import { picker } from '@kit.CoreFileKit';
@@ -128,6 +128,7 @@ export struct GalleryListScene {
   @State resultCount: string = '';
   @State galleries: GalleryInfo[] = [];
   @State hasFirstRefresh: boolean = false;
+  @State scrollResetVersion: number = 0;
   @State fabExpanded: boolean = false;
   @State filterActive: boolean = false;
   @State showDetail: boolean = false;
@@ -263,6 +264,7 @@ export struct GalleryListScene {
     this.isLoadingMore = false;
     if (pageIndex === 0 && !preserveExisting) {
       this.resetListScroll();
+      this.scrollResetVersion++;
     }
     this.renderVersion++;
     this.closeDetail();
@@ -773,6 +775,7 @@ export struct GalleryListScene {
           onSelectGallery: (gallery: GalleryInfo) => {
             this.loadDetail(gallery);
           },
+          scrollResetVersion: this.scrollResetVersion,
           initialScrollOffset: this.listScrollOffset,
           onScrollUpdate: (offset: number) => {
             this.listScrollOffset = offset;
@@ -801,6 +804,8 @@ export struct GalleryListContent {
   @Prop requestUrl: string = '';
   @Prop isLoadingMore: boolean = false;
   @Prop galleries: GalleryInfo[] = [];
+  @Prop @Watch('onScrollReset') scrollResetVersion: number = 0;
+  private lastResetVersion: number = 0;
   onKeywordChange: (value: string) => void = () => {};
   onMenu: () => void = () => {};
   onSearch: () => void = () => {};
@@ -829,6 +834,13 @@ export struct GalleryListContent {
   private barHeight: number = 56; // matches EhNavBar body height
   @StorageProp('statusBarHeight') statusBarHeightPx: number = 0;
   
+  onScrollReset(): void {
+    // scrollResetVersion 变化时滚回顶部
+    this.listScroller.scrollTo({ xOffset: 0, yOffset: 0 });
+    this.toolbarOffsetY = 0;
+    this.lastScrollY = 0;
+  }
+
   private statusBarVp(): number {
     return this.getUIContext().px2vp(this.statusBarHeightPx);
   }
@@ -1009,70 +1021,68 @@ export struct GalleryListContent {
 
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
+      // Refresh 包裹 List
+      // List 用 contentStartOffset 为导航栏留出空间，
+      // 这样 yOffset=0 就是真正的列表顶端，Refresh 能立即感知下拉。
       Refresh({ refreshing: $$this.refreshing, builder: this.customRefreshComponent() }) {
-        Scroll(this.listScroller) {
-          Column() {
-            if (this.galleries.length === 0) {
+        List({ space: 0, scroller: this.listScroller }) {
+          // 空状态或画廊列表
+          if (this.galleries.length === 0) {
+            ListItem() {
               GalleryListStateView({
                 statusText: this.statusText,
                 requestUrl: this.requestUrl,
                 onRefresh: this.onRefresh
               })
               .width('100%')
-              .constraintSize({ minHeight: '100%' })
-              .padding({ top: this.contentTopPadding() })
-            } else {
-              Column() {
-                Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
-                  ForEach(this.galleries, (gallery: GalleryInfo, index: number) => {
+              .height('100%')
+            }
+          } else {
+            // 画廊卡片按行分组，每行 galleryColumnCount() 张
+            ForEach(this.buildRows(), (row: GalleryInfo[], rowIndex: number) => {
+              ListItem() {
+                Row() {
+                  ForEach(row, (gallery: GalleryInfo, colIndex: number) => {
                     if (galleryListMode() === 'Thumb') {
                       GalleryThumbCard({ gallery: gallery })
                         .width(this.galleryCardWidth())
-                        .margin({ right: this.galleryCardRightMargin(index), bottom: this.galleryCardGap() })
-                        .animation({ duration: 220, curve: Curve.EaseInOut })
+                        .margin({
+                          right: colIndex < row.length - 1 ? this.galleryCardGap() : 0
+                        })
                         .onClick(() => { this.onSelectGallery(gallery); })
                     } else {
                       GalleryListRow({ gallery: gallery })
                         .width(this.galleryCardWidth())
-                        .margin({ right: this.galleryCardRightMargin(index), bottom: this.galleryCardGap() })
-                        .animation({ duration: 220, curve: Curve.EaseInOut })
+                        .margin({
+                          right: colIndex < row.length - 1 ? this.galleryCardGap() : 0
+                        })
                         .onClick(() => { this.onSelectGallery(gallery); })
                     }
                   }, (gallery: GalleryInfo) => gallery.gid.toString())
                 }
                 .width('100%')
                 .padding({ left: this.galleryContentPadding(), right: this.galleryContentPadding() })
+                .justifyContent(FlexAlign.Start)
               }
-              .width('100%')
-              .padding({ top: this.contentTopPadding() })
-            }
+              .margin({ bottom: this.galleryCardGap() })
+            }, (_row: GalleryInfo[], rowIndex: number) => rowIndex.toString() + ':' + this.renderVersion.toString())
 
+            // 加载更多指示器
             if (this.isLoadingMore) {
-              Row() {
-                LoadingProgress().width(20).height(20).color('#9BB8CB')
-                Text(uiText('Loading...')).fontSize(12).fontColor('#9BB8CB').margin({ left: 6 })
+              ListItem() {
+                Row() {
+                  LoadingProgress().width(20).height(20).color('#9BB8CB')
+                  Text(uiText('Loading...')).fontSize(12).fontColor('#9BB8CB').margin({ left: 6 })
+                }
+                .width('100%')
+                .height(40)
+                .justifyContent(FlexAlign.Center)
               }
-              .width('100%')
-              .height(40)
-              .justifyContent(FlexAlign.Center)
             }
-
-            QuickActionColumn({
-              expanded: this.actionsExpanded,
-              filterActive: this.filterActive,
-              canJump: this.canJump,
-              canRandom: this.canRandom,
-              onToggle: this.onToggleActions,
-              onFilter: this.onFilter,
-              onJump: this.onJump,
-              onRefresh: this.onRefresh,
-              onRandom: this.onRandom
-            })
           }
-          .width('100%')
-          .constraintSize({ minHeight: '100%' })
         }
-        .scrollable(ScrollDirection.Vertical)
+        // contentStartOffset: 内容从导航栏高度以下开始，yOffset=0 是真正的顶端
+        .contentStartOffset(this.contentTopPadding())
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring)
         .width('100%')
@@ -1094,7 +1104,6 @@ export struct GalleryListContent {
         .onScrollStop(() => {
           const yOff = this.listScroller.currentOffset().yOffset;
           this.onScrollUpdate(yOff);
-          // Snap toolbar fully visible or fully hidden
           if (this.toolbarOffsetY < -this.totalBarHeight() / 2) {
             this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
               this.toolbarOffsetY = -this.totalBarHeight();
@@ -1115,16 +1124,13 @@ export struct GalleryListContent {
         if (value < this.REFRESH_OFFSET) {
           this.refreshShowLogo = true;
           this.refreshMsg = uiText('Pull down to refresh');
-          // scale from 0 to 1 as user pulls down
           this.refreshScaleNum = value / this.REFRESH_OFFSET;
         } else {
           this.refreshMsg = uiText('Release to refresh');
-          // scale back from 1 to smaller as user pulls past threshold
           this.refreshScaleNum = this.REFRESH_OFFSET / value;
         }
       })
       .onStateChange((refreshStatus: RefreshStatus) => {
-        // RefreshStatus 3 = Refresh (rebounded to offset, now refreshing)
         if (refreshStatus === RefreshStatus.Refresh) {
           this.refreshShowLogo = false;
           this.refreshMsg = uiText('Refreshing...');
@@ -1144,7 +1150,28 @@ export struct GalleryListContent {
       })
       .backgroundColor($r('app.color.page_background'))
 
-      // Floating EhNavBar overlays the scroll content
+      // FAB 悬浮按钮
+      Column() {
+        QuickActionColumn({
+          expanded: this.actionsExpanded,
+          filterActive: this.filterActive,
+          canJump: this.canJump,
+          canRandom: this.canRandom,
+          onToggle: this.onToggleActions,
+          onFilter: this.onFilter,
+          onJump: this.onJump,
+          onRefresh: this.onRefresh,
+          onRandom: this.onRandom
+        })
+      }
+      .width('100%')
+      .height('100%')
+      .justifyContent(FlexAlign.End)
+      .alignItems(HorizontalAlign.End)
+      .padding({ right: 16, bottom: 24 })
+      .hitTestBehavior(HitTestMode.Transparent)
+
+      // 浮动导航栏
       EhNavBar({
         statusBarHeight: this.statusBarVp(),
         title: this.sceneTitle,
@@ -1163,11 +1190,20 @@ export struct GalleryListContent {
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
   }
 
+  // 把 galleries 按列数分组成行数组
+  private buildRows(): GalleryInfo[][] {
+    const cols = this.galleryColumnCount();
+    const rows: GalleryInfo[][] = [];
+    for (let i = 0; i < this.galleries.length; i += cols) {
+      rows.push(this.galleries.slice(i, i + cols));
+    }
+    return rows;
+  }
+
   private searchMode(): boolean {
     return this.listMode === 'Search' || this.listMode === 'Favorites';
   }
 }
-
 @Component
 export struct GalleryListStateView {
   @Prop statusText: string = '';
