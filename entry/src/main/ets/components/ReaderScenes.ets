@@ -371,6 +371,7 @@ export struct ReaderScene {
   @State preferOriginal: boolean = false;
   @State menuVisible: boolean = false;
   @State sliderVisible: boolean = false;
+  @State autoTransferPlaying: boolean = false;
   @State currentIndex: number = 0;
   @State isDisableSwipe: boolean = false;
   @State zoomPercent: number = 100;
@@ -430,7 +431,6 @@ export struct ReaderScene {
     this.applyReaderWindowSettings();
     this.applyBrightnessFromSettings();
     this.updateVolumePageBinding();
-    this.scheduleAutoTransfer();
   }
 
   aboutToDisappear(): void {
@@ -608,6 +608,11 @@ export struct ReaderScene {
     this.sliderVisible = false;
   }
 
+  private hideSliderAndStopPlayback(): void {
+    this.stopAutoTransferPlayback();
+    this.hideSlider();
+  }
+
   private showMenu(): void {
     this.menuScreenRotation = ehSettingsStore.getValue('screen_rotation', 'System');
     this.menuReadingDirection = ehSettingsStore.getValue('reading_direction', 'Right to left');
@@ -624,6 +629,7 @@ export struct ReaderScene {
     this.menuBrightnessLevel = ehSettingsStore.getValue('screen_lightness', '50%');
     this.menuVisible = true;
     this.clearAutoTransferTimer();
+    this.autoTransferPlaying = false;
   }
 
   private applyMenuSettings(): void {
@@ -652,7 +658,9 @@ export struct ReaderScene {
     }
     this.applyReaderWindowSettings();
     this.updateVolumePageBinding();
-    this.scheduleAutoTransfer();
+    if (this.autoTransferPlaying) {
+      this.scheduleAutoTransfer();
+    }
     const win = this.readerWindow();
     if (win !== undefined) {
       win.setWindowKeepScreenOn(this.menuKeepScreenOn).catch(() => {});
@@ -722,7 +730,11 @@ export struct ReaderScene {
 
   private scheduleAutoTransfer(): void {
     this.clearAutoTransferTimer();
-    if (!this.readerWindowActive || !this.canGoNext()) {
+    if (!this.readerWindowActive || !this.autoTransferPlaying) {
+      return;
+    }
+    if (!this.canGoNext()) {
+      this.autoTransferPlaying = false;
       return;
     }
     const delay = this.autoTransferDelayMs();
@@ -736,6 +748,28 @@ export struct ReaderScene {
       }
       this.jumpTo(this.currentIndex + 1);
     }, delay) as number;
+  }
+
+  private startAutoTransferPlayback(): void {
+    if (!this.canGoNext() || this.autoTransferDelayMs() <= 0) {
+      return;
+    }
+    this.autoTransferPlaying = true;
+    this.hideSlider();
+    this.scheduleAutoTransfer();
+  }
+
+  private stopAutoTransferPlayback(): void {
+    this.autoTransferPlaying = false;
+    this.clearAutoTransferTimer();
+  }
+
+  private toggleAutoTransferPlayback(): void {
+    if (this.autoTransferPlaying) {
+      this.stopAutoTransferPlayback();
+    } else {
+      this.startAutoTransferPlayback();
+    }
   }
 
   private updateVolumePageBinding(): void {
@@ -785,22 +819,28 @@ export struct ReaderScene {
     this.applyMenuSettings();
     this.menuVisible = false;
     this.showInfo = false;
-    this.scheduleAutoTransfer();
+    if (this.autoTransferPlaying) {
+      this.scheduleAutoTransfer();
+    }
   }
 
   private hideAll(): void {
     this.hideMenu();
-    this.hideSlider();
+    this.hideSliderAndStopPlayback();
   }
 
   // Called from ReaderImageViewport with tap coordinates (vp units)
   private onTap(x: number, y: number, w: number, h: number): void {
+    if (this.autoTransferPlaying) {
+      this.stopAutoTransferPlayback();
+      return;
+    }
     if (this.menuVisible) {
       this.hideAll();
       return;
     }
     if (this.sliderVisible) {
-      this.hideSlider();
+      this.hideSliderAndStopPlayback();
       return;
     }
     const relX = w > 0 ? x / w : 0.5;
@@ -849,7 +889,9 @@ export struct ReaderScene {
     this.currentIndex = target;
     this.isDisableSwipe = false;
     this.zoomPercent = 100;
-    this.scheduleAutoTransfer();
+    if (this.autoTransferPlaying) {
+      this.scheduleAutoTransfer();
+    }
     try {
       this.swiperController.changeIndex(target, true);
     } catch (e) {}
@@ -863,7 +905,9 @@ export struct ReaderScene {
     this.currentIndex = index;
     this.isDisableSwipe = false;
     this.zoomPercent = 100;
-    this.scheduleAutoTransfer();
+    if (this.autoTransferPlaying) {
+      this.scheduleAutoTransfer();
+    }
     this.onJump(index);
   }
 
@@ -961,7 +1005,7 @@ export struct ReaderScene {
         Stack() {}
           .width('100%')
           .height('100%')
-          .onClick(() => { this.hideSlider(); })
+          .onClick(() => { this.hideSliderAndStopPlayback(); })
           .zIndex(4)
 
         Column() {
@@ -981,16 +1025,24 @@ export struct ReaderScene {
               .enabled(this.totalPages > 1)
               .onChange((value: number, mode: SliderChangeMode) => {
                 if (mode === SliderChangeMode.End || mode === SliderChangeMode.Click) {
+                  this.stopAutoTransferPlayback();
                   this.clearSliderTimer();
                   this.jumpTo(value);
                   this.scheduleSliderHide();
                 }
               })
-            Text((this.totalPages <= 0 ? 1 : this.totalPages).toString())
-              .fontSize(12)
-              .fontColor('#E5E7EB')
-              .textAlign(TextAlign.Center)
+            Button({ type: ButtonType.Circle, stateEffect: true }) {
+              SymbolGlyph(this.autoTransferPlaying ? $r('sys.symbol.pause_fill') : $r('sys.symbol.play_fill'))
+                .fontSize(18)
+                .fontColor([Color.White])
+            }
               .width(42)
+              .height(36)
+              .enabled(this.autoTransferDelayMs() > 0 && this.canGoNext())
+              .backgroundColor(this.autoTransferDelayMs() > 0 && this.canGoNext() ? '#334155' : '#1F2937')
+              .onClick(() => {
+                this.toggleAutoTransferPlayback();
+              })
           }
           .width('100%')
           .alignItems(VerticalAlign.Center)
