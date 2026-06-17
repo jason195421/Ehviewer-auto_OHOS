@@ -230,6 +230,9 @@ export struct GalleryListScene {
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
   private listScrollOffset: number = 0;
   private detailScrollOffset: number = 0;
+  private readerPreviewMap: Map<number, GalleryPreview> = new Map();
+  private readerPreviewPageRequests: Map<number, Promise<GalleryPreview | null>> = new Map();
+  private readerPreviewPageSize: number = 0;
 
   private cacheKey(): string {
     const mode = this.useForcedMode ? this.forcedMode.toString() : listModeForRoute(this.sourceRoute).toString();
@@ -626,6 +629,7 @@ export struct GalleryListScene {
   private loadDetail(gallery: GalleryInfo): void {
     this.showDetail = true;
     this.detail = createDetailFromGallery(gallery);
+    this.resetReaderPreviewCache();
     this.detailStatus = 'Loading detail for gid ' + gallery.gid.toString() + '...';
     this.detailRequestUrl = '';
     this.detailDownloadText = downloadButtonText(gallery.gid);
@@ -644,6 +648,7 @@ export struct GalleryListScene {
 
       this.detailStatus = 'Detail loaded';
       this.detail = mergeLoadedGalleryDetail(result.detail, this.detail);
+      this.seedReaderPreviewCache(this.detail.previewSet);
       this.detailDownloadText = downloadButtonText(result.detail.gid);
       this.detailLoaded = true;
       this.optimisticFavorite = this.detail.isFavorited;
@@ -662,6 +667,7 @@ export struct GalleryListScene {
     this.showReader = false;
     this.showComments = false;
     this.detail = createEmptyDetail();
+    this.resetReaderPreviewCache();
     this.detailStatus = 'Tap a gallery row to load detail';
     this.detailRequestUrl = '';
     this.detailDownloadText = 'Download';
@@ -699,6 +705,7 @@ export struct GalleryListScene {
       return;
     }
 
+    this.readerPreviewMap.set(preview.index, preview);
     this.showReader = true;
     this.readerPreviewIndex = preview.index;
     saveGalleryReadPosition(this.detail.gid, preview.index);
@@ -755,11 +762,14 @@ export struct GalleryListScene {
 
     for (let offset = 1; offset <= count; offset++) {
       const nextIndex = index + offset;
-      if (nextIndex < 0 || nextIndex >= this.detail.previewSet.length) {
+      if (nextIndex < 0 || nextIndex >= this.readerTotalPages()) {
         return;
       }
 
-      const preview = this.detail.previewSet[nextIndex];
+      const preview = await this.ensureReaderPreview(nextIndex, true);
+      if (preview === null) {
+        continue;
+      }
       if (preview.pageUrl.length === 0 || galleryPageCache.has(preview.pageUrl)) {
         continue;
       }
@@ -779,11 +789,14 @@ export struct GalleryListScene {
   }
 
   private async prewarmReader(): Promise<void> {
-    if (this.detail.previewSet.length === 0) {
+    if (this.readerTotalPages() <= 0) {
       return;
     }
 
-    const preview = this.detail.previewSet[0];
+    const preview = await this.ensureReaderPreview(0, true);
+    if (preview === null) {
+      return;
+    }
     if (preview.pageUrl.length === 0 || galleryPageCache.has(preview.pageUrl)) {
       return;
     }
@@ -803,18 +816,148 @@ export struct GalleryListScene {
   }
 
   private loadReaderPageByIndex(index: number): void {
-    if (index < 0 || index >= this.detail.previewSet.length) {
+    if (index < 0 || index >= this.readerTotalPages()) {
       return;
     }
-    this.loadReaderPage(this.detail.previewSet[index]);
+    const preview = this.readerPreviewForIndex(index);
+    if (preview !== null) {
+      this.loadReaderPage(preview);
+      return;
+    }
+
+    this.showReader = true;
+    this.readerPreviewIndex = index;
+    saveGalleryReadPosition(this.detail.gid, index);
+    this.readerStatus = 'Resolving page ' + (index + 1).toString() + '...';
+    this.readerPage = createReaderLoadingPage('');
+    this.renderVersion++;
+    this.ensureReaderPreview(index, false).then((resolved: GalleryPreview | null) => {
+      if (resolved === null) {
+        if (this.readerPreviewIndex === index) {
+          this.readerStatus = 'Page URL is unavailable';
+          this.renderVersion++;
+        }
+        return;
+      }
+      if (this.readerPreviewIndex === index) {
+        this.loadReaderPage(resolved);
+      }
+    }).catch((error: Error) => {
+      if (this.readerPreviewIndex === index) {
+        this.readerStatus = 'Page URL load failed: ' + error.message;
+        this.renderVersion++;
+      }
+    });
   }
 
   private readDetail(): void {
-    if (this.detail.previewSet.length === 0) {
+    if (this.readerTotalPages() <= 0) {
       this.detailStatus = 'Read is waiting for preview pages';
       return;
     }
     this.loadReaderPageByIndex(readerStartIndex(this.detail));
+  }
+
+  private resetReaderPreviewCache(): void {
+    this.readerPreviewMap.clear();
+    this.readerPreviewPageRequests.clear();
+    this.readerPreviewPageSize = 0;
+  }
+
+  private seedReaderPreviewCache(previews: GalleryPreview[]): void {
+    if (previews.length > 0 && (this.readerPreviewPageSize <= 0 || previews.length > this.readerPreviewPageSize)) {
+      this.readerPreviewPageSize = previews.length;
+    }
+    for (let i = 0; i < previews.length; i++) {
+      this.readerPreviewMap.set(previews[i].index, previews[i]);
+    }
+  }
+
+  private readerTotalPages(): number {
+    if (this.detail.pages > 0) {
+      return this.detail.pages;
+    }
+    return Math.max(this.detail.previewSet.length, this.readerPreviewMap.size);
+  }
+
+  private readerPreviewForIndex(index: number): GalleryPreview | null {
+    const cached = this.readerPreviewMap.get(index);
+    if (cached !== undefined) {
+      return cached;
+    }
+    for (let i = 0; i < this.detail.previewSet.length; i++) {
+      if (this.detail.previewSet[i].index === index) {
+        this.readerPreviewMap.set(index, this.detail.previewSet[i]);
+        return this.detail.previewSet[i];
+      }
+    }
+    return null;
+  }
+
+  private readerPreviewPageIndex(index: number): number {
+    const pageSize = this.readerPreviewPageSize > 0 ? this.readerPreviewPageSize :
+      Math.max(1, this.detail.previewSet.length);
+    return Math.floor(index / pageSize);
+  }
+
+  private ensureReaderPreview(index: number, silent: boolean): Promise<GalleryPreview | null> {
+    const cached = this.readerPreviewForIndex(index);
+    if (cached !== null) {
+      return Promise.resolve(cached);
+    }
+    if (this.detail.gid <= 0 || this.detail.token.length === 0 || index < 0 || index >= this.readerTotalPages()) {
+      return Promise.resolve(null);
+    }
+
+    const previewPageIndex = this.readerPreviewPageIndex(index);
+    const pending = this.readerPreviewPageRequests.get(previewPageIndex);
+    if (pending !== undefined) {
+      return pending;
+    }
+
+    const referer = this.detailRequestUrl.length > 0 ? this.detailRequestUrl : this.requestUrl;
+    const request = this.client.loadGalleryDetail(this.detail.gid, this.detail.token, previewPageIndex,
+      this.activeSite, referer).then((result: GalleryDetailLoadResult) => {
+      this.readerPreviewPageRequests.delete(previewPageIndex);
+      if (!result.ok || result.detail === null) {
+        if (!silent) {
+          this.readerStatus = 'Preview page load failed: ' + result.message;
+          this.renderVersion++;
+        }
+        return null;
+      }
+      this.mergeReaderPreviewSet(result.detail);
+      return this.readerPreviewForIndex(index);
+    }).catch((error: Error) => {
+      this.readerPreviewPageRequests.delete(previewPageIndex);
+      if (!silent) {
+        this.readerStatus = 'Preview page load failed: ' + error.message;
+        this.renderVersion++;
+      }
+      return null;
+    });
+    this.readerPreviewPageRequests.set(previewPageIndex, request);
+    return request;
+  }
+
+  private mergeReaderPreviewSet(loaded: GalleryDetail): void {
+    this.seedReaderPreviewCache(loaded.previewSet);
+    const byIndex: Map<number, GalleryPreview> = new Map();
+    for (let i = 0; i < this.detail.previewSet.length; i++) {
+      byIndex.set(this.detail.previewSet[i].index, this.detail.previewSet[i]);
+    }
+    for (let i = 0; i < loaded.previewSet.length; i++) {
+      byIndex.set(loaded.previewSet[i].index, loaded.previewSet[i]);
+    }
+    const merged: GalleryPreview[] = Array.from(byIndex.values());
+    merged.sort((left: GalleryPreview, right: GalleryPreview) => left.index - right.index);
+    const nextDetail = cloneGalleryDetail(this.detail);
+    nextDetail.previewSet = cloneGalleryPreviews(merged);
+    nextDetail.previewPages = Math.max(nextDetail.previewPages, loaded.previewPages);
+    nextDetail.pages = Math.max(nextDetail.pages, loaded.pages);
+    this.detail = nextDetail;
+    this.seedReaderPreviewCache(this.detail.previewSet);
+    this.renderVersion++;
   }
 
   private toggleDownloadDetail(): void {
@@ -989,7 +1132,7 @@ export struct GalleryListScene {
           page: this.readerPage,
           statusText: this.readerStatus,
           pageIndex: this.readerPreviewIndex,
-          totalPages: this.detail.previewSet.length,
+          totalPages: this.readerTotalPages(),
           onBack: () => {
             this.closeReader();
           },
@@ -3702,8 +3845,8 @@ export struct PreviewTile {
 
   build() {
     Column() {
-      GalleryThumb({
-        url: this.preview.imageUrl,
+      PreviewThumb({
+        preview: this.preview,
         widthValue: this.tileWidth,
         heightValue: this.imageHeight,
         radiusValue: 4
@@ -3719,6 +3862,129 @@ export struct PreviewTile {
     .onClick(() => {
       this.onSelectPreview(this.preview);
     })
+  }
+}
+
+@Component
+export struct PreviewThumb {
+  preview: GalleryPreview = createEmptyPreview();
+  widthValue: number = 132;
+  heightValue: number = 96;
+  radiusValue: number = 4;
+  @State localUrl: string = '';
+  @State cachedUrl: string = '';
+  @State loadFailed: boolean = false;
+
+  aboutToAppear(): void {
+    this.cacheThumb();
+  }
+
+  aboutToDisappear(): void {
+    this.cachedUrl = '';
+    this.localUrl = '';
+  }
+
+  aboutToReuse(params: Record<string, Object>): void {
+    const next = params['preview'] as GalleryPreview | undefined;
+    const nextUrl = next === undefined ? this.preview.imageUrl : next.imageUrl;
+    if (nextUrl !== this.cachedUrl) {
+      this.cachedUrl = '';
+      this.localUrl = '';
+      this.loadFailed = false;
+      this.cacheThumb();
+    }
+  }
+
+  private cacheThumb(): void {
+    const url = this.preview.imageUrl;
+    if (url.length === 0 || url === this.cachedUrl) {
+      return;
+    }
+    this.cachedUrl = url;
+    this.loadFailed = false;
+    cacheThumbnailImage(url, (localPath: string) => {
+      if (this.cachedUrl === url && localPath.length > 0) {
+        this.localUrl = localPath;
+      }
+    }, () => {
+      if (this.cachedUrl === url) {
+        this.loadFailed = true;
+      }
+    });
+  }
+
+  private scaleValue(): number {
+    if (this.preview.width <= 0 || this.preview.height <= 0 || this.widthValue <= 0 || this.heightValue <= 0) {
+      return 1;
+    }
+    return Math.max(this.widthValue / this.preview.width, this.heightValue / this.preview.height);
+  }
+
+  private imageWidthValue(): number | string {
+    if (this.preview.width <= 0) {
+      return '100%';
+    }
+    return Math.max(this.widthValue, Math.round(this.preview.width * this.scaleValue()));
+  }
+
+  private imageHeightValue(): number | string {
+    if (this.preview.height <= 0) {
+      return '100%';
+    }
+    return Math.max(this.heightValue, Math.round(this.preview.height * this.scaleValue()));
+  }
+
+  private xPosition(): number {
+    return -Math.round(this.preview.xOffset * this.scaleValue());
+  }
+
+  private yPosition(): number {
+    return -Math.round(this.preview.yOffset * this.scaleValue());
+  }
+
+  build() {
+    Stack() {
+      Column()
+        .width('100%')
+        .height('100%')
+        .backgroundColor('#E7ECF1')
+        .borderRadius(this.radiusValue)
+
+      if (this.loadFailed) {
+        Column({ space: 4 }) {
+          SymbolGlyph($r('sys.symbol.xmark'))
+            .fontSize(20)
+            .fontColor(['#9BB8CB'])
+          Text((this.preview.index + 1).toString())
+            .fontSize(10)
+            .fontColor('#9BB8CB')
+        }
+        .justifyContent(FlexAlign.Center)
+        .onClick(() => {
+          this.cachedUrl = '';
+          this.cacheThumb();
+        })
+      } else if (this.localUrl.length > 0) {
+        Image(this.localUrl)
+          .width(this.imageWidthValue())
+          .height(this.imageHeightValue())
+          .objectFit(ImageFit.Fill)
+          .position({ x: this.xPosition(), y: this.yPosition() })
+          .syncLoad(true)
+          .onError(() => {
+            this.loadFailed = true;
+          })
+      } else {
+        LoadingProgress()
+          .width(28)
+          .height(28)
+          .color('#9BB8CB')
+      }
+    }
+    .width(this.widthValue)
+    .height(this.heightValue)
+    .clip(true)
+    .borderRadius(this.radiusValue)
   }
 }
 
@@ -3976,6 +4242,12 @@ export struct ReaderScene {
       win.setWindowSystemBarEnable(['status']).catch(() => {});
     } catch (e) {}
     try {
+      win.setSpecificSystemBarEnabled('status', true, false).catch(() => {});
+    } catch (e) {}
+    try {
+      win.setSpecificSystemBarEnabled('navigation', true, false).catch(() => {});
+    } catch (e) {}
+    try {
       win.setWindowSystemBarProperties({
         statusBarColor: '#FF2F6F8F',
         isStatusBarLightIcon: true
@@ -4002,9 +4274,18 @@ export struct ReaderScene {
         try {
           win.setWindowSystemBarEnable([]).catch(() => {});
         } catch (e) {}
+        try {
+          win.setSpecificSystemBarEnabled('status', false, false).catch(() => {});
+        } catch (e) {}
+        try {
+          win.setSpecificSystemBarEnabled('navigation', false, false).catch(() => {});
+        } catch (e) {}
       } else {
         try {
           win.setWindowSystemBarEnable(['status']).catch(() => {});
+        } catch (e) {}
+        try {
+          win.setSpecificSystemBarEnabled('status', true, false).catch(() => {});
         } catch (e) {}
       }
       try {
@@ -4317,6 +4598,7 @@ export struct ReaderScene {
     .width('100%')
     .height('100%')
     .backgroundColor('#050608')
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
   }
 }
 

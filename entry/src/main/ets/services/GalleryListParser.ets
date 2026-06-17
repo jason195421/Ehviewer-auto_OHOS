@@ -364,13 +364,35 @@ function parseRated(row: string): boolean {
 
 function parseSimpleTags(row: string): string[] {
   const tags: string[] = [];
-  const pattern = /title=["']([^"']+:[^"']+)["']/gi;
+  const seen: Set<string> = new Set();
+  const pattern = /(?:title|data-title)=["']([^"']+:[^"']+)["']/gi;
   let match: RegExpExecArray | null = pattern.exec(row);
   while (match !== null) {
-    tags.push(decodeHtml(match[1]));
+    pushSimpleTag(tags, seen, decodeHtml(match[1]));
     match = pattern.exec(row);
   }
+
+  const visiblePattern = /<div[^>]+class=["'][^"']*\b(?:gt|gtl|gtw)\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi;
+  match = visiblePattern.exec(row);
+  while (match !== null) {
+    const text = cleanText(match[1]).toLowerCase();
+    const namespaced = text.indexOf(':') >= 0 ? text : languageTagFromText(text);
+    if (namespaced.length > 0) {
+      pushSimpleTag(tags, seen, namespaced);
+    }
+    match = visiblePattern.exec(row);
+  }
   return tags;
+}
+
+function pushSimpleTag(tags: string[], seen: Set<string>, tag: string): void {
+  const normalized = tag.trim();
+  const key = normalized.toLowerCase();
+  if (normalized.length === 0 || seen.has(key)) {
+    return;
+  }
+  seen.add(key);
+  tags.push(normalized);
 }
 
 function parseSimpleLanguage(tags: string[], title: string): string | undefined {
@@ -404,6 +426,31 @@ function parseSimpleLanguage(tags: string[], title: string): string | undefined 
     }
   }
   return undefined;
+}
+
+function languageTagFromText(text: string): string {
+  const knownLanguages: string[] = [
+    'english',
+    'chinese',
+    'spanish',
+    'korean',
+    'russian',
+    'french',
+    'portuguese',
+    'thai',
+    'german',
+    'italian',
+    'vietnamese',
+    'polish',
+    'hungarian',
+    'dutch'
+  ];
+  for (let i = 0; i < knownLanguages.length; i++) {
+    if (text === knownLanguages[i]) {
+      return 'language:' + knownLanguages[i];
+    }
+  }
+  return '';
 }
 
 function parseTagList(row: string): string[] {

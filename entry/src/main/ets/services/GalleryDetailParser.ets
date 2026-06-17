@@ -8,12 +8,21 @@ const COVER_PATTERN: RegExp = /id=["']gd1["'][\s\S]*?style=["']([^"']*url\([^)]+
 const COVER_URL_PATTERN: RegExp = /url\(([^)]+)\)/i;
 const PREVIEW_PATTERN: RegExp =
   /<a[^>]+href=["']([^"']+)["'][^>]*>[\s\S]*?<div[^>]+title=["']Page\s+(\d+):[^"']*["'][^>]+style=["']([^"']*width:\s*(\d+)px;?\s*height:\s*(\d+)px;?[^"']*url\([^)]+\)[^"']*)["'][^>]*>/gi;
+const NORMAL_PREVIEW_PATTERN: RegExp =
+  /<div[^>]+class=["'][^"']*\bgdtm\b[^"']*["'][^>]*>[\s\S]*?<div[^>]+style=["']([^"']*width:\s*(\d+)px[^"']*height:\s*(\d+)px[^"']*url\([^)]+\)[^"']*)["'][^>]*>[\s\S]*?<a[^>]+href=["']([^"']+)["'][^>]*>[\s\S]*?<img[^>]+alt=["']([\d,]+)["']/gi;
 const LARGE_PREVIEW_PATTERN: RegExp =
   /<div[^>]+class=["'][^"']*\bgdtl\b[^"']*["'][\s\S]*?<a[^>]+href=["']([^"']+)["'][^>]*>\s*<img[^>]+alt=["']([\d,]+)["'][^>]+src=["']([^"']+)["']/gi;
+const LARGE_PREVIEW_NEW_PATTERN: RegExp =
+  /<a[^>]+href=["']([^"']+)["'][^>]*>[\s\S]*?<div[^>]+title=["']Page\s+(\d+):[^"']*["'][^>]+style=["']([^"']*url\([^)]+\)[^"']*0\s+0[^"']*)["'][^>]*>/gi;
 
 export interface GalleryDetailParseResult {
   detail: GalleryDetail | null;
   warning: string;
+}
+
+interface StyleOffset {
+  x: number;
+  y: number;
 }
 
 export function parseGalleryDetail(body: string): GalleryDetailParseResult {
@@ -227,17 +236,55 @@ function parsePreviewSet(body: string): GalleryPreview[] {
     const index = parseIntSafe(match[2], 1) - 1;
     if (index >= 0 && !seen.has(index)) {
       seen.add(index);
+      const offset = parseStyleOffset(match[3]);
       previews.push({
         index: index,
         pageUrl: decodeHtml(match[1]),
         imageUrl: normalizeThumbUrl(extractStyleUrl(match[3])),
         width: parseIntSafe(match[4], 0),
         height: parseIntSafe(match[5], 0),
-        xOffset: parseStyleOffset(match[3]),
-        yOffset: 0
+        xOffset: offset.x,
+        yOffset: offset.y
       });
     }
     match = PREVIEW_PATTERN.exec(body);
+  }
+
+  match = NORMAL_PREVIEW_PATTERN.exec(body);
+  while (match !== null) {
+    const index = parseIntSafe(match[5], 1) - 1;
+    if (index >= 0 && !seen.has(index)) {
+      seen.add(index);
+      const offset = parseStyleOffset(match[1]);
+      previews.push({
+        index: index,
+        pageUrl: decodeHtml(match[4]),
+        imageUrl: normalizeThumbUrl(extractStyleUrl(match[1])),
+        width: parseIntSafe(match[2], 0),
+        height: parseIntSafe(match[3], 0),
+        xOffset: offset.x,
+        yOffset: offset.y
+      });
+    }
+    match = NORMAL_PREVIEW_PATTERN.exec(body);
+  }
+
+  match = LARGE_PREVIEW_NEW_PATTERN.exec(body);
+  while (match !== null) {
+    const index = parseIntSafe(match[2], 1) - 1;
+    if (index >= 0 && !seen.has(index)) {
+      seen.add(index);
+      previews.push({
+        index: index,
+        pageUrl: decodeHtml(match[1]),
+        imageUrl: normalizeThumbUrl(extractStyleUrl(match[3])),
+        width: 200,
+        height: 0,
+        xOffset: 0,
+        yOffset: 0
+      });
+    }
+    match = LARGE_PREVIEW_NEW_PATTERN.exec(body);
   }
 
   match = LARGE_PREVIEW_PATTERN.exec(body);
@@ -270,9 +317,28 @@ function extractStyleUrl(style: string): string {
   return decodeHtml(match[1]).replace(/^["']|["']$/g, '').trim();
 }
 
-function parseStyleOffset(style: string): number {
-  const match = /-\s*(\d+)px/i.exec(style);
-  return match === null ? 0 : parseIntSafe(match[1], 0);
+function parseStyleOffset(style: string): StyleOffset {
+  const position = /background-position\s*:\s*(-?\d+)px\s+(-?\d+)px/i.exec(style);
+  if (position !== null) {
+    return {
+      x: Math.abs(parseIntSafe(position[1], 0)),
+      y: Math.abs(parseIntSafe(position[2], 0))
+    };
+  }
+
+  const numbers: number[] = [];
+  const pattern = /(-?\d+)px/gi;
+  let match: RegExpExecArray | null = pattern.exec(style);
+  while (match !== null) {
+    numbers.push(parseIntSafe(match[1], 0));
+    match = pattern.exec(style);
+  }
+  for (let i = numbers.length - 1; i >= 0; i--) {
+    if (numbers[i] < 0) {
+      return { x: Math.abs(numbers[i]), y: 0 };
+    }
+  }
+  return { x: 0, y: 0 };
 }
 
 function normalizeThumbUrl(url: string): string {

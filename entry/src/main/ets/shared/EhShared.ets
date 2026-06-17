@@ -969,16 +969,17 @@ export function saveGalleryReadPosition(gid: number, pageIndex: number): void {
 }
 
 export function readerStartIndex(detail: GalleryDetail): number {
-  if (detail.previewSet.length === 0) {
+  const total = detail.pages > 0 ? detail.pages : detail.previewSet.length;
+  if (total <= 0) {
     return 0;
   }
   const startPosition = ehSettingsStore.getValue('start_position', 'Beginning');
   if (startPosition === 'End') {
-    return detail.previewSet.length - 1;
+    return total - 1;
   }
   if (startPosition === 'Last read') {
     const saved = ehHistoryStore.getReadPage(detail.gid);
-    if (saved >= 0 && saved < detail.previewSet.length) {
+    if (saved >= 0 && saved < total) {
       return saved;
     }
   }
@@ -1430,7 +1431,7 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
       staticSettingsRow('latest_release', 'Latest release', 'GitHub releases URL from original settings', 'Link', 'url'),
       staticSettingsRow('issue_help', 'Issue help', 'Issue guide URL from original settings', 'Link', 'url'),
       staticSettingsRow('license', 'License', 'Open-source license view', 'GPL', 'activity'),
-      staticSettingsRow('version', 'Version', 'HarmonyOS port workspace version', '0.1.87', 'version'),
+      staticSettingsRow('version', 'Version', 'HarmonyOS port workspace version', '0.1.88', 'version'),
       staticSettingsRow('check_for_updates', 'Check for updates', 'Original AppUpdater entry', 'Open', 'action'),
       optionSettingsRow('close_auto_updates', 'Close automatic updates', 'Disable startup update check', entries, ON_OFF_OPTIONS),
       staticSettingsRow('donate', 'Donate', 'Original donation entry', 'Not migrated', 'url')

@@ -75,6 +75,9 @@ export struct HistoryScene {
   private historyScrollOffset: number = 0;
   private historyToolbarScrollOffset: number = 0;
   private detailScrollOffset: number = 0;
+  private readerPreviewMap: Map<number, GalleryPreview> = new Map();
+  private readerPreviewPageRequests: Map<number, Promise<GalleryPreview | null>> = new Map();
+  private readerPreviewPageSize: number = 0;
 
   aboutToAppear(): void {
     setActiveBackHandler(() => this.handleSystemBack());
@@ -144,6 +147,7 @@ export struct HistoryScene {
   private loadDetail(gallery: GalleryInfo): void {
     this.showDetail = true;
     this.detail = createDetailFromGallery(gallery);
+    this.resetReaderPreviewCache();
     this.detailStatus = 'Loading detail for gid ' + gallery.gid.toString() + '...';
     this.detailRequestUrl = '';
     this.detailDownloadText = downloadButtonText(gallery.gid);
@@ -162,6 +166,7 @@ export struct HistoryScene {
 
       this.detailStatus = 'Detail loaded';
       this.detail = mergeLoadedSceneDetail(result.detail, this.detail);
+      this.seedReaderPreviewCache(this.detail.previewSet);
       this.detailDownloadText = downloadButtonText(result.detail.gid);
       this.detailLoaded = true;
       this.optimisticFavorite = this.detail.isFavorited;
@@ -181,6 +186,7 @@ export struct HistoryScene {
     this.showReader = false;
     this.showComments = false;
     this.detail = createEmptyDetail();
+    this.resetReaderPreviewCache();
     this.detailStatus = 'Tap a history item to load detail';
     this.detailRequestUrl = '';
     this.detailDownloadText = 'Download';
@@ -219,6 +225,7 @@ export struct HistoryScene {
       return;
     }
 
+    this.readerPreviewMap.set(preview.index, preview);
     this.showReader = true;
     this.readerPreviewIndex = preview.index;
     saveGalleryReadPosition(this.detail.gid, preview.index);
@@ -356,11 +363,14 @@ export struct HistoryScene {
 
     for (let offset = 1; offset <= count; offset++) {
       const nextIndex = index + offset;
-      if (nextIndex < 0 || nextIndex >= this.detail.previewSet.length) {
+      if (nextIndex < 0 || nextIndex >= this.readerTotalPages()) {
         return;
       }
 
-      const preview = this.detail.previewSet[nextIndex];
+      const preview = await this.ensureReaderPreview(nextIndex, true);
+      if (preview === null) {
+        continue;
+      }
       if (preview.pageUrl.length === 0 || galleryPageCache.has(preview.pageUrl)) {
         continue;
       }
@@ -380,11 +390,14 @@ export struct HistoryScene {
   }
 
   private async prewarmReader(): Promise<void> {
-    if (this.detail.previewSet.length === 0) {
+    if (this.readerTotalPages() <= 0) {
       return;
     }
 
-    const preview = this.detail.previewSet[0];
+    const preview = await this.ensureReaderPreview(0, true);
+    if (preview === null) {
+      return;
+    }
     if (preview.pageUrl.length === 0 || galleryPageCache.has(preview.pageUrl)) {
       return;
     }
@@ -404,18 +417,122 @@ export struct HistoryScene {
   }
 
   private loadReaderPageByIndex(index: number): void {
-    if (index < 0 || index >= this.detail.previewSet.length) {
+    if (index < 0 || index >= this.readerTotalPages()) {
       return;
     }
-    this.loadReaderPage(this.detail.previewSet[index]);
+    const preview = this.readerPreviewForIndex(index);
+    if (preview !== null) {
+      this.loadReaderPage(preview);
+      return;
+    }
+
+    this.showReader = true;
+    this.readerPreviewIndex = index;
+    saveGalleryReadPosition(this.detail.gid, index);
+    this.readerStatus = 'Resolving page ' + (index + 1).toString() + '...';
+    this.readerPage = createReaderLoadingPage('');
+    this.renderVersion++;
+    this.ensureReaderPreview(index, false).then((resolved: GalleryPreview | null) => {
+      if (resolved !== null && this.readerPreviewIndex === index) {
+        this.loadReaderPage(resolved);
+      }
+    });
   }
 
   private readDetail(): void {
-    if (this.detail.previewSet.length === 0) {
+    if (this.readerTotalPages() <= 0) {
       this.detailStatus = 'Read is waiting for preview pages';
       return;
     }
     this.loadReaderPageByIndex(readerStartIndex(this.detail));
+  }
+
+  private resetReaderPreviewCache(): void {
+    this.readerPreviewMap.clear();
+    this.readerPreviewPageRequests.clear();
+    this.readerPreviewPageSize = 0;
+  }
+
+  private seedReaderPreviewCache(previews: GalleryPreview[]): void {
+    if (previews.length > 0 && (this.readerPreviewPageSize <= 0 || previews.length > this.readerPreviewPageSize)) {
+      this.readerPreviewPageSize = previews.length;
+    }
+    for (let i = 0; i < previews.length; i++) {
+      this.readerPreviewMap.set(previews[i].index, previews[i]);
+    }
+  }
+
+  private readerTotalPages(): number {
+    return this.detail.pages > 0 ? this.detail.pages : Math.max(this.detail.previewSet.length, this.readerPreviewMap.size);
+  }
+
+  private readerPreviewForIndex(index: number): GalleryPreview | null {
+    const cached = this.readerPreviewMap.get(index);
+    if (cached !== undefined) {
+      return cached;
+    }
+    for (let i = 0; i < this.detail.previewSet.length; i++) {
+      if (this.detail.previewSet[i].index === index) {
+        this.readerPreviewMap.set(index, this.detail.previewSet[i]);
+        return this.detail.previewSet[i];
+      }
+    }
+    return null;
+  }
+
+  private readerPreviewPageIndex(index: number): number {
+    const pageSize = this.readerPreviewPageSize > 0 ? this.readerPreviewPageSize : Math.max(1, this.detail.previewSet.length);
+    return Math.floor(index / pageSize);
+  }
+
+  private ensureReaderPreview(index: number, silent: boolean): Promise<GalleryPreview | null> {
+    const cached = this.readerPreviewForIndex(index);
+    if (cached !== null) {
+      return Promise.resolve(cached);
+    }
+    if (this.detail.gid <= 0 || this.detail.token.length === 0 || index < 0 || index >= this.readerTotalPages()) {
+      return Promise.resolve(null);
+    }
+    const previewPageIndex = this.readerPreviewPageIndex(index);
+    const pending = this.readerPreviewPageRequests.get(previewPageIndex);
+    if (pending !== undefined) {
+      return pending;
+    }
+    const request = this.client.loadGalleryDetail(this.detail.gid, this.detail.token, previewPageIndex,
+      currentGallerySite(), this.detailRequestUrl).then((result: GalleryDetailLoadResult) => {
+      this.readerPreviewPageRequests.delete(previewPageIndex);
+      if (!result.ok || result.detail === null) {
+        if (!silent) {
+          this.readerStatus = 'Preview page load failed: ' + result.message;
+          this.renderVersion++;
+        }
+        return null;
+      }
+      this.mergeReaderPreviewSet(result.detail);
+      return this.readerPreviewForIndex(index);
+    });
+    this.readerPreviewPageRequests.set(previewPageIndex, request);
+    return request;
+  }
+
+  private mergeReaderPreviewSet(loaded: GalleryDetail): void {
+    this.seedReaderPreviewCache(loaded.previewSet);
+    const byIndex: Map<number, GalleryPreview> = new Map();
+    for (let i = 0; i < this.detail.previewSet.length; i++) {
+      byIndex.set(this.detail.previewSet[i].index, this.detail.previewSet[i]);
+    }
+    for (let i = 0; i < loaded.previewSet.length; i++) {
+      byIndex.set(loaded.previewSet[i].index, loaded.previewSet[i]);
+    }
+    const merged: GalleryPreview[] = Array.from(byIndex.values());
+    merged.sort((left: GalleryPreview, right: GalleryPreview) => left.index - right.index);
+    const nextDetail = cloneGalleryDetail(this.detail);
+    nextDetail.previewSet = cloneGalleryPreviews(merged);
+    nextDetail.previewPages = Math.max(nextDetail.previewPages, loaded.previewPages);
+    nextDetail.pages = Math.max(nextDetail.pages, loaded.pages);
+    this.detail = nextDetail;
+    this.seedReaderPreviewCache(this.detail.previewSet);
+    this.renderVersion++;
   }
 
   private toggleDownloadDetail(): void {
@@ -558,7 +675,7 @@ export struct HistoryScene {
         page: this.readerPage,
         statusText: this.readerStatus,
         pageIndex: this.readerPreviewIndex,
-        totalPages: this.detail.previewSet.length,
+        totalPages: this.readerTotalPages(),
         onBack: () => {
           this.closeReader();
         },
@@ -813,6 +930,9 @@ export struct TopListScene {
   private topListScrollOffset: number = 0;
   private topListToolbarScrollOffset: number = 0;
   private detailScrollOffset: number = 0;
+  private readerPreviewMap: Map<number, GalleryPreview> = new Map();
+  private readerPreviewPageRequests: Map<number, Promise<GalleryPreview | null>> = new Map();
+  private readerPreviewPageSize: number = 0;
 
   aboutToAppear(): void {
     setActiveBackHandler(() => this.handleSystemBack());
@@ -899,6 +1019,7 @@ export struct TopListScene {
     loadingDetail.token = item.token;
     loadingDetail.title = item.value;
     this.detail = loadingDetail;
+    this.resetReaderPreviewCache();
     this.detailStatus = 'Loading detail for gid ' + item.gid + '...';
     this.detailRequestUrl = '';
     this.detailDownloadText = downloadButtonText(gid);
@@ -916,6 +1037,7 @@ export struct TopListScene {
       }
       this.detailStatus = 'Detail loaded';
       this.detail = mergeLoadedSceneDetail(result.detail, this.detail);
+      this.seedReaderPreviewCache(this.detail.previewSet);
       this.detailDownloadText = downloadButtonText(result.detail.gid);
       this.detailLoaded = true;
       this.optimisticFavorite = this.detail.isFavorited;
@@ -934,6 +1056,7 @@ export struct TopListScene {
     this.showReader = false;
     this.showComments = false;
     this.detail = createEmptyDetail();
+    this.resetReaderPreviewCache();
     this.detailStatus = 'Tap a ranking item to load detail';
     this.detailRequestUrl = '';
     this.detailDownloadText = 'Download';
@@ -971,6 +1094,7 @@ export struct TopListScene {
       return;
     }
 
+    this.readerPreviewMap.set(preview.index, preview);
     this.showReader = true;
     this.readerPreviewIndex = preview.index;
     saveGalleryReadPosition(this.detail.gid, preview.index);
@@ -1027,11 +1151,14 @@ export struct TopListScene {
 
     for (let offset = 1; offset <= count; offset++) {
       const nextIndex = index + offset;
-      if (nextIndex < 0 || nextIndex >= this.detail.previewSet.length) {
+      if (nextIndex < 0 || nextIndex >= this.readerTotalPages()) {
         return;
       }
 
-      const preview = this.detail.previewSet[nextIndex];
+      const preview = await this.ensureReaderPreview(nextIndex, true);
+      if (preview === null) {
+        continue;
+      }
       if (preview.pageUrl.length === 0 || galleryPageCache.has(preview.pageUrl)) {
         continue;
       }
@@ -1051,11 +1178,14 @@ export struct TopListScene {
   }
 
   private async prewarmReader(): Promise<void> {
-    if (this.detail.previewSet.length === 0) {
+    if (this.readerTotalPages() <= 0) {
       return;
     }
 
-    const preview = this.detail.previewSet[0];
+    const preview = await this.ensureReaderPreview(0, true);
+    if (preview === null) {
+      return;
+    }
     if (preview.pageUrl.length === 0 || galleryPageCache.has(preview.pageUrl)) {
       return;
     }
@@ -1075,18 +1205,122 @@ export struct TopListScene {
   }
 
   private loadReaderPageByIndex(index: number): void {
-    if (index < 0 || index >= this.detail.previewSet.length) {
+    if (index < 0 || index >= this.readerTotalPages()) {
       return;
     }
-    this.loadReaderPage(this.detail.previewSet[index]);
+    const preview = this.readerPreviewForIndex(index);
+    if (preview !== null) {
+      this.loadReaderPage(preview);
+      return;
+    }
+
+    this.showReader = true;
+    this.readerPreviewIndex = index;
+    saveGalleryReadPosition(this.detail.gid, index);
+    this.readerStatus = 'Resolving page ' + (index + 1).toString() + '...';
+    this.readerPage = createReaderLoadingPage('');
+    this.renderVersion++;
+    this.ensureReaderPreview(index, false).then((resolved: GalleryPreview | null) => {
+      if (resolved !== null && this.readerPreviewIndex === index) {
+        this.loadReaderPage(resolved);
+      }
+    });
   }
 
   private readDetail(): void {
-    if (this.detail.previewSet.length === 0) {
+    if (this.readerTotalPages() <= 0) {
       this.detailStatus = 'Read is waiting for preview pages';
       return;
     }
     this.loadReaderPageByIndex(readerStartIndex(this.detail));
+  }
+
+  private resetReaderPreviewCache(): void {
+    this.readerPreviewMap.clear();
+    this.readerPreviewPageRequests.clear();
+    this.readerPreviewPageSize = 0;
+  }
+
+  private seedReaderPreviewCache(previews: GalleryPreview[]): void {
+    if (previews.length > 0 && (this.readerPreviewPageSize <= 0 || previews.length > this.readerPreviewPageSize)) {
+      this.readerPreviewPageSize = previews.length;
+    }
+    for (let i = 0; i < previews.length; i++) {
+      this.readerPreviewMap.set(previews[i].index, previews[i]);
+    }
+  }
+
+  private readerTotalPages(): number {
+    return this.detail.pages > 0 ? this.detail.pages : Math.max(this.detail.previewSet.length, this.readerPreviewMap.size);
+  }
+
+  private readerPreviewForIndex(index: number): GalleryPreview | null {
+    const cached = this.readerPreviewMap.get(index);
+    if (cached !== undefined) {
+      return cached;
+    }
+    for (let i = 0; i < this.detail.previewSet.length; i++) {
+      if (this.detail.previewSet[i].index === index) {
+        this.readerPreviewMap.set(index, this.detail.previewSet[i]);
+        return this.detail.previewSet[i];
+      }
+    }
+    return null;
+  }
+
+  private readerPreviewPageIndex(index: number): number {
+    const pageSize = this.readerPreviewPageSize > 0 ? this.readerPreviewPageSize : Math.max(1, this.detail.previewSet.length);
+    return Math.floor(index / pageSize);
+  }
+
+  private ensureReaderPreview(index: number, silent: boolean): Promise<GalleryPreview | null> {
+    const cached = this.readerPreviewForIndex(index);
+    if (cached !== null) {
+      return Promise.resolve(cached);
+    }
+    if (this.detail.gid <= 0 || this.detail.token.length === 0 || index < 0 || index >= this.readerTotalPages()) {
+      return Promise.resolve(null);
+    }
+    const previewPageIndex = this.readerPreviewPageIndex(index);
+    const pending = this.readerPreviewPageRequests.get(previewPageIndex);
+    if (pending !== undefined) {
+      return pending;
+    }
+    const request = this.client.loadGalleryDetail(this.detail.gid, this.detail.token, previewPageIndex,
+      GallerySite.E, this.detailRequestUrl).then((result: GalleryDetailLoadResult) => {
+      this.readerPreviewPageRequests.delete(previewPageIndex);
+      if (!result.ok || result.detail === null) {
+        if (!silent) {
+          this.readerStatus = 'Preview page load failed: ' + result.message;
+          this.renderVersion++;
+        }
+        return null;
+      }
+      this.mergeReaderPreviewSet(result.detail);
+      return this.readerPreviewForIndex(index);
+    });
+    this.readerPreviewPageRequests.set(previewPageIndex, request);
+    return request;
+  }
+
+  private mergeReaderPreviewSet(loaded: GalleryDetail): void {
+    this.seedReaderPreviewCache(loaded.previewSet);
+    const byIndex: Map<number, GalleryPreview> = new Map();
+    for (let i = 0; i < this.detail.previewSet.length; i++) {
+      byIndex.set(this.detail.previewSet[i].index, this.detail.previewSet[i]);
+    }
+    for (let i = 0; i < loaded.previewSet.length; i++) {
+      byIndex.set(loaded.previewSet[i].index, loaded.previewSet[i]);
+    }
+    const merged: GalleryPreview[] = Array.from(byIndex.values());
+    merged.sort((left: GalleryPreview, right: GalleryPreview) => left.index - right.index);
+    const nextDetail = cloneGalleryDetail(this.detail);
+    nextDetail.previewSet = cloneGalleryPreviews(merged);
+    nextDetail.previewPages = Math.max(nextDetail.previewPages, loaded.previewPages);
+    nextDetail.pages = Math.max(nextDetail.pages, loaded.pages);
+    this.detail = nextDetail;
+    this.seedReaderPreviewCache(this.detail.previewSet);
+    this.renderVersion++;
   }
 
   private toggleDownloadDetail(): void {
@@ -1221,7 +1455,7 @@ export struct TopListScene {
         page: this.readerPage,
         statusText: this.readerStatus,
         pageIndex: this.readerPreviewIndex,
-        totalPages: this.detail.previewSet.length,
+        totalPages: this.readerTotalPages(),
         onBack: () => {
           this.closeReader();
         },
