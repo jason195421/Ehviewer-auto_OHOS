@@ -14,6 +14,7 @@ import { ehSettingsStore, SettingEntry, defaultSettingEntries } from '../service
 import { EhHttpClient, GalleryDetailLoadResult, GalleryListLoadResult, GalleryPageLoadResult, NetworkDiagnosticResult, RateGalleryResult, SignInResult, ToggleFavoriteResult, TopListLoadResult } from '../services/EhHttpClient';
 import { EhUrl, FavListUrlBuilder, ListMode, ListUrlBuilder } from '../services/EhUrl';
 import { galleryPageCache } from '../services/GalleryPageCache';
+import { createReaderSessionState, readerSessionStore } from '../services/ReaderSessionStore';
 import { CacheClearResult, readerImageCache } from '../services/ReaderImageCache';
 import { ehSpiderInfoStore } from '../services/EhSpiderInfoStore';
 import { MigrationTask, migrationTasks } from '../services/MigrationStatus';
@@ -226,12 +227,12 @@ export struct HistoryScene {
     }
 
     this.readerPreviewMap.set(preview.index, preview);
-    this.showReader = true;
     this.readerPreviewIndex = preview.index;
     saveGalleryReadPosition(this.detail.gid, preview.index);
     this.readerStatus = 'Loading page ' + (preview.index + 1).toString() + '...';
     this.readerPage = createReaderLoadingPage(preview.pageUrl);
     this.renderVersion++;
+    this.openReaderAbility(currentGallerySite());
 
     const cached = galleryPageCache.get(preview.pageUrl);
     if (cached !== null) {
@@ -240,6 +241,7 @@ export struct HistoryScene {
       this.renderVersion++;
       this.cacheReaderImage(preview.index, cached);
       this.preloadReaderPages(preview.index);
+      this.persistReaderSession(currentGallerySite());
       return;
     }
 
@@ -257,9 +259,11 @@ export struct HistoryScene {
       this.renderVersion++;
       this.cacheReaderImage(preview.index, result.page);
       this.preloadReaderPages(preview.index);
+      this.persistReaderSession(currentGallerySite());
     }).catch((error: Error) => {
       this.readerStatus = 'Page load failed: ' + error.message;
       this.renderVersion++;
+      this.persistReaderSession(currentGallerySite());
     });
   }
 
@@ -426,12 +430,12 @@ export struct HistoryScene {
       return;
     }
 
-    this.showReader = true;
     this.readerPreviewIndex = index;
     saveGalleryReadPosition(this.detail.gid, index);
     this.readerStatus = 'Resolving page ' + (index + 1).toString() + '...';
     this.readerPage = createReaderLoadingPage('');
     this.renderVersion++;
+    this.openReaderAbility(currentGallerySite());
     this.ensureReaderPreview(index, false).then((resolved: GalleryPreview | null) => {
       if (resolved !== null && this.readerPreviewIndex === index) {
         this.loadReaderPage(resolved);
@@ -445,6 +449,30 @@ export struct HistoryScene {
       return;
     }
     this.loadReaderPageByIndex(readerStartIndex(this.detail));
+  }
+
+  private persistReaderSession(site: GallerySite): void {
+    readerSessionStore.updateSession(createReaderSessionState(this.detail, this.readerPage, this.readerStatus,
+      this.detailRequestUrl, '', site, this.readerPreviewIndex));
+  }
+
+  private openReaderAbility(site: GallerySite): void {
+    this.persistReaderSession(site);
+    const context = getAbilityContext();
+    if (context === undefined) {
+      this.showReader = true;
+      return;
+    }
+    context.startAbility({
+      bundleName: 'yt.ehviewer.huawei',
+      moduleName: 'entry',
+      abilityName: 'ReaderAbility'
+    }).catch((error: Error) => {
+      this.readerStatus = 'Reader launch failed: ' + error.message;
+      this.showReader = true;
+      this.renderVersion++;
+      this.persistReaderSession(site);
+    });
   }
 
   private resetReaderPreviewCache(): void {
@@ -1095,12 +1123,12 @@ export struct TopListScene {
     }
 
     this.readerPreviewMap.set(preview.index, preview);
-    this.showReader = true;
     this.readerPreviewIndex = preview.index;
     saveGalleryReadPosition(this.detail.gid, preview.index);
     this.readerStatus = 'Loading page ' + (preview.index + 1).toString() + '...';
     this.readerPage = createReaderLoadingPage(preview.pageUrl);
     this.renderVersion++;
+    this.openReaderAbility(GallerySite.E);
 
     const cached = galleryPageCache.get(preview.pageUrl);
     if (cached !== null) {
@@ -1109,6 +1137,7 @@ export struct TopListScene {
       this.renderVersion++;
       this.cacheReaderImage(preview.index, cached);
       this.preloadReaderPages(preview.index);
+      this.persistReaderSession(GallerySite.E);
       return;
     }
 
@@ -1126,9 +1155,11 @@ export struct TopListScene {
       this.renderVersion++;
       this.cacheReaderImage(preview.index, result.page);
       this.preloadReaderPages(preview.index);
+      this.persistReaderSession(GallerySite.E);
     }).catch((error: Error) => {
       this.readerStatus = 'Page load failed: ' + error.message;
       this.renderVersion++;
+      this.persistReaderSession(GallerySite.E);
     });
   }
 
@@ -1214,12 +1245,12 @@ export struct TopListScene {
       return;
     }
 
-    this.showReader = true;
     this.readerPreviewIndex = index;
     saveGalleryReadPosition(this.detail.gid, index);
     this.readerStatus = 'Resolving page ' + (index + 1).toString() + '...';
     this.readerPage = createReaderLoadingPage('');
     this.renderVersion++;
+    this.openReaderAbility(GallerySite.E);
     this.ensureReaderPreview(index, false).then((resolved: GalleryPreview | null) => {
       if (resolved !== null && this.readerPreviewIndex === index) {
         this.loadReaderPage(resolved);
@@ -1233,6 +1264,30 @@ export struct TopListScene {
       return;
     }
     this.loadReaderPageByIndex(readerStartIndex(this.detail));
+  }
+
+  private persistReaderSession(site: GallerySite): void {
+    readerSessionStore.updateSession(createReaderSessionState(this.detail, this.readerPage, this.readerStatus,
+      this.detailRequestUrl, this.requestUrl, site, this.readerPreviewIndex));
+  }
+
+  private openReaderAbility(site: GallerySite): void {
+    this.persistReaderSession(site);
+    const context = getAbilityContext();
+    if (context === undefined) {
+      this.showReader = true;
+      return;
+    }
+    context.startAbility({
+      bundleName: 'yt.ehviewer.huawei',
+      moduleName: 'entry',
+      abilityName: 'ReaderAbility'
+    }).catch((error: Error) => {
+      this.readerStatus = 'Reader launch failed: ' + error.message;
+      this.showReader = true;
+      this.renderVersion++;
+      this.persistReaderSession(site);
+    });
   }
 
   private resetReaderPreviewCache(): void {

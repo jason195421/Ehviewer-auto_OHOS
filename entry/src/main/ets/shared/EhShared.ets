@@ -19,6 +19,7 @@ import { CacheClearResult, readerImageCache } from '../services/ReaderImageCache
 import { ehSpiderInfoStore } from '../services/EhSpiderInfoStore';
 import { MigrationTask, migrationTasks } from '../services/MigrationStatus';
 import { FilterRule, FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, FILTER_MODE_TAG_NAMESPACE, ehFilterStore } from '../services/EhFilterStore';
+import { EH_APP_VERSION_NAME, EH_GIT_BRANCH, EH_GIT_COMMIT, EH_GIT_DESCRIBE, EH_RELEASE_TAG } from '../services/EhBuildInfo';
 
 export interface EhBackupBundle {
   version: number;
@@ -570,16 +571,19 @@ export function zhText(text: string): string {
     case 'Original Wi-Fi transfer tools': return '原应用 Wi-Fi 传输工具';
     case 'Declaration': return '声明';
     case 'Original declaration and project notice': return '原应用声明和项目说明';
+    case 'Current HarmonyOS repository': return '当前 HarmonyOS 仓库';
     case 'Author': return '作者';
     case 'xiaojieonly/Ehviewer_CN_SXJ contributors': return 'xiaojieonly/Ehviewer_CN_SXJ 贡献者';
     case 'Latest release': return '最新版本';
-    case 'GitHub releases URL from original settings': return '原设置中的 GitHub releases 地址';
+    case 'GitHub release for the current port': return '当前移植版 GitHub release';
     case 'Issue help': return '问题帮助';
-    case 'Issue guide URL from original settings': return '原设置中的问题反馈地址';
+    case 'Issue tracker for the current port': return '当前移植版问题反馈';
     case 'License': return '许可证';
     case 'Open-source license view': return '开源许可证查看';
     case 'Version': return '版本';
     case 'HarmonyOS port workspace version': return 'HarmonyOS 移植工作区版本';
+    case 'Git commit': return 'Git 提交';
+    case 'Branch and describe from the build workspace': return '构建工作区分支和 describe 信息';
     case 'Check for updates': return '检查更新';
     case 'Original AppUpdater entry': return '原 AppUpdater 入口';
     case 'Close automatic updates': return '关闭自动更新';
@@ -1446,12 +1450,14 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
 
   if (panel === SettingsPanel.About) {
     return [
-      staticSettingsRow('declaration', 'Declaration', 'Original declaration and project notice', 'Info', 'message'),
+      staticSettingsRow('declaration', 'Declaration', 'Current HarmonyOS repository', 'Info', 'message'),
       staticSettingsRow('author', 'Author', 'xiaojieonly/Ehviewer_CN_SXJ contributors', '', 'message'),
-      staticSettingsRow('latest_release', 'Latest release', 'GitHub releases URL from original settings', 'Link', 'url'),
-      staticSettingsRow('issue_help', 'Issue help', 'Issue guide URL from original settings', 'Link', 'url'),
+      staticSettingsRow('latest_release', 'Latest release', 'GitHub release for the current port', EH_RELEASE_TAG, 'url'),
+      staticSettingsRow('issue_help', 'Issue help', 'Issue tracker for the current port', 'Issues', 'url'),
       staticSettingsRow('license', 'License', 'Open-source license view', 'GPL', 'activity'),
-      staticSettingsRow('version', 'Version', 'HarmonyOS port workspace version', '0.1.98', 'version'),
+      staticSettingsRow('version', 'Version', 'HarmonyOS port workspace version', EH_APP_VERSION_NAME, 'version'),
+      staticSettingsRow('git_commit', 'Git commit', 'Branch and describe from the build workspace',
+        EH_GIT_BRANCH + ' / ' + EH_GIT_COMMIT + ' / ' + EH_GIT_DESCRIBE, 'version'),
       staticSettingsRow('check_for_updates', 'Check for updates', 'Original AppUpdater entry', 'Open', 'action'),
       optionSettingsRow('close_auto_updates', 'Close automatic updates', 'Disable startup update check', entries, ON_OFF_OPTIONS),
       staticSettingsRow('donate', 'Donate', 'Original donation entry', 'Not migrated', 'url')

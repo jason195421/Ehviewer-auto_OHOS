@@ -19,6 +19,19 @@ import { ehSpiderInfoStore } from '../services/EhSpiderInfoStore';
 import { MigrationTask, migrationTasks } from '../services/MigrationStatus';
 import { FilterRule, FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, FILTER_MODE_TAG_NAMESPACE, ehFilterStore } from '../services/EhFilterStore';
 import { applyWindowPrivacyMode } from '../services/EhWindowPrivacy';
+import {
+  EH_APP_VERSION_CODE,
+  EH_APP_VERSION_NAME,
+  EH_GIT_BRANCH,
+  EH_GIT_COMMIT,
+  EH_GIT_DESCRIBE,
+  EH_ISSUES_URL,
+  EH_RELEASE_TAG,
+  EH_RELEASE_URL,
+  EH_REPOSITORY_NAME,
+  EH_REPOSITORY_URL,
+  EH_TARGET_PLATFORM
+} from '../services/EhBuildInfo';
 import { LANGUAGE_REVISION_KEY, notifyLanguageChanged } from '../shared/EhShared';
 import { EhBackupBundle, DrawerItem, SettingsHeaderItem, SettingsRowItem, SessionMode, SettingsPanel, DRAWER_ITEMS, SETTINGS_HEADERS, STATUS_BAR_HEIGHT_KEY, ON_OFF_OPTIONS, shouldUseChineseUi, uiText, uiValue, uiStatusText, uiPageText, zhText, setActiveBackHandler, runActiveBackHandler, createEmptyGallery, createEmptyDownloadInfo, createDetailFromGallery, createEmptyDetail, createEmptyPreview, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneStringArray, cloneRequiredStringArray, cloneGalleryInfo, cloneGalleryInfos, padTwo, applyGalleryFilters, cloneGalleryTagGroups, cloneGalleryComments, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListItem, cloneTopListBucket, cloneTopListInfo, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, saveDownloadsQuietly, filterDownloadItems, downloadItemMatches, sortDownloadItems, nextDownloadStatusFilter, nextDownloadLabelFilter, nextDownloadSortMode, nextStringOption, nextDownloadState, nextDownloadLabel, downloadLabelName, downloadStateLabel, downloadStateColor, downloadProgressText, downloadSizeText, downloadImageUrlForPage, downloadThreadLimit, downloadPageIndexes, downloadQueueSummary, parseHistoryMaxSize, routeTitle, routeSubtitle, launchRouteFromSetting, settingsPanelTitle, settingsRowsForPanel, optionSettingsRow, textSettingsRow, staticSettingsRow, settingEntryValue, cloneStringOptions, settingMigrationMessage, nextOption, isValidProxyPortText, formatNetworkDiagnostics, listModeForRoute, routeUsesKeyword, usesGallerySearchToolbar, usesEmbeddedToolbar, defaultKeywordForRoute, gallerySearchTitle, currentGallerySite, effectiveListSite, gallerySiteName, galleryListFailureMessage, withGalleryListMessage, readerPageReferer, readerDisplayImageUrl, cacheReaderImageForPage, cacheThumbnailImage, cloneGalleryPageWithCache, readerLocalImageSource, readerZoomSize, readerFullImageWidth, readerFullImageHeight, readerImageFit, readerShortUrl, readerPreloadCount, readerIsRightToLeft, categoryName, categoryColor, ratingText, galleryDisplayTitle, showGalleryPages, galleryListMode, galleryThumbWidth, galleryThumbHeight, galleryRowHeight, galleryTagPreview, detailTitleFontSize, detailTitleMaxLines, detailHeadingFontSize, readerShowProgress, readerShowClock, readerClockText, padTimeNumber, topListChipColor } from '../shared/EhShared';
 import { FilterPanel, MigrationScene } from './DownloadMigrationScenes';
@@ -733,19 +746,19 @@ export struct SettingsScene {
       return true;
     }
     if (key === 'declaration') {
-      this.statusText = 'EhViewer_CN_SXJ HarmonyOS port keeps the original project notice and uses migrated local services where available.';
+      this.statusText = 'EhViewer_CN_SXJ HarmonyOS port repository: ' + EH_REPOSITORY_URL;
       return true;
     }
     if (key === 'author') {
-      this.statusText = 'Original project: xiaojieonly/Ehviewer_CN_SXJ. HarmonyOS migration continues from the local workspace.';
+      this.statusText = 'Original project: xiaojieonly/Ehviewer_CN_SXJ. Current port: ' + EH_REPOSITORY_NAME + '.';
       return true;
     }
     if (key === 'latest_release') {
-      this.statusText = 'Latest release: https://github.com/xiaojieonly/Ehviewer_CN_SXJ/releases';
+      this.statusText = 'Latest release: ' + EH_RELEASE_TAG + ' ' + EH_RELEASE_URL;
       return true;
     }
     if (key === 'issue_help') {
-      this.statusText = 'Issue help: https://github.com/xiaojieonly/Ehviewer_CN_SXJ/issues';
+      this.statusText = 'Issue help: ' + EH_ISSUES_URL;
       return true;
     }
     if (key === 'license') {
@@ -753,11 +766,16 @@ export struct SettingsScene {
       return true;
     }
     if (key === 'version') {
-      this.statusText = 'Version: HarmonyOS port target 6.1.0 / API 6.1.1 (24), app version 0.1.98.';
+      this.statusText = 'Version: ' + EH_APP_VERSION_NAME + ' (' + EH_APP_VERSION_CODE.toString() + '), target ' +
+        EH_TARGET_PLATFORM + '.';
+      return true;
+    }
+    if (key === 'git_commit') {
+      this.statusText = 'Git: ' + EH_GIT_BRANCH + ' / ' + EH_GIT_COMMIT + ' / ' + EH_GIT_DESCRIBE + '.';
       return true;
     }
     if (key === 'check_for_updates') {
-      this.statusText = 'Update check uses the release page for now: https://github.com/xiaojieonly/Ehviewer_CN_SXJ/releases';
+      this.statusText = 'Update check uses the release page for now: ' + EH_RELEASE_URL;
       return true;
     }
     if (key === 'donate') {

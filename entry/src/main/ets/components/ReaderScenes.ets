@@ -1,7 +1,12 @@
 ﻿import { window } from '@kit.ArkUI';
 import { batteryInfo } from '@kit.BasicServicesKit';
 import { GalleryComment, GalleryPage } from '../model/GalleryModels';
-import { applyAppChromeImmersiveMode, applyReaderFullscreenImmersiveMode, getMainWindow } from '../services/EhWindowImmersive';
+import {
+  applyAppChromeImmersiveMode,
+  applyReaderFullscreenImmersiveMode,
+  getMainWindow,
+  getReaderWindow
+} from '../services/EhWindowImmersive';
 import { ehSettingsStore } from '../services/EhSettingsStore';
 import {
   createEmptyPage,
@@ -354,6 +359,7 @@ export struct ReaderScene {
   onNext: () => void = () => {};
   onJump: (index: number) => void = () => {};
   onRetry: () => void = () => {};
+  restoreAppChromeOnExit: boolean = true;
 
   @State fitMode: string = 'Fit width';
   @State showInfo: boolean = false;
@@ -409,6 +415,9 @@ export struct ReaderScene {
   }
 
   private restoreWindowSettings(): void {
+    if (!this.restoreAppChromeOnExit) {
+      return;
+    }
     const win = getMainWindow();
     if (win === undefined) {
       return;
@@ -425,10 +434,18 @@ export struct ReaderScene {
   private applyReaderWindowSettings(): void {
     const keepOn = ehSettingsStore.getValue('keep_screen_on', 'Off') === 'On';
     const orientation = ehSettingsStore.getValue('screen_rotation', 'System');
-    const win = getMainWindow();
+    const win = this.readerWindow();
     if (win === undefined) {
       return;
     }
+    this.applyReaderWindowSettingsFor(win, keepOn, orientation);
+  }
+
+  private readerWindow(): window.Window | undefined {
+    return this.restoreAppChromeOnExit ? getMainWindow() : getReaderWindow();
+  }
+
+  private applyReaderWindowSettingsFor(win: window.Window, keepOn: boolean, orientation: string): void {
     this.enterReaderFullscreen(win);
     this.scheduleReaderFullscreen(80);
     this.scheduleReaderFullscreen(260);
@@ -456,7 +473,7 @@ export struct ReaderScene {
       if (!this.readerWindowActive) {
         return;
       }
-      const win = getMainWindow();
+      const win = this.readerWindow();
       if (win !== undefined) {
         this.enterReaderFullscreen(win);
       }
@@ -596,7 +613,7 @@ export struct ReaderScene {
       ehSettingsStore.save(context).catch(() => {});
     }
     this.applyReaderWindowSettings();
-    const win = getMainWindow();
+    const win = this.readerWindow();
     if (win !== undefined) {
       win.setWindowKeepScreenOn(this.menuKeepScreenOn).catch(() => {});
       let o: window.Orientation = window.Orientation.UNSPECIFIED;
@@ -610,7 +627,7 @@ export struct ReaderScene {
   }
 
   private applyBrightness(): void {
-    const win = getMainWindow();
+    const win = this.readerWindow();
     if (win === undefined) {
       return;
     }

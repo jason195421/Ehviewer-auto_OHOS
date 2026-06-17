@@ -32,6 +32,17 @@
             ]
           }
         ]
+      },
+      {
+        "name": "ReaderAbility",
+        "srcEntry": "./ets/entryability/ReaderAbility.ets",
+        "description": "$string:EntryAbility_desc",
+        "icon": "$media:app_icon",
+        "label": "$string:EntryAbility_label",
+        "startWindowIcon": "$media:app_icon",
+        "startWindowBackground": "$color:start_window_background",
+        "exported": false,
+        "skills": []
       }
     ],
     "requestPermissions": [
