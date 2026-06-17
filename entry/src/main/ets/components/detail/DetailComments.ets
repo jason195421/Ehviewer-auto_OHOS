@@ -1,23 +1,5 @@
 ﻿import { GalleryComment } from '../../model/GalleryModels';
-import { uiText } from '../../shared/EhShared';
-function stripHtml(html: string): string {
-  let text = html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<\/div>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;/g, "'")
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-  return text;
-}
-
+import { plainTextFromHtml, uiText } from '../../shared/EhShared';
 @Component
 export struct DetailComments {
   @Prop comments: GalleryComment[] = [];
@@ -76,7 +58,7 @@ export struct DetailComments {
             .width('100%')
             .margin({ bottom: 4 })
 
-            Text(stripHtml(comment.content))
+            Text(plainTextFromHtml(comment.content))
               .fontSize(13)
               .fontColor('#333333')
               .maxLines(4)

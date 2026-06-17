@@ -5,6 +5,7 @@ import {
   createEmptyPage,
   getAbilityContext,
   nextOption,
+  plainTextFromHtml,
   readerClockText,
   readerDisplayImageUrl,
   readerShowClock,
@@ -17,24 +18,6 @@ import {
 const READER_MIN_SCALE: number = 1;
 const READER_MAX_SCALE: number = 4;
 const READER_DOUBLE_TAP_SCALE: number = 2.25;
-
-function stripHtml(html: string): string {
-  let text = html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<\/div>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;/g, "'")
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-  return text;
-}
 
 @Component
 struct ReaderInfoRow {
@@ -331,7 +314,7 @@ export struct CommentsScene {
                   .fontColor('#667085')
                   .margin({ bottom: 8 })
 
-                Text(stripHtml(comment.content))
+                Text(plainTextFromHtml(comment.content))
                   .fontSize(14)
                   .fontColor('#17202A')
                   .width('100%')

@@ -3,17 +3,11 @@ import { STATUS_BAR_HEIGHT_KEY, createEmptyDetail, galleryDisplayTitle, uiStatus
 import { EhSubNavBar } from './NavigationComponents';
 import { DetailHeader, DetailLoadStatus } from './detail/DetailHeader';
 import { DetailInfoBlock } from './detail/DetailInfo';
-import { DetailActionItem, DetailActions, RatingPanel, RatingSummary } from './detail/DetailActions';
-import { DetailTags, TagGroupRow } from './detail/DetailTags';
-import { DetailPreviews, PreviewRow, PreviewThumb, PreviewTile } from './detail/DetailPreviews';
+import { DetailActions, RatingPanel } from './detail/DetailActions';
+import { DetailTags } from './detail/DetailTags';
+import { DetailPreviews } from './detail/DetailPreviews';
 import { DetailComments } from './detail/DetailComments';
 
-export { DetailHeader, DetailLoadStatus, HeaderActionButton } from './detail/DetailHeader';
-export { DetailInfoBlock, DetailSummaryCell, InfoRow } from './detail/DetailInfo';
-export { DetailActionItem, DetailActions, RatingPanel, RatingSummary } from './detail/DetailActions';
-export { DetailTags, TagGroupRow } from './detail/DetailTags';
-export { DetailPreviews, PreviewRow, PreviewThumb, PreviewTile } from './detail/DetailPreviews';
-export { DetailComments } from './detail/DetailComments';
 @Component
 export struct GalleryDetailScene {
   @Prop renderVersion: number = 0;
