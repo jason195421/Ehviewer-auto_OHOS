@@ -422,6 +422,9 @@ export struct ReaderScene {
   }
 
   private showAppSystemBars(win: window.Window): void {
+    try {
+      win.setImmersiveModeEnabledState(false);
+    } catch (e) {}
     Promise.all([
       win.setSpecificSystemBarEnabled('status', true),
       win.setSpecificSystemBarEnabled('navigationIndicator', true)
@@ -463,7 +466,7 @@ export struct ReaderScene {
 
   private applyReaderWindowSettings(): void {
     const keepOn = ehSettingsStore.getValue('keep_screen_on', 'Off') === 'On';
-    const fullscreen = ehSettingsStore.getValue('reading_fullscreen', 'On') === 'On';
+    const fullscreen = true;
     const orientation = ehSettingsStore.getValue('screen_rotation', 'System');
     const win = AppStorage.get<window.Window>('mainWindow');
     if (win === undefined) {
@@ -488,17 +491,23 @@ export struct ReaderScene {
 
   private applyFullscreenBars(win: window.Window, fullscreen: boolean): void {
     if (fullscreen) {
-      win.setWindowLayoutFullScreen(true).then(() => {
-        return win.setWindowSystemBarEnable([]);
-      }).then(() => {
-        return Promise.all([
-          win.setSpecificSystemBarEnabled('status', false),
-          win.setSpecificSystemBarEnabled('navigationIndicator', false)
-        ]);
-      }).catch(() => {});
+      this.hideReaderSystemBars(win);
       return;
     }
     this.showAppSystemBars(win);
+  }
+
+  private hideReaderSystemBars(win: window.Window): void {
+    try {
+      win.setImmersiveModeEnabledState(true);
+    } catch (e) {}
+    win.setWindowLayoutFullScreen(true).then(() => {
+      win.setSpecificSystemBarEnabled('status', false).catch(() => {});
+      win.setSpecificSystemBarEnabled('navigationIndicator', false).catch(() => {});
+    }).catch(() => {
+      win.setSpecificSystemBarEnabled('status', false).catch(() => {});
+      win.setSpecificSystemBarEnabled('navigationIndicator', false).catch(() => {});
+    });
   }
 
   private scheduleFullscreenBars(fullscreen: boolean, delay: number): void {
