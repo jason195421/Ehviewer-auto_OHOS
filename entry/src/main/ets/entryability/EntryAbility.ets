@@ -2,12 +2,12 @@ import { UIAbility } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { preferences } from '@kit.ArkData';
 import { userAuth } from '@kit.UserAuthenticationKit';
+import { applyAppChromeImmersiveMode, MAIN_WINDOW_KEY, rememberMainWindow } from '../services/EhWindowImmersive';
 import { applyWindowPrivacyMode, WINDOW_PRIVACY_STATUS_KEY } from '../services/EhWindowPrivacy';
 
 const SETTINGS_PREF_NAME: string = 'ehviewer_settings';
 const SETTINGS_VALUES_KEY: string = 'values';
 const STATUS_BAR_HEIGHT_KEY: string = 'statusBarHeight';
-const MAIN_WINDOW_KEY: string = 'mainWindow';
 const LANGUAGE_REVISION_KEY: string = 'ehviewer_language_revision';
 
 interface SettingEntry {
@@ -34,13 +34,8 @@ export default class EntryAbility extends UIAbility {
     });
     stage.getMainWindow().then((win) => {
       this.mainWindow = win;
-      AppStorage.set<window.Window | undefined>(MAIN_WINDOW_KEY, win);
-      win.setWindowLayoutFullScreen(true);
-      win.setWindowSystemBarEnable(['status']);
-      win.setWindowSystemBarProperties({
-        statusBarColor: '#FF2F6F8F',
-        isStatusBarLightIcon: true
-      });
+      rememberMainWindow(win);
+      applyAppChromeImmersiveMode(win);
       this.updateSystemAvoidArea(win);
       win.on('avoidAreaChange', (data: window.AvoidAreaOptions) => {
         if (data.type === window.AvoidAreaType.TYPE_SYSTEM) {

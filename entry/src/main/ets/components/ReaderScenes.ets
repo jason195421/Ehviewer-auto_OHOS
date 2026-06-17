@@ -1,6 +1,7 @@
 ﻿import { window } from '@kit.ArkUI';
 import { batteryInfo } from '@kit.BasicServicesKit';
 import { GalleryComment, GalleryPage } from '../model/GalleryModels';
+import { applyAppChromeImmersiveMode, applyReaderFullscreenImmersiveMode, getMainWindow } from '../services/EhWindowImmersive';
 import { ehSettingsStore } from '../services/EhSettingsStore';
 import {
   createEmptyPage,
@@ -408,36 +409,17 @@ export struct ReaderScene {
   }
 
   private restoreWindowSettings(): void {
-    const win = AppStorage.get<window.Window>('mainWindow');
+    const win = getMainWindow();
     if (win === undefined) {
       return;
     }
-    this.showAppSystemBars(win);
+    applyAppChromeImmersiveMode(win);
     try {
       win.setWindowKeepScreenOn(false).catch(() => {});
     } catch (e) {}
     try {
       win.setPreferredOrientation(window.Orientation.UNSPECIFIED).catch(() => {});
     } catch (e) {}
-  }
-
-  private showAppSystemBars(win: window.Window): void {
-    try {
-      win.setImmersiveModeEnabledState(false);
-    } catch (e) {}
-    Promise.all([
-      win.setSpecificSystemBarEnabled('status', true),
-      win.setSpecificSystemBarEnabled('navigationIndicator', true)
-    ]).then(() => {
-      return win.setWindowSystemBarEnable(['status']);
-    }).then(() => {
-      return win.setWindowLayoutFullScreen(true);
-    }).then(() => {
-      win.setWindowSystemBarProperties({
-        statusBarColor: '#FF2F6F8F',
-        isStatusBarLightIcon: true
-      }).catch(() => {});
-    }).catch(() => {});
   }
 
   private syncOverlayState(): void {
@@ -466,15 +448,14 @@ export struct ReaderScene {
 
   private applyReaderWindowSettings(): void {
     const keepOn = ehSettingsStore.getValue('keep_screen_on', 'Off') === 'On';
-    const fullscreen = true;
     const orientation = ehSettingsStore.getValue('screen_rotation', 'System');
-    const win = AppStorage.get<window.Window>('mainWindow');
+    const win = getMainWindow();
     if (win === undefined) {
       return;
     }
-    this.applyFullscreenBars(win, fullscreen);
-    this.scheduleFullscreenBars(fullscreen, 120);
-    this.scheduleFullscreenBars(fullscreen, 420);
+    this.enterReaderFullscreen(win);
+    this.scheduleReaderFullscreen(120);
+    this.scheduleReaderFullscreen(420);
     try {
       win.setWindowKeepScreenOn(keepOn).catch(() => {});
     } catch (e) {}
@@ -489,35 +470,18 @@ export struct ReaderScene {
     } catch (e) {}
   }
 
-  private applyFullscreenBars(win: window.Window, fullscreen: boolean): void {
-    if (fullscreen) {
-      this.hideReaderSystemBars(win);
-      return;
-    }
-    this.showAppSystemBars(win);
+  private enterReaderFullscreen(win: window.Window): void {
+    applyReaderFullscreenImmersiveMode(win);
   }
 
-  private hideReaderSystemBars(win: window.Window): void {
-    try {
-      win.setImmersiveModeEnabledState(true);
-    } catch (e) {}
-    win.setWindowLayoutFullScreen(true).then(() => {
-      win.setSpecificSystemBarEnabled('status', false).catch(() => {});
-      win.setSpecificSystemBarEnabled('navigationIndicator', false).catch(() => {});
-    }).catch(() => {
-      win.setSpecificSystemBarEnabled('status', false).catch(() => {});
-      win.setSpecificSystemBarEnabled('navigationIndicator', false).catch(() => {});
-    });
-  }
-
-  private scheduleFullscreenBars(fullscreen: boolean, delay: number): void {
+  private scheduleReaderFullscreen(delay: number): void {
     setTimeout(() => {
       if (!this.readerWindowActive) {
         return;
       }
-      const win = AppStorage.get<window.Window>('mainWindow');
+      const win = getMainWindow();
       if (win !== undefined) {
-        this.applyFullscreenBars(win, fullscreen);
+        this.enterReaderFullscreen(win);
       }
     }, delay);
   }
@@ -634,7 +598,7 @@ export struct ReaderScene {
     if (oldFullscreen !== this.menuReadingFullscreen) {
       this.applyReaderWindowSettings();
     }
-    const win = AppStorage.get<window.Window>('mainWindow');
+    const win = getMainWindow();
     if (win !== undefined) {
       win.setWindowKeepScreenOn(this.menuKeepScreenOn).catch(() => {});
       let o: window.Orientation = window.Orientation.UNSPECIFIED;
@@ -648,7 +612,7 @@ export struct ReaderScene {
   }
 
   private applyBrightness(): void {
-    const win = AppStorage.get<window.Window>('mainWindow');
+    const win = getMainWindow();
     if (win === undefined) {
       return;
     }
