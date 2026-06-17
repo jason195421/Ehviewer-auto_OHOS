@@ -3,7 +3,7 @@ import { GalleryDetail, GalleryPage, GalleryPreview, GallerySite } from '../mode
 import { READER_ABILITY_CONTEXT_KEY } from '../entryability/ReaderAbility';
 import { EhHttpClient, GalleryDetailLoadResult, GalleryPageLoadResult } from '../services/EhHttpClient';
 import { galleryPageCache } from '../services/GalleryPageCache';
-import { createReaderSessionState, readerSessionStore } from '../services/ReaderSessionStore';
+import { createReaderSessionState, readerSessionStore, READER_SESSION_REVISION_KEY } from '../services/ReaderSessionStore';
 import {
   cacheReaderImageForPage,
   cloneGalleryDetail,
@@ -31,17 +31,34 @@ export struct ReaderHostScene {
   @State site: GallerySite = GallerySite.E;
   @State pageIndex: number = 0;
   @State renderVersion: number = 0;
+  @StorageProp(READER_SESSION_REVISION_KEY) @Watch('onSessionRevisionChange') sessionRevision: number = 0;
+  private loadedSessionRevision: number = -1;
   private readerPreviewMap: Map<number, GalleryPreview> = new Map();
   private readerPreviewPageRequests: Map<number, Promise<GalleryPreview | null>> = new Map();
   private readerPreviewPageSize: number = 0;
 
   aboutToAppear(): void {
+    this.loadCurrentSession();
+  }
+
+  onSessionRevisionChange(): void {
+    if (this.sessionRevision === this.loadedSessionRevision) {
+      return;
+    }
+    this.loadCurrentSession();
+  }
+
+  private loadCurrentSession(): void {
     const session = readerSessionStore.getSession();
     if (session === null || session.detail.gid <= 0) {
       this.statusText = 'Reader session is empty';
       this.renderVersion++;
       return;
     }
+    this.loadedSessionRevision = this.sessionRevision;
+    this.readerPreviewMap.clear();
+    this.readerPreviewPageRequests.clear();
+    this.readerPreviewPageSize = 0;
     this.detail = cloneGalleryDetail(session.detail);
     this.page = cloneGalleryPage(session.page);
     this.statusText = session.statusText;

@@ -7,6 +7,7 @@ import { DEFAULT_ADVANCE_SEARCH, EhUrl, FavListUrlBuilder, ListMode, ListUrlBuil
 import { galleryPageCache } from '../services/GalleryPageCache';
 import { ehFilterStore } from '../services/EhFilterStore';
 import { createReaderSessionState, readerSessionStore } from '../services/ReaderSessionStore';
+import { ehSettingsStore } from '../services/EhSettingsStore';
 import { LANGUAGE_REVISION_KEY, APP_THEME_COLOR } from '../shared/EhShared';
 import { EhNavBar } from '../components/NavigationComponents';
 import { CategoryBadge, GalleryListRow, GalleryThumb, GalleryThumbCard } from './GalleryCards';
@@ -840,8 +841,17 @@ export struct GalleryListScene {
       this.detailRequestUrl, this.requestUrl, this.activeSite, this.readerPreviewIndex));
   }
 
+  private publishReaderSession(): void {
+    readerSessionStore.setSession(createReaderSessionState(this.detail, this.readerPage, this.readerStatus,
+      this.detailRequestUrl, this.requestUrl, this.activeSite, this.readerPreviewIndex));
+  }
+
   private openReaderAbility(): void {
-    this.persistReaderSession();
+    this.publishReaderSession();
+    if (ehSettingsStore.getValue('reader_standalone', 'On') !== 'On') {
+      this.showReader = true;
+      return;
+    }
     const context = getAbilityContext();
     if (context === undefined) {
       this.showReader = true;

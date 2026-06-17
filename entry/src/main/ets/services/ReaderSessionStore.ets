@@ -1,6 +1,8 @@
 import { GalleryDetail, GalleryPage, GalleryPreview, GallerySite } from '../model/GalleryModels';
 import { cloneGalleryDetail, cloneGalleryPage, cloneGalleryPreviews, createEmptyDetail, createEmptyPage } from '../shared/EhShared';
 
+export const READER_SESSION_REVISION_KEY: string = 'readerSessionRevision';
+
 export interface ReaderSessionState {
   detail: GalleryDetail;
   page: GalleryPage;
@@ -16,6 +18,8 @@ class ReaderSessionStore {
 
   setSession(state: ReaderSessionState): void {
     this.session = cloneReaderSessionState(state);
+    const current = AppStorage.get<number>(READER_SESSION_REVISION_KEY);
+    AppStorage.setOrCreate<number>(READER_SESSION_REVISION_KEY, current === undefined ? 1 : current + 1);
   }
 
   getSession(): ReaderSessionState | null {
@@ -26,7 +30,7 @@ class ReaderSessionStore {
   }
 
   updateSession(state: ReaderSessionState): void {
-    this.setSession(state);
+    this.session = cloneReaderSessionState(state);
   }
 
   clear(): void {

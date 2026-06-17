@@ -425,6 +425,7 @@ export function zhText(text: string): string {
     case 'Landscape': return '横屏';
     case 'Left to right': return '从左到右';
     case 'Right to left': return '从右到左';
+    case 'Top to bottom': return '从上到下';
     case 'Vertical': return '纵向';
     case 'Beginning': return '开头';
     case 'Last read': return '上次阅读';
@@ -501,6 +502,8 @@ export function zhText(text: string): string {
     case 'Where a gallery starts when opened': return '打开画廊时的起始页';
     case 'Auto transfer time': return '自动翻页时间';
     case 'Automatic next-page delay from original seekbar preference': return '原应用滑动条设置的自动下一页延迟';
+    case 'Standalone reader': return '独立阅读器';
+    case 'Open reader in a standalone ability': return '使用独立 Ability 打开阅读器';
     case 'Keep screen on': return '保持屏幕常亮';
     case 'Prevent screen sleep while reading': return '阅读时防止屏幕休眠';
     case 'Show clock': return '显示时钟';
@@ -513,6 +516,8 @@ export function zhText(text: string): string {
     case 'Use volume buttons to turn pages': return '使用音量键翻页';
     case 'Reading fullscreen': return '阅读全屏';
     case 'Hide system chrome while reading': return '阅读时隐藏系统界面';
+    case 'Custom brightness': return '自定义亮度';
+    case 'Enable custom reader brightness': return '启用阅读器自定义亮度';
     case 'Screen lightness': return '屏幕亮度';
     case 'Custom reader brightness when enabled': return '启用后使用自定义阅读亮度';
     case 'Download location': return '下载位置';
@@ -1382,16 +1387,18 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
   if (panel === SettingsPanel.Read) {
     return [
       optionSettingsRow('screen_rotation', 'Screen rotation', 'Reader orientation policy', entries, ['System', 'Portrait', 'Landscape']),
-      optionSettingsRow('reading_direction', 'Reading direction', 'Left-to-right, right-to-left or vertical reader movement', entries, ['Left to right', 'Right to left', 'Vertical']),
+      optionSettingsRow('reading_direction', 'Reading direction', 'Left-to-right, right-to-left or vertical reader movement', entries, ['Left to right', 'Right to left', 'Top to bottom']),
       optionSettingsRow('page_scaling', 'Page scaling', 'Fit width, fit height or original page scaling', entries, ['Fit width', 'Fit height', 'Original', 'Smart fit']),
       optionSettingsRow('start_position', 'Start position', 'Where a gallery starts when opened', entries, ['Beginning', 'Last read', 'End']),
       optionSettingsRow('start_transfer_time', 'Auto transfer time', 'Automatic next-page delay from original seekbar preference', entries, ['Off', '2s', '5s', '10s', '15s']),
+      optionSettingsRow('reader_standalone', 'Standalone reader', 'Open reader in a standalone ability', entries, ON_OFF_OPTIONS),
       optionSettingsRow('keep_screen_on', 'Keep screen on', 'Prevent screen sleep while reading', entries, ON_OFF_OPTIONS),
       optionSettingsRow('gallery_show_clock', 'Show clock', 'Show clock overlay in the reader', entries, ON_OFF_OPTIONS),
       optionSettingsRow('gallery_show_progress', 'Show progress', 'Show reader progress overlay', entries, ON_OFF_OPTIONS),
       optionSettingsRow('gallery_show_battery', 'Show battery', 'Show battery overlay', entries, ON_OFF_OPTIONS),
       optionSettingsRow('volume_page', 'Volume page', 'Use volume buttons to turn pages', entries, ON_OFF_OPTIONS),
       optionSettingsRow('reading_fullscreen', 'Reading fullscreen', 'Hide system chrome while reading', entries, ON_OFF_OPTIONS),
+      optionSettingsRow('custom_screen_lightness', 'Custom brightness', 'Enable custom reader brightness', entries, ON_OFF_OPTIONS),
       optionSettingsRow('screen_lightness', 'Screen lightness', 'Custom reader brightness when enabled', entries, ['0%', '25%', '50%', '75%', '100%'])
     ];
   }

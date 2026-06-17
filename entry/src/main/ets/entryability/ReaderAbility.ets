@@ -1,6 +1,12 @@
 import { UIAbility, common } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
-import { applyReaderFullscreenImmersiveMode, clearReaderWindow, rememberReaderWindow } from '../services/EhWindowImmersive';
+import {
+  applyReaderFullscreenImmersiveMode,
+  applyReaderStatusVisibleImmersiveMode,
+  clearReaderWindow,
+  rememberReaderWindow
+} from '../services/EhWindowImmersive';
+import { ehSettingsStore } from '../services/EhSettingsStore';
 
 export const READER_ABILITY_CONTEXT_KEY: string = 'readerAbilityContext';
 
@@ -18,12 +24,12 @@ export default class ReaderAbility extends UIAbility {
       const win = stage.getMainWindowSync();
       this.readerWindow = win;
       rememberReaderWindow(win);
-      applyReaderFullscreenImmersiveMode(win);
+      this.applyReaderChrome(win);
       setTimeout(() => {
-        applyReaderFullscreenImmersiveMode(win);
+        this.applyReaderChrome(win);
       }, 120);
       setTimeout(() => {
-        applyReaderFullscreenImmersiveMode(win);
+        this.applyReaderChrome(win);
       }, 420);
     } catch (error) {
     }
@@ -31,7 +37,15 @@ export default class ReaderAbility extends UIAbility {
 
   onForeground(): void {
     if (this.readerWindow !== undefined) {
-      applyReaderFullscreenImmersiveMode(this.readerWindow);
+      this.applyReaderChrome(this.readerWindow);
+    }
+  }
+
+  private applyReaderChrome(win: window.Window): void {
+    if (ehSettingsStore.getValue('reading_fullscreen', 'On') === 'On') {
+      applyReaderFullscreenImmersiveMode(win);
+    } else {
+      applyReaderStatusVisibleImmersiveMode(win);
     }
   }
 

@@ -1,9 +1,13 @@
 ﻿import { window } from '@kit.ArkUI';
 import { batteryInfo } from '@kit.BasicServicesKit';
+import inputConsumer from '@ohos.multimodalInput.inputConsumer';
+import { KeyCode } from '@ohos.multimodalInput.keyCode';
+import { KeyEvent } from '@ohos.multimodalInput.keyEvent';
 import { GalleryComment, GalleryPage } from '../model/GalleryModels';
 import {
   applyAppChromeImmersiveMode,
   applyReaderFullscreenImmersiveMode,
+  applyReaderStatusVisibleImmersiveMode,
   getMainWindow,
   getReaderWindow
 } from '../services/EhWindowImmersive';
@@ -23,6 +27,7 @@ const READER_MIN_SCALE: number = 1;
 const READER_MAX_SCALE: number = 4;
 const READER_DOUBLE_TAP_SCALE: number = 2.25;
 const SLIDER_AUTO_HIDE_DELAY: number = 3000;
+const READER_AUTO_TRANSFER_OFF: string = 'Off';
 
 @Component
 struct ReaderInfoRow {
@@ -392,9 +397,26 @@ export struct ReaderScene {
   @State menuShowProgress: boolean = true;
   @State menuShowBattery: boolean = true;
   @State menuReadingFullscreen: boolean = true;
+  @State menuVolumePage: boolean = false;
+  @State menuAutoTransferTime: string = READER_AUTO_TRANSFER_OFF;
   @State menuCustomBrightness: boolean = false;
   @State menuBrightnessLevel: string = '50%';
   private readerWindowActive: boolean = false;
+  private autoTransferTimer: number = -1;
+  private volumeUpConfig: inputConsumer.KeyPressedConfig = {
+    key: KeyCode.KEYCODE_VOLUME_UP,
+    action: 1,
+    isRepeat: false
+  };
+  private volumeDownConfig: inputConsumer.KeyPressedConfig = {
+    key: KeyCode.KEYCODE_VOLUME_DOWN,
+    action: 1,
+    isRepeat: false
+  };
+  private volumePageRegistered: boolean = false;
+  private volumePageCallback: (event: KeyEvent) => void = (event: KeyEvent) => {
+    this.handleVolumePageKey(event);
+  };
 
   aboutToAppear(): void {
     this.readerWindowActive = true;
@@ -406,11 +428,17 @@ export struct ReaderScene {
     this.syncDirectionState();
     this.refreshBattery();
     this.applyReaderWindowSettings();
+    this.applyBrightnessFromSettings();
+    this.updateVolumePageBinding();
+    this.scheduleAutoTransfer();
   }
 
   aboutToDisappear(): void {
     this.readerWindowActive = false;
     this.clearSliderTimer();
+    this.clearAutoTransferTimer();
+    this.unregisterVolumePageKeys();
+    this.resetReaderBrightness();
     this.restoreWindowSettings();
   }
 
@@ -446,10 +474,10 @@ export struct ReaderScene {
   }
 
   private applyReaderWindowSettingsFor(win: window.Window, keepOn: boolean, orientation: string): void {
-    this.enterReaderFullscreen(win);
-    this.scheduleReaderFullscreen(80);
-    this.scheduleReaderFullscreen(260);
-    this.scheduleReaderFullscreen(620);
+    this.applyReaderChromeMode(win);
+    this.scheduleReaderChromeMode(80);
+    this.scheduleReaderChromeMode(260);
+    this.scheduleReaderChromeMode(620);
     try {
       win.setWindowKeepScreenOn(keepOn).catch(() => {});
     } catch (e) {}
@@ -464,18 +492,22 @@ export struct ReaderScene {
     } catch (e) {}
   }
 
-  private enterReaderFullscreen(win: window.Window): void {
-    applyReaderFullscreenImmersiveMode(win);
+  private applyReaderChromeMode(win: window.Window): void {
+    if (ehSettingsStore.getValue('reading_fullscreen', 'On') === 'On') {
+      applyReaderFullscreenImmersiveMode(win);
+    } else {
+      applyReaderStatusVisibleImmersiveMode(win);
+    }
   }
 
-  private scheduleReaderFullscreen(delay: number): void {
+  private scheduleReaderChromeMode(delay: number): void {
     setTimeout(() => {
       if (!this.readerWindowActive) {
         return;
       }
       const win = this.readerWindow();
       if (win !== undefined) {
-        this.enterReaderFullscreen(win);
+        this.applyReaderChromeMode(win);
       }
     }, delay);
   }
@@ -508,6 +540,7 @@ export struct ReaderScene {
     this.currentIndex = this.pageIndex;
     this.isDisableSwipe = false;
     this.zoomPercent = 100;
+    this.scheduleAutoTransfer();
     try {
       this.swiperController.changeIndex(this.pageIndex, false);
     } catch (e) {}
@@ -585,9 +618,12 @@ export struct ReaderScene {
     this.menuShowProgress = ehSettingsStore.getValue('gallery_show_progress', 'On') === 'On';
     this.menuShowBattery = ehSettingsStore.getValue('gallery_show_battery', 'On') === 'On';
     this.menuReadingFullscreen = ehSettingsStore.getValue('reading_fullscreen', 'On') === 'On';
+    this.menuVolumePage = ehSettingsStore.getValue('volume_page', 'Off') === 'On';
+    this.menuAutoTransferTime = ehSettingsStore.getValue('start_transfer_time', READER_AUTO_TRANSFER_OFF);
     this.menuCustomBrightness = ehSettingsStore.getValue('custom_screen_lightness', 'Off') === 'On';
     this.menuBrightnessLevel = ehSettingsStore.getValue('screen_lightness', '50%');
     this.menuVisible = true;
+    this.clearAutoTransferTimer();
   }
 
   private applyMenuSettings(): void {
@@ -600,6 +636,8 @@ export struct ReaderScene {
     ehSettingsStore.setValue('gallery_show_progress', this.menuShowProgress ? 'On' : 'Off');
     ehSettingsStore.setValue('gallery_show_battery', this.menuShowBattery ? 'On' : 'Off');
     ehSettingsStore.setValue('reading_fullscreen', this.menuReadingFullscreen ? 'On' : 'Off');
+    ehSettingsStore.setValue('volume_page', this.menuVolumePage ? 'On' : 'Off');
+    ehSettingsStore.setValue('start_transfer_time', this.menuAutoTransferTime);
     ehSettingsStore.setValue('custom_screen_lightness', this.menuCustomBrightness ? 'On' : 'Off');
     ehSettingsStore.setValue('screen_lightness', this.menuBrightnessLevel);
     this.fitMode = this.menuPageScaling;
@@ -613,6 +651,8 @@ export struct ReaderScene {
       ehSettingsStore.save(context).catch(() => {});
     }
     this.applyReaderWindowSettings();
+    this.updateVolumePageBinding();
+    this.scheduleAutoTransfer();
     const win = this.readerWindow();
     if (win !== undefined) {
       win.setWindowKeepScreenOn(this.menuKeepScreenOn).catch(() => {});
@@ -640,10 +680,112 @@ export struct ReaderScene {
     win.setWindowBrightness(brightness).catch(() => {});
   }
 
+  private applyBrightnessFromSettings(): void {
+    const win = this.readerWindow();
+    if (win === undefined) {
+      return;
+    }
+    if (ehSettingsStore.getValue('custom_screen_lightness', 'Off') !== 'On') {
+      win.setWindowBrightness(-1).catch(() => {});
+      return;
+    }
+    const pct = Number.parseFloat(ehSettingsStore.getValue('screen_lightness', '50%')) / 100;
+    const brightness = Number.isNaN(pct) ? 0.5 : Math.max(0, Math.min(1, pct));
+    win.setWindowBrightness(brightness).catch(() => {});
+  }
+
+  private resetReaderBrightness(): void {
+    const win = this.readerWindow();
+    if (win !== undefined) {
+      win.setWindowBrightness(-1).catch(() => {});
+    }
+  }
+
+  private clearAutoTransferTimer(): void {
+    if (this.autoTransferTimer !== -1) {
+      clearTimeout(this.autoTransferTimer);
+      this.autoTransferTimer = -1;
+    }
+  }
+
+  private autoTransferDelayMs(): number {
+    const value = ehSettingsStore.getValue('start_transfer_time', READER_AUTO_TRANSFER_OFF);
+    if (value === READER_AUTO_TRANSFER_OFF) {
+      return 0;
+    }
+    const seconds = Number.parseInt(value);
+    if (Number.isNaN(seconds) || seconds <= 0) {
+      return 0;
+    }
+    return seconds * 1000;
+  }
+
+  private scheduleAutoTransfer(): void {
+    this.clearAutoTransferTimer();
+    if (!this.readerWindowActive || !this.canGoNext()) {
+      return;
+    }
+    const delay = this.autoTransferDelayMs();
+    if (delay <= 0) {
+      return;
+    }
+    this.autoTransferTimer = setTimeout(() => {
+      this.autoTransferTimer = -1;
+      if (!this.readerWindowActive || this.menuVisible || this.sliderVisible || !this.canGoNext()) {
+        return;
+      }
+      this.jumpTo(this.currentIndex + 1);
+    }, delay) as number;
+  }
+
+  private updateVolumePageBinding(): void {
+    if (ehSettingsStore.getValue('volume_page', 'Off') === 'On') {
+      this.registerVolumePageKeys();
+    } else {
+      this.unregisterVolumePageKeys();
+    }
+  }
+
+  private registerVolumePageKeys(): void {
+    if (this.volumePageRegistered) {
+      return;
+    }
+    try {
+      inputConsumer.on('keyPressed', this.volumeUpConfig, this.volumePageCallback);
+      inputConsumer.on('keyPressed', this.volumeDownConfig, this.volumePageCallback);
+      this.volumePageRegistered = true;
+    } catch (error) {
+      this.volumePageRegistered = false;
+    }
+  }
+
+  private unregisterVolumePageKeys(): void {
+    if (!this.volumePageRegistered) {
+      return;
+    }
+    try {
+      inputConsumer.off('keyPressed', this.volumePageCallback);
+    } catch (error) {
+    }
+    this.volumePageRegistered = false;
+  }
+
+  private handleVolumePageKey(event: KeyEvent): void {
+    if (!this.readerWindowActive || ehSettingsStore.getValue('volume_page', 'Off') !== 'On') {
+      return;
+    }
+    if (event.key.code === KeyCode.KEYCODE_VOLUME_UP) {
+      this.jumpTo(this.currentIndex - 1);
+    } else if (event.key.code === KeyCode.KEYCODE_VOLUME_DOWN) {
+      this.jumpTo(this.currentIndex + 1);
+    }
+  }
+
   private hideMenu(): void {
     this.applyMenuSettings();
     this.menuVisible = false;
     this.showInfo = false;
+    this.scheduleAutoTransfer();
   }
 
   private hideAll(): void {
@@ -707,6 +849,7 @@ export struct ReaderScene {
     this.currentIndex = target;
     this.isDisableSwipe = false;
     this.zoomPercent = 100;
+    this.scheduleAutoTransfer();
     try {
       this.swiperController.changeIndex(target, true);
     } catch (e) {}
@@ -720,6 +863,7 @@ export struct ReaderScene {
     this.currentIndex = index;
     this.isDisableSwipe = false;
     this.zoomPercent = 100;
+    this.scheduleAutoTransfer();
     this.onJump(index);
   }
 
@@ -941,6 +1085,14 @@ export struct ReaderScene {
               })
               ReaderMenuDivider()
 
+              ReaderMenuSelect({
+                label: uiText('Auto transfer time'),
+                options: [READER_AUTO_TRANSFER_OFF, '2s', '5s', '10s', '15s'],
+                value: this.menuAutoTransferTime,
+                onChange: (v: string) => { this.menuAutoTransferTime = v; }
+              })
+              ReaderMenuDivider()
+
               ReaderMenuToggle({
                 label: uiText('Keep screen on'),
                 value: this.menuKeepScreenOn,
@@ -977,7 +1129,14 @@ export struct ReaderScene {
               ReaderMenuDivider()
 
               ReaderMenuToggle({
-                label: uiText('Screen lightness'),
+                label: uiText('Volume page'),
+                value: this.menuVolumePage,
+                onChange: (v: boolean) => { this.menuVolumePage = v; }
+              })
+              ReaderMenuDivider()
+
+              ReaderMenuToggle({
+                label: uiText('Custom brightness'),
                 value: this.menuCustomBrightness,
                 onChange: (v: boolean) => { this.menuCustomBrightness = v; }
               })
@@ -985,7 +1144,7 @@ export struct ReaderScene {
               if (this.menuCustomBrightness) {
                 ReaderMenuDivider()
                 ReaderMenuSelect({
-                  label: '',
+                  label: uiText('Screen lightness'),
                   options: ['0%', '25%', '50%', '75%', '100%'],
                   value: this.menuBrightnessLevel,
                   onChange: (v: string) => { this.menuBrightnessLevel = v; }

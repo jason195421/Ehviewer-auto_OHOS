@@ -456,8 +456,17 @@ export struct HistoryScene {
       this.detailRequestUrl, '', site, this.readerPreviewIndex));
   }
 
+  private publishReaderSession(site: GallerySite): void {
+    readerSessionStore.setSession(createReaderSessionState(this.detail, this.readerPage, this.readerStatus,
+      this.detailRequestUrl, '', site, this.readerPreviewIndex));
+  }
+
   private openReaderAbility(site: GallerySite): void {
-    this.persistReaderSession(site);
+    this.publishReaderSession(site);
+    if (ehSettingsStore.getValue('reader_standalone', 'On') !== 'On') {
+      this.showReader = true;
+      return;
+    }
     const context = getAbilityContext();
     if (context === undefined) {
       this.showReader = true;
@@ -1271,8 +1280,17 @@ export struct TopListScene {
       this.detailRequestUrl, this.requestUrl, site, this.readerPreviewIndex));
   }
 
+  private publishReaderSession(site: GallerySite): void {
+    readerSessionStore.setSession(createReaderSessionState(this.detail, this.readerPage, this.readerStatus,
+      this.detailRequestUrl, this.requestUrl, site, this.readerPreviewIndex));
+  }
+
   private openReaderAbility(site: GallerySite): void {
-    this.persistReaderSession(site);
+    this.publishReaderSession(site);
+    if (ehSettingsStore.getValue('reader_standalone', 'On') !== 'On') {
+      this.showReader = true;
+      return;
+    }
     const context = getAbilityContext();
     if (context === undefined) {
       this.showReader = true;
