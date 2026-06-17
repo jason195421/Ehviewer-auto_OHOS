@@ -1,0 +1,170 @@
+﻿import { GalleryDetail, GalleryPreview } from '../model/GalleryModels';
+import { STATUS_BAR_HEIGHT_KEY, createEmptyDetail, galleryDisplayTitle, uiStatusText } from '../shared/EhShared';
+import { EhSubNavBar } from './NavigationComponents';
+import { DetailHeader, DetailLoadStatus } from './detail/DetailHeader';
+import { DetailInfoBlock } from './detail/DetailInfo';
+import { DetailActionItem, DetailActions, RatingPanel, RatingSummary } from './detail/DetailActions';
+import { DetailTags, TagGroupRow } from './detail/DetailTags';
+import { DetailPreviews, PreviewRow, PreviewThumb, PreviewTile } from './detail/DetailPreviews';
+import { DetailComments } from './detail/DetailComments';
+
+export { DetailHeader, DetailLoadStatus, HeaderActionButton } from './detail/DetailHeader';
+export { DetailInfoBlock, DetailSummaryCell, InfoRow } from './detail/DetailInfo';
+export { DetailActionItem, DetailActions, RatingPanel, RatingSummary } from './detail/DetailActions';
+export { DetailTags, TagGroupRow } from './detail/DetailTags';
+export { DetailPreviews, PreviewRow, PreviewThumb, PreviewTile } from './detail/DetailPreviews';
+export { DetailComments } from './detail/DetailComments';
+@Component
+export struct GalleryDetailScene {
+  @Prop renderVersion: number = 0;
+  @Prop detail: GalleryDetail = createEmptyDetail();
+  @Prop isDetailLoaded: boolean = false;
+  @Prop isFavorited: boolean = false;
+  @Prop statusText: string = '';
+  @Prop requestUrl: string = '';
+  @Prop downloadText: string = 'Download';
+  onBack: () => void = () => {};
+  onDownload: () => void = () => {};
+  onRead: () => void = () => {};
+  onSelectPreview: (preview: GalleryPreview) => void = () => {};
+  onComments: () => void = () => {};
+  onFavorite: () => void = () => {};
+  onShare: () => void = () => {};
+  onRate: (rating: number) => void = (_rating: number) => {};
+  onTorrent: () => void = () => {};
+  onArchive: () => void = () => {};
+  initialDetailScrollOffset: number = 0;
+  onDetailScrollUpdate: (offset: number) => void = () => {};
+  private detailScroller: Scroller = new Scroller();
+  @State showRatingDialog: boolean = false;
+  @State pendingRating: number = 0;
+  @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeightPx: number = 0;
+
+  private statusBarVp(): number {
+    return this.getUIContext().px2vp(this.statusBarHeightPx);
+  }
+
+  private startRating(): void {
+    if (!this.isDetailLoaded || this.detail.apiUid < 0 || this.detail.apiKey.length === 0) {
+      return;
+    }
+    const current = this.detail.rated && this.detail.rating > 0 ? Math.round(this.detail.rating) : 5;
+    this.pendingRating = Math.max(1, Math.min(5, current));
+    this.showRatingDialog = true;
+  }
+
+  build() {
+    Stack({ alignContent: Alignment.Center }) {
+      Column() {
+        EhSubNavBar({
+          statusBarHeight: this.statusBarVp(),
+          title: galleryDisplayTitle(this.detail),
+          onBack: this.onBack
+        })
+
+        if (this.statusText.length > 0) {
+          Text(uiStatusText(this.statusText))
+            .fontSize(12)
+            .fontColor('#0A6B45')
+            .width('100%')
+            .padding({ left: 14, right: 14, top: 6, bottom: 6 })
+            .backgroundColor('#F0FBF6')
+        }
+
+        List({ space: 0, scroller: this.detailScroller }) {
+          ListItem() {
+            DetailHeader({
+              detail: this.detail,
+              downloadText: this.downloadText,
+              onDownload: this.onDownload,
+              onRead: this.onRead
+            })
+          }
+          if (this.statusText.length > 0 && (!this.isDetailLoaded || this.statusText.indexOf('failed') >= 0 ||
+            this.statusText.indexOf('Failed') >= 0)) {
+            ListItem() {
+              DetailLoadStatus({
+                statusText: this.statusText,
+                isError: this.statusText.indexOf('failed') >= 0 || this.statusText.indexOf('Failed') >= 0
+              })
+            }
+          }
+          ListItem() {
+            DetailInfoBlock({ detail: this.detail, requestUrl: this.requestUrl, isDetailLoaded: this.isDetailLoaded })
+          }
+          ListItem() {
+            DetailActions({
+              detail: this.detail,
+              isDetailLoaded: this.isDetailLoaded,
+              isFavorited: this.isFavorited,
+              onFavorite: this.onFavorite,
+              onShare: this.onShare,
+              onRate: () => {
+                this.startRating();
+              },
+              onTorrent: this.onTorrent,
+              onArchive: this.onArchive
+            })
+          }
+          ListItem() {
+            DetailTags({ tags: this.detail.tags, isDetailLoaded: this.isDetailLoaded })
+          }
+          ListItem() {
+            DetailPreviews({
+              previews: this.detail.previewSet,
+              previewPages: this.detail.previewPages,
+              isDetailLoaded: this.isDetailLoaded,
+              onSelectPreview: this.onSelectPreview
+            })
+          }
+          ListItem() {
+            DetailComments({
+              comments: this.detail.comments,
+              isDetailLoaded: this.isDetailLoaded,
+              onComments: this.onComments
+            })
+          }
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .onAppear(() => {
+          if (this.initialDetailScrollOffset > 0) {
+            this.detailScroller.scrollTo({ xOffset: 0, yOffset: this.initialDetailScrollOffset });
+          }
+        })
+        .onScrollStop(() => {
+          this.onDetailScrollUpdate(this.detailScroller.currentOffset().yOffset);
+        })
+      }
+      .width('100%')
+      .height('100%')
+
+      if (this.showRatingDialog) {
+        Column() {
+          RatingPanel({
+            rating: this.pendingRating,
+            onChange: (rating: number) => {
+              this.pendingRating = rating;
+            },
+            onCancel: () => {
+              this.showRatingDialog = false;
+            },
+            onSubmit: () => {
+              this.showRatingDialog = false;
+              this.onRate(this.pendingRating);
+            }
+          })
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .padding(24)
+        .backgroundColor('#66000000')
+      }
+    }
+    .width('100%')
+    .height('100%')
+  }
+}
+
