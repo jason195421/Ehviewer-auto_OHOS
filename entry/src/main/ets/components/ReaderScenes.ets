@@ -1,4 +1,4 @@
-import { window } from '@kit.ArkUI';
+﻿import { window } from '@kit.ArkUI';
 import { GalleryComment, GalleryPage } from '../model/GalleryModels';
 import { ehSettingsStore } from '../services/EhSettingsStore';
 import {
@@ -7,16 +7,16 @@ import {
   nextOption,
   readerClockText,
   readerDisplayImageUrl,
-  readerFullImageHeight,
-  readerFullImageWidth,
-  readerImageFit,
-  readerIsRightToLeft,
   readerShowClock,
   readerShowProgress,
   uiStatusText,
   uiText,
   uiValue
 } from '../shared/EhShared';
+
+const READER_MIN_SCALE: number = 1;
+const READER_MAX_SCALE: number = 4;
+const READER_DOUBLE_TAP_SCALE: number = 2.25;
 
 function stripHtml(html: string): string {
   let text = html
@@ -56,6 +56,202 @@ struct ReaderInfoRow {
     }
     .width('100%')
     .margin({ bottom: 6 })
+  }
+}
+
+@Observed
+class ReaderPreviewModel {
+  currentScale: number = READER_MIN_SCALE;
+  lastScale: number = READER_MIN_SCALE;
+  currentOffsetX: number = 0;
+  currentOffsetY: number = 0;
+  lastOffsetX: number = 0;
+  lastOffsetY: number = 0;
+  componentWidth: number = 1;
+  componentHeight: number = 1;
+  imageWidth: number = 1;
+  imageHeight: number = 1;
+  centerX: number = 0.5;
+  centerY: number = 0.5;
+  disableSwipe: boolean = false;
+
+  reset(): void {
+    this.currentScale = READER_MIN_SCALE;
+    this.lastScale = READER_MIN_SCALE;
+    this.currentOffsetX = 0;
+    this.currentOffsetY = 0;
+    this.lastOffsetX = 0;
+    this.lastOffsetY = 0;
+    this.centerX = 0.5;
+    this.centerY = 0.5;
+    this.disableSwipe = false;
+  }
+
+  setComponentSize(width: number, height: number): void {
+    if (width > 0) {
+      this.componentWidth = width;
+    }
+    if (height > 0) {
+      this.componentHeight = height;
+    }
+    this.restrictBoundary();
+    this.commit();
+  }
+
+  setImageSize(width: number, height: number): void {
+    if (width > 0) {
+      this.imageWidth = width;
+    }
+    if (height > 0) {
+      this.imageHeight = height;
+    }
+    this.restrictBoundary();
+    this.commit();
+  }
+
+  pinchStart(centerX: number, centerY: number): void {
+    const center = this.evaluateCenter(centerX, centerY);
+    this.centerX = center[0];
+    this.centerY = center[1];
+    this.lastScale = this.currentScale;
+    this.lastOffsetX = this.currentOffsetX;
+    this.lastOffsetY = this.currentOffsetY;
+    this.disableSwipe = true;
+  }
+
+  pinchUpdate(scale: number): void {
+    if (scale <= 0 || Number.isNaN(scale)) {
+      return;
+    }
+    const nextScale = this.clampScale(this.lastScale * scale);
+    const deltaScale = nextScale / this.lastScale;
+    this.currentScale = nextScale;
+    this.currentOffsetX = this.lastOffsetX + (0.5 - this.centerX) * this.imageWidth * (1 - deltaScale) * this.lastScale;
+    this.currentOffsetY = this.lastOffsetY + (0.5 - this.centerY) * this.imageHeight * (1 - deltaScale) * this.lastScale;
+    this.restrictBoundary();
+  }
+
+  pinchEnd(): void {
+    if (this.currentScale <= READER_MIN_SCALE + 0.01) {
+      this.reset();
+      return;
+    }
+    this.restrictBoundary();
+    this.commit();
+  }
+
+  panStart(): void {
+    this.lastOffsetX = this.currentOffsetX;
+    this.lastOffsetY = this.currentOffsetY;
+    this.lastScale = this.currentScale;
+    this.disableSwipe = this.currentScale > READER_MIN_SCALE + 0.01 && !this.isHorizontalBoundary();
+  }
+
+  panUpdate(offsetX: number, offsetY: number): void {
+    if (this.currentScale <= READER_MIN_SCALE + 0.01) {
+      this.disableSwipe = false;
+      return;
+    }
+    this.currentOffsetX = this.lastOffsetX + offsetX;
+    this.currentOffsetY = this.lastOffsetY + offsetY;
+    this.restrictBoundary();
+  }
+
+  panEnd(): void {
+    this.restrictBoundary();
+    this.commit();
+  }
+
+  toggleDoubleTap(centerX: number, centerY: number): void {
+    if (this.currentScale > READER_MIN_SCALE + 0.01) {
+      this.reset();
+      return;
+    }
+    const center = this.evaluateCenter(centerX, centerY);
+    this.centerX = center[0];
+    this.centerY = center[1];
+    this.lastScale = READER_MIN_SCALE;
+    this.lastOffsetX = 0;
+    this.lastOffsetY = 0;
+    this.currentScale = READER_DOUBLE_TAP_SCALE;
+    this.currentOffsetX = (0.5 - this.centerX) * this.imageWidth * (1 - READER_DOUBLE_TAP_SCALE);
+    this.currentOffsetY = (0.5 - this.centerY) * this.imageHeight * (1 - READER_DOUBLE_TAP_SCALE);
+    this.restrictBoundary();
+    this.commit();
+  }
+
+  zoomBy(factor: number): void {
+    const target = this.clampScale(this.currentScale * factor);
+    if (Math.abs(target - READER_MIN_SCALE) < 0.01) {
+      this.reset();
+      return;
+    }
+    this.currentScale = target;
+    this.restrictBoundary();
+    this.commit();
+  }
+
+  setScale(target: number): void {
+    this.currentScale = this.clampScale(target);
+    this.restrictBoundary();
+    this.commit();
+  }
+
+  zoomPercent(): number {
+    return Math.round(this.currentScale * 100);
+  }
+
+  private commit(): void {
+    this.lastScale = this.currentScale;
+    this.lastOffsetX = this.currentOffsetX;
+    this.lastOffsetY = this.currentOffsetY;
+    this.disableSwipe = this.currentScale > READER_MIN_SCALE + 0.01 && !this.isHorizontalBoundary();
+  }
+
+  private clampScale(value: number): number {
+    return Math.max(READER_MIN_SCALE, Math.min(READER_MAX_SCALE, value));
+  }
+
+  private evaluateCenter(centerX: number, centerY: number): [number, number] {
+    const imgDisplayWidth = this.imageWidth * this.lastScale;
+    const imgDisplayHeight = this.imageHeight * this.lastScale;
+    const imgX = (this.componentWidth - imgDisplayWidth) / 2 + this.lastOffsetX;
+    const imgY = (this.componentHeight - imgDisplayHeight) / 2 + this.lastOffsetY;
+    const cX = Math.max(0, Math.min(1, (centerX - imgX) / imgDisplayWidth));
+    const cY = Math.max(0, Math.min(1, (centerY - imgY) / imgDisplayHeight));
+    return [cX, cY];
+  }
+
+  private maxOffsetX(): number {
+    const scaledWidth = this.imageWidth * this.currentScale;
+    return scaledWidth > this.componentWidth ? (scaledWidth - this.componentWidth) / 2 : 0;
+  }
+
+  private maxOffsetY(): number {
+    const scaledHeight = this.imageHeight * this.currentScale;
+    return scaledHeight > this.componentHeight ? (scaledHeight - this.componentHeight) / 2 : 0;
+  }
+
+  private restrictBoundary(): void {
+    const maxX = this.maxOffsetX();
+    const maxY = this.maxOffsetY();
+    this.currentOffsetX = Math.max(-maxX, Math.min(maxX, this.currentOffsetX));
+    this.currentOffsetY = Math.max(-maxY, Math.min(maxY, this.currentOffsetY));
+    if (this.currentScale <= READER_MIN_SCALE + 0.01) {
+      this.currentOffsetX = 0;
+      this.currentOffsetY = 0;
+      this.disableSwipe = false;
+    } else {
+      this.disableSwipe = !this.isHorizontalBoundary();
+    }
+  }
+
+  private isHorizontalBoundary(): boolean {
+    const maxX = this.maxOffsetX();
+    if (maxX <= 0) {
+      return true;
+    }
+    return Math.abs(this.currentOffsetX) >= maxX - 0.5;
   }
 }
 
@@ -168,7 +364,7 @@ export struct ReaderScene {
   @Prop renderVersion: number = 0;
   @Prop page: GalleryPage = createEmptyPage();
   @Prop statusText: string = '';
-  @Prop pageIndex: number = 0;
+  @Prop @Watch('onPageIndexChange') pageIndex: number = 0;
   @Prop totalPages: number = 0;
   onBack: () => void = () => {};
   onPrev: () => void = () => {};
@@ -176,17 +372,21 @@ export struct ReaderScene {
   onJump: (index: number) => void = () => {};
   onRetry: () => void = () => {};
 
-  @State zoomPercent: number = 100;
   @State fitMode: string = 'Fit width';
   @State showInfo: boolean = false;
   @State preferOriginal: boolean = false;
   @State controlsVisible: boolean = false;
-  @State pageDragOffsetX: number = 0;
-  @State pinchBaseZoom: number = 100;
+  @State currentIndex: number = 0;
+  @State isDisableSwipe: boolean = false;
+  @State zoomPercent: number = 100;
+  @State viewportCommand: string = '';
+  @State viewportCommandVersion: number = 0;
+  private swiperController: SwiperController = new SwiperController();
 
   aboutToAppear(): void {
     this.fitMode = ehSettingsStore.getValue('page_scaling', 'Fit width');
     this.controlsVisible = false;
+    this.currentIndex = this.pageIndex;
     this.applyReaderWindowSettings();
   }
 
@@ -276,25 +476,46 @@ export struct ReaderScene {
     }
   }
 
+  private onPageIndexChange(): void {
+    this.currentIndex = this.pageIndex;
+    this.isDisableSwipe = false;
+    this.zoomPercent = 100;
+    try {
+      this.swiperController.changeIndex(this.pageIndex, false);
+    } catch (e) {}
+  }
+
+  private pageIndexes(): number[] {
+    const count = this.totalPages <= 0 ? 1 : this.totalPages;
+    const pages: number[] = [];
+    for (let i = 0; i < count; i++) {
+      pages.push(i);
+    }
+    return pages;
+  }
+
+  private pageForIndex(index: number): GalleryPage {
+    if (index === this.pageIndex) {
+      return this.page;
+    }
+    return createEmptyPage();
+  }
+
+  private issueViewportCommand(command: string): void {
+    this.viewportCommand = command;
+    this.viewportCommandVersion++;
+  }
+
   private zoomOut(): void {
-    this.zoomPercent = Math.max(50, this.zoomPercent - 25);
+    this.issueViewportCommand('zoom_out');
   }
 
   private zoomIn(): void {
-    this.zoomPercent = Math.min(300, this.zoomPercent + 25);
+    this.issueViewportCommand('zoom_in');
   }
 
   private resetZoom(): void {
-    this.zoomPercent = 100;
-  }
-
-  private clampZoom(value: number): number {
-    return Math.max(50, Math.min(300, Math.round(value)));
-  }
-
-  private setZoom(value: number): void {
-    this.zoomPercent = this.clampZoom(value);
-    this.fitMode = 'Original';
+    this.issueViewportCommand('reset');
   }
 
   private zoomLabel(): string {
@@ -304,6 +525,7 @@ export struct ReaderScene {
   private cycleFitMode(): void {
     const next = nextOption(this.fitMode, ['Fit width', 'Fit height', 'Original', 'Smart fit']);
     this.fitMode = next;
+    this.issueViewportCommand('reset');
     ehSettingsStore.setValue('page_scaling', next);
     const context = getAbilityContext();
     if (context !== undefined) {
@@ -311,99 +533,20 @@ export struct ReaderScene {
     }
   }
 
-  private tapLeftPageArea(): void {
-    if (readerIsRightToLeft()) {
-      if (this.totalPages <= 0 || this.pageIndex + 1 < this.totalPages) {
-        this.onNext();
-      }
-      return;
-    }
-
-    if (this.pageIndex > 0) {
-      this.onPrev();
-    }
-  }
-
-  private tapRightPageArea(): void {
-    if (readerIsRightToLeft()) {
-      if (this.pageIndex > 0) {
-        this.onPrev();
-      }
-      return;
-    }
-
-    if (this.totalPages <= 0 || this.pageIndex + 1 < this.totalPages) {
-      this.onNext();
-    }
+  private hideControls(): void {
+    this.controlsVisible = false;
   }
 
   private toggleControls(): void {
     this.controlsVisible = !this.controlsVisible;
   }
 
-  private hideControls(): void {
-    this.controlsVisible = false;
-  }
-
-  private showControlsMenu(): void {
-    this.controlsVisible = true;
+  private canGoPrev(): boolean {
+    return this.currentIndex > 0;
   }
 
   private canGoNext(): boolean {
-    return this.totalPages <= 0 || this.pageIndex + 1 < this.totalPages;
-  }
-
-  private canGoPrev(): boolean {
-    return this.pageIndex > 0;
-  }
-
-  private goNextPage(): void {
-    if (this.canGoNext()) {
-      this.onNext();
-    }
-  }
-
-  private goPrevPage(): void {
-    if (this.canGoPrev()) {
-      this.onPrev();
-    }
-  }
-
-  private panTargetIsNext(offsetX: number): boolean {
-    if (readerIsRightToLeft()) {
-      return offsetX > 0;
-    }
-    return offsetX < 0;
-  }
-
-  private finishPagePan(offsetX: number, velocityX: number): void {
-    const absOffset = Math.abs(offsetX);
-    const absVelocity = Math.abs(velocityX);
-    this.pageDragOffsetX = 0;
-    if (absOffset < 64 && absVelocity < 420) {
-      return;
-    }
-    if (this.panTargetIsNext(offsetX)) {
-      this.goNextPage();
-    } else {
-      this.goPrevPage();
-    }
-  }
-
-  private updatePagePan(offsetX: number, offsetY: number): void {
-    if (Math.abs(offsetX) < Math.abs(offsetY)) {
-      return;
-    }
-    this.controlsVisible = false;
-    this.pageDragOffsetX = Math.max(-96, Math.min(96, offsetX * 0.32));
-  }
-
-  private updatePinchZoom(scale: number): void {
-    if (scale <= 0 || Number.isNaN(scale)) {
-      return;
-    }
-    this.fitMode = 'Original';
-    this.zoomPercent = this.clampZoom(this.pinchBaseZoom * scale);
+    return this.totalPages <= 0 || this.currentIndex + 1 < this.totalPages;
   }
 
   private jumpTo(value: number): void {
@@ -411,109 +554,102 @@ export struct ReaderScene {
       return;
     }
     const target = Math.max(0, Math.min(this.totalPages - 1, Math.round(value)));
-    if (target !== this.pageIndex) {
-      this.onJump(target);
+    if (target === this.currentIndex) {
+      return;
     }
+    this.currentIndex = target;
+    this.isDisableSwipe = false;
+    this.zoomPercent = 100;
+    try {
+      this.swiperController.changeIndex(target, true);
+    } catch (e) {}
+    this.onJump(target);
+  }
+
+  private onSwiperChange(index: number): void {
+    if (index === this.currentIndex) {
+      return;
+    }
+    this.currentIndex = index;
+    this.isDisableSwipe = false;
+    this.zoomPercent = 100;
+    this.onJump(index);
   }
 
   private progressText(): string {
     const total = this.totalPages <= 0 ? 1 : this.totalPages;
-    return (this.pageIndex + 1).toString() + '/' + total.toString();
+    return (this.currentIndex + 1).toString() + '/' + total.toString();
   }
 
   build() {
     Stack({ alignContent: Alignment.Center }) {
-      Column() {
-        Stack({ alignContent: Alignment.Center }) {
-          if (readerDisplayImageUrl(this.page, this.preferOriginal).length > 0) {
-            Image(readerDisplayImageUrl(this.page, this.preferOriginal))
-              .width(readerFullImageWidth(this.zoomPercent))
-              .height(readerFullImageHeight(this.zoomPercent))
-              .objectFit(readerImageFit(this.fitMode))
-              .backgroundColor('#050608')
-              .translate({ x: this.pageDragOffsetX })
-              .animation({ duration: 120, curve: Curve.EaseOut })
-          } else {
-            Text(this.statusText.indexOf('failed') >= 0 || this.statusText.indexOf('Failed') >= 0 ?
-              uiText('Image page failed to load') : uiText('Image page is loading'))
-              .fontSize(16)
-              .fontColor('#98A2B3')
-              .translate({ x: this.pageDragOffsetX })
-          }
-
-          if (!this.controlsVisible && readerShowProgress()) {
-            Text(this.progressText())
-              .fontSize(12)
-              .fontColor('#F2F4F7')
-              .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-              .backgroundColor('#66000000')
-              .borderRadius(12)
-              .position({ x: 12, y: 12 })
-          }
-
-          Row() {
-            Blank()
-              .height('100%')
-              .layoutWeight(1)
-              .onClick(() => {
-                this.tapLeftPageArea();
-              })
-            Column() {
-              Blank()
-                .layoutWeight(1)
-                .onClick(() => {
-                  this.showControlsMenu();
-                })
-              Blank()
-                .layoutWeight(1)
-                .onClick(() => {
-                  this.showControlsMenu();
-                })
+      Swiper(this.swiperController) {
+        ForEach(this.pageIndexes(), (index: number) => {
+          ReaderImageViewport({
+            page: this.pageForIndex(index),
+            statusText: index === this.pageIndex ? this.statusText : uiText('Image page is loading'),
+            preferOriginal: this.preferOriginal,
+            fitMode: this.fitMode,
+            isActive: index === this.currentIndex,
+            command: this.viewportCommand,
+            commandVersion: this.viewportCommandVersion,
+            onToggleControls: () => {
+              this.toggleControls();
+            },
+            onSwipeLockChange: (locked: boolean) => {
+              if (index === this.currentIndex) {
+                this.isDisableSwipe = locked;
+              }
+            },
+            onZoomChange: (percent: number) => {
+              if (index === this.currentIndex) {
+                this.zoomPercent = percent;
+              }
             }
+          })
+            .width('100%')
             .height('100%')
-            .layoutWeight(1)
-            Blank()
-              .height('100%')
-              .layoutWeight(1)
-              .onClick(() => {
-                this.tapRightPageArea();
-              })
-          }
-          .width('100%')
-          .height('100%')
-          .zIndex(3)
-          .gesture(
-            GestureGroup(GestureMode.Parallel,
-              PanGesture({ fingers: 1, direction: PanDirection.Horizontal, distance: 12 })
-                .onActionUpdate((event: GestureEvent) => {
-                  this.updatePagePan(event.offsetX, event.offsetY);
-                })
-                .onActionEnd((event: GestureEvent) => {
-                  this.finishPagePan(event.offsetX, event.velocityX);
-                })
-                .onActionCancel(() => {
-                  this.pageDragOffsetX = 0;
-                }),
-              PinchGesture({ fingers: 2, distance: 4 })
-                .onActionStart(() => {
-                  this.pinchBaseZoom = this.zoomPercent;
-                  this.controlsVisible = false;
-                })
-                .onActionUpdate((event: GestureEvent) => {
-                  this.updatePinchZoom(event.scale);
-                })
-                .onActionEnd(() => {
-                  this.pinchBaseZoom = this.zoomPercent;
-                })
-            )
-          )
-        }
-        .width('100%')
-        .height('100%')
-        .backgroundColor('#050608')
+        }, (index: number) => index.toString())
       }
+      .index(this.currentIndex)
+      .cachedCount(3)
+      .indicator(false)
+      .loop(false)
+      .autoPlay(false)
+      .displayCount(1)
+      .itemSpace(0)
+      .duration(180)
+      .curve(Curve.EaseOut)
+      .effectMode(EdgeEffect.None)
+      .disableSwipe(this.isDisableSwipe)
+      .onChange((index: number) => {
+        this.onSwiperChange(index);
+      })
       .width('100%')
       .height('100%')
+      .backgroundColor('#050608')
+
+      if (!this.controlsVisible && readerShowProgress()) {
+        Text(this.progressText())
+          .fontSize(12)
+          .fontColor('#F2F4F7')
+          .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+          .backgroundColor('#66000000')
+          .borderRadius(12)
+          .position({ x: 12, y: 12 })
+          .zIndex(3)
+      }
+
+      if (!this.controlsVisible && readerShowClock()) {
+        Text(readerClockText())
+          .fontSize(12)
+          .fontColor('#F2F4F7')
+          .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+          .backgroundColor('#66000000')
+          .borderRadius(12)
+          .position({ x: 12, y: 42 })
+          .zIndex(3)
+      }
 
       if (this.controlsVisible) {
         Stack() {
@@ -573,12 +709,12 @@ export struct ReaderScene {
 
             Column() {
               Row() {
-                Text((this.pageIndex + 1).toString())
+                Text((this.currentIndex + 1).toString())
                   .fontSize(12)
                   .fontColor('#E5E7EB')
                   .width(42)
                 Slider({
-                  value: this.pageIndex,
+                  value: this.currentIndex,
                   min: 0,
                   max: Math.max(0, this.totalPages - 1),
                   step: 1
@@ -602,14 +738,18 @@ export struct ReaderScene {
               Row({ space: 8 }) {
                 ReaderNavButton({
                   text: uiText('Previous'),
-                  active: this.pageIndex > 0,
-                  onTap: this.onPrev
+                  active: this.canGoPrev(),
+                  onTap: () => {
+                    this.jumpTo(this.currentIndex - 1);
+                  }
                 })
                   .layoutWeight(1)
                 ReaderNavButton({
                   text: uiText('Next'),
-                  active: this.totalPages <= 0 || this.pageIndex + 1 < this.totalPages,
-                  onTap: this.onNext
+                  active: this.canGoNext(),
+                  onTap: () => {
+                    this.jumpTo(this.currentIndex + 1);
+                  }
                 })
                   .layoutWeight(1)
               }
@@ -619,7 +759,7 @@ export struct ReaderScene {
               Flex({ wrap: FlexWrap.Wrap }) {
                 ReaderToolButton({
                   text: uiText('Zoom out'),
-                  active: this.zoomPercent > 50,
+                  active: this.zoomPercent > 100,
                   onTap: () => {
                     this.zoomOut();
                   }
@@ -635,17 +775,17 @@ export struct ReaderScene {
                   .margin({ right: 8, bottom: 8 })
                 ReaderToolButton({
                   text: uiText('Zoom in'),
-                  active: this.zoomPercent < 300,
+                  active: this.zoomPercent < 400,
                   onTap: () => {
                     this.zoomIn();
                   }
                 })
                   .margin({ right: 8, bottom: 8 })
                 ReaderToolButton({
-                  text: '150%',
+                  text: '225%',
                   active: true,
                   onTap: () => {
-                    this.setZoom(150);
+                    this.issueViewportCommand('double_zoom');
                   }
                 })
                   .margin({ right: 8, bottom: 8 })
@@ -662,6 +802,7 @@ export struct ReaderScene {
                   active: this.page.originImageUrl.length > 0,
                   onTap: () => {
                     this.preferOriginal = !this.preferOriginal;
+                    this.issueViewportCommand('reset');
                   }
                 })
                   .margin({ right: 8, bottom: 8 })
@@ -710,6 +851,191 @@ export struct ReaderScene {
   }
 }
 
+@Component
+struct ReaderImageViewport {
+  @Prop page: GalleryPage = createEmptyPage();
+  @Prop statusText: string = '';
+  @Prop preferOriginal: boolean = false;
+  @Prop fitMode: string = 'Fit width';
+  @Prop isActive: boolean = false;
+  @Prop command: string = '';
+  @Prop @Watch('onCommandChange') commandVersion: number = 0;
+  onToggleControls: () => void = () => {};
+  onSwipeLockChange: (locked: boolean) => void = (_locked: boolean) => {};
+  onZoomChange: (percent: number) => void = (_percent: number) => {};
+
+  @State imageModel: ReaderPreviewModel = new ReaderPreviewModel();
+  private lastCommandVersion: number = -1;
+
+  aboutToAppear(): void {
+    this.reportState();
+  }
+
+  aboutToDisappear(): void {
+    if (this.isActive) {
+      this.onSwipeLockChange(false);
+    }
+  }
+
+  onCommandChange(): void {
+    if (!this.isActive || this.commandVersion === this.lastCommandVersion) {
+      return;
+    }
+    this.lastCommandVersion = this.commandVersion;
+    if (this.command === 'zoom_in') {
+      this.imageModel.zoomBy(1.25);
+    } else if (this.command === 'zoom_out') {
+      this.imageModel.zoomBy(0.8);
+    } else if (this.command === 'double_zoom') {
+      this.imageModel.setScale(READER_DOUBLE_TAP_SCALE);
+    } else if (this.command === 'reset') {
+      this.imageModel.reset();
+    }
+    this.reportState();
+  }
+
+  private imageUrl(): string {
+    return readerDisplayImageUrl(this.page, this.preferOriginal);
+  }
+
+  private isFailed(): boolean {
+    return this.statusText.indexOf('failed') >= 0 || this.statusText.indexOf('Failed') >= 0;
+  }
+
+  private imageFit(): ImageFit {
+    if (this.fitMode === 'Original') {
+      return ImageFit.None;
+    }
+    if (this.fitMode === 'Smart fit') {
+      return ImageFit.Cover;
+    }
+    return ImageFit.Contain;
+  }
+
+  private readAreaSize(value: Length): number {
+    const parsed = Number.parseFloat(value.toString());
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  private updateComponentSize(width: number, height: number): void {
+    if (width <= 0 || height <= 0) {
+      return;
+    }
+    this.imageModel.setComponentSize(width, height);
+    this.imageModel.setImageSize(width, height);
+    this.reportState();
+  }
+
+  private tapCenterX(event: GestureEvent): number {
+    if (event.fingerList.length > 0) {
+      return event.fingerList[0].localX;
+    }
+    return this.imageModel.componentWidth / 2;
+  }
+
+  private tapCenterY(event: GestureEvent): number {
+    if (event.fingerList.length > 0) {
+      return event.fingerList[0].localY;
+    }
+    return this.imageModel.componentHeight / 2;
+  }
+
+  private reportState(): void {
+    if (!this.isActive) {
+      return;
+    }
+    this.onSwipeLockChange(this.imageModel.disableSwipe);
+    this.onZoomChange(this.imageModel.zoomPercent());
+  }
+
+  build() {
+    Stack({ alignContent: Alignment.Center }) {
+      if (this.imageUrl().length > 0) {
+        Image(this.imageUrl())
+          .width('100%')
+          .height('100%')
+          .objectFit(this.imageFit())
+          .backgroundColor('#050608')
+          .scale({ x: this.imageModel.currentScale, y: this.imageModel.currentScale, centerX: '50%', centerY: '50%' })
+          .translate({ x: this.imageModel.currentOffsetX, y: this.imageModel.currentOffsetY })
+          .animation({ duration: 120, curve: Curve.EaseOut })
+      } else {
+        Column({ space: 12 }) {
+          if (this.isFailed()) {
+            SymbolGlyph($r('sys.symbol.exclamationmark_triangle'))
+              .fontSize(32)
+              .fontColor(['#98A2B3'])
+          } else {
+            LoadingProgress()
+              .width(36)
+              .height(36)
+              .color('#98A2B3')
+          }
+          Text(this.isFailed() ? uiText('Image page failed to load') : uiText('Image page is loading'))
+            .fontSize(16)
+            .fontColor('#98A2B3')
+        }
+        .justifyContent(FlexAlign.Center)
+      }
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor('#050608')
+    .clip(true)
+    .onAreaChange((oldValue: Area, newValue: Area) => {
+      this.updateComponentSize(this.readAreaSize(newValue.width), this.readAreaSize(newValue.height));
+    })
+    .gesture(
+      GestureGroup(GestureMode.Exclusive,
+        TapGesture({ count: 2 })
+          .onAction((event: GestureEvent) => {
+            this.imageModel.toggleDoubleTap(this.tapCenterX(event), this.tapCenterY(event));
+            this.reportState();
+          }),
+        TapGesture({ count: 1 })
+          .onAction(() => {
+            this.onToggleControls();
+          }),
+        GestureGroup(GestureMode.Parallel,
+          PanGesture({ fingers: 1, distance: this.imageModel.disableSwipe ? 3 : 50 })
+            .onActionStart(() => {
+              this.imageModel.panStart();
+              this.reportState();
+            })
+            .onActionUpdate((event: GestureEvent) => {
+              this.imageModel.panUpdate(event.offsetX, event.offsetY);
+              this.reportState();
+            })
+            .onActionEnd(() => {
+              this.imageModel.panEnd();
+              this.reportState();
+            })
+            .onActionCancel(() => {
+              this.imageModel.panEnd();
+              this.reportState();
+            }),
+          PinchGesture({ fingers: 2, distance: 1 })
+            .onActionStart((event: GestureEvent) => {
+              this.imageModel.pinchStart(event.pinchCenterX, event.pinchCenterY);
+              this.reportState();
+            })
+            .onActionUpdate((event: GestureEvent) => {
+              this.imageModel.pinchUpdate(event.scale);
+              this.reportState();
+            })
+            .onActionEnd(() => {
+              this.imageModel.pinchEnd();
+              this.reportState();
+            })
+            .onActionCancel(() => {
+              this.imageModel.pinchEnd();
+              this.reportState();
+            })
+        )
+      )
+    )
+  }
+}
 @Component
 export struct ReaderToolButton {
   text: string = '';
