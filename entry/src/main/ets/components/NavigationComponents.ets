@@ -229,9 +229,11 @@ export struct EhNavBar {
   @Prop showClear: boolean = false;
   @Prop canClear: boolean = false;
   @Prop showSearchButton: boolean = false;
+  @Prop showBackButton: boolean = false;
   // translate offset injected by parent for scroll-hide; 0 = visible, negative = hidden
   @Prop translateY: number = 0;
   onMenu: () => void = () => {};
+  onBack: () => void = () => {};
   onSearch: () => void = () => {};
   onKeywordChange: (value: string) => void = () => {};
   onRefresh: () => void = () => {};
@@ -256,9 +258,9 @@ export struct EhNavBar {
 
       // Main bar row
       Row() {
-        // Hamburger / menu button
+        // Hamburger / back button
         Button({ type: ButtonType.Circle, stateEffect: true }) {
-          SymbolGlyph($r('sys.symbol.open_sidebar'))
+          SymbolGlyph(this.showBackButton ? $r('sys.symbol.chevron_left') : $r('sys.symbol.open_sidebar'))
             .fontSize(22)
             .fontColor([Color.White])
         }
@@ -266,7 +268,13 @@ export struct EhNavBar {
         .height(40)
         .backgroundColor('rgba(255,255,255,0.14)')
         .flexShrink(0)
-        .onClick(() => { this.onMenu(); })
+        .onClick(() => {
+          if (this.showBackButton) {
+            this.onBack();
+          } else {
+            this.onMenu();
+          }
+        })
 
         if (this.searchMode) {
           // Search input
