@@ -1383,6 +1383,7 @@ export struct GalleryListContent {
   @State advancedPanelVisible: boolean = false;
   @State pageJumpDraft: string = '';
   @State jumpPanelVisible: boolean = false;
+  @State selectedTagNamespaces: string[] = [];
   onRefreshPull: (done: () => void) => void = (done: () => void) => { done(); };
   // 下拉刷新自定义 builder 状态
   @State refreshScaleNum: number = 0;
@@ -1763,7 +1764,7 @@ export struct GalleryListContent {
   }
 
   private searchSuggestions(): SearchSuggestionItem[] {
-    return buildSearchSuggestions(this.keyword);
+    return buildSearchSuggestions(this.keyword, 40, this.selectedTagNamespaces);
   }
 
   private applySearchSuggestion(suggestion: SearchSuggestionItem): void {
@@ -1775,6 +1776,17 @@ export struct GalleryListContent {
     this.onKeywordChange(suggestion.query);
   }
 
+  private toggleTagNamespace(namespace: string): void {
+    const next = this.selectedTagNamespaces.slice();
+    const index = next.indexOf(namespace);
+    if (index >= 0) {
+      next.splice(index, 1);
+    } else {
+      next.push(namespace);
+    }
+    this.selectedTagNamespaces = next;
+  }
+
   @Builder
   private searchSuggestionPlaceholder() {
     Column({ space: 10 }) {
@@ -1782,7 +1794,11 @@ export struct GalleryListContent {
         mode: this.searchModeValue,
         category: this.searchCategory,
         advancedEnabled: this.advancedSearchEnabled,
-        filterActive: this.filterActive
+        filterActive: this.filterActive,
+        selectedTagNamespaces: this.selectedTagNamespaces,
+        onToggleTagNamespace: (namespace: string) => {
+          this.toggleTagNamespace(namespace);
+        }
       })
       if (this.searchSuggestions().length > 0) {
         SearchSuggestionList({

@@ -4,6 +4,7 @@ import { GalleryDetail, GalleryInfo, GalleryPage, GallerySite, TopListDetail } f
 import { ehCookieStore } from './EhCookieStore';
 import { EhUrl, FavListUrlBuilder, ListUrlBuilder } from './EhUrl';
 import { GalleryDetailParseResult, parseGalleryDetail } from './GalleryDetailParser';
+import { mergeGalleryApiMetadata } from './GalleryApiParser';
 import { GalleryListParseResult, parseGalleryList } from './GalleryListParser';
 import { GalleryPageApiParseResult, parseGalleryPageApi } from './GalleryPageApiParser';
 import { GalleryPageParseResult, parseGalleryPage } from './GalleryPageParser';
@@ -542,6 +543,7 @@ export class EhHttpClient {
       }
 
       const parsed: GalleryListParseResult = parseGalleryList(response.body);
+      await this.fillGalleryListByApi(parsed.galleries, url, site);
       const parseMessage = parsed.warning.length > 0 ? parsed.warning + '; ' + galleryListBodyDiagnostic(response.body) :
         'Parsed ' + parsed.galleries.length.toString() + ' galleries';
       return {
@@ -567,6 +569,33 @@ export class EhHttpClient {
         resultCount: '',
         galleries: []
       };
+    }
+  }
+
+  private async fillGalleryListByApi(galleries: GalleryInfo[], referer: string, site: GallerySite): Promise<void> {
+    if (galleries.length === 0) {
+      return;
+    }
+    const maxBatchSize = 25;
+    for (let start = 0; start < galleries.length; start += maxBatchSize) {
+      const batch = galleries.slice(start, Math.min(start + maxBatchSize, galleries.length));
+      const gidlist: (number | string)[][] = [];
+      for (let i = 0; i < batch.length; i++) {
+        gidlist.push([batch[i].gid, batch[i].token]);
+      }
+      const payload = JSON.stringify({
+        method: 'gdata',
+        gidlist: gidlist,
+        namespace: 1
+      });
+      try {
+        const response = await this.postJson(EhUrl.getApiUrl(site), payload, referer, EhUrl.getReferer(site));
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          mergeGalleryApiMetadata(response.body, galleries);
+        }
+      } catch (error) {
+        return;
+      }
     }
   }
 

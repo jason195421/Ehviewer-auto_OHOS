@@ -1,4 +1,5 @@
 import { GalleryCategory, GalleryInfo } from '../model/GalleryModels';
+import { inferSimpleLanguage, languageTagFromText } from './GalleryApiParser';
 
 export enum GalleryListDisplayMode {
   Unknown = 'unknown',
@@ -229,7 +230,7 @@ function parseGalleryInfo(row: string, displayMode: GalleryListDisplayMode): Gal
     uploader: parseUploader(row, displayMode),
     rating: parseRating(row),
     rated: parseRated(row),
-    simpleLanguage: parseSimpleLanguage(simpleTags, title),
+    simpleLanguage: inferSimpleLanguage(simpleTags, title),
     simpleTags: simpleTags,
     pages: parseItemPages(row),
     thumbWidth: parseThumbWidth(row),
@@ -393,64 +394,6 @@ function pushSimpleTag(tags: string[], seen: Set<string>, tag: string): void {
   }
   seen.add(key);
   tags.push(normalized);
-}
-
-function parseSimpleLanguage(tags: string[], title: string): string | undefined {
-  const knownLanguages: string[] = [
-    'english',
-    'chinese',
-    'spanish',
-    'korean',
-    'russian',
-    'french',
-    'portuguese',
-    'thai',
-    'german',
-    'italian',
-    'vietnamese',
-    'polish',
-    'hungarian',
-    'dutch'
-  ];
-  for (let i = 0; i < tags.length; i++) {
-    const tag = tags[i].toLowerCase();
-    if (tag.indexOf('language:') === 0) {
-      return tags[i].substring(tags[i].indexOf(':') + 1);
-    }
-  }
-
-  const titleText = title.toLowerCase();
-  for (let i = 0; i < knownLanguages.length; i++) {
-    if (titleText.indexOf(knownLanguages[i]) >= 0) {
-      return knownLanguages[i];
-    }
-  }
-  return undefined;
-}
-
-function languageTagFromText(text: string): string {
-  const knownLanguages: string[] = [
-    'english',
-    'chinese',
-    'spanish',
-    'korean',
-    'russian',
-    'french',
-    'portuguese',
-    'thai',
-    'german',
-    'italian',
-    'vietnamese',
-    'polish',
-    'hungarian',
-    'dutch'
-  ];
-  for (let i = 0; i < knownLanguages.length; i++) {
-    if (text === knownLanguages[i]) {
-      return 'language:' + knownLanguages[i];
-    }
-  }
-  return '';
 }
 
 function parseTagList(row: string): string[] {

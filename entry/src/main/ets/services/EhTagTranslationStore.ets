@@ -14,15 +14,19 @@ class EhTagTranslationStore {
   private loaded: boolean = false;
   private entries: EhTagSuggestion[] = [];
 
-  suggest(keyword: string, limit: number = 40): EhTagSuggestion[] {
+  suggest(keyword: string, limit: number = 40, namespaces: string[] = []): EhTagSuggestion[] {
     const normalized = keyword.trim().toLowerCase();
     if (normalized.length === 0) {
       return [];
     }
     this.ensureLoaded();
+    const filter = normalizeNamespaces(namespaces);
     const result: EhTagSuggestion[] = [];
     for (let i = 0; i < this.entries.length && result.length < limit; i++) {
       const entry = this.entries[i];
+      if (filter.length > 0 && filter.indexOf(entry.namespace) < 0) {
+        continue;
+      }
       if (entry.searchText.indexOf(normalized) >= 0) {
         result.push({
           namespace: entry.namespace,
@@ -77,3 +81,14 @@ class EhTagTranslationStore {
 }
 
 export const ehTagTranslationStore = new EhTagTranslationStore();
+
+function normalizeNamespaces(namespaces: string[]): string[] {
+  const next: string[] = [];
+  for (let i = 0; i < namespaces.length; i++) {
+    const value = namespaces[i].trim().toLowerCase();
+    if (value.length > 0 && next.indexOf(value) < 0) {
+      next.push(value);
+    }
+  }
+  return next;
+}

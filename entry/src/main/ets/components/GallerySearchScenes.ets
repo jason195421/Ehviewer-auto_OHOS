@@ -22,7 +22,26 @@ interface SearchCategoryOption {
   category: number;
 }
 
+interface TagNamespaceOption {
+  label: string;
+  value: string;
+}
+
 const searchHistoryKeywords: string[] = [];
+const TAG_NAMESPACE_OPTIONS: TagNamespaceOption[] = [
+  { label: 'Artist', value: 'artist' },
+  { label: 'Group', value: 'group' },
+  { label: 'Parody', value: 'parody' },
+  { label: 'Character', value: 'character' },
+  { label: 'Female', value: 'female' },
+  { label: 'Male', value: 'male' },
+  { label: 'Mixed', value: 'mixed' },
+  { label: 'Language', value: 'language' },
+  { label: 'Cosplayer', value: 'cosplayer' },
+  { label: 'Other', value: 'other' },
+  { label: 'Location', value: 'location' },
+  { label: 'Rows', value: 'rows' }
+];
 
 function activeTagPrefix(keyword: string): string {
   const parts = keyword.trim().split(/\s+/);
@@ -93,7 +112,8 @@ export function pageSuggestionUrl(text: string): string {
   return parsePageUrl(text);
 }
 
-export function buildSearchSuggestions(keyword: string, limit: number = 40): SearchSuggestionItem[] {
+export function buildSearchSuggestions(keyword: string, limit: number = 40,
+  namespaces: string[] = []): SearchSuggestionItem[] {
   const text = keyword.trim();
   const next: SearchSuggestionItem[] = [];
   if (text.length === 0) {
@@ -114,7 +134,7 @@ export function buildSearchSuggestions(keyword: string, limit: number = 40): Sea
     return next;
   }
 
-  const tags = ehTagTranslationStore.suggest(active, limit);
+  const tags = ehTagTranslationStore.suggest(active, limit, namespaces);
   for (let i = 0; i < tags.length; i++) {
     const tag = tags[i];
     next.push({
@@ -160,6 +180,7 @@ export struct GallerySearchScene {
   @State modeLabelDraft: string = '';
   @State advancedPanelVisible: boolean = false;
   @State suggestions: SearchSuggestionItem[] = [];
+  @State selectedTagNamespaces: string[] = [];
   @StorageProp('statusBarHeight') statusBarHeightPx: number = 0;
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
 
@@ -186,7 +207,7 @@ export struct GallerySearchScene {
   }
 
   private refreshSuggestions(): void {
-    this.suggestions = buildSearchSuggestions(this.keywordDraft);
+    this.suggestions = buildSearchSuggestions(this.keywordDraft, 40, this.selectedTagNamespaces);
   }
 
   private applySuggestion(suggestion: SearchSuggestionItem): void {
@@ -197,6 +218,18 @@ export struct GallerySearchScene {
       return;
     }
     this.keywordDraft = suggestion.query;
+    this.refreshSuggestions();
+  }
+
+  private toggleTagNamespace(namespace: string): void {
+    const next = this.selectedTagNamespaces.slice();
+    const index = next.indexOf(namespace);
+    if (index >= 0) {
+      next.splice(index, 1);
+    } else {
+      next.push(namespace);
+    }
+    this.selectedTagNamespaces = next;
     this.refreshSuggestions();
   }
 
@@ -264,7 +297,11 @@ export struct GallerySearchScene {
             mode: this.modeDraft,
             category: this.categoryDraft,
             advancedEnabled: this.advancedEnabledDraft,
-            filterActive: this.filterActive
+            filterActive: this.filterActive,
+            selectedTagNamespaces: this.selectedTagNamespaces,
+            onToggleTagNamespace: (namespace: string) => {
+              this.toggleTagNamespace(namespace);
+            }
           })
           if (this.suggestions.length > 0) {
             SearchSuggestionList({
@@ -347,6 +384,8 @@ export struct SearchSummaryStrip {
   @Prop category: number = GalleryCategory.None;
   @Prop advancedEnabled: boolean = false;
   @Prop filterActive: boolean = false;
+  @Prop selectedTagNamespaces: string[] = [];
+  onToggleTagNamespace: (namespace: string) => void = (_namespace: string) => {};
 
   private modeLabel(): string {
     if (this.mode === ListMode.Subscription) {
@@ -362,19 +401,35 @@ export struct SearchSummaryStrip {
   }
 
   build() {
-    Row({ space: 8 }) {
-      SearchStatusChip({ label: this.modeLabel(), isActive: true })
-      SearchStatusChip({ label: this.categoryLabel(), isActive: false })
-      if (this.advancedEnabled) {
-        SearchStatusChip({ label: 'Advanced', isActive: true })
-      }
-      if (this.filterActive) {
-        SearchStatusChip({ label: 'Filter', isActive: true })
+    Scroll() {
+      Row({ space: 8 }) {
+        SearchStatusChip({ label: this.modeLabel(), isActive: true })
+        SearchStatusChip({ label: this.categoryLabel(), isActive: false })
+        if (this.advancedEnabled) {
+          SearchStatusChip({ label: 'Advanced', isActive: true })
+        }
+        if (this.filterActive) {
+          SearchStatusChip({ label: 'Filter', isActive: true })
+        }
+        ForEach(TAG_NAMESPACE_OPTIONS, (option: TagNamespaceOption) => {
+          SearchStatusChip({
+            label: option.label,
+            isActive: this.namespaceSelected(option.value),
+            onClickAction: () => {
+              this.onToggleTagNamespace(option.value);
+            }
+          })
+        }, (option: TagNamespaceOption) => option.value)
       }
     }
     .width('100%')
     .height(34)
-    .alignItems(VerticalAlign.Center)
+    .scrollable(ScrollDirection.Horizontal)
+    .scrollBar(BarState.Off)
+  }
+
+  private namespaceSelected(namespace: string): boolean {
+    return this.selectedTagNamespaces.indexOf(namespace) >= 0;
   }
 
   private categoryLabel(): string {
@@ -392,6 +447,7 @@ export struct SearchSummaryStrip {
 export struct SearchSuggestionList {
   @Prop suggestions: SearchSuggestionItem[] = [];
   onSelect: (suggestion: SearchSuggestionItem) => void = (_suggestion: SearchSuggestionItem) => {};
+  @State contentWidth: number = 0;
 
   private iconForKind(kind: string): Resource {
     if (kind === 'tag') {
@@ -407,53 +463,103 @@ export struct SearchSuggestionList {
     return '#6B7C8C';
   }
 
-  build() {
-    Column() {
-      ForEach(this.suggestions, (suggestion: SearchSuggestionItem, index: number) => {
-        Column() {
-          Row({ space: 10 }) {
-            SymbolGlyph(this.iconForKind(suggestion.kind))
-              .fontSize(18)
-              .fontColor([this.tintForKind(suggestion.kind)])
-              .width(24)
-            Column({ space: 2 }) {
-              Text(suggestion.kind === 'history' ? uiText(suggestion.title) : suggestion.title)
-                .fontSize(14)
-                .fontColor('#17202A')
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-              if (suggestion.subtitle.length > 0) {
-                Text(suggestion.subtitle)
-                  .fontSize(11)
-                  .fontColor('#667085')
-                  .maxLines(1)
-                  .textOverflow({ overflow: TextOverflow.Ellipsis })
-              }
-            }
-            .alignItems(HorizontalAlign.Start)
-            .layoutWeight(1)
-          }
-          .width('100%')
-          .height(50)
-          .padding({ left: 8, right: 8 })
-          .alignItems(VerticalAlign.Center)
-          .onClick(() => {
-            this.onSelect(suggestion);
-          })
+  private columnCount(): number {
+    if (this.contentWidth <= 0) {
+      return 1;
+    }
+    return Math.max(1, Math.floor((this.contentWidth + 8) / 260));
+  }
 
-          if (index < this.suggestions.length - 1) {
-            Divider()
-              .strokeWidth(1)
-              .color('#E2E8EE')
-              .margin({ left: 42 })
-          }
+  private itemWidth(): number {
+    const columns = this.columnCount();
+    return Math.floor((Math.max(0, this.contentWidth) - (columns - 1) * 8) / columns);
+  }
+
+  private suggestionRows(): SearchSuggestionItem[][] {
+    const columns = this.columnCount();
+    const rows: SearchSuggestionItem[][] = [];
+    for (let i = 0; i < this.suggestions.length; i += columns) {
+      rows.push(this.suggestions.slice(i, i + columns));
+    }
+    return rows;
+  }
+
+  build() {
+    Column({ space: 8 }) {
+      ForEach(this.suggestionRows(), (row: SearchSuggestionItem[], rowIndex: number) => {
+        Row({ space: 8 }) {
+          ForEach(row, (suggestion: SearchSuggestionItem) => {
+            SearchSuggestionTile({
+              suggestion: suggestion,
+              widthValue: this.itemWidth(),
+              onSelect: (item: SearchSuggestionItem) => {
+                this.onSelect(item);
+              }
+            })
+          }, (suggestion: SearchSuggestionItem) => suggestion.kind + ':' + suggestion.query + ':' +
+            suggestion.subtitle)
         }
-      }, (suggestion: SearchSuggestionItem) => suggestion.kind + ':' + suggestion.query)
+        .width('100%')
+      }, (_row: SearchSuggestionItem[], index: number) => index.toString())
     }
     .width('100%')
+    .onAreaChange((_oldArea: Area, newArea: Area) => {
+      const width = newArea.width as number;
+      if (width > 0 && !Number.isNaN(width)) {
+        this.contentWidth = width;
+      }
+    })
+  }
+}
+
+@Component
+struct SearchSuggestionTile {
+  suggestion: SearchSuggestionItem = { kind: '', title: '', subtitle: '', query: '' };
+  widthValue: number = 260;
+  onSelect: (suggestion: SearchSuggestionItem) => void = (_suggestion: SearchSuggestionItem) => {};
+
+  private iconForKind(kind: string): Resource {
+    return kind === 'tag' ? $r('sys.symbol.star') : $r('sys.symbol.clock');
+  }
+
+  private tintForKind(kind: string): string {
+    return kind === 'tag' ? APP_THEME_COLOR : '#6B7C8C';
+  }
+
+  build() {
+    Row({ space: 10 }) {
+      SymbolGlyph(this.iconForKind(this.suggestion.kind))
+        .fontSize(18)
+        .fontColor([this.tintForKind(this.suggestion.kind)])
+        .width(24)
+        .flexShrink(0)
+      Column({ space: 2 }) {
+        Text(this.suggestion.kind === 'history' ? uiText(this.suggestion.title) : this.suggestion.title)
+          .fontSize(14)
+          .fontColor('#17202A')
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+        if (this.suggestion.subtitle.length > 0) {
+          Text(this.suggestion.subtitle)
+            .fontSize(11)
+            .fontColor('#667085')
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+    }
+    .width(this.widthValue > 0 ? this.widthValue : '100%')
+    .height(56)
+    .padding({ left: 10, right: 10 })
+    .alignItems(VerticalAlign.Center)
     .backgroundColor(Color.White)
     .borderRadius(6)
-    .shadow({ radius: 6, color: '#16000000', offsetX: 0, offsetY: 2 })
+    .shadow({ radius: 4, color: '#12000000', offsetX: 0, offsetY: 1 })
+    .onClick(() => {
+      this.onSelect(this.suggestion);
+    })
   }
 }
 
@@ -461,6 +567,7 @@ export struct SearchSuggestionList {
 export struct SearchStatusChip {
   label: string = '';
   isActive: boolean = false;
+  onClickAction: () => void = () => {};
 
   build() {
     Text(uiText(this.label))
@@ -471,6 +578,9 @@ export struct SearchStatusChip {
       .padding({ left: 8, right: 8, top: 4, bottom: 4 })
       .maxLines(1)
       .textOverflow({ overflow: TextOverflow.Ellipsis })
+      .onClick(() => {
+        this.onClickAction();
+      })
   }
 }
 
