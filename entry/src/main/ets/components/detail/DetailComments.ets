@@ -1,5 +1,9 @@
 ﻿import { GalleryComment } from '../../model/GalleryModels';
-import { plainTextFromHtml, uiText } from '../../shared/EhShared';
+import {
+  plainTextFromHtml,
+  uiText
+} from '../../shared/EhShared';
+import { themePrimaryText, themeSecondaryText, themeSurface, themeSurfaceVariant } from '../../shared/EhTheme';
 @Component
 export struct DetailComments {
   @Prop comments: GalleryComment[] = [];
@@ -12,12 +16,12 @@ export struct DetailComments {
         Text(uiText('Comments'))
           .fontSize(15)
           .fontWeight(FontWeight.Medium)
-          .fontColor('#17202A')
+          .fontColor(themePrimaryText())
           .layoutWeight(1)
         if (!this.isDetailLoaded) {
           Text(uiText('Loading...'))
             .fontSize(13)
-            .fontColor('#667085')
+            .fontColor(themeSecondaryText())
         } else if (this.comments.length > 0) {
           Text(uiText('See all') + ' (' + this.comments.length.toString() + ')')
             .fontSize(13)
@@ -28,7 +32,7 @@ export struct DetailComments {
         } else {
           Text('0 ' + uiText('comments'))
             .fontSize(13)
-            .fontColor('#667085')
+            .fontColor(themeSecondaryText())
         }
       }
       .width('100%')
@@ -37,11 +41,11 @@ export struct DetailComments {
       if (!this.isDetailLoaded) {
         Text(uiText('Loading comments...'))
           .fontSize(13)
-          .fontColor('#667085')
+          .fontColor(themeSecondaryText())
       } else if (this.comments.length === 0) {
         Text(uiText('No comments'))
           .fontSize(13)
-          .fontColor('#667085')
+          .fontColor(themeSecondaryText())
       } else {
         ForEach(this.comments.slice(0, 2), (comment: GalleryComment) => {
           Column() {
@@ -49,18 +53,18 @@ export struct DetailComments {
               Text(comment.user.length > 0 ? comment.user : uiText('Anonymous'))
                 .fontSize(13)
                 .fontWeight(FontWeight.Medium)
-                .fontColor('#17202A')
+                .fontColor(themePrimaryText())
                 .layoutWeight(1)
               Text(comment.posted)
                 .fontSize(11)
-                .fontColor('#667085')
+                .fontColor(themeSecondaryText())
             }
             .width('100%')
             .margin({ bottom: 4 })
 
             Text(plainTextFromHtml(comment.content))
               .fontSize(13)
-              .fontColor('#333333')
+              .fontColor(themePrimaryText())
               .maxLines(4)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .width('100%')
@@ -69,7 +73,7 @@ export struct DetailComments {
           .width('100%')
           .padding(10)
           .margin({ bottom: 6 })
-          .backgroundColor('#F5F8FA')
+          .backgroundColor(themeSurfaceVariant())
           .borderRadius(6)
         }, (comment: GalleryComment) => comment.id)
 
@@ -87,7 +91,7 @@ export struct DetailComments {
     .alignItems(HorizontalAlign.Start)
     .width('100%')
     .padding(16)
-    .backgroundColor(Color.White)
+    .backgroundColor(themeSurface())
   }
 }
 

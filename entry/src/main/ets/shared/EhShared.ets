@@ -21,6 +21,23 @@ import { ehSpiderInfoStore } from '../services/EhSpiderInfoStore';
 import { MigrationTask, migrationTasks } from '../services/MigrationStatus';
 import { FilterRule, FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, FILTER_MODE_TAG_NAMESPACE, ehFilterStore } from '../services/EhFilterStore';
 import { EH_APP_VERSION_NAME, EH_GIT_BRANCH, EH_GIT_COMMIT, EH_GIT_DESCRIBE, EH_RELEASE_TAG } from '../services/EhBuildInfo';
+import {
+  currentThemeName as themeCurrentThemeName,
+  isBlackTheme as themeIsBlackTheme,
+  isDarkTheme as themeIsDarkTheme,
+  themeDividerColor as paletteDividerColor,
+  themeFieldBackground as paletteFieldBackground,
+  themeMutedText as paletteMutedText,
+  themePageBackground as palettePageBackground,
+  themePlaceholderColor as palettePlaceholderColor,
+  themePrimaryText as palettePrimaryText,
+  themeSecondaryText as paletteSecondaryText,
+  themeSelectedBackground as paletteSelectedBackground,
+  themeSelectedBackgroundLight as paletteSelectedBackgroundLight,
+  themeSurface as paletteSurface,
+  themeSurfaceVariant as paletteSurfaceVariant,
+  themeTertiaryText as paletteTertiaryText
+} from './EhTheme';
 
 export interface EhBackupBundle {
   version: number;
@@ -101,6 +118,10 @@ export const SETTINGS_HEADERS: SettingsHeaderItem[] = [
 export function notifyLanguageChanged(): void {
   const current = AppStorage.get<number>(LANGUAGE_REVISION_KEY);
   AppStorage.setOrCreate<number>(LANGUAGE_REVISION_KEY, current === undefined ? 1 : current + 1);
+}
+
+export function notifyThemeChanged(): void {
+  notifyLanguageChanged();
 }
 
 export function shouldUseChineseUi(): boolean {
@@ -1331,6 +1352,66 @@ export function downloadStateColor(state: DownloadState): string {
 }
 
 export const APP_THEME_COLOR: string = '#2F6F8F';
+
+export function currentThemeName(): string {
+  return themeCurrentThemeName();
+}
+
+export function isDarkTheme(): boolean {
+  return themeIsDarkTheme();
+}
+
+export function isBlackTheme(): boolean {
+  return themeIsBlackTheme();
+}
+
+export function themePageBackground(): string {
+  return palettePageBackground();
+}
+
+export function themeSurface(): string {
+  return paletteSurface();
+}
+
+export function themeSurfaceVariant(): string {
+  return paletteSurfaceVariant();
+}
+
+export function themeFieldBackground(): string {
+  return paletteFieldBackground();
+}
+
+export function themePrimaryText(): string {
+  return palettePrimaryText();
+}
+
+export function themeSecondaryText(): string {
+  return paletteSecondaryText();
+}
+
+export function themeTertiaryText(): string {
+  return paletteTertiaryText();
+}
+
+export function themeMutedText(): string {
+  return paletteMutedText();
+}
+
+export function themeDividerColor(): string {
+  return paletteDividerColor();
+}
+
+export function themePlaceholderColor(): string {
+  return palettePlaceholderColor();
+}
+
+export function themeSelectedBackground(): string {
+  return paletteSelectedBackground();
+}
+
+export function themeSelectedBackgroundLight(): string {
+  return paletteSelectedBackgroundLight();
+}
 
 function clampColorChannel(value: number): number {
   return Math.max(0, Math.min(255, Math.round(value)));

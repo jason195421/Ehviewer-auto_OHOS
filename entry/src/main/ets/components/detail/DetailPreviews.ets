@@ -1,5 +1,18 @@
 ﻿import { GalleryPreview } from '../../model/GalleryModels';
-import { cachePreviewThumbnail, createEmptyPreview, readerLocalImageSource, shouldUseChineseUi, uiText } from '../../shared/EhShared';
+import {
+  cachePreviewThumbnail,
+  createEmptyPreview,
+  readerLocalImageSource,
+  shouldUseChineseUi,
+  uiText
+} from '../../shared/EhShared';
+import {
+  themePlaceholderColor,
+  themePrimaryText,
+  themeSecondaryText,
+  themeSurface,
+  themeSurfaceVariant
+} from '../../shared/EhTheme';
 import { GalleryThumb } from '../GalleryCards';
 @Component
 export struct DetailPreviews {
@@ -52,19 +65,19 @@ export struct DetailPreviews {
       Text(uiText('Previews'))
         .fontSize(15)
         .fontWeight(FontWeight.Medium)
-        .fontColor('#17202A')
+        .fontColor(themePrimaryText())
         .width('100%')
       Text(!this.isDetailLoaded ? uiText('Loading previews...') :
         (shouldUseChineseUi() ? this.previews.length.toString() + ' 个缩略图 / ' + this.previewPages.toString() + ' 页' :
           this.previews.length.toString() + ' thumbnails / ' + this.previewPages.toString() + ' pages'))
         .fontSize(12)
-        .fontColor('#667085')
+        .fontColor(themeSecondaryText())
         .width('100%')
         .margin({ top: 6, bottom: 8 })
       if (this.isDetailLoaded && this.previews.length === 0) {
         Text(uiText('No previews'))
           .fontSize(12)
-          .fontColor('#667085')
+          .fontColor(themeSecondaryText())
       } else {
         Column() {
           ForEach(this.previewRows(), (row: GalleryPreview[], rowIndex: number) => {
@@ -95,7 +108,7 @@ export struct DetailPreviews {
     .alignItems(HorizontalAlign.Start)
     .width('100%')
     .padding(16)
-    .backgroundColor(Color.White)
+    .backgroundColor(themeSurface())
     .onAreaChange((_oldArea: Area, newArea: Area) => {
       const width = newArea.width as number;
       if (width > 0 && !Number.isNaN(width) && this.contentWidth !== width) {
@@ -121,10 +134,10 @@ export struct PreviewRow {
         Text(uiText('Page') + ' ' + (this.preview.index + 1).toString())
           .fontSize(13)
           .fontWeight(FontWeight.Medium)
-          .fontColor('#17202A')
+          .fontColor(themePrimaryText())
         Text(this.preview.pageUrl)
           .fontSize(11)
-          .fontColor('#667085')
+          .fontColor(themeSecondaryText())
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .margin({ top: 5 })
@@ -158,7 +171,7 @@ export struct PreviewTile {
       })
       Text((this.preview.index + 1).toString())
         .fontSize(11)
-        .fontColor('#40566F')
+        .fontColor(themeSecondaryText())
         .margin({ top: 6 })
     }
     .width(this.tileWidth)
@@ -229,17 +242,17 @@ export struct PreviewThumb {
       Column()
         .width('100%')
         .height('100%')
-        .backgroundColor('#E7ECF1')
+        .backgroundColor(themeSurfaceVariant())
         .borderRadius(this.radiusValue)
 
       if (this.loadFailed) {
         Column({ space: 4 }) {
           SymbolGlyph($r('sys.symbol.xmark'))
             .fontSize(20)
-            .fontColor(['#9BB8CB'])
+            .fontColor([themePlaceholderColor()])
           Text((this.preview.index + 1).toString())
             .fontSize(10)
-            .fontColor('#9BB8CB')
+            .fontColor(themePlaceholderColor())
         }
         .justifyContent(FlexAlign.Center)
         .onClick(() => {
@@ -259,7 +272,7 @@ export struct PreviewThumb {
         LoadingProgress()
           .width(28)
           .height(28)
-          .color('#9BB8CB')
+          .color(themePlaceholderColor())
       }
     }
     .width(this.widthValue)

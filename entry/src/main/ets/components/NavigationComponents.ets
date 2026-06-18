@@ -13,6 +13,16 @@ import {
   DrawerItem,
   DRAWER_ITEMS,
 } from '../shared/EhShared';
+import {
+  themeDividerColor,
+  themeFieldBackground,
+  themePrimaryText,
+  themeSecondaryText,
+  themeSelectedBackground,
+  themeSelectedBackgroundLight,
+  themeSurface,
+  themeSurfaceVariant
+} from '../shared/EhTheme';
 
 // ===================================================================
 // EhDrawer  -- slide-in navigation drawer (HarmonyOS style)
@@ -71,7 +81,7 @@ export struct EhDrawer {
             .textAlign(TextAlign.Center)
             .width(52)
             .height(52)
-            .backgroundColor($r('app.color.surface'))
+            .backgroundColor(themeSurface())
             .borderRadius(26)
 
           Column() {
@@ -110,7 +120,7 @@ export struct EhDrawer {
       }
       .width('100%')
       .layoutWeight(1)
-      .divider({ strokeWidth: 0.5, color: $r('app.color.divider'), startMargin: 56, endMargin: 0 })
+      .divider({ strokeWidth: 0.5, color: themeDividerColor(), startMargin: 56, endMargin: 0 })
 
       // ---- Footer: download summary ----
       if (this.downloadSummary.length > 0) {
@@ -128,12 +138,12 @@ export struct EhDrawer {
         }
         .width('100%')
         .padding({ left: 16, right: 16, top: 10, bottom: 10 })
-        .backgroundColor($r('app.color.surface_variant'))
+        .backgroundColor(themeSurfaceVariant())
       }
     }
     .width(264)
     .height('100%')
-    .backgroundColor($r('app.color.surface'))
+    .backgroundColor(themeSurface())
   }
 }
 
@@ -176,26 +186,26 @@ struct DrawerNavItem {
       Column() {
         SymbolGlyph(this.symbolForRoute(this.item.route))
           .fontSize(20)
-          .fontColor([this.selected ? APP_THEME_COLOR : '#667085'])
+          .fontColor([this.selected ? APP_THEME_COLOR : themeSecondaryText()])
       }
       .width(38)
       .height(38)
       .justifyContent(FlexAlign.Center)
       .alignItems(HorizontalAlign.Center)
-      .backgroundColor(this.selected ? $r('app.color.selected_bg') : Color.Transparent)
+      .backgroundColor(this.selected ? themeSelectedBackground() : Color.Transparent)
       .borderRadius(10)
 
       Column() {
         Text(uiText(this.item.title))
           .fontSize(15)
           .fontWeight(this.selected ? FontWeight.Medium : FontWeight.Normal)
-          .fontColor(this.selected ? APP_THEME_COLOR : '#17202A')
+          .fontColor(this.selected ? APP_THEME_COLOR : themePrimaryText())
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
 
         Text(uiText(this.item.subtitle))
           .fontSize(11)
-          .fontColor('#667085')
+          .fontColor(themeSecondaryText())
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .margin({ top: 1 })
@@ -207,7 +217,7 @@ struct DrawerNavItem {
     .width('100%')
     .height(60)
     .padding({ left: 8, right: 16 })
-    .backgroundColor(this.selected ? $r('app.color.selected_bg_light') : Color.Transparent)
+    .backgroundColor(this.selected ? themeSelectedBackgroundLight() : Color.Transparent)
     .alignItems(VerticalAlign.Center)
     .onClick(() => { this.onTap(); })
   }
@@ -285,10 +295,10 @@ export struct EhNavBar {
             })
               .height(38)
               .width('100%')
-              .backgroundColor(themeSurfaceColor())
+              .backgroundColor(themeFieldBackground())
               .borderRadius(19)
-              .placeholderColor('#5D7183')
-              .fontColor('#17202A')
+              .placeholderColor(themeSecondaryText())
+              .fontColor(themePrimaryText())
               .caretColor(APP_THEME_COLOR)
               .padding({ left: 16, right: 42 })
               .onChange((v: string) => { this.onKeywordChange(v); })
@@ -624,11 +634,11 @@ struct LegacySearchBar {
       TextInput({ text: this.keyword, placeholder: uiText(this.title.length > 0 ? this.title : 'Search') })
         .height(38)
         .layoutWeight(1)
-        .backgroundColor(themeSurfaceColor())
+        .backgroundColor(themeFieldBackground())
         .borderRadius(19)
-        .fontColor('#17202A')
+        .fontColor(themePrimaryText())
         .caretColor(APP_THEME_COLOR)
-        .placeholderColor('#5D7183')
+        .placeholderColor(themeSecondaryText())
         .padding({ left: 14, right: 14 })
         .margin({ left: 10 })
         .onChange((v: string) => { this.onKeywordChange(v); })

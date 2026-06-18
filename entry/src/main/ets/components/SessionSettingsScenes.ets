@@ -32,7 +32,16 @@ import {
   EH_REPOSITORY_URL,
   EH_TARGET_PLATFORM
 } from '../services/EhBuildInfo';
-import { LANGUAGE_REVISION_KEY, notifyLanguageChanged } from '../shared/EhShared';
+import { LANGUAGE_REVISION_KEY, notifyLanguageChanged, notifyThemeChanged } from '../shared/EhShared';
+import {
+  themeFieldBackground,
+  themePageBackground,
+  themePrimaryText,
+  themeSecondaryText,
+  themeSurface,
+  themeSurfaceVariant,
+  themeTertiaryText
+} from '../shared/EhTheme';
 import { EhBackupBundle, DrawerItem, SettingsHeaderItem, SettingsRowItem, SessionMode, SettingsPanel, DRAWER_ITEMS, SETTINGS_HEADERS, STATUS_BAR_HEIGHT_KEY, ON_OFF_OPTIONS, shouldUseChineseUi, uiText, uiValue, uiStatusText, uiPageText, zhText, setActiveBackHandler, runActiveBackHandler, createEmptyGallery, createEmptyDownloadInfo, createDetailFromGallery, createEmptyDetail, createEmptyPreview, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneStringArray, cloneRequiredStringArray, cloneGalleryInfo, cloneGalleryInfos, padTwo, applyGalleryFilters, cloneGalleryTagGroups, cloneGalleryComments, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListItem, cloneTopListBucket, cloneTopListInfo, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, saveDownloadsQuietly, filterDownloadItems, downloadItemMatches, sortDownloadItems, nextDownloadStatusFilter, nextDownloadLabelFilter, nextDownloadSortMode, nextStringOption, nextDownloadState, nextDownloadLabel, downloadLabelName, downloadStateLabel, downloadStateColor, downloadProgressText, downloadSizeText, downloadImageUrlForPage, downloadThreadLimit, downloadPageIndexes, downloadQueueSummary, parseHistoryMaxSize, routeTitle, routeSubtitle, launchRouteFromSetting, settingsPanelTitle, settingsRowsForPanel, optionSettingsRow, textSettingsRow, staticSettingsRow, settingEntryValue, cloneStringOptions, settingMigrationMessage, nextOption, isValidProxyPortText, formatNetworkDiagnostics, listModeForRoute, routeUsesKeyword, usesGallerySearchToolbar, usesEmbeddedToolbar, defaultKeywordForRoute, gallerySearchTitle, currentGallerySite, effectiveListSite, gallerySiteName, galleryListFailureMessage, withGalleryListMessage, readerPageReferer, readerDisplayImageUrl, cacheReaderImageForPage, cacheThumbnailImage, cloneGalleryPageWithCache, readerLocalImageSource, readerZoomSize, readerFullImageWidth, readerFullImageHeight, readerImageFit, readerShortUrl, readerPreloadCount, readerIsRightToLeft, categoryName, categoryColor, ratingText, galleryDisplayTitle, showGalleryPages, galleryListMode, galleryThumbWidth, galleryThumbHeight, galleryRowHeight, galleryTagPreview, detailTitleFontSize, detailTitleMaxLines, detailHeadingFontSize, readerShowProgress, readerShowClock, readerClockText, padTimeNumber, topListChipColor } from '../shared/EhShared';
 import { FilterPanel, MigrationScene } from './DownloadMigrationScenes';
 import { AppSubToolbar, AppToolbar } from './NavigationComponents';
@@ -398,7 +407,7 @@ export struct SessionScene {
         Text(uiText('Cookie Sign In'))
           .fontSize(18)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#17202A')
+          .fontColor(themePrimaryText())
           .margin({ left: 12 })
       }
       .width('100%')
@@ -411,7 +420,7 @@ export struct SessionScene {
         Column() {
           Text(uiText('Use this when password login needs captcha, or when importing an ExHentai session.'))
             .fontSize(13)
-            .fontColor('#475467')
+            .fontColor(themeSecondaryText())
             .lineHeight(20)
             .width('100%')
             .constraintSize({ maxWidth: 420 })
@@ -509,7 +518,7 @@ export struct SessionScene {
         })
         Text(uiStatusText(this.statusText))
           .fontSize(13)
-          .fontColor('#667085')
+          .fontColor(themeSecondaryText())
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1)
@@ -518,7 +527,7 @@ export struct SessionScene {
       .width('100%')
       .height(44)
       .padding({ left: 12, right: 12 })
-      .backgroundColor(Color.White)
+      .backgroundColor(themeSurface())
 
       Web({ src: this.webUrl, controller: this.webController })
         .javaScriptAccess(true)
@@ -645,6 +654,9 @@ export struct SettingsScene {
     }
     if (key === 'app_language') {
       notifyLanguageChanged();
+    }
+    if (key === 'theme') {
+      notifyThemeChanged();
     }
     if (key === 'enable_secure') {
       applyWindowPrivacyMode(value === 'On', (status: string) => {
@@ -1382,7 +1394,7 @@ export struct SettingsHomePanel {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#F3F5F7')
+    .backgroundColor(themePageBackground())
   }
 }
 
@@ -1410,11 +1422,11 @@ export struct SettingsHeaderRow {
       .layoutWeight(1)
       Text('>')
         .fontSize(16)
-        .fontColor('#98A2B3')
+        .fontColor(themeTertiaryText())
     }
     .width('100%')
     .padding(14)
-    .backgroundColor(Color.White)
+    .backgroundColor(themeSurface())
     .borderRadius(6)
     .onClick(() => {
       this.onTap();
@@ -1434,13 +1446,13 @@ export struct SettingsStatusBlock {
         .margin({ right: 10 })
       Text(uiStatusText(this.statusText))
         .fontSize(13)
-        .fontColor('#40566F')
+        .fontColor(themeSecondaryText())
         .lineHeight(19)
         .layoutWeight(1)
     }
     .width('100%')
     .padding(14)
-    .backgroundColor('#EAF3F8')
+    .backgroundColor(themeSurfaceVariant())
     .borderRadius(6)
   }
 }
@@ -1456,10 +1468,10 @@ export struct SettingsTextBlock {
       Text(this.title)
         .fontSize(15)
         .fontWeight(FontWeight.Medium)
-        .fontColor(this.isEnabled ? '#17202A' : '#98A2B3')
+        .fontColor(this.isEnabled ? themePrimaryText() : themeTertiaryText())
       Text(this.summary)
         .fontSize(12)
-        .fontColor('#667085')
+        .fontColor(themeSecondaryText())
         .lineHeight(18)
         .maxLines(2)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -1600,7 +1612,7 @@ export struct SettingsDetailPanel {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#F3F5F7')
+    .backgroundColor(themePageBackground())
   }
 }
 
@@ -1623,11 +1635,11 @@ export struct SettingsOptionPanel {
       if (this.summary.length > 0) {
         Text(uiText(this.summary))
           .fontSize(12)
-          .fontColor('#667085')
+          .fontColor(themeSecondaryText())
           .lineHeight(18)
           .width('100%')
           .padding({ left: 14, right: 14, top: 12, bottom: 10 })
-          .backgroundColor(Color.White)
+          .backgroundColor(themeSurface())
       }
 
       List({ space: 8 }) {
@@ -1637,7 +1649,7 @@ export struct SettingsOptionPanel {
               Text(uiValue(option))
                 .fontSize(15)
                 .fontWeight(option === this.value ? FontWeight.Medium : FontWeight.Regular)
-                .fontColor('#17202A')
+                .fontColor(themePrimaryText())
                 .layoutWeight(1)
               if (option === this.value) {
                 Text(uiText('Selected'))
@@ -1647,7 +1659,7 @@ export struct SettingsOptionPanel {
             }
             .width('100%')
             .padding(14)
-            .backgroundColor(Color.White)
+            .backgroundColor(themeSurface())
             .borderRadius(6)
             .onClick(() => {
               this.onSelect(option);
@@ -1661,7 +1673,7 @@ export struct SettingsOptionPanel {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#F3F5F7')
+    .backgroundColor(themePageBackground())
   }
 }
 
@@ -1688,7 +1700,7 @@ export struct SettingsActionRow {
     }
     .width('100%')
     .padding(14)
-    .backgroundColor(Color.White)
+    .backgroundColor(themeSurface())
     .borderRadius(6)
     .onClick(() => {
       if (this.isEnabled) {
@@ -1718,6 +1730,9 @@ export struct SettingsStaticRow {
           .width(150)
           .height(38)
           .fontSize(13)
+          .fontColor(themePrimaryText())
+          .placeholderColor(themeSecondaryText())
+          .backgroundColor(themeFieldBackground())
           .margin({ left: 12 })
           .onChange((value: string) => {
             if (this.row.key !== undefined) {
@@ -1749,7 +1764,7 @@ export struct SettingsStaticRow {
           .fontColor('#2F6F8F')
           .selectedOptionBgColor('#EDF7FA')
           .selectedOptionFontColor('#2F6F8F')
-          .optionBgColor(Color.White)
+          .optionBgColor(themeSurface())
           .optionFont({ size: 13 })
           .margin({ left: 8 })
           .onSelect((index: number) => {
@@ -1761,8 +1776,8 @@ export struct SettingsStaticRow {
         Button(settingsRowActionText(this.row))
           .height(34)
           .fontSize(12)
-          .fontColor('#40566F')
-          .backgroundColor('#F2F4F7')
+          .fontColor(themeSecondaryText())
+          .backgroundColor(themeSurfaceVariant())
           .margin({ left: 12 })
           .onClick(() => {
             this.onTap();
@@ -1771,7 +1786,7 @@ export struct SettingsStaticRow {
     }
     .width('100%')
     .padding(14)
-    .backgroundColor(Color.White)
+    .backgroundColor(themeSurface())
     .borderRadius(6)
     .onClick(() => {
       if (this.row.type !== 'input' && this.row.type !== 'switch' && this.row.type !== 'list') {

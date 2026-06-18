@@ -1,5 +1,10 @@
 ﻿import { GalleryDetail } from '../../model/GalleryModels';
-import { createEmptyDetail, shouldUseChineseUi, uiText } from '../../shared/EhShared';
+import {
+  createEmptyDetail,
+  shouldUseChineseUi,
+  uiText
+} from '../../shared/EhShared';
+import { themePrimaryText, themeSecondaryText, themeSurface } from '../../shared/EhTheme';
 @Component
 export struct DetailInfoBlock {
   @Prop detail: GalleryDetail = createEmptyDetail();
@@ -56,7 +61,7 @@ export struct DetailInfoBlock {
     }
     .width('100%')
     .padding(16)
-    .backgroundColor(Color.White)
+    .backgroundColor(themeSurface())
   }
 }
 
@@ -68,7 +73,7 @@ export struct DetailSummaryCell {
   build() {
     Text(this.value.length === 0 ? '-' : this.value)
       .fontSize(13)
-      .fontColor('#17202A')
+      .fontColor(themePrimaryText())
       .textAlign(this.textAlignValue)
       .maxLines(1)
       .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -85,11 +90,11 @@ export struct InfoRow {
     Row() {
       Text(this.label)
         .fontSize(12)
-        .fontColor('#667085')
+        .fontColor(themeSecondaryText())
         .width(86)
       Text(this.value.length === 0 ? '-' : this.value)
         .fontSize(12)
-        .fontColor('#17202A')
+        .fontColor(themePrimaryText())
         .maxLines(2)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .layoutWeight(1)

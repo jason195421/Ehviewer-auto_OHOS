@@ -16,6 +16,7 @@ import {
   launchRouteFromSetting,
   runActiveBackHandler
 } from '../shared/EhShared';
+import { themePageBackground } from '../shared/EhTheme';
 
 // ----------------------------------------------------------------
 // Root page: full-screen immersive shell with slide-in side drawer
@@ -111,7 +112,7 @@ struct Index {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor($r('app.color.page_background'))
+      .backgroundColor(themePageBackground())
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
 
       // ---- Scrim + drawer ----

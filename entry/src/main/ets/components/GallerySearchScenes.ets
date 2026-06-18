@@ -1,7 +1,20 @@
 import { ALL_CATEGORY, GalleryCategory, GalleryRoute } from '../model/GalleryModels';
 import { DEFAULT_ADVANCE_SEARCH, ListMode } from '../services/EhUrl';
 import { ehTagTranslationStore } from '../services/EhTagTranslationStore';
-import { APP_THEME_COLOR, LANGUAGE_REVISION_KEY, categoryColor, themeSurfaceColor, uiText } from '../shared/EhShared';
+import {
+  APP_THEME_COLOR,
+  LANGUAGE_REVISION_KEY,
+  categoryColor,
+  uiText
+} from '../shared/EhShared';
+import {
+  themeFieldBackground,
+  themePageBackground,
+  themePrimaryText,
+  themeSecondaryText,
+  themeSurface,
+  themeSurfaceVariant
+} from '../shared/EhTheme';
 
 export interface SearchSuggestionItem {
   kind: string;
@@ -267,10 +280,10 @@ export struct GallerySearchScene {
           TextInput({ text: this.keywordDraft, placeholder: uiText('Search galleries') })
             .height(38)
             .layoutWeight(1)
-            .backgroundColor(themeSurfaceColor())
+            .backgroundColor(themeFieldBackground())
             .borderRadius(19)
-            .placeholderColor('#5D7183')
-            .fontColor('#17202A')
+            .placeholderColor(themeSecondaryText())
+            .fontColor(themePrimaryText())
             .caretColor(APP_THEME_COLOR)
             .padding({ left: 16, right: 16 })
             .onChange((value: string) => {
@@ -325,11 +338,11 @@ export struct GallerySearchScene {
         .width('100%')
         .padding({ left: 8, right: 8, top: 4 })
         .layoutWeight(1)
-        .backgroundColor($r('app.color.page_background'))
+        .backgroundColor(themePageBackground())
       }
       .width('100%')
       .height('100%')
-      .backgroundColor($r('app.color.page_background'))
+      .backgroundColor(themePageBackground())
 
       if (this.advancedPanelVisible) {
         Column()
@@ -540,13 +553,13 @@ struct SearchSuggestionTile {
         Text(this.suggestion.kind === 'history' ? uiText(this.suggestion.title) : this.suggestion.title)
           .fontSize(17)
           .fontWeight(FontWeight.Medium)
-          .fontColor('#17202A')
+          .fontColor(themePrimaryText())
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         if (this.suggestion.subtitle.length > 0) {
           Text(this.suggestion.subtitle)
             .fontSize(13)
-            .fontColor('#667085')
+            .fontColor(themeSecondaryText())
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
@@ -558,7 +571,7 @@ struct SearchSuggestionTile {
     .height(44)
     .padding({ left: 6, right: 6 })
     .alignItems(VerticalAlign.Center)
-    .backgroundColor(Color.White)
+    .backgroundColor(themeSurface())
     .borderRadius(5)
     .shadow({ radius: 3, color: '#10000000', offsetX: 0, offsetY: 1 })
     .onClick(() => {
@@ -762,7 +775,7 @@ export struct SearchAdvancedPanel {
   private sectionTitle(title: string) {
     Text(uiText(title))
       .fontSize(12)
-      .fontColor('#667085')
+      .fontColor(themeSecondaryText())
       .fontWeight(FontWeight.Medium)
       .margin({ top: 4 })
   }
@@ -818,8 +831,8 @@ export struct SearchAdvancedPanel {
 
           Row() {
             Text(uiText('Advanced'))
-              .fontSize(14)
-              .fontColor('#17202A')
+            .fontSize(14)
+            .fontColor(themePrimaryText())
             Blank()
             Toggle({ type: ToggleType.Switch, isOn: this.advancedEnabledDraft })
               .onChange((isOn: boolean) => {
@@ -830,7 +843,7 @@ export struct SearchAdvancedPanel {
           .width('100%')
           .height(42)
           .padding({ left: 10, right: 10 })
-          .backgroundColor('#F3F6F8')
+          .backgroundColor(themeSurfaceVariant())
           .borderRadius(6)
 
           if (this.advancedEnabledDraft) {
@@ -904,11 +917,11 @@ export struct SearchAdvancedPanel {
       }
       .width('100%')
       .padding({ left: 12, right: 12, top: 10, bottom: 10 })
-      .backgroundColor(Color.White)
+      .backgroundColor(themeSurface())
       .borderRadius({ bottomLeft: 8, bottomRight: 8 })
     }
     .width('100%')
-    .backgroundColor(Color.White)
+    .backgroundColor(themeSurface())
     .borderRadius(8)
     .clip(true)
     .shadow({ radius: 12, color: '#33000000', offsetX: 0, offsetY: 4 })

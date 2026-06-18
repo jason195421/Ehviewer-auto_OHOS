@@ -1,5 +1,9 @@
 ﻿import { GalleryDetail } from '../../model/GalleryModels';
-import { createEmptyDetail, uiText } from '../../shared/EhShared';
+import {
+  createEmptyDetail,
+  uiText
+} from '../../shared/EhShared';
+import { themePrimaryText, themeSecondaryText, themeSurface, themeSurfaceVariant } from '../../shared/EhTheme';
 @Component
 export struct DetailActions {
   @Prop detail: GalleryDetail = createEmptyDetail();
@@ -63,7 +67,7 @@ export struct DetailActions {
     }
     .width('100%')
     .padding({ top: 12, bottom: 12 })
-    .backgroundColor(Color.White)
+    .backgroundColor(themeSurface())
   }
 }
 
@@ -84,7 +88,7 @@ export struct RatingSummary {
     Column() {
       Text(this.isDetailLoaded ? this.ratingLabel() + '  (' + this.ratingCount.toString() + ')' : uiText('Loading rating...'))
         .fontSize(13)
-        .fontColor('#40566F')
+        .fontColor(themeSecondaryText())
       Row({ space: 2 }) {
         ForEach([0, 1, 2, 3, 4], (index: number) => {
           SymbolGlyph($r('sys.symbol.star_fill'))
@@ -111,11 +115,11 @@ export struct RatingPanel {
       Text(uiText('Rate'))
         .fontSize(18)
         .fontWeight(FontWeight.Bold)
-        .fontColor('#17202A')
+        .fontColor(themePrimaryText())
         .width('100%')
       Text(this.rating.toString() + ' / 5')
         .fontSize(13)
-        .fontColor('#667085')
+        .fontColor(themeSecondaryText())
         .width('100%')
         .margin({ top: 4, bottom: 14 })
       Row({ space: 8 }) {
@@ -136,8 +140,8 @@ export struct RatingPanel {
           .type(ButtonType.Normal)
           .height(38)
           .fontSize(13)
-          .fontColor('#40566F')
-          .backgroundColor('#EEF2F6')
+          .fontColor(themeSecondaryText())
+          .backgroundColor(themeSurfaceVariant())
           .borderRadius(4)
           .layoutWeight(1)
           .onClick(() => {
@@ -160,7 +164,7 @@ export struct RatingPanel {
     }
     .width('100%')
     .padding(18)
-    .backgroundColor(Color.White)
+    .backgroundColor(themeSurface())
     .borderRadius(8)
   }
 }
@@ -189,7 +193,7 @@ export struct DetailActionItem {
     .width(72)
     .height(68)
     .justifyContent(FlexAlign.Center)
-    .backgroundColor(this.pressed ? '#E6F1F6' : '#00FFFFFF')
+    .backgroundColor(this.pressed ? themeSurfaceVariant() : '#00FFFFFF')
     .borderRadius(6)
     .scale({ x: this.pressed ? 0.92 : 1, y: this.pressed ? 0.92 : 1 })
     .animation({ duration: 120, curve: Curve.EaseOut })

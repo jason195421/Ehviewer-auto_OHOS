@@ -13,6 +13,14 @@ import {
   showGalleryPages,
   uiText
 } from '../shared/EhShared';
+import {
+  themePlaceholderColor,
+  themePrimaryText,
+  themeSecondaryText,
+  themeSurface,
+  themeSurfaceVariant,
+  themeTertiaryText
+} from '../shared/EhTheme';
 
 @Component
 export struct GalleryListRow {
@@ -28,6 +36,10 @@ export struct GalleryListRow {
 
   private metaGap(): number {
     return 2;
+  }
+
+  private metaTopGap(): number {
+    return galleryListMode() === 'Extended' ? 6 : this.metaGap();
   }
 
   private titleMaxLines(): number {
@@ -102,20 +114,25 @@ export struct GalleryListRow {
 
       Column() {
         Column() {
-          Text(galleryDisplayTitle(this.gallery))
-            .fontSize(15)
-            .fontWeight(FontWeight.Medium)
-            .fontColor('#17202A')
-            .maxLines(this.titleMaxLines())
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .width('100%')
-            .height(this.titleHeight())
-            .clip(true)
+          Column() {
+            Text(galleryDisplayTitle(this.gallery))
+              .fontSize(15)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(themePrimaryText())
+              .maxLines(this.titleMaxLines())
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .width('100%')
+          }
+          .width('100%')
+          .height(this.titleHeight())
+          .clip(true)
+          .justifyContent(FlexAlign.Start)
+          .alignItems(HorizontalAlign.Start)
 
           Text(this.gallery.uploader === undefined || this.gallery.uploader.length === 0 ? uiText('unknown uploader') :
             this.gallery.uploader)
             .fontSize(12)
-            .fontColor('#667085')
+            .fontColor(themeSecondaryText())
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .margin({ top: 3 })
@@ -129,14 +146,14 @@ export struct GalleryListRow {
             Row() {
               Text(this.languageText())
                 .fontSize(13)
-                .fontColor('#40566F')
+                .fontColor(themeSecondaryText())
                 .fontWeight(FontWeight.Medium)
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
               if (showGalleryPages()) {
                 Text(this.readPageText())
                   .fontSize(13)
-                  .fontColor('#40566F')
+                  .fontColor(themeSecondaryText())
                   .fontWeight(FontWeight.Medium)
                   .margin({ left: 8 })
               }
@@ -145,7 +162,7 @@ export struct GalleryListRow {
 
             Text(this.gallery.posted === undefined ? '' : this.gallery.posted)
               .fontSize(13)
-              .fontColor('#98A2B3')
+              .fontColor(themeTertiaryText())
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .margin({ top: this.metaGap() })
@@ -167,7 +184,7 @@ export struct GalleryListRow {
         }
         .width('100%')
         .alignItems(VerticalAlign.Bottom)
-        .margin({ top: this.metaGap() })
+        .margin({ top: this.metaTopGap() })
 
         if (this.hasTags()) {
           Flex({ wrap: FlexWrap.Wrap }) {
@@ -193,7 +210,7 @@ export struct GalleryListRow {
     }
     .width('100%')
     .height(this.cardHeight())
-    .backgroundColor(Color.White)
+    .backgroundColor(themeSurface())
     .borderRadius(6)
     .clip(true)
   }
@@ -275,17 +292,17 @@ export struct GalleryThumb {
       Column()
         .width('100%')
         .height('100%')
-        .backgroundColor('#E7ECF1')
+        .backgroundColor(themeSurfaceVariant())
         .borderRadius(this.radiusValue)
 
       if (this.loadFailed) {
         Column({ space: 4 }) {
           SymbolGlyph($r('sys.symbol.xmark'))
             .fontSize(22)
-            .fontColor(['#9BB8CB'])
+            .fontColor([themePlaceholderColor()])
           Text('EH')
             .fontSize(10)
-            .fontColor('#9BB8CB')
+            .fontColor(themePlaceholderColor())
         }
         .justifyContent(FlexAlign.Center)
         .onClick(() => {
@@ -307,7 +324,7 @@ export struct GalleryThumb {
         LoadingProgress()
           .width(32)
           .height(32)
-          .color('#9BB8CB')
+          .color(themePlaceholderColor())
       }
     }
     .width(this.widthValue > 0 ? this.widthValue : '100%')
@@ -330,22 +347,27 @@ export struct GalleryThumbCard {
         .aspectRatio(0.75)
 
       Column() {
-        Text(galleryDisplayTitle(this.gallery))
-          .fontSize(12)
-          .fontWeight(FontWeight.Medium)
-          .fontColor('#17202A')
-          .maxLines(2)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .width('100%')
-          .height(32)
-          .clip(true)
+        Column() {
+          Text(galleryDisplayTitle(this.gallery))
+            .fontSize(12)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(themePrimaryText())
+            .maxLines(2)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .width('100%')
+        }
+        .width('100%')
+        .height(32)
+        .clip(true)
+        .justifyContent(FlexAlign.Start)
+        .alignItems(HorizontalAlign.Start)
 
         Row() {
           CategoryBadge({ category: this.gallery.category })
           Blank()
           Text(this.gallery.pages.toString() + 'p')
             .fontSize(11)
-            .fontColor('#98A2B3')
+            .fontColor(themeTertiaryText())
         }
         .width('100%')
         .margin({ top: 4 })
@@ -353,7 +375,7 @@ export struct GalleryThumbCard {
       .padding({ left: 6, right: 6, top: 6, bottom: 6 })
       .alignItems(HorizontalAlign.Start)
     }
-    .backgroundColor(Color.White)
+    .backgroundColor(themeSurface())
     .borderRadius(6)
     .clip(true)
   }
