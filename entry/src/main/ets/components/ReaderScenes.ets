@@ -7,6 +7,7 @@ import { GalleryComment, GalleryPage } from '../model/GalleryModels';
 import {
   applyReaderFullscreenImmersiveMode,
   applyReaderStatusVisibleImmersiveMode,
+  applyAppChromeImmersiveMode,
   getMainWindow,
   getReaderWindow,
   setEmbeddedReaderActive
@@ -452,6 +453,7 @@ export struct ReaderScene {
     try {
       win.setPreferredOrientation(window.Orientation.UNSPECIFIED).catch(() => {});
     } catch (e) {}
+    applyAppChromeImmersiveMode(win);
   }
 
   private applyReaderWindowSettings(): void {
@@ -1253,6 +1255,7 @@ struct ReaderMenuSelect {
         .fontColor('#E5E7EB')
         .layoutWeight(1)
       Select(this.options.map((o: string) => ({ value: o } as SelectOption)))
+        .id('reader-menu-select-' + this.label + '-' + this.value)
         .value(this.value)
         .font({ size: 13 })
         .fontColor(readerSelectColors().buttonText)

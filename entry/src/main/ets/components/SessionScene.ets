@@ -1,0 +1,765 @@
+import { common } from '@kit.AbilityKit';
+import { window } from '@kit.ArkUI';
+import { pasteboard } from '@kit.BasicServicesKit';
+import { picker } from '@kit.CoreFileKit';
+import { fileIo as fs } from '@kit.CoreFileKit';
+import { util } from '@kit.ArkTS';
+import { webview } from '@kit.ArkWeb';
+import { GalleryCategory, GalleryComment, GalleryDetail, GalleryInfo, GalleryPage, GalleryPreview, GalleryRoute, GallerySite, GalleryTagGroup, TopListBucket, TopListDetail, TopListInfo, TopListItem, TopListKind } from '../model/GalleryModels';
+import { ehCookieStore } from '../services/EhCookieStore';
+import { DownloadDirectoryScanResult, RestoredDownloadGallery, ehDownloadFileStore } from '../services/EhDownloadFileStore';
+import { DownloadInfo, DownloadLabel, DownloadState, ehDownloadStore } from '../services/EhDownloadStore';
+import { ehHistoryStore } from '../services/EhHistoryStore';
+import { ehSettingsStore, SettingEntry, defaultSettingEntries } from '../services/EhSettingsStore';
+import { EhHttpClient, GalleryDetailLoadResult, GalleryListLoadResult, GalleryPageLoadResult, NetworkDiagnosticResult, RateGalleryResult, SignInResult, ToggleFavoriteResult, TopListLoadResult } from '../services/EhHttpClient';
+import { EhUrl, FavListUrlBuilder, ListMode, ListUrlBuilder } from '../services/EhUrl';
+import { galleryPageCache } from '../services/GalleryPageCache';
+import { CacheClearResult, readerImageCache } from '../services/ReaderImageCache';
+import { ehSpiderInfoStore } from '../services/EhSpiderInfoStore';
+import { MigrationTask, migrationTasks } from '../services/MigrationStatus';
+import { FilterRule, FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, FILTER_MODE_TAG_NAMESPACE, ehFilterStore } from '../services/EhFilterStore';
+import { applyAppChromeImmersiveMode } from '../services/EhWindowImmersive';
+import { applyWindowPrivacyMode } from '../services/EhWindowPrivacy';
+import {
+  EH_APP_VERSION_CODE,
+  EH_APP_VERSION_NAME,
+  EH_GIT_BRANCH,
+  EH_GIT_COMMIT,
+  EH_GIT_DESCRIBE,
+  EH_ISSUES_URL,
+  EH_RELEASE_TAG,
+  EH_RELEASE_URL,
+  EH_REPOSITORY_NAME,
+  EH_REPOSITORY_URL,
+  EH_TARGET_PLATFORM
+} from '../services/EhBuildInfo';
+import { LANGUAGE_REVISION_KEY, notifyLanguageChanged, notifyThemeChanged } from '../shared/EhShared';
+import {
+  themeFieldBackground,
+  themePageBackground,
+  themePrimaryColor,
+  themePrimaryText,
+  themeSecondaryText,
+  themeSurface,
+  themeSurfaceVariant,
+  themeTertiaryText
+} from '../shared/EhTheme';
+import {
+  selectArrowModifier,
+  themedSelectButtonBackground,
+  themedSelectButtonText,
+  themedSelectMenuBackground,
+  themedSelectOptionBackground,
+  themedSelectOptionText,
+  themedSelectOutlineColor,
+  themedSelectSelectedOptionBackground,
+  themedSelectSelectedOptionText
+} from '../shared/EhSelectStyle';
+import { EhBackupBundle, DrawerItem, SettingsHeaderItem, SettingsRowItem, SessionMode, SettingsPanel, DRAWER_ITEMS, SETTINGS_HEADERS, STATUS_BAR_HEIGHT_KEY, ON_OFF_OPTIONS, shouldUseChineseUi, uiText, uiValue, uiStatusText, uiPageText, zhText, setActiveBackHandler, runActiveBackHandler, createEmptyGallery, createEmptyDownloadInfo, createDetailFromGallery, createEmptyDetail, createEmptyPreview, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneStringArray, cloneRequiredStringArray, cloneGalleryInfo, cloneGalleryInfos, padTwo, applyGalleryFilters, cloneGalleryTagGroups, cloneGalleryComments, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListItem, cloneTopListBucket, cloneTopListInfo, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, saveDownloadsQuietly, filterDownloadItems, downloadItemMatches, sortDownloadItems, nextDownloadStatusFilter, nextDownloadLabelFilter, nextDownloadSortMode, nextStringOption, nextDownloadState, nextDownloadLabel, downloadLabelName, downloadStateLabel, downloadStateColor, downloadProgressText, downloadSizeText, downloadImageUrlForPage, downloadThreadLimit, downloadPageIndexes, downloadQueueSummary, parseHistoryMaxSize, routeTitle, routeSubtitle, launchRouteFromSetting, settingsPanelTitle, settingsRowsForPanel, optionSettingsRow, textSettingsRow, staticSettingsRow, settingEntryValue, cloneStringOptions, settingMigrationMessage, nextOption, isValidProxyPortText, formatNetworkDiagnostics, listModeForRoute, routeUsesKeyword, usesGallerySearchToolbar, usesEmbeddedToolbar, defaultKeywordForRoute, gallerySearchTitle, currentGallerySite, effectiveListSite, gallerySiteName, galleryListFailureMessage, withGalleryListMessage, readerPageReferer, readerDisplayImageUrl, cacheReaderImageForPage, cacheThumbnailImage, cloneGalleryPageWithCache, readerLocalImageSource, readerZoomSize, readerFullImageWidth, readerFullImageHeight, readerImageFit, readerShortUrl, readerPreloadCount, readerIsRightToLeft, categoryName, categoryColor, ratingText, galleryDisplayTitle, showGalleryPages, galleryListMode, galleryThumbWidth, galleryThumbHeight, galleryRowHeight, galleryTagPreview, detailTitleFontSize, detailTitleMaxLines, detailHeadingFontSize, readerShowProgress, readerShowClock, readerClockText, padTimeNumber, topListChipColor } from '../shared/EhShared';
+import { FilterPanel, MigrationScene } from './DownloadMigrationScenes';
+import { AppSubToolbar, AppToolbar } from './NavigationComponents';
+
+@Component
+export struct SessionScene {
+  private client: EhHttpClient = new EhHttpClient();
+  private webController: webview.WebviewController = new webview.WebviewController();
+
+  @State mode: SessionMode = SessionMode.Password;
+  @State username: string = '';
+  @State password: string = '';
+  @State cookieInput: string = '';
+  @State memberId: string = '';
+  @State passHash: string = '';
+  @State igneous: string = '';
+  @State signingIn: boolean = false;
+  @State webCookieCaptured: boolean = false;
+  @State webUrl: string = EhUrl.URL_SIGN_IN;
+  @State statusText: string = 'Sign in with an E-Hentai forum account';
+  @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
+  onSignedIn: () => void = () => {};
+
+  aboutToAppear(): void {
+    applyAppChromeImmersiveMode();
+    this.cookieInput = ehCookieStore.getEditableCookieHeader();
+    const context = getAbilityContext();
+    if (context !== undefined) {
+      ehCookieStore.load(context).then(() => {
+        this.cookieInput = ehCookieStore.getEditableCookieHeader();
+        this.syncCookieFieldsFromInput(this.cookieInput, false);
+        this.statusText = ehCookieStore.hasCookies() ? 'Persisted Cookie loaded' : 'No Cookie saved';
+      }).catch((error: Error) => {
+        this.statusText = 'Cookie load failed: ' + error.message;
+      });
+    }
+  }
+
+  private switchMode(mode: SessionMode): void {
+    this.mode = mode;
+    if (mode === SessionMode.Password) {
+      this.statusText = 'Sign in with an E-Hentai forum account';
+    } else if (mode === SessionMode.Cookie) {
+      this.statusText = 'Enter ipb_member_id and ipb_pass_hash, or paste a full Cookie header';
+    } else {
+      this.statusText = 'Finish login in the web page; Cookie will be captured automatically';
+      this.webCookieCaptured = false;
+    }
+  }
+
+  private signInWithPassword(): void {
+    const context = getAbilityContext();
+    if (context === undefined) {
+      this.statusText = 'Ability context is not ready';
+      return;
+    }
+    if (this.signingIn) {
+      return;
+    }
+    if (this.username.trim().length === 0) {
+      this.statusText = 'Username cannot be empty';
+      return;
+    }
+    if (this.password.length === 0) {
+      this.statusText = 'Password cannot be empty';
+      return;
+    }
+
+    this.signingIn = true;
+    this.statusText = 'Signing in...';
+    this.client.signIn(this.username.trim(), this.password).then((result: SignInResult) => {
+      this.signingIn = false;
+      if (!result.ok) {
+        this.statusText = 'Sign in failed: ' + result.message;
+        return;
+      }
+
+      ehCookieStore.save(context).then(() => {
+        this.cookieInput = ehCookieStore.getEditableCookieHeader();
+        this.statusText = result.message;
+        this.onSignedIn();
+      }).catch((error: Error) => {
+        this.statusText = 'Signed in but Cookie save failed: ' + error.message;
+      });
+    }).catch((error: Error) => {
+      this.signingIn = false;
+      this.statusText = 'Sign in failed: ' + error.message;
+    });
+  }
+
+  private prepareWebSignIn(): void {
+    try {
+      webview.WebCookieManager.configCookieSync(EhUrl.HOST_E, 'nw=1; path=/');
+      webview.WebCookieManager.configCookieSync(EhUrl.HOST_EX, 'nw=1; path=/');
+      webview.WebCookieManager.saveCookieSync();
+    } catch (error) {
+    }
+    ehCookieStore.clear();
+    this.webCookieCaptured = false;
+    this.statusText = 'Web sign-in is ready; existing browser verification is kept';
+  }
+
+  private checkWebCookie(url: string): void {
+    if (this.webCookieCaptured) {
+      return;
+    }
+
+    const cookieHeader = collectWebCookies(url);
+    if (cookieHeader.length > 0) {
+      ehCookieStore.setCookieHeader(cookieHeader);
+      this.cookieInput = ehCookieStore.getEditableCookieHeader();
+    }
+    if (!hasLoginCookie(cookieHeader)) {
+      this.statusText = cookieHeader.length > 0 ? 'Web verification Cookie captured; waiting for login...' :
+        'Waiting for web login...';
+      return;
+    }
+
+    const context = getAbilityContext();
+    if (context === undefined) {
+      this.statusText = 'Web Cookie found, but context is not ready';
+      return;
+    }
+
+    this.webCookieCaptured = true;
+    ehCookieStore.setCookieHeader(cookieHeader);
+    ehCookieStore.save(context).then(() => {
+      this.cookieInput = ehCookieStore.getEditableCookieHeader();
+      this.statusText = 'Web Cookie captured';
+      this.onSignedIn();
+    }).catch((error: Error) => {
+      this.webCookieCaptured = false;
+      this.statusText = 'Web Cookie save failed: ' + error.message;
+    });
+  }
+
+  private saveCookie(): void {
+    const context = getAbilityContext();
+    if (context === undefined) {
+      this.statusText = 'Ability context is not ready';
+      return;
+    }
+
+    const cookieHeader = this.buildCookieHeader();
+    if (!this.validateCookieFields()) {
+      return;
+    }
+    ehCookieStore.setCookieHeader(cookieHeader);
+    ehCookieStore.save(context).then(() => {
+      this.cookieInput = ehCookieStore.getEditableCookieHeader();
+      this.statusText = ehCookieStore.hasCookies() ? 'Cookie saved' : 'Empty Cookie saved';
+      if (ehCookieStore.hasCookies()) {
+        this.onSignedIn();
+      }
+    }).catch((error: Error) => {
+      this.statusText = 'Cookie save failed: ' + error.message;
+    });
+  }
+
+  private buildCookieHeader(): string {
+    const names: string[] = [];
+    const values: string[] = [];
+    absorbCookieHeaderText(this.cookieInput, names, values);
+    if (this.memberId.trim().length > 0) {
+      upsertCookiePair('ipb_member_id', this.memberId.trim(), names, values);
+    }
+    if (this.passHash.trim().length > 0) {
+      upsertCookiePair('ipb_pass_hash', this.passHash.trim(), names, values);
+    }
+    if (this.igneous.trim().length > 0) {
+      upsertCookiePair('igneous', this.igneous.trim(), names, values);
+    }
+
+    const parts: string[] = [];
+    for (let i = 0; i < names.length; i++) {
+      parts.push(names[i] + '=' + values[i]);
+    }
+    return parts.join('; ');
+  }
+
+  private syncCookieFieldsFromInput(value: string, showStatus: boolean): void {
+    const parsed = parseCookieIdentity(value);
+    let changed = false;
+    if (parsed.memberId.length > 0) {
+      this.memberId = parsed.memberId;
+      changed = true;
+    }
+    if (parsed.passHash.length > 0) {
+      this.passHash = parsed.passHash;
+      changed = true;
+    }
+    if (parsed.igneous.length > 0) {
+      this.igneous = parsed.igneous;
+      changed = true;
+    }
+    if (showStatus) {
+      this.statusText = changed ? 'Cookie fields detected' : 'No known Cookie fields detected';
+    }
+  }
+
+  private validateCookieFields(): boolean {
+    const id = this.memberId.trim();
+    const hash = this.passHash.trim();
+    if (id.length === 0) {
+      this.statusText = 'ipb_member_id is empty';
+      return false;
+    }
+    if (hash.length === 0) {
+      this.statusText = 'ipb_pass_hash is empty';
+      return false;
+    }
+    if (!checkIpbMemberId(id)) {
+      this.statusText = 'ipb_member_id should contain digits only';
+      return false;
+    }
+    if (!checkIpbPassHash(hash)) {
+      this.statusText = 'ipb_pass_hash should be 32 lowercase letters or digits';
+      return false;
+    }
+    return true;
+  }
+
+  private clearCookie(): void {
+    const context = getAbilityContext();
+    if (context === undefined) {
+      ehCookieStore.clear();
+      this.cookieInput = '';
+      this.statusText = 'Cookie cleared in memory';
+      return;
+    }
+
+    ehCookieStore.clearPersisted(context).then(() => {
+      this.cookieInput = '';
+      this.memberId = '';
+      this.passHash = '';
+      this.igneous = '';
+      this.statusText = 'Cookie cleared';
+    }).catch((error: Error) => {
+      this.statusText = 'Cookie clear failed: ' + error.message;
+    });
+  }
+
+  build() {
+    Column() {
+      if (this.mode === SessionMode.Web) {
+        this.WebSignInPanel()
+      } else if (this.mode === SessionMode.Cookie) {
+        this.CookieSignInPanel()
+      } else {
+        this.PasswordSignInPanel()
+      }
+    }
+    .width('100%')
+    .height('100%')
+  }
+
+  @Builder
+  private PasswordSignInPanel() {
+    Stack() {
+      Scroll() {
+        Column() {
+          SignInMark({ label: 'EH' })
+
+          Column() {
+          TextInput({ text: this.username, placeholder: uiText('Username') })
+              .height(46)
+              .width('100%')
+              .onChange((value: string) => {
+                this.username = value;
+              })
+            TextInput({ text: this.password, placeholder: uiText('Password') })
+              .height(46)
+              .width('100%')
+              .margin({ top: 10 })
+              .type(InputType.Password)
+              .onChange((value: string) => {
+                this.password = value;
+              })
+          }
+          .width('100%')
+          .constraintSize({ maxWidth: 420 })
+          .margin({ top: 8 })
+
+          Text(uiStatusText(this.statusText))
+            .fontSize(13)
+            .fontColor('#0A6B45')
+            .textAlign(TextAlign.Center)
+            .width('100%')
+            .constraintSize({ maxWidth: 420 })
+            .margin({ top: 12 })
+
+          Blank()
+            .layoutWeight(1)
+
+          Row() {
+            Button(uiText('Register'))
+              .type(ButtonType.Normal)
+              .fontColor('#2F6F8F')
+              .backgroundColor(Color.Transparent)
+              .layoutWeight(1)
+            Button(this.signingIn ? uiText('Signing in...') : uiText('Sign in'))
+              .type(ButtonType.Normal)
+              .fontColor('#2F6F8F')
+              .fontWeight(FontWeight.Bold)
+              .backgroundColor(Color.Transparent)
+              .layoutWeight(1)
+              .enabled(!this.signingIn)
+              .onClick(() => {
+                this.signInWithPassword();
+              })
+          }
+          .width('100%')
+          .constraintSize({ maxWidth: 520 })
+          .margin({ top: 22 })
+
+          Text(uiText('Sign in via WebView'))
+            .fontSize(14)
+            .fontColor(themePrimaryColor())
+            .margin({ top: 8 })
+            .onClick(() => {
+              this.prepareWebSignIn();
+              this.switchMode(SessionMode.Web);
+            })
+          Text(uiText('Sign in via Cookies'))
+            .fontSize(14)
+            .fontColor(themePrimaryColor())
+            .margin({ top: 10 })
+            .onClick(() => {
+              this.switchMode(SessionMode.Cookie);
+            })
+          Text(uiText('Guest mode'))
+            .fontSize(14)
+            .fontColor('#2F6F8F')
+            .margin({ top: 10, bottom: 18 })
+            .onClick(() => {
+              this.onSignedIn();
+            })
+        }
+        .alignItems(HorizontalAlign.Center)
+        .width('100%')
+        .height('100%')
+        .padding(20)
+      }
+      .width('100%')
+      .height('100%')
+    }
+  }
+
+  @Builder
+  private CookieSignInPanel() {
+    Column() {
+      Row() {
+        Button({ type: ButtonType.Circle, stateEffect: true }) {
+          SymbolGlyph($r('sys.symbol.chevron_left'))
+            .fontSize(20)
+            .fontColor([Color.White])
+        }
+        .width(36)
+        .height(36)
+        .backgroundColor('#2F6F8F')
+        .onClick(() => {
+          this.switchMode(SessionMode.Password);
+        })
+        Text(uiText('Cookie Sign In'))
+          .fontSize(18)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(themePrimaryText())
+          .margin({ left: 12 })
+      }
+      .width('100%')
+      .padding({ left: 12, right: 12, top: 12 })
+
+      SignInMark({ label: 'CK' })
+        .margin({ top: 6 })
+
+      Scroll() {
+        Column() {
+          Text(uiText('Use this when password login needs captcha, or when importing an ExHentai session.'))
+            .fontSize(13)
+            .fontColor(themeSecondaryText())
+            .lineHeight(20)
+            .width('100%')
+            .constraintSize({ maxWidth: 420 })
+
+          TextInput({ text: this.memberId, placeholder: 'ipb_member_id' })
+            .height(46)
+            .width('100%')
+            .constraintSize({ maxWidth: 420 })
+            .margin({ top: 14 })
+            .onChange((value: string) => {
+              this.memberId = value;
+            })
+          TextInput({ text: this.passHash, placeholder: 'ipb_pass_hash' })
+            .height(46)
+            .width('100%')
+            .constraintSize({ maxWidth: 420 })
+            .margin({ top: 10 })
+            .onChange((value: string) => {
+              this.passHash = value;
+            })
+          TextInput({ text: this.igneous, placeholder: 'igneous' })
+            .height(46)
+            .width('100%')
+            .constraintSize({ maxWidth: 420 })
+            .margin({ top: 10 })
+            .onChange((value: string) => {
+              this.igneous = value;
+            })
+          TextArea({ text: this.cookieInput, placeholder: uiText('Full Cookie header') })
+            .height(116)
+            .width('100%')
+            .constraintSize({ maxWidth: 420 })
+            .fontSize(13)
+            .margin({ top: 12 })
+            .onChange((value: string) => {
+              this.cookieInput = value;
+              this.syncCookieFieldsFromInput(value, true);
+            })
+
+          Text(uiStatusText(this.statusText))
+            .fontSize(13)
+            .fontColor('#0A6B45')
+            .textAlign(TextAlign.Center)
+            .width('100%')
+            .constraintSize({ maxWidth: 420 })
+            .margin({ top: 12 })
+        }
+        .alignItems(HorizontalAlign.Center)
+        .width('100%')
+        .padding({ left: 20, right: 20, top: 16, bottom: 20 })
+      }
+      .layoutWeight(1)
+      .width('100%')
+
+      Row() {
+        Button(uiText('Clear'))
+          .type(ButtonType.Normal)
+          .fontColor('#2F6F8F')
+          .backgroundColor(Color.Transparent)
+          .layoutWeight(1)
+          .onClick(() => {
+            this.clearCookie();
+          })
+        Button(uiText('OK'))
+          .type(ButtonType.Normal)
+          .fontColor('#2F6F8F')
+          .fontWeight(FontWeight.Bold)
+          .backgroundColor(Color.Transparent)
+          .layoutWeight(1)
+          .onClick(() => {
+            this.saveCookie();
+          })
+      }
+      .width('100%')
+      .padding({ left: 12, right: 12, bottom: 12 })
+    }
+    .width('100%')
+    .height('100%')
+  }
+
+  @Builder
+  private WebSignInPanel() {
+    Column() {
+      Row() {
+        Button({ type: ButtonType.Circle, stateEffect: true }) {
+          SymbolGlyph($r('sys.symbol.chevron_left'))
+            .fontSize(20)
+            .fontColor([Color.White])
+        }
+        .width(36)
+        .height(36)
+        .backgroundColor('#2F6F8F')
+        .onClick(() => {
+          this.switchMode(SessionMode.Password);
+        })
+        Text(uiStatusText(this.statusText))
+          .fontSize(13)
+          .fontColor(themeSecondaryText())
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .layoutWeight(1)
+          .margin({ left: 12 })
+      }
+      .width('100%')
+      .height(44)
+      .padding({ left: 12, right: 12 })
+      .backgroundColor(themeSurface())
+
+      Web({ src: this.webUrl, controller: this.webController })
+        .javaScriptAccess(true)
+        .domStorageAccess(true)
+        .onPageEnd((event: OnPageEndEvent) => {
+          this.checkWebCookie(event.url);
+        })
+        .width('100%')
+        .layoutWeight(1)
+    }
+    .width('100%')
+    .height('100%')
+  }
+}
+
+@Component
+export struct SignInMark {
+  label: string = '';
+
+  build() {
+    Text(this.label)
+      .fontSize(24)
+      .fontWeight(FontWeight.Bold)
+      .fontColor(Color.White)
+      .textAlign(TextAlign.Center)
+      .width(72)
+      .height(72)
+      .backgroundColor(themePrimaryColor())
+      .borderRadius(18)
+      .padding({ top: 18 })
+  }
+}
+
+export function collectWebCookies(currentUrl: string): string {
+  const names: string[] = [];
+  const values: string[] = [];
+  absorbCookieHeader(currentUrl, names, values);
+  absorbCookieHeader(EhUrl.HOST_E, names, values);
+  absorbCookieHeader(EhUrl.HOST_EX, names, values);
+  absorbCookieHeader(EhUrl.FORUM_ORIGIN, names, values);
+  absorbCookieHeader(EhUrl.URL_SIGN_IN, names, values);
+
+  const parts: string[] = [];
+  for (let i = 0; i < names.length; i++) {
+    parts.push(names[i] + '=' + values[i]);
+  }
+  return parts.join('; ');
+}
+
+export function syncCookieHeaderToWebView(url: string, cookieHeader: string): void {
+  if (url.length === 0 || cookieHeader.trim().length === 0) {
+    return;
+  }
+
+  const names: string[] = [];
+  const values: string[] = [];
+  absorbCookieHeaderText(cookieHeader, names, values);
+  for (let i = 0; i < names.length; i++) {
+    if (names[i].length === 0 || values[i].length === 0) {
+      continue;
+    }
+    try {
+      webview.WebCookieManager.configCookieSync(url, names[i] + '=' + values[i] + '; path=/');
+    } catch (error) {
+    }
+  }
+  try {
+    webview.WebCookieManager.saveCookieSync();
+  } catch (error) {
+  }
+}
+
+interface CookieIdentity {
+  memberId: string;
+  passHash: string;
+  igneous: string;
+}
+
+function parseCookieIdentity(text: string): CookieIdentity {
+  const names: string[] = [];
+  const values: string[] = [];
+  absorbCookieHeaderText(text, names, values);
+  return {
+    memberId: findCookieValue('ipb_member_id', names, values),
+    passHash: findCookieValue('ipb_pass_hash', names, values),
+    igneous: findCookieValue('igneous', names, values)
+  };
+}
+
+function absorbCookieHeaderText(text: string, names: string[], values: string[]): void {
+  if (text.trim().length === 0) {
+    return;
+  }
+
+  const rows = text.replace(/\r/g, '\n').split('\n');
+  for (let i = 0; i < rows.length; i++) {
+    absorbCookieRow(rows[i], names, values);
+  }
+}
+
+function absorbCookieRow(row: string, names: string[], values: string[]): void {
+  const trimmed = row.trim();
+  if (trimmed.length === 0) {
+    return;
+  }
+
+  const colon = trimmed.indexOf(':');
+  if (colon > 0) {
+    const key = trimmed.substring(0, colon).trim();
+    const value = trimmed.substring(colon + 1).trim();
+    if (isKnownCookieName(key) && value.length > 0) {
+      upsertCookiePair(key, value, names, values);
+      return;
+    }
+  }
+
+  const normalized = trimmed.startsWith('Cookie:') ? trimmed.substring(7).trim() : trimmed;
+  const pieces = normalized.split(';');
+  for (let i = 0; i < pieces.length; i++) {
+    const piece = pieces[i].trim();
+    const eq = piece.indexOf('=');
+    if (eq <= 0) {
+      continue;
+    }
+    const key = piece.substring(0, eq).trim();
+    const value = piece.substring(eq + 1).trim();
+    if (key.length === 0 || value.length === 0 || isCookieAttribute(key)) {
+      continue;
+    }
+    upsertCookiePair(key, value, names, values);
+  }
+}
+
+function findCookieValue(name: string, names: string[], values: string[]): string {
+  for (let i = 0; i < names.length; i++) {
+    if (names[i] === name) {
+      return values[i];
+    }
+  }
+  return '';
+}
+
+function absorbCookieHeader(url: string, names: string[], values: string[]): void {
+  if (url.length === 0) {
+    return;
+  }
+
+  let header = '';
+  try {
+    header = webview.WebCookieManager.fetchCookieSync(url);
+  } catch (error) {
+    header = '';
+  }
+  if (header.length === 0) {
+    return;
+  }
+
+  const pairs = header.split(';');
+  for (let i = 0; i < pairs.length; i++) {
+    const pair = pairs[i].trim();
+    const index = pair.indexOf('=');
+    if (index <= 0) {
+      continue;
+    }
+    upsertCookiePair(pair.substring(0, index), pair.substring(index + 1), names, values);
+  }
+}
+
+function upsertCookiePair(name: string, value: string, names: string[], values: string[]): void {
+  for (let i = 0; i < names.length; i++) {
+    if (names[i] === name) {
+      values[i] = value;
+      return;
+    }
+  }
+  names.push(name);
+  values.push(value);
+}
+
+export function hasLoginCookie(cookieHeader: string): boolean {
+  return cookieHeader.indexOf('ipb_member_id=') >= 0 && cookieHeader.indexOf('ipb_pass_hash=') >= 0;
+}
+
+function isKnownCookieName(name: string): boolean {
+  return name === 'ipb_member_id' || name === 'ipb_pass_hash' || name === 'igneous' ||
+    name === 'cf_clearance' || name === 'sk' || name === 'yay' || name === 'sl';
+}
+
+function isCookieAttribute(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower === 'domain' || lower === 'path' || lower === 'expires' || lower === 'max-age' ||
+    lower === 'secure' || lower === 'httponly' || lower === 'samesite';
+}
+
+function checkIpbMemberId(id: string): boolean {
+  if (id.length === 0) {
+    return false;
+  }
+  for (let i = 0; i < id.length; i++) {
+    const code = id.charCodeAt(i);
+    if (code < 48 || code > 57) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function checkIpbPassHash(hash: string): boolean {
+  if (hash.length !== 32) {
+    return false;
+  }
+  for (let i = 0; i < hash.length; i++) {
+    const code = hash.charCodeAt(i);
+    const digit = code >= 48 && code <= 57;
+    const lower = code >= 97 && code <= 122;
+    if (!digit && !lower) {
+      return false;
+    }
+  }
+  return true;
+}

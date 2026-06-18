@@ -5,6 +5,7 @@ import { ehDownloadStore } from '../services/EhDownloadStore';
 import { ehSettingsStore } from '../services/EhSettingsStore';
 import { ehSpiderInfoStore } from '../services/EhSpiderInfoStore';
 import { EhDrawer } from '../components/NavigationComponents';
+import { applyAppChromeImmersiveMode } from '../services/EhWindowImmersive';
 import { FavoriteGalleryScene, HomeGalleryScene, HotGalleryScene, SubscriptionGalleryScene } from '../components/GalleryScenes';
 import { HistoryScene, TopListScene } from '../components/HistoryTopScenes';
 import { DownloadScene, MigrationScene } from '../components/DownloadMigrationScenes';
@@ -52,6 +53,7 @@ struct Index {
   }
 
   aboutToAppear(): void {
+    applyAppChromeImmersiveMode();
     const context = getAbilityContext();
     if (context === undefined) {
       this.activeRoute = GalleryRoute.Home;
@@ -81,6 +83,7 @@ struct Index {
   }
 
   selectRoute(route: GalleryRoute): void {
+    applyAppChromeImmersiveMode();
     if (this.activeRoute !== route) {
       this.activeRoute = route;
     }

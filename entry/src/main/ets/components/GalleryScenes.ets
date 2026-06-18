@@ -110,63 +110,10 @@ function mergeLoadedGalleryDetail(loaded: GalleryDetail, previous: GalleryDetail
   return next;
 }
 
-@Component
-export struct HomeGalleryScene {
-  onMenu: () => void = () => {};
-
-  build() {
-    GalleryListScene({
-      sceneTitle: 'Homepage',
-      listMode: 'Search',
-      sourceRoute: GalleryRoute.Home,
-      onMenu: this.onMenu
-    })
-  }
-}
-
-@Component
-export struct SubscriptionGalleryScene {
-  onMenu: () => void = () => {};
-
-  build() {
-    GalleryListScene({
-      sceneTitle: 'Subscription',
-      listMode: 'Watched tags',
-      sourceRoute: GalleryRoute.Subscription,
-      onMenu: this.onMenu
-    })
-  }
-}
-
-@Component
-export struct HotGalleryScene {
-  onMenu: () => void = () => {};
-
-  build() {
-    GalleryListScene({
-      sceneTitle: 'What\'s Hot',
-      listMode: 'Popular',
-      sourceRoute: GalleryRoute.WhatsHot,
-      onMenu: this.onMenu
-    })
-  }
-}
-
-@Component
-export struct FavoriteGalleryScene {
-  onMenu: () => void = () => {};
-
-  build() {
-    GalleryListScene({
-      sceneTitle: 'Favourite',
-      listMode: 'Favorites',
-      sourceRoute: GalleryRoute.Favorites,
-      onMenu: this.onMenu
-    })
-  }
-}
-
-
+export { HomeGalleryScene } from './HomeGalleryScene';
+export { SubscriptionGalleryScene } from './SubscriptionGalleryScene';
+export { HotGalleryScene } from './HotGalleryScene';
+export { FavoriteGalleryScene } from './FavoriteGalleryScene';
 @Component
 export struct GalleryListScene {
   private client: EhHttpClient = new EhHttpClient();

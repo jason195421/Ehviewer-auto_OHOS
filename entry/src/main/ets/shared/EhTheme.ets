@@ -28,15 +28,15 @@ const LIGHT_PALETTE: EhColorPalette = {
   pageBackground: '#F3F5F7',
   surface: '#FFFFFF',
   surfaceVariant: '#F0F4F7',
-  fieldBackground: '#DCECF3',
+  fieldBackground: '#EAF4F8',
   primaryText: '#17202A',
   secondaryText: '#667085',
   tertiaryText: '#98A2B3',
   mutedText: '#95A1B0',
   divider: '#E8EDF2',
   placeholder: '#9BB8CB',
-  selectedBackground: '#D6EBF5',
-  selectedBackgroundLight: '#EAF4FA',
+  selectedBackground: '#B7DCEB',
+  selectedBackgroundLight: '#D3ECF5',
   scrim: 'rgba(0,0,0,0.18)'
 };
 
@@ -53,8 +53,8 @@ const DARK_PALETTE: EhColorPalette = {
   mutedText: '#7D8C96',
   divider: '#2B3A45',
   placeholder: '#6F8490',
-  selectedBackground: '#244354',
-  selectedBackgroundLight: '#1C3441',
+  selectedBackground: '#386A80',
+  selectedBackgroundLight: '#2C5062',
   scrim: 'rgba(0,0,0,0.32)'
 };
 
@@ -71,8 +71,8 @@ const BLACK_PALETTE: EhColorPalette = {
   mutedText: '#747D84',
   divider: '#222222',
   placeholder: '#666666',
-  selectedBackground: '#17313F',
-  selectedBackgroundLight: '#101F27',
+  selectedBackground: '#23566D',
+  selectedBackgroundLight: '#1B3E50',
   scrim: 'rgba(0,0,0,0.42)'
 };
 

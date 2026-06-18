@@ -648,6 +648,7 @@ export struct SearchAdvancedPanel {
   @State pageFromDraft: number = -1;
   @State pageToDraft: number = -1;
   @State modeLabelDraft: string = '';
+  @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
   onSearchModeChange: (mode: ListMode) => void = (_mode: ListMode) => {};
   onSearchCategoryChange: (category: number) => void = (_category: number) => {};
   onAdvancedEnabledChange: (enabled: boolean) => void = (_enabled: boolean) => {};
@@ -796,6 +797,7 @@ export struct SearchAdvancedPanel {
         Column({ space: 10 }) {
           Row() {
             Select(this.searchModeOptions())
+              .id('search-mode-select-' + this.languageRevision.toString() + '-' + this.modeLabelDraft)
               .selected(this.searchModeIndex())
               .value(this.modeLabelDraft.length > 0 ? this.modeLabelDraft : this.modeLabelForIndex(this.searchModeIndex()))
               .height(38)
