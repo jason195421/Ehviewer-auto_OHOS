@@ -30,6 +30,7 @@ import {
   themeMutedText as paletteMutedText,
   themePageBackground as palettePageBackground,
   themePlaceholderColor as palettePlaceholderColor,
+  themePrimaryColor as palettePrimaryColor,
   themePrimaryText as palettePrimaryText,
   themeSecondaryText as paletteSecondaryText,
   themeSelectedBackground as paletteSelectedBackground,
@@ -1369,6 +1370,10 @@ export function themePageBackground(): string {
   return palettePageBackground();
 }
 
+export function themePrimaryColor(): string {
+  return palettePrimaryColor();
+}
+
 export function themeSurface(): string {
   return paletteSurface();
 }
@@ -1601,6 +1606,7 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
       optionSettingsRow('show_jpn_title', 'Show Japanese title', 'Prefer original title when available', entries, ON_OFF_OPTIONS),
       optionSettingsRow('show_gallery_pages', 'Show gallery pages', 'Display page count in gallery list rows', entries, ON_OFF_OPTIONS),
       optionSettingsRow('show_tag_translations', 'Show tag translations', 'Use translated tag labels when data is available', entries, ON_OFF_OPTIONS),
+      optionSettingsRow('theme', 'Theme', 'Original app cycles Light, Dark and Black from drawer/footer and Settings', entries, ['Light', 'Dark', 'Black']),
       staticSettingsRow('filter', 'Filter', 'Keyword/gallery filtering rules', 'Open', 'action'),
       staticSettingsRow('blacklist', 'Blacklist', 'Hide matching galleries from lists (uses same filter rules)', 'Open', 'action'),
       optionSettingsRow('show_eh_limits', 'Show EH limits', 'Display account and image limits in the drawer', entries, ON_OFF_OPTIONS),

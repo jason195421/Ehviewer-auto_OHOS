@@ -40,7 +40,7 @@ const LIGHT_PALETTE: EhColorPalette = {
 
 const DARK_PALETTE: EhColorPalette = {
   name: 'Dark',
-  primary: EH_THEME_PRIMARY_COLOR,
+  primary: '#24586F',
   pageBackground: '#101820',
   surface: '#18232D',
   surfaceVariant: '#22303B',
@@ -58,7 +58,7 @@ const DARK_PALETTE: EhColorPalette = {
 
 const BLACK_PALETTE: EhColorPalette = {
   name: 'Black',
-  primary: EH_THEME_PRIMARY_COLOR,
+  primary: '#173E50',
   pageBackground: '#000000',
   surface: '#070707',
   surfaceVariant: '#111111',
@@ -100,6 +100,10 @@ export function isBlackTheme(): boolean {
 
 export function themePageBackground(): string {
   return currentThemePalette().pageBackground;
+}
+
+export function themePrimaryColor(): string {
+  return currentThemePalette().primary;
 }
 
 export function themeSurface(): string {

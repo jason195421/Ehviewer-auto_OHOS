@@ -2,7 +2,6 @@ import { GalleryRoute } from '../model/GalleryModels';
 import { ehCookieStore } from '../services/EhCookieStore';
 import { ehDownloadStore } from '../services/EhDownloadStore';
 import {
-  APP_THEME_COLOR,
   LANGUAGE_REVISION_KEY,
   STATUS_BAR_HEIGHT_KEY,
   themeSurfaceColor,
@@ -16,6 +15,7 @@ import {
 import {
   themeDividerColor,
   themeFieldBackground,
+  themePrimaryColor,
   themePrimaryText,
   themeSecondaryText,
   themeSelectedBackground,
@@ -77,7 +77,7 @@ export struct EhDrawer {
           Text(this.signedIn ? 'EH' : '?')
             .fontSize(22)
             .fontWeight(FontWeight.Bold)
-            .fontColor(APP_THEME_COLOR)
+            .fontColor(themePrimaryColor())
             .textAlign(TextAlign.Center)
             .width(52)
             .height(52)
@@ -104,7 +104,7 @@ export struct EhDrawer {
         .alignItems(VerticalAlign.Center)
       }
       .width('100%')
-      .backgroundColor(APP_THEME_COLOR)
+      .backgroundColor(themePrimaryColor())
 
       // ---- Nav items ----
       List() {
@@ -179,14 +179,14 @@ struct DrawerNavItem {
         .width(3)
         .height(28)
         .borderRadius(2)
-        .backgroundColor(this.selected ? APP_THEME_COLOR : Color.Transparent)
+        .backgroundColor(this.selected ? themePrimaryColor() : Color.Transparent)
         .margin({ right: 10 })
 
       // Icon badge
       Column() {
         SymbolGlyph(this.symbolForRoute(this.item.route))
           .fontSize(20)
-          .fontColor([this.selected ? APP_THEME_COLOR : themeSecondaryText()])
+          .fontColor([this.selected ? themePrimaryColor() : themeSecondaryText()])
       }
       .width(38)
       .height(38)
@@ -199,7 +199,7 @@ struct DrawerNavItem {
         Text(uiText(this.item.title))
           .fontSize(15)
           .fontWeight(this.selected ? FontWeight.Medium : FontWeight.Normal)
-          .fontColor(this.selected ? APP_THEME_COLOR : themePrimaryText())
+          .fontColor(this.selected ? themePrimaryColor() : themePrimaryText())
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
 
@@ -264,7 +264,7 @@ export struct EhNavBar {
       Column()
         .height(this.statusBarHeight)
         .width('100%')
-        .backgroundColor(APP_THEME_COLOR)
+        .backgroundColor(themePrimaryColor())
 
       // Main bar row
       Row() {
@@ -299,7 +299,7 @@ export struct EhNavBar {
               .borderRadius(19)
               .placeholderColor(themeSecondaryText())
               .fontColor(themePrimaryText())
-              .caretColor(APP_THEME_COLOR)
+              .caretColor(themePrimaryColor())
               .padding({ left: 16, right: 42 })
               .onChange((v: string) => { this.onKeywordChange(v); })
               .onSubmit(() => { this.onSearch(); })
@@ -402,7 +402,7 @@ export struct EhNavBar {
       .height(this.barBodyHeight())
       .padding({ left: 12, right: 12 })
       .alignItems(VerticalAlign.Center)
-      .backgroundColor(APP_THEME_COLOR)
+      .backgroundColor(themePrimaryColor())
     }
     .width('100%')
     .translate({ y: this.translateY })
@@ -426,7 +426,7 @@ export struct EhSubNavBar {
       Column()
         .height(this.statusBarHeight)
         .width('100%')
-        .backgroundColor(APP_THEME_COLOR)
+        .backgroundColor(themePrimaryColor())
 
       Row() {
         Button({ type: ButtonType.Circle, stateEffect: true }) {
@@ -453,7 +453,7 @@ export struct EhSubNavBar {
       .height(56)
       .padding({ left: 12, right: 16 })
       .alignItems(VerticalAlign.Center)
-      .backgroundColor(APP_THEME_COLOR)
+      .backgroundColor(themePrimaryColor())
     }
     .width('100%')
     .zIndex(10)
@@ -637,7 +637,7 @@ struct LegacySearchBar {
         .backgroundColor(themeFieldBackground())
         .borderRadius(19)
         .fontColor(themePrimaryText())
-        .caretColor(APP_THEME_COLOR)
+        .caretColor(themePrimaryColor())
         .placeholderColor(themeSecondaryText())
         .padding({ left: 14, right: 14 })
         .margin({ left: 10 })
@@ -657,7 +657,7 @@ struct LegacySearchBar {
     .height(62)
     .padding({ left: 12, right: 12 })
     .alignItems(VerticalAlign.Center)
-    .backgroundColor(APP_THEME_COLOR)
+    .backgroundColor(themePrimaryColor())
   }
 }
 
@@ -719,7 +719,7 @@ struct LegacyActionBar {
     .height(62)
     .padding({ left: 12, right: 12 })
     .alignItems(VerticalAlign.Center)
-    .backgroundColor(APP_THEME_COLOR)
+    .backgroundColor(themePrimaryColor())
   }
 }
 
@@ -811,6 +811,6 @@ export struct AppTopBar {
     .height(62)
     .padding({ left: 12, right: 16 })
     .alignItems(VerticalAlign.Center)
-    .backgroundColor(APP_THEME_COLOR)
+    .backgroundColor(themePrimaryColor())
   }
 }

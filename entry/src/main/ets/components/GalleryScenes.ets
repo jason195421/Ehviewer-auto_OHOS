@@ -9,7 +9,19 @@ import { ehFilterStore } from '../services/EhFilterStore';
 import { DetailPreviewPager, mergeGalleryPreviewSets, seedPreviewMap } from '../services/GalleryPreviewLoader';
 import { createReaderSessionState, readerSessionStore } from '../services/ReaderSessionStore';
 import { ehSettingsStore } from '../services/EhSettingsStore';
-import { LANGUAGE_REVISION_KEY, APP_THEME_COLOR } from '../shared/EhShared';
+import { LANGUAGE_REVISION_KEY } from '../shared/EhShared';
+import {
+  themeFieldBackground,
+  themePageBackground,
+  themePlaceholderColor,
+  themePrimaryColor,
+  themePrimaryText,
+  themeScrimColor,
+  themeSecondaryText,
+  themeSurface,
+  themeSurfaceVariant,
+  themeTertiaryText
+} from '../shared/EhTheme';
 import { EhNavBar } from '../components/NavigationComponents';
 import { CategoryBadge, GalleryListRow, GalleryThumb, GalleryThumbCard } from './GalleryCards';
 import { GalleryDetailOverlayScene, GalleryDetailScene } from './GalleryDetailScenes';
@@ -1659,7 +1671,7 @@ export struct GalleryListContent {
         LoadingProgress()
           .width(26)
           .height(26)
-          .color(APP_THEME_COLOR)
+          .color(themePrimaryColor())
           .visibility(this.refreshShowLogo ? Visibility.None : Visibility.Visible)
         if (this.refreshMsg.length > 0) {
           Text(this.refreshMsg)
@@ -1681,7 +1693,7 @@ export struct GalleryListContent {
       Column()
         .height(this.statusBarVp())
         .width('100%')
-        .backgroundColor(APP_THEME_COLOR)
+        .backgroundColor(themePrimaryColor())
 
       Row({ space: 8 }) {
         Button({ type: ButtonType.Circle, stateEffect: true }) {
@@ -1700,11 +1712,11 @@ export struct GalleryListContent {
         TextInput({ text: this.keyword, placeholder: uiText('Search galleries') })
           .height(38)
           .layoutWeight(1)
-          .backgroundColor('#F4F7F9')
+          .backgroundColor(themeFieldBackground())
           .borderRadius(19)
-          .placeholderColor('#5D7183')
-          .fontColor('#17202A')
-          .caretColor(APP_THEME_COLOR)
+          .placeholderColor(themeSecondaryText())
+          .fontColor(themePrimaryText())
+          .caretColor(themePrimaryColor())
           .padding({ left: 16, right: 16 })
           .onChange((value: string) => {
             this.onKeywordChange(value);
@@ -1732,7 +1744,7 @@ export struct GalleryListContent {
       .height(this.barHeight)
       .padding({ left: 12, right: 12 })
       .alignItems(VerticalAlign.Center)
-      .backgroundColor(APP_THEME_COLOR)
+      .backgroundColor(themePrimaryColor())
     }
     .width('100%')
     .translate({ y: this.toolbarOffsetY })
@@ -1745,14 +1757,14 @@ export struct GalleryListContent {
     Row({ space: 8 }) {
       Text(uiText('Page'))
         .fontSize(12)
-        .fontColor('#40566F')
+        .fontColor(themeSecondaryText())
       TextInput({ text: this.pageJumpDraft, placeholder: '1' })
         .width(64)
         .height(30)
         .type(InputType.Number)
         .fontSize(13)
-        .fontColor('#17202A')
-        .backgroundColor('#EEF2F6')
+        .fontColor(themePrimaryText())
+        .backgroundColor(themeFieldBackground())
         .borderRadius(4)
         .textAlign(TextAlign.Center)
         .onChange((value: string) => {
@@ -1763,10 +1775,10 @@ export struct GalleryListContent {
         })
       Text('/ ' + (this.totalPages > 0 ? this.totalPages.toString() : '-'))
         .fontSize(12)
-        .fontColor('#667085')
+        .fontColor(themeSecondaryText())
       Text(this.resultSummaryText())
         .fontSize(12)
-        .fontColor('#667085')
+        .fontColor(themeSecondaryText())
         .layoutWeight(1)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -1777,7 +1789,7 @@ export struct GalleryListContent {
       }
       .width(32)
       .height(32)
-      .backgroundColor(APP_THEME_COLOR)
+      .backgroundColor(themePrimaryColor())
       .onClick(() => {
         this.closeAdvancedPanel();
         this.onSearch();
@@ -1786,7 +1798,7 @@ export struct GalleryListContent {
     .width('100%')
     .height(42)
     .padding({ left: 10, right: 10 })
-    .backgroundColor(Color.White)
+    .backgroundColor(themeSurface())
   }
 
   private resultSummaryText(): string {
@@ -1854,19 +1866,19 @@ export struct GalleryListContent {
         Column({ space: 8 }) {
           SymbolGlyph($r('sys.symbol.clock'))
             .fontSize(28)
-            .fontColor(['#A2AFBA'])
+            .fontColor([themePlaceholderColor()])
           Text(uiText('Search history'))
             .fontSize(15)
-            .fontColor('#40566F')
+            .fontColor(themeSecondaryText())
           Text(uiText('Search history appears before typing; tag tips appear while typing'))
             .fontSize(12)
-            .fontColor('#7A8A99')
+            .fontColor(themeTertiaryText())
         }
         .width('100%')
         .height(180)
         .justifyContent(FlexAlign.Center)
         .alignItems(HorizontalAlign.Center)
-        .backgroundColor(Color.White)
+        .backgroundColor(themeSurface())
         .borderRadius(6)
       }
     }
@@ -2033,7 +2045,7 @@ export struct GalleryListContent {
         })
         .width('100%')
         .layoutWeight(1)
-        .backgroundColor($r('app.color.page_background'))
+        .backgroundColor(themePageBackground())
       }
       .width('100%')
       .height('100%')
@@ -2044,7 +2056,7 @@ export struct GalleryListContent {
           this.viewportHeight = h;
         }
       })
-      .backgroundColor($r('app.color.page_background'))
+      .backgroundColor(themePageBackground())
 
       // FAB 悬浮按钮
       Column() {
@@ -2073,7 +2085,7 @@ export struct GalleryListContent {
         Column()
           .width('100%')
           .height('100%')
-          .backgroundColor('rgba(0,0,0,0.18)')
+          .backgroundColor(themeScrimColor())
           .onClick(() => {
             this.closeAdvancedPanel();
           })
@@ -2110,7 +2122,7 @@ export struct GalleryListContent {
         Column()
           .width('100%')
           .height('100%')
-          .backgroundColor('rgba(0,0,0,0.16)')
+          .backgroundColor(themeScrimColor())
           .onClick(() => {
             this.closeJumpPanel();
           })
@@ -2120,15 +2132,15 @@ export struct GalleryListContent {
           Text(uiText('Jump'))
             .fontSize(15)
             .fontWeight(FontWeight.Medium)
-            .fontColor('#17202A')
+            .fontColor(themePrimaryText())
             .width('100%')
           Row({ space: 8 }) {
             TextInput({ text: this.pageJumpDraft, placeholder: (this.pageIndex + 1).toString() })
               .height(38)
               .layoutWeight(1)
               .type(InputType.Number)
-              .fontColor('#17202A')
-              .backgroundColor('#EEF2F6')
+              .fontColor(themePrimaryText())
+              .backgroundColor(themeFieldBackground())
               .borderRadius(4)
               .padding({ left: 10, right: 10 })
               .onChange((value: string) => {
@@ -2140,14 +2152,14 @@ export struct GalleryListContent {
               })
             Text('/ ' + (this.totalPages > 0 ? this.totalPages.toString() : '-'))
               .fontSize(13)
-              .fontColor('#667085')
+              .fontColor(themeSecondaryText())
           }
           Button(uiText('Jump'))
             .height(36)
             .width('100%')
             .fontSize(13)
             .fontColor(Color.White)
-            .backgroundColor(APP_THEME_COLOR)
+            .backgroundColor(themePrimaryColor())
             .borderRadius(4)
             .onClick(() => {
               this.submitPageJump();
@@ -2156,7 +2168,7 @@ export struct GalleryListContent {
         }
         .width(220)
         .padding(12)
-        .backgroundColor(Color.White)
+        .backgroundColor(themeSurface())
         .borderRadius(8)
         .shadow({ radius: 12, color: '#33000000', offsetX: 0, offsetY: 4 })
         .position({ x: this.contentWidth > 0 ? Math.max(12, this.contentWidth - 244) : 100, y: this.viewportHeight > 0 ? Math.max(96, this.viewportHeight - 210) : 360 })
@@ -2249,13 +2261,13 @@ export struct GalleryListStateView {
       Text(uiText(this.titleText()))
         .fontSize(18)
         .fontWeight(FontWeight.Bold)
-        .fontColor('#17202A')
+        .fontColor(themePrimaryText())
         .margin({ top: 14 })
 
       if (this.statusText.length > 0) {
         Text(uiStatusText(this.statusText))
           .fontSize(13)
-          .fontColor('#667085')
+          .fontColor(themeSecondaryText())
           .lineHeight(20)
           .textAlign(TextAlign.Center)
           .margin({ top: 8 })
@@ -2265,7 +2277,7 @@ export struct GalleryListStateView {
       if (this.requestUrl.length > 0 && this.isError()) {
         Text(this.requestUrl)
           .fontSize(11)
-          .fontColor('#98A2B3')
+          .fontColor(themeTertiaryText())
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .textAlign(TextAlign.Center)
@@ -2278,7 +2290,7 @@ export struct GalleryListStateView {
           .height(38)
           .fontSize(13)
           .fontColor(Color.White)
-          .backgroundColor('#2F6F8F')
+          .backgroundColor(themePrimaryColor())
           .margin({ top: 16 })
           .onClick(() => {
             this.onRefresh();
@@ -2290,6 +2302,6 @@ export struct GalleryListStateView {
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Center)
     .padding({ left: 24, right: 24, bottom: 48 })
-    .backgroundColor('#F3F5F7')
+    .backgroundColor(themePageBackground())
   }
 }

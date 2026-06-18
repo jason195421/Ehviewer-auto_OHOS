@@ -36,6 +36,7 @@ import { LANGUAGE_REVISION_KEY, notifyLanguageChanged, notifyThemeChanged } from
 import {
   themeFieldBackground,
   themePageBackground,
+  themePrimaryColor,
   themePrimaryText,
   themeSecondaryText,
   themeSurface,
@@ -358,7 +359,7 @@ export struct SessionScene {
 
           Text(uiText('Sign in via WebView'))
             .fontSize(14)
-            .fontColor('#2F6F8F')
+            .fontColor(themePrimaryColor())
             .margin({ top: 8 })
             .onClick(() => {
               this.prepareWebSignIn();
@@ -366,7 +367,7 @@ export struct SessionScene {
             })
           Text(uiText('Sign in via Cookies'))
             .fontSize(14)
-            .fontColor('#2F6F8F')
+            .fontColor(themePrimaryColor())
             .margin({ top: 10 })
             .onClick(() => {
               this.switchMode(SessionMode.Cookie);
@@ -633,12 +634,6 @@ export struct SettingsScene {
     }).catch((error: Error) => {
       this.statusText = 'Sign out failed: ' + error.message;
     });
-  }
-
-  private cycleTheme(): void {
-    this.saveSettingValue('theme', nextOption(this.themeName, ['Light', 'Dark', 'Black']));
-    this.themeName = settingEntryValue(this.settingEntries, 'theme', 'Light');
-    this.statusText = 'Theme preference saved: ' + this.themeName;
   }
 
   private saveSettingValue(key: string, value: string): void {
@@ -1342,9 +1337,6 @@ export struct SettingsScene {
         onSignOut: () => {
           this.signOut();
         },
-        onCycleTheme: () => {
-          this.cycleTheme();
-        },
         onCycleSetting: (row: SettingsRowItem) => {
           this.cycleSetting(row);
         },
@@ -1442,7 +1434,7 @@ export struct SettingsStatusBlock {
     Row() {
       SymbolGlyph($r('sys.symbol.info_circle'))
         .fontSize(20)
-        .fontColor(['#2F6F8F'])
+        .fontColor([themePrimaryColor()])
         .margin({ right: 10 })
       Text(uiStatusText(this.statusText))
         .fontSize(13)
@@ -1492,7 +1484,6 @@ export struct SettingsDetailPanel {
   onOpenSession: () => void = () => {};
   onOpenMigration: () => void = () => {};
   onSignOut: () => void = () => {};
-  onCycleTheme: () => void = () => {};
   onCycleSetting: (row: SettingsRowItem) => void = () => {};
   onSetSetting: (key: string, value: string) => void = () => {};
 
@@ -1547,14 +1538,6 @@ export struct SettingsDetailPanel {
               })
             }
           }, (row: SettingsRowItem) => settingsRowRenderKey(row))
-          ListItem() {
-            SettingsActionRow({
-              title: uiText('Theme'),
-              summary: uiText('Original app cycles Light, Dark and Black from drawer/footer and Settings'),
-              value: uiValue(this.themeName),
-              onTap: this.onCycleTheme
-            })
-          }
         } else if (this.panel === SettingsPanel.About) {
           ForEach(settingsRowsForPanel(this.panel, this.themeName, this.settingEntries), (row: SettingsRowItem) => {
             ListItem() {
@@ -1654,7 +1637,7 @@ export struct SettingsOptionPanel {
               if (option === this.value) {
                 Text(uiText('Selected'))
                   .fontSize(12)
-                  .fontColor('#2F6F8F')
+                  .fontColor(themePrimaryColor())
               }
             }
             .width('100%')
@@ -1695,7 +1678,7 @@ export struct SettingsActionRow {
       .layoutWeight(1)
       Text(this.value)
         .fontSize(12)
-        .fontColor(this.isEnabled ? '#2F6F8F' : '#98A2B3')
+        .fontColor(this.isEnabled ? themePrimaryColor() : themeTertiaryText())
         .margin({ left: 12 })
     }
     .width('100%')
@@ -1743,10 +1726,10 @@ export struct SettingsStaticRow {
         Row() {
           Text(this.row.value === 'On' ? uiText('On') : uiText('Off'))
             .fontSize(12)
-            .fontColor(this.row.value === 'On' ? '#2F6F8F' : '#98A2B3')
+            .fontColor(this.row.value === 'On' ? themePrimaryColor() : themeTertiaryText())
             .margin({ right: 8 })
           Toggle({ type: ToggleType.Switch, isOn: this.row.value === 'On' })
-            .selectedColor('#2F6F8F')
+            .selectedColor(themePrimaryColor())
             .switchPointColor(Color.White)
             .onChange((isOn: boolean) => {
               if (this.row.key !== undefined) {
@@ -1761,9 +1744,9 @@ export struct SettingsStaticRow {
           .selected(optionIndex(this.row.options, this.row.value))
           .value(uiValue(this.row.value))
           .font({ size: 13 })
-          .fontColor('#2F6F8F')
-          .selectedOptionBgColor('#EDF7FA')
-          .selectedOptionFontColor('#2F6F8F')
+          .fontColor(themePrimaryColor())
+          .selectedOptionBgColor(themeSurfaceVariant())
+          .selectedOptionFontColor(themePrimaryColor())
           .optionBgColor(themeSurface())
           .optionFont({ size: 13 })
           .margin({ left: 8 })
@@ -1841,7 +1824,7 @@ export struct SignInMark {
       .textAlign(TextAlign.Center)
       .width(72)
       .height(72)
-      .backgroundColor('#2F6F8F')
+      .backgroundColor(themePrimaryColor())
       .borderRadius(18)
       .padding({ top: 18 })
   }

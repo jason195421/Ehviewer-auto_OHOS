@@ -1,16 +1,13 @@
 import { ALL_CATEGORY, GalleryCategory, GalleryRoute } from '../model/GalleryModels';
 import { DEFAULT_ADVANCE_SEARCH, ListMode } from '../services/EhUrl';
 import { ehTagTranslationStore } from '../services/EhTagTranslationStore';
-import {
-  APP_THEME_COLOR,
-  LANGUAGE_REVISION_KEY,
-  categoryColor,
-  uiText
-} from '../shared/EhShared';
+import { LANGUAGE_REVISION_KEY, categoryColor, uiText } from '../shared/EhShared';
 import {
   themeFieldBackground,
   themePageBackground,
+  themePrimaryColor,
   themePrimaryText,
+  themeScrimColor,
   themeSecondaryText,
   themeSurface,
   themeSurfaceVariant
@@ -261,7 +258,7 @@ export struct GallerySearchScene {
         Column()
           .height(this.statusBarVp())
           .width('100%')
-          .backgroundColor(APP_THEME_COLOR)
+          .backgroundColor(themePrimaryColor())
 
         Row({ space: 8 }) {
           Button({ type: ButtonType.Circle, stateEffect: true }) {
@@ -284,7 +281,7 @@ export struct GallerySearchScene {
             .borderRadius(19)
             .placeholderColor(themeSecondaryText())
             .fontColor(themePrimaryText())
-            .caretColor(APP_THEME_COLOR)
+            .caretColor(themePrimaryColor())
             .padding({ left: 16, right: 16 })
             .onChange((value: string) => {
               this.keywordDraft = value;
@@ -312,7 +309,7 @@ export struct GallerySearchScene {
         .height(56)
         .padding({ left: 12, right: 12 })
         .alignItems(VerticalAlign.Center)
-        .backgroundColor(APP_THEME_COLOR)
+        .backgroundColor(themePrimaryColor())
 
         Column() {
           SearchSummaryStrip({
@@ -348,7 +345,7 @@ export struct GallerySearchScene {
         Column()
           .width('100%')
           .height('100%')
-          .backgroundColor('rgba(0,0,0,0.18)')
+          .backgroundColor(themeScrimColor())
           .onClick(() => {
             this.advancedPanelVisible = false;
           })
@@ -539,7 +536,7 @@ struct SearchSuggestionTile {
   }
 
   private tintForKind(kind: string): string {
-    return kind === 'tag' ? APP_THEME_COLOR : '#6B7C8C';
+    return kind === 'tag' ? themePrimaryColor() : themeSecondaryText();
   }
 
   build() {
@@ -803,8 +800,8 @@ export struct SearchAdvancedPanel {
           Button(uiText('All categories'))
             .height(32)
             .fontSize(14)
-            .fontColor(this.allCategoriesSelected() ? Color.White : '#40566F')
-            .backgroundColor(this.allCategoriesSelected() ? APP_THEME_COLOR : '#EEF2F6')
+            .fontColor(this.allCategoriesSelected() ? Color.White : themeSecondaryText())
+            .backgroundColor(this.allCategoriesSelected() ? themePrimaryColor() : themeSurfaceVariant())
             .borderRadius(4)
             .width('100%')
             .onClick(() => {
@@ -908,7 +905,7 @@ export struct SearchAdvancedPanel {
           .width('100%')
         }
         .height(44)
-        .backgroundColor(APP_THEME_COLOR)
+        .backgroundColor(themePrimaryColor())
         .borderRadius(8)
         .width('100%')
         .onClick(() => {
@@ -1022,7 +1019,7 @@ export struct ActionBubble {
       .width(this.primary ? 54 : 44)
       .height(this.primary ? 54 : 44)
       .enabled(this.isEnabled)
-      .backgroundColor(this.isEnabled ? (this.primary ? '#2F6F8F' : '#5A8FA8') : '#A8C0CC')
+      .backgroundColor(this.isEnabled ? (this.primary ? themePrimaryColor() : '#5A8FA8') : '#A8C0CC')
       .shadow({ radius: this.primary ? 14 : 8, color: '#33000000', offsetX: 0, offsetY: 3 })
       .onClick(() => {
         this.onTapAction();
@@ -1031,7 +1028,7 @@ export struct ActionBubble {
       if (!this.primary && this.label.length > 0) {
         Text(this.label)
           .fontSize(10)
-          .fontColor('#2F6F8F')
+          .fontColor(themePrimaryColor())
           .textAlign(TextAlign.Center)
           .backgroundColor('#DEEAF2')
           .padding({ left: 6, right: 6, top: 2, bottom: 2 })
@@ -1053,8 +1050,8 @@ export struct SearchFlagChip {
     Button(uiText(this.label))
       .height(30)
       .fontSize(13)
-      .fontColor(this.isOn ? Color.White : '#40566F')
-      .backgroundColor(this.isOn ? APP_THEME_COLOR : '#EEF2F6')
+      .fontColor(this.isOn ? Color.White : themeSecondaryText())
+      .backgroundColor(this.isOn ? themePrimaryColor() : themeSurfaceVariant())
       .borderRadius(4)
       .layoutWeight(1)
       .onClick(() => {
@@ -1093,7 +1090,7 @@ export struct SearchCategoryChip {
       case GalleryCategory.Misc:
         return '#E5E7EB';
       default:
-        return '#EEF2F6';
+        return themeSurfaceVariant();
     }
   }
 
@@ -1135,7 +1132,7 @@ export struct RatingStarBar {
           }
           .width(36)
           .height(36)
-          .backgroundColor(this.starActive(index) ? '#FFF0D4' : '#EEF2F6')
+          .backgroundColor(this.starActive(index) ? '#6E521F' : themeSurfaceVariant())
           .onClick(() => {
             this.onSelect(index);
           })
@@ -1145,7 +1142,7 @@ export struct RatingStarBar {
       .width('100%')
       Text(uiText(this.labelText()))
         .fontSize(13)
-        .fontColor('#40566F')
+        .fontColor(themeSecondaryText())
         .maxLines(1)
         .textAlign(TextAlign.Center)
     }
