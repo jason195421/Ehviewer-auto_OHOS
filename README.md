@@ -1,5 +1,9 @@
 # EhViewer HarmonyOS
 
+<p align="center">
+  <img src="docs/images/app-icon.png" width="120" alt="EhViewer HarmonyOS app icon" />
+</p>
+
 `Ehviewer_OHOS` 是基于 `Ehviewer_CN_SXJ` 的 HarmonyOS 原生移植项目。项目目标不是通过 Android 兼容层运行 APK，而是使用 ArkTS、ArkUI 和 HarmonyOS Stage 模型重写主要界面、网络、阅读器、下载、历史、设置等功能。
 
 当前目标环境：
@@ -8,6 +12,13 @@
 - API 6.1.1 (24)
 - 包名：`yt.ehviewer.huawei`
 - 技术栈：ArkTS + ArkUI + Stage 模型
+
+## 应用预览
+
+<p align="center">
+  <img src="docs/images/gallery-list.jpg" width="280" alt="Gallery list screenshot" />
+  <img src="docs/images/gallery-detail.jpg" width="280" alt="Gallery detail screenshot" />
+</p>
 
 ## 项目说明
 
@@ -35,6 +46,7 @@
 - `entry/src/main/ets/parser/`：列表页、详情页、图片页、排行页解析逻辑。
 - `entry/src/main/ets/model/`：画廊、下载、设置等数据模型。
 - `entry/src/main/resources/`：模块资源和语言资源。
+- `docs/images/`：README 中使用的图标和截图。
 
 ## 反馈与贡献
 
@@ -56,4 +68,4 @@
 
 ## License
 
-本项目继承原项目的开源许可约束，按 `GPL-3.0-or-later` 发布。移植过程中新增的代码也按相同许可发布。
+本项目继承原项目的开源许可证，按 `GPL-3.0-or-later` 发布。移植过程中新增的代码也按相同许可发布。
