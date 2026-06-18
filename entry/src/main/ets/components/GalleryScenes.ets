@@ -19,7 +19,7 @@ import { uiText, uiStatusText, setActiveBackHandler, createEmptyGallery, createD
 
 export { CategoryBadge, GalleryListRow, GalleryTagChip, GalleryThumb, GalleryThumbCard } from './GalleryCards';
 export { GalleryDetailOverlayScene, GalleryDetailScene } from './GalleryDetailScenes';
-export { ActionBubble, GallerySearchScene, QuickActionColumn, SearchAdvancedPanel, SearchFlagChip, SearchStatusChip, SearchSuggestionList, SearchSummaryStrip } from './GallerySearchScenes';
+export { ActionBubble, GallerySearchScene, QuickActionColumn, SearchAdvancedPanel, SearchFlagChip, SearchSuggestionList, SearchSummaryStrip } from './GallerySearchScenes';
 export { CommentsScene, PlaceholderScene, ReaderNavButton, ReaderScene, ReaderToolButton } from './ReaderScenes';
 
 interface GalleryListSceneCache {
@@ -1791,10 +1791,6 @@ export struct GalleryListContent {
   private searchSuggestionPlaceholder() {
     Column({ space: 10 }) {
       SearchSummaryStrip({
-        mode: this.searchModeValue,
-        category: this.searchCategory,
-        advancedEnabled: this.advancedSearchEnabled,
-        filterActive: this.filterActive,
         selectedTagNamespaces: this.selectedTagNamespaces,
         onToggleTagNamespace: (namespace: string) => {
           this.toggleTagNamespace(namespace);

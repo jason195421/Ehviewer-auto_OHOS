@@ -1,7 +1,7 @@
 import { ALL_CATEGORY, GalleryCategory, GalleryRoute } from '../model/GalleryModels';
 import { DEFAULT_ADVANCE_SEARCH, ListMode } from '../services/EhUrl';
 import { ehTagTranslationStore } from '../services/EhTagTranslationStore';
-import { APP_THEME_COLOR, LANGUAGE_REVISION_KEY, categoryColor, categoryName, themeSurfaceColor, uiText } from '../shared/EhShared';
+import { APP_THEME_COLOR, LANGUAGE_REVISION_KEY, categoryColor, themeSurfaceColor, uiText } from '../shared/EhShared';
 
 export interface SearchSuggestionItem {
   kind: string;
@@ -206,8 +206,8 @@ export struct GallerySearchScene {
       this.advanceSearchDraft, this.minRatingDraft, this.pageFromDraft, this.pageToDraft);
   }
 
-  private refreshSuggestions(): void {
-    this.suggestions = buildSearchSuggestions(this.keywordDraft, 40, this.selectedTagNamespaces);
+  private refreshSuggestions(namespaces: string[] = this.selectedTagNamespaces): void {
+    this.suggestions = buildSearchSuggestions(this.keywordDraft, 40, namespaces);
   }
 
   private applySuggestion(suggestion: SearchSuggestionItem): void {
@@ -230,7 +230,7 @@ export struct GallerySearchScene {
       next.push(namespace);
     }
     this.selectedTagNamespaces = next;
-    this.refreshSuggestions();
+    this.refreshSuggestions(next);
   }
 
   build() {
@@ -294,10 +294,6 @@ export struct GallerySearchScene {
 
         Column() {
           SearchSummaryStrip({
-            mode: this.modeDraft,
-            category: this.categoryDraft,
-            advancedEnabled: this.advancedEnabledDraft,
-            filterActive: this.filterActive,
             selectedTagNamespaces: this.selectedTagNamespaces,
             onToggleTagNamespace: (namespace: string) => {
               this.toggleTagNamespace(namespace);
@@ -310,11 +306,11 @@ export struct GallerySearchScene {
                 this.applySuggestion(suggestion);
               }
             })
-              .margin({ top: 10 })
+              .margin({ top: 6 })
           }
         }
         .width('100%')
-        .padding({ left: 14, right: 14, top: 12 })
+        .padding({ left: 8, right: 8, top: 8 })
         .layoutWeight(1)
         .backgroundColor($r('app.color.page_background'))
       }
@@ -380,40 +376,16 @@ export struct GallerySearchScene {
 
 @Component
 export struct SearchSummaryStrip {
-  @Prop mode: ListMode = ListMode.Normal;
-  @Prop category: number = GalleryCategory.None;
-  @Prop advancedEnabled: boolean = false;
-  @Prop filterActive: boolean = false;
   @Prop selectedTagNamespaces: string[] = [];
   onToggleTagNamespace: (namespace: string) => void = (_namespace: string) => {};
-
-  private modeLabel(): string {
-    if (this.mode === ListMode.Subscription) {
-      return 'Subscription';
-    }
-    if (this.mode === ListMode.Uploader) {
-      return 'Uploader';
-    }
-    if (this.mode === ListMode.Tag) {
-      return 'Tag';
-    }
-    return 'Normal';
-  }
 
   build() {
     Scroll() {
       Row({ space: 8 }) {
-        SearchStatusChip({ label: this.modeLabel(), isActive: true })
-        SearchStatusChip({ label: this.categoryLabel(), isActive: false })
-        if (this.advancedEnabled) {
-          SearchStatusChip({ label: 'Advanced', isActive: true })
-        }
-        if (this.filterActive) {
-          SearchStatusChip({ label: 'Filter', isActive: true })
-        }
-        ForEach(TAG_NAMESPACE_OPTIONS, (option: TagNamespaceOption) => {
-          SearchStatusChip({
+        ForEach(TAG_NAMESPACE_OPTIONS, (option: TagNamespaceOption, index: number) => {
+          SearchNamespaceChip({
             label: option.label,
+            paletteIndex: index,
             isActive: this.namespaceSelected(option.value),
             onClickAction: () => {
               this.onToggleTagNamespace(option.value);
@@ -423,23 +395,14 @@ export struct SearchSummaryStrip {
       }
     }
     .width('100%')
-    .height(34)
+    .height(46)
+    .padding({ top: 6, bottom: 6 })
     .scrollable(ScrollDirection.Horizontal)
     .scrollBar(BarState.Off)
   }
 
   private namespaceSelected(namespace: string): boolean {
     return this.selectedTagNamespaces.indexOf(namespace) >= 0;
-  }
-
-  private categoryLabel(): string {
-    if (this.category === GalleryCategory.None || this.category === ALL_CATEGORY) {
-      return 'All categories';
-    }
-    if (this.category === 0) {
-      return 'No categories';
-    }
-    return categoryName(this.category);
   }
 }
 
@@ -449,30 +412,19 @@ export struct SearchSuggestionList {
   onSelect: (suggestion: SearchSuggestionItem) => void = (_suggestion: SearchSuggestionItem) => {};
   @State contentWidth: number = 0;
 
-  private iconForKind(kind: string): Resource {
-    if (kind === 'tag') {
-      return $r('sys.symbol.star');
-    }
-    return $r('sys.symbol.clock');
-  }
-
-  private tintForKind(kind: string): string {
-    if (kind === 'tag') {
-      return APP_THEME_COLOR;
-    }
-    return '#6B7C8C';
-  }
-
   private columnCount(): number {
     if (this.contentWidth <= 0) {
       return 1;
     }
-    return Math.max(1, Math.floor((this.contentWidth + 8) / 260));
+    const minWidth = 154;
+    const maxColumns = this.contentWidth >= 980 ? 5 : (this.contentWidth >= 740 ? 4 :
+      (this.contentWidth >= 500 ? 3 : (this.contentWidth >= 320 ? 2 : 1)));
+    return Math.max(1, Math.min(maxColumns, Math.floor((this.contentWidth + 6) / (minWidth + 6))));
   }
 
   private itemWidth(): number {
     const columns = this.columnCount();
-    return Math.floor((Math.max(0, this.contentWidth) - (columns - 1) * 8) / columns);
+    return Math.floor((Math.max(0, this.contentWidth) - (columns - 1) * 6) / columns);
   }
 
   private suggestionRows(): SearchSuggestionItem[][] {
@@ -485,9 +437,9 @@ export struct SearchSuggestionList {
   }
 
   build() {
-    Column({ space: 8 }) {
+    Column({ space: 6 }) {
       ForEach(this.suggestionRows(), (row: SearchSuggestionItem[], rowIndex: number) => {
-        Row({ space: 8 }) {
+        Row({ space: 6 }) {
           ForEach(row, (suggestion: SearchSuggestionItem) => {
             SearchSuggestionTile({
               suggestion: suggestion,
@@ -498,6 +450,9 @@ export struct SearchSuggestionList {
             })
           }, (suggestion: SearchSuggestionItem) => suggestion.kind + ':' + suggestion.query + ':' +
             suggestion.subtitle)
+          if (row.length < this.columnCount()) {
+            Blank().layoutWeight(1)
+          }
         }
         .width('100%')
       }, (_row: SearchSuggestionItem[], index: number) => index.toString())
@@ -527,21 +482,22 @@ struct SearchSuggestionTile {
   }
 
   build() {
-    Row({ space: 10 }) {
+    Row({ space: 5 }) {
       SymbolGlyph(this.iconForKind(this.suggestion.kind))
         .fontSize(18)
         .fontColor([this.tintForKind(this.suggestion.kind)])
-        .width(24)
+        .width(19)
         .flexShrink(0)
-      Column({ space: 2 }) {
+      Column({ space: 1 }) {
         Text(this.suggestion.kind === 'history' ? uiText(this.suggestion.title) : this.suggestion.title)
-          .fontSize(14)
+          .fontSize(17)
+          .fontWeight(FontWeight.Medium)
           .fontColor('#17202A')
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         if (this.suggestion.subtitle.length > 0) {
           Text(this.suggestion.subtitle)
-            .fontSize(11)
+            .fontSize(13)
             .fontColor('#667085')
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -551,12 +507,12 @@ struct SearchSuggestionTile {
       .layoutWeight(1)
     }
     .width(this.widthValue > 0 ? this.widthValue : '100%')
-    .height(56)
-    .padding({ left: 10, right: 10 })
+    .height(44)
+    .padding({ left: 6, right: 6 })
     .alignItems(VerticalAlign.Center)
     .backgroundColor(Color.White)
-    .borderRadius(6)
-    .shadow({ radius: 4, color: '#12000000', offsetX: 0, offsetY: 1 })
+    .borderRadius(5)
+    .shadow({ radius: 3, color: '#10000000', offsetX: 0, offsetY: 1 })
     .onClick(() => {
       this.onSelect(this.suggestion);
     })
@@ -564,20 +520,37 @@ struct SearchSuggestionTile {
 }
 
 @Component
-export struct SearchStatusChip {
+struct SearchNamespaceChip {
   label: string = '';
+  paletteIndex: number = 0;
   isActive: boolean = false;
   onClickAction: () => void = () => {};
 
+  private activeColor(): string {
+    const colors: string[] = ['#245F82', '#5B4EA0', '#955626', '#24704D', '#8F3E66', '#456B9F'];
+    return colors[this.paletteIndex % colors.length];
+  }
+
+  private softColor(): string {
+    const colors: string[] = ['#D9EEF7', '#E8E3F8', '#F5E6D8', '#D8F0E4', '#F4DFEB', '#DEEAF7'];
+    return colors[this.paletteIndex % colors.length];
+  }
+
+  private textColor(): string {
+    const colors: string[] = ['#1E5575', '#4A3D8A', '#7A441D', '#245B40', '#77344F', '#375B86'];
+    return colors[this.paletteIndex % colors.length];
+  }
+
   build() {
-    Text(uiText(this.label))
-      .fontSize(12)
-      .fontColor(this.isActive ? Color.White : '#40566F')
-      .backgroundColor(this.isActive ? APP_THEME_COLOR : '#E7EEF3')
-      .borderRadius(4)
-      .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-      .maxLines(1)
-      .textOverflow({ overflow: TextOverflow.Ellipsis })
+    Button(uiText(this.label), { type: ButtonType.Normal, stateEffect: true })
+      .height(36)
+      .fontSize(15)
+      .fontWeight(FontWeight.Medium)
+      .fontColor(this.isActive ? Color.White : this.textColor())
+      .backgroundColor(this.isActive ? this.activeColor() : this.softColor())
+      .borderRadius(5)
+      .padding({ left: 15, right: 15 })
+      .animation({ duration: 120, curve: Curve.EaseOut })
       .onClick(() => {
         this.onClickAction();
       })
