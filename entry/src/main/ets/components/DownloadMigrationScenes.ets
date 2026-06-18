@@ -20,6 +20,7 @@ import { MigrationTask, migrationTasks } from '../services/MigrationStatus';
 import { FilterRule, FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, FILTER_MODE_TAG_NAMESPACE, ehFilterStore } from '../services/EhFilterStore';
 import { applyAppChromeImmersiveMode } from '../services/EhWindowImmersive';
 import { APP_THEME_COLOR, LANGUAGE_REVISION_KEY } from '../shared/EhShared';
+import { themeDividerColor, themeMutedText, themePageBackground, themePrimaryColor, themePrimaryText, themeSecondaryText, themeSelectedBackgroundLight, themeSurface, themeSurfaceVariant, themeTertiaryText } from '../shared/EhTheme';
 import { EhBackupBundle, DrawerItem, SettingsHeaderItem, SettingsRowItem, SessionMode, SettingsPanel, DRAWER_ITEMS, SETTINGS_HEADERS, STATUS_BAR_HEIGHT_KEY, ON_OFF_OPTIONS, shouldUseChineseUi, uiText, uiValue, uiStatusText, uiPageText, zhText, setActiveBackHandler, runActiveBackHandler, createEmptyGallery, createEmptyDownloadInfo, createDetailFromGallery, createEmptyDetail, createEmptyPreview, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneStringArray, cloneRequiredStringArray, cloneGalleryInfo, cloneGalleryInfos, padTwo, applyGalleryFilters, cloneGalleryTagGroups, cloneGalleryComments, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListItem, cloneTopListBucket, cloneTopListInfo, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, saveDownloadsQuietly, filterDownloadItems, downloadItemMatches, sortDownloadItems, nextDownloadStatusFilter, nextDownloadLabelFilter, nextDownloadSortMode, nextStringOption, nextDownloadState, nextDownloadLabel, downloadLabelName, downloadStateLabel, downloadStateColor, downloadProgressText, downloadSizeText, downloadImageUrlForPage, downloadThreadLimit, downloadPageIndexes, downloadQueueSummary, parseHistoryMaxSize, routeTitle, routeSubtitle, launchRouteFromSetting, settingsPanelTitle, settingsRowsForPanel, optionSettingsRow, textSettingsRow, staticSettingsRow, settingEntryValue, cloneStringOptions, settingMigrationMessage, nextOption, isValidProxyPortText, formatNetworkDiagnostics, listModeForRoute, routeUsesKeyword, usesGallerySearchToolbar, usesEmbeddedToolbar, defaultKeywordForRoute, gallerySearchTitle, currentGallerySite, effectiveListSite, gallerySiteName, galleryListFailureMessage, withGalleryListMessage, readerPageReferer, readerDisplayImageUrl, cacheReaderImageForPage, cacheThumbnailImage, cloneGalleryPageWithCache, readerLocalImageSource, readerZoomSize, readerFullImageWidth, readerFullImageHeight, readerImageFit, readerShortUrl, readerPreloadCount, readerIsRightToLeft, categoryName, categoryColor, ratingText, galleryDisplayTitle, showGalleryPages, galleryListMode, galleryThumbWidth, galleryThumbHeight, galleryRowHeight, galleryTagPreview, detailTitleFontSize, detailTitleMaxLines, detailHeadingFontSize, readerShowProgress, readerShowClock, readerClockText, padTimeNumber, topListChipColor } from '../shared/EhShared';
 import { CategoryBadge, GalleryThumb, PlaceholderScene } from './GalleryScenes';
 import { EhNavBar } from './NavigationComponents';
@@ -327,7 +328,7 @@ export struct DownloadScene {
           Blank()
           Text(this.visibleDownloadItems().length.toString() + '/' + this.items.length.toString())
             .fontSize(12)
-            .fontColor('#667085')
+            .fontColor(themeSecondaryText())
         }
         .width('100%')
 
@@ -360,13 +361,13 @@ export struct DownloadScene {
         Row() {
           Text(uiStatusText(this.statusText))
             .fontSize(11)
-            .fontColor('#40566F')
+            .fontColor(themeSecondaryText())
             .layoutWeight(1)
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
           Text(uiStatusText(downloadQueueSummary(this.items)))
             .fontSize(11)
-            .fontColor('#667085')
+            .fontColor(themeSecondaryText())
             .margin({ left: 8 })
         }
         .width('100%')
@@ -374,7 +375,7 @@ export struct DownloadScene {
       }
       .width('100%')
       .padding({ left: 12, right: 12, top: 10, bottom: 10 })
-      .backgroundColor(Color.White)
+      .backgroundColor(themeSurface())
       .margin({ left: 12, right: 12, top: 12, bottom: 8 })
 
       if (this.visibleDownloadItems().length === 0) {
@@ -382,10 +383,10 @@ export struct DownloadScene {
           Text(uiText('Downloads'))
             .fontSize(22)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#17202A')
+            .fontColor(themePrimaryText())
           Text(this.items.length === 0 ? uiText('Download items will be shown here') : uiText('No items match the current filter'))
             .fontSize(14)
-            .fontColor('#667085')
+            .fontColor(themeSecondaryText())
             .margin({ top: 10 })
         }
         .layoutWeight(1)
@@ -442,7 +443,7 @@ export struct DownloadScene {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#F3F5F7')
+    .backgroundColor(themePageBackground())
   }
 }
 
@@ -466,7 +467,7 @@ export struct DownloadRow {
           Text(galleryDisplayTitle(this.item))
             .fontSize(15)
             .fontWeight(FontWeight.Medium)
-            .fontColor('#17202A')
+            .fontColor(themePrimaryText())
             .maxLines(2)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .layoutWeight(1)
@@ -485,17 +486,17 @@ export struct DownloadRow {
           if (showGalleryPages()) {
             Text(this.item.pages.toString() + 'p')
               .fontSize(12)
-              .fontColor('#667085')
+              .fontColor(themeSecondaryText())
               .margin({ left: 8 })
           }
           Text(this.item.label.length === 0 ? uiText('Default') : this.item.label)
             .fontSize(12)
-            .fontColor('#667085')
+            .fontColor(themeSecondaryText())
             .margin({ left: 8 })
           Blank()
           Text(downloadProgressText(this.item))
             .fontSize(12)
-            .fontColor('#667085')
+            .fontColor(themeSecondaryText())
         }
         .width('100%')
         .margin({ top: 8 })
@@ -504,10 +505,10 @@ export struct DownloadRow {
           Row() {
             Text(downloadSizeText(this.item.fileSize))
               .fontSize(11)
-              .fontColor('#667085')
+              .fontColor(themeSecondaryText())
             Text(this.item.archiveUri)
               .fontSize(11)
-              .fontColor('#98A2B3')
+              .fontColor(themeTertiaryText())
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .layoutWeight(1)
@@ -520,7 +521,7 @@ export struct DownloadRow {
         Row() {
           Text(this.item.uploader === undefined || this.item.uploader.length === 0 ? uiText('unknown uploader') : this.item.uploader)
             .fontSize(12)
-            .fontColor('#98A2B3')
+            .fontColor(themeTertiaryText())
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .layoutWeight(1)
@@ -552,7 +553,7 @@ export struct DownloadRow {
     }
     .width('100%')
     .padding(8)
-    .backgroundColor(Color.White)
+    .backgroundColor(themeSurface())
     .borderRadius(6)
   }
 }
@@ -623,18 +624,18 @@ export struct FilterPanel {
         if (this.statusText.length > 0) {
           Text(uiStatusText(this.statusText))
             .fontSize(12)
-            .fontColor('#667085')
+            .fontColor(themeSecondaryText())
             .padding({ left: 16, right: 16, bottom: 8 })
             .width('100%')
         }
 
         Text(uiText('Mode: tap to cycle ¡ª Title / Uploader / Tag / Tag:Namespace'))
           .fontSize(11)
-          .fontColor('#95A1B0')
+          .fontColor(themeMutedText())
           .padding({ left: 16, right: 16, bottom: 10 })
           .width('100%')
       }
-      .backgroundColor(Color.White)
+      .backgroundColor(themeSurface())
 
       if (this.rules.length === 0) {
         PlaceholderScene({
@@ -649,11 +650,11 @@ export struct FilterPanel {
                 Column() {
                   Text(rule.text)
                     .fontSize(14)
-                    .fontColor(rule.enabled ? '#17202A' : '#95A1B0')
+                    .fontColor(rule.enabled ? themePrimaryText() : themeMutedText())
                     .fontWeight(rule.enabled ? FontWeight.Medium : FontWeight.Normal)
                   Text(this.filterModeName(rule.mode))
                     .fontSize(11)
-                    .fontColor('#667085')
+                    .fontColor(themeSecondaryText())
                     .margin({ top: 2 })
                 }
                 .alignItems(HorizontalAlign.Start)
@@ -662,8 +663,8 @@ export struct FilterPanel {
                 Button(rule.enabled ? uiText('On') : uiText('Off'))
                   .height(30)
                   .fontSize(12)
-                  .fontColor(rule.enabled ? '#0A6B45' : '#95A1B0')
-                  .backgroundColor(rule.enabled ? '#EDFAF3' : '#F5F5F5')
+                  .fontColor(rule.enabled ? themePrimaryColor() : themeMutedText())
+                  .backgroundColor(rule.enabled ? themeSelectedBackgroundLight() : themeSurfaceVariant())
                   .margin({ left: 8 })
                   .onClick(() => {
                     this.onToggle(rule.id);
@@ -672,7 +673,7 @@ export struct FilterPanel {
                   .height(30)
                   .fontSize(12)
                   .fontColor('#C33A2C')
-                  .backgroundColor('#FDF0EE')
+                  .backgroundColor(themeSurfaceVariant())
                   .margin({ left: 6 })
                   .onClick(() => {
                     this.onRemove(rule.id);
@@ -680,18 +681,18 @@ export struct FilterPanel {
               }
               .width('100%')
               .padding({ left: 16, right: 12, top: 12, bottom: 12 })
-              .backgroundColor(Color.White)
+              .backgroundColor(themeSurface())
             }
           }, (rule: FilterRule) => rule.id.toString())
         }
-        .divider({ strokeWidth: 1, color: '#F0F0F0' })
+        .divider({ strokeWidth: 1, color: themeDividerColor() })
         .width('100%')
         .layoutWeight(1)
       }
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#F5F7FA')
+    .backgroundColor(themePageBackground())
   }
 }
 
@@ -709,15 +710,15 @@ export struct MigrationScene {
             Text(task.name)
               .fontSize(15)
               .fontWeight(FontWeight.Medium)
-              .fontColor('#17202A')
+              .fontColor(themePrimaryText())
             Text(task.source)
               .fontSize(12)
-              .fontColor('#667085')
+              .fontColor(themeSecondaryText())
               .margin({ top: 6 })
             Row() {
               Text(task.target)
                 .fontSize(12)
-                .fontColor('#40566F')
+                .fontColor(themeSecondaryText())
                 .layoutWeight(1)
               Text(task.status)
                 .fontSize(12)
@@ -727,7 +728,7 @@ export struct MigrationScene {
           }
           .width('100%')
           .padding(14)
-          .backgroundColor(Color.White)
+          .backgroundColor(themeSurface())
           .borderRadius(6)
         }
       })

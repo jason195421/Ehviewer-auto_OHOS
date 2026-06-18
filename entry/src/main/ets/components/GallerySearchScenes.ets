@@ -13,7 +13,17 @@ import {
   themeSurface,
   themeSurfaceVariant
 } from '../shared/EhTheme';
-import { selectArrowModifier } from '../shared/EhSelectStyle';
+import {
+  selectArrowModifier,
+  themedSelectButtonBackground,
+  themedSelectButtonText,
+  themedSelectMenuBackground,
+  themedSelectOptionBackground,
+  themedSelectOptionText,
+  themedSelectOutlineColor,
+  themedSelectSelectedOptionBackground,
+  themedSelectSelectedOptionText
+} from '../shared/EhSelectStyle';
 
 export interface SearchSuggestionItem {
   kind: string;
@@ -790,11 +800,15 @@ export struct SearchAdvancedPanel {
               .value(this.modeLabelDraft.length > 0 ? this.modeLabelDraft : this.modeLabelForIndex(this.searchModeIndex()))
               .height(38)
               .width('100%')
-              .fontColor(themePrimaryText())
-              .selectedOptionBgColor(themeSurfaceVariant())
-              .selectedOptionFontColor(themePrimaryText())
-              .optionBgColor(themeSurface())
+              .fontColor(themedSelectButtonText())
+              .backgroundColor(themedSelectButtonBackground())
+              .menuBackgroundColor(themedSelectMenuBackground())
+              .optionBgColor(themedSelectOptionBackground())
+              .optionFontColor(themedSelectOptionText())
               .optionFont({ size: 13 })
+              .selectedOptionBgColor(themedSelectSelectedOptionBackground())
+              .selectedOptionFontColor(themedSelectSelectedOptionText())
+              .menuOutline({ width: 1, color: themedSelectOutlineColor() })
               .arrowModifier(selectArrowModifier())
               .onSelect((index: number) => {
                 const next = this.modeForIndex(index);

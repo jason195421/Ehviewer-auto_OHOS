@@ -22,7 +22,7 @@ import {
   uiText,
   uiValue
 } from '../shared/EhShared';
-import { selectArrowModifier } from '../shared/EhSelectStyle';
+import { readerSelectColors, selectArrowModifier } from '../shared/EhSelectStyle';
 import { EhSubNavBar } from './NavigationComponents';
 
 const READER_MIN_SCALE: number = 1;
@@ -1255,13 +1255,16 @@ struct ReaderMenuSelect {
       Select(this.options.map((o: string) => ({ value: o } as SelectOption)))
         .value(this.value)
         .font({ size: 13 })
-        .fontColor('#E5E7EB')
-        .backgroundColor('#1F2937')
-        .selectedOptionBgColor('#374151')
-        .selectedOptionFontColor('#F9FAFB')
-        .optionBgColor('#111827')
+        .fontColor(readerSelectColors().buttonText)
+        .backgroundColor(readerSelectColors().buttonBackground)
+        .menuBackgroundColor(readerSelectColors().menuBackground)
+        .optionBgColor(readerSelectColors().optionBackground)
+        .optionFontColor(readerSelectColors().optionText)
         .optionFont({ size: 13 })
-        .arrowModifier(selectArrowModifier('#E5E7EB'))
+        .selectedOptionBgColor(readerSelectColors().selectedOptionBackground)
+        .selectedOptionFontColor(readerSelectColors().selectedOptionText)
+        .menuOutline({ width: 1, color: readerSelectColors().outline })
+        .arrowModifier(selectArrowModifier(readerSelectColors().arrow))
         .onSelect((_idx: number, v: string) => { this.onChange(v); })
     }
     .width('100%')

@@ -4,6 +4,7 @@ import { preferences } from '@kit.ArkData';
 import { userAuth } from '@kit.UserAuthenticationKit';
 import { MAIN_WINDOW_KEY, rememberMainWindow } from '../services/EhWindowImmersive';
 import { applyWindowPrivacyMode, WINDOW_PRIVACY_STATUS_KEY } from '../services/EhWindowPrivacy';
+import { ehSettingsStore } from '../services/EhSettingsStore';
 
 const SETTINGS_PREF_NAME: string = 'ehviewer_settings';
 const SETTINGS_VALUES_KEY: string = 'values';
@@ -27,11 +28,6 @@ export default class EntryAbility extends UIAbility {
     AppStorage.setOrCreate<window.Window | undefined>(MAIN_WINDOW_KEY, undefined);
     AppStorage.setOrCreate<number>(LANGUAGE_REVISION_KEY, 0);
     AppStorage.setOrCreate<string>(WINDOW_PRIVACY_STATUS_KEY, '');
-    stage.loadContent('pages/Index', (error) => {
-      if (error.code) {
-        console.error(`Failed to load the main page. code=${error.code}, message=${error.message}`);
-      }
-    });
     stage.getMainWindow().then((win) => {
       this.mainWindow = win;
       rememberMainWindow(win);
@@ -43,6 +39,19 @@ export default class EntryAbility extends UIAbility {
       });
       this.applyPersistedSecureScreen();
     }).catch(() => {});
+    ehSettingsStore.load(this.context).then(() => {
+      this.loadIndexContent(stage);
+    }).catch(() => {
+      this.loadIndexContent(stage);
+    });
+  }
+
+  private loadIndexContent(stage: window.WindowStage): void {
+    stage.loadContent('pages/Index', (error) => {
+      if (error.code) {
+        console.error(`Failed to load the main page. code=${error.code}, message=${error.message}`);
+      }
+    });
   }
 
   private updateSystemAvoidArea(win: window.Window): void {

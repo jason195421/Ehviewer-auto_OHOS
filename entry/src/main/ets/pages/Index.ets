@@ -28,6 +28,7 @@ struct Index {
   @State drawerVisible: boolean = false;
   @State drawerOffsetX: number = -264;
   @State drawerOverlayOpacity: number = 0;
+  @State settingsReady: boolean = false;
   @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeight: number = 0;
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
 
@@ -59,8 +60,10 @@ struct Index {
     ehSpiderInfoStore.load(context).catch(() => {});
     ehDownloadStore.load(context).catch(() => {});
     ehSettingsStore.load(context).then(() => {
+      this.settingsReady = true;
       this.loadSessionRoute(context);
     }).catch(() => {
+      this.settingsReady = true;
       this.loadSessionRoute(context);
     });
   }
@@ -108,7 +111,9 @@ struct Index {
     Stack({ alignContent: Alignment.TopStart }) {
       // ---- Main content ----
       Column() {
-        this.RouteContent()
+        if (this.settingsReady) {
+          this.RouteContent()
+        }
       }
       .width('100%')
       .height('100%')

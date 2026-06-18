@@ -44,7 +44,17 @@ import {
   themeSurfaceVariant,
   themeTertiaryText
 } from '../shared/EhTheme';
-import { selectArrowModifier } from '../shared/EhSelectStyle';
+import {
+  selectArrowModifier,
+  themedSelectButtonBackground,
+  themedSelectButtonText,
+  themedSelectMenuBackground,
+  themedSelectOptionBackground,
+  themedSelectOptionText,
+  themedSelectOutlineColor,
+  themedSelectSelectedOptionBackground,
+  themedSelectSelectedOptionText
+} from '../shared/EhSelectStyle';
 import { EhBackupBundle, DrawerItem, SettingsHeaderItem, SettingsRowItem, SessionMode, SettingsPanel, DRAWER_ITEMS, SETTINGS_HEADERS, STATUS_BAR_HEIGHT_KEY, ON_OFF_OPTIONS, shouldUseChineseUi, uiText, uiValue, uiStatusText, uiPageText, zhText, setActiveBackHandler, runActiveBackHandler, createEmptyGallery, createEmptyDownloadInfo, createDetailFromGallery, createEmptyDetail, createEmptyPreview, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneStringArray, cloneRequiredStringArray, cloneGalleryInfo, cloneGalleryInfos, padTwo, applyGalleryFilters, cloneGalleryTagGroups, cloneGalleryComments, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListItem, cloneTopListBucket, cloneTopListInfo, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, saveDownloadsQuietly, filterDownloadItems, downloadItemMatches, sortDownloadItems, nextDownloadStatusFilter, nextDownloadLabelFilter, nextDownloadSortMode, nextStringOption, nextDownloadState, nextDownloadLabel, downloadLabelName, downloadStateLabel, downloadStateColor, downloadProgressText, downloadSizeText, downloadImageUrlForPage, downloadThreadLimit, downloadPageIndexes, downloadQueueSummary, parseHistoryMaxSize, routeTitle, routeSubtitle, launchRouteFromSetting, settingsPanelTitle, settingsRowsForPanel, optionSettingsRow, textSettingsRow, staticSettingsRow, settingEntryValue, cloneStringOptions, settingMigrationMessage, nextOption, isValidProxyPortText, formatNetworkDiagnostics, listModeForRoute, routeUsesKeyword, usesGallerySearchToolbar, usesEmbeddedToolbar, defaultKeywordForRoute, gallerySearchTitle, currentGallerySite, effectiveListSite, gallerySiteName, galleryListFailureMessage, withGalleryListMessage, readerPageReferer, readerDisplayImageUrl, cacheReaderImageForPage, cacheThumbnailImage, cloneGalleryPageWithCache, readerLocalImageSource, readerZoomSize, readerFullImageWidth, readerFullImageHeight, readerImageFit, readerShortUrl, readerPreloadCount, readerIsRightToLeft, categoryName, categoryColor, ratingText, galleryDisplayTitle, showGalleryPages, galleryListMode, galleryThumbWidth, galleryThumbHeight, galleryRowHeight, galleryTagPreview, detailTitleFontSize, detailTitleMaxLines, detailHeadingFontSize, readerShowProgress, readerShowClock, readerClockText, padTimeNumber, topListChipColor } from '../shared/EhShared';
 import { FilterPanel, MigrationScene } from './DownloadMigrationScenes';
 import { AppSubToolbar, AppToolbar } from './NavigationComponents';
@@ -1758,11 +1768,15 @@ export struct SettingsStaticRow {
             .selected(optionIndex(this.row.options, this.row.value))
             .value(uiValue(this.row.value))
             .font({ size: 13 })
-            .fontColor(themePrimaryText())
-            .selectedOptionBgColor(themeSurfaceVariant())
-            .selectedOptionFontColor(themePrimaryText())
-            .optionBgColor(themeSurface())
+            .fontColor(themedSelectButtonText())
+            .backgroundColor(themedSelectButtonBackground())
+            .menuBackgroundColor(themedSelectMenuBackground())
+            .optionBgColor(themedSelectOptionBackground())
+            .optionFontColor(themedSelectOptionText())
             .optionFont({ size: 13 })
+            .selectedOptionBgColor(themedSelectSelectedOptionBackground())
+            .selectedOptionFontColor(themedSelectSelectedOptionText())
+            .menuOutline({ width: 1, color: themedSelectOutlineColor() })
             .arrowModifier(selectArrowModifier())
             .margin({ left: 8 })
             .onSelect((index: number) => {

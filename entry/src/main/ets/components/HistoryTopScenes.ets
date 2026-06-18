@@ -22,6 +22,13 @@ import { MigrationTask, migrationTasks } from '../services/MigrationStatus';
 import { FilterRule, FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, FILTER_MODE_TAG_NAMESPACE, ehFilterStore } from '../services/EhFilterStore';
 import { applyAppChromeImmersiveMode } from '../services/EhWindowImmersive';
 import { APP_THEME_COLOR, LANGUAGE_REVISION_KEY, nextFloatingToolbarOffset } from '../shared/EhShared';
+import {
+  themePageBackground,
+  themePrimaryColor,
+  themePrimaryText,
+  themeSecondaryText,
+  themeSurface
+} from '../shared/EhTheme';
 import { EhBackupBundle, DrawerItem, SettingsHeaderItem, SettingsRowItem, SessionMode, SettingsPanel, DRAWER_ITEMS, SETTINGS_HEADERS, STATUS_BAR_HEIGHT_KEY, ON_OFF_OPTIONS, shouldUseChineseUi, uiText, uiValue, uiStatusText, uiPageText, zhText, setActiveBackHandler, runActiveBackHandler, createEmptyGallery, createEmptyDownloadInfo, createDetailFromGallery, createEmptyDetail, createEmptyPreview, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneStringArray, cloneRequiredStringArray, cloneGalleryInfo, cloneGalleryInfos, padTwo, applyGalleryFilters, cloneGalleryTagGroups, cloneGalleryComments, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListItem, cloneTopListBucket, cloneTopListInfo, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, saveDownloadsQuietly, filterDownloadItems, downloadItemMatches, sortDownloadItems, nextDownloadStatusFilter, nextDownloadLabelFilter, nextDownloadSortMode, nextStringOption, nextDownloadState, nextDownloadLabel, downloadLabelName, downloadStateLabel, downloadStateColor, downloadProgressText, downloadSizeText, downloadImageUrlForPage, downloadThreadLimit, downloadPageIndexes, downloadQueueSummary, parseHistoryMaxSize, routeTitle, routeSubtitle, launchRouteFromSetting, settingsPanelTitle, settingsRowsForPanel, optionSettingsRow, textSettingsRow, staticSettingsRow, settingEntryValue, cloneStringOptions, settingMigrationMessage, nextOption, isValidProxyPortText, formatNetworkDiagnostics, listModeForRoute, routeUsesKeyword, usesGallerySearchToolbar, usesEmbeddedToolbar, defaultKeywordForRoute, gallerySearchTitle, currentGallerySite, effectiveListSite, gallerySiteName, galleryListFailureMessage, withGalleryListMessage, readerPageReferer, readerDisplayImageUrl, cacheReaderImageForPage, cacheThumbnailImage, cloneGalleryPageWithCache, readerLocalImageSource, readerZoomSize, readerFullImageWidth, readerFullImageHeight, readerImageFit, readerShortUrl, readerPreloadCount, readerIsRightToLeft, categoryName, categoryColor, ratingText, galleryDisplayTitle, showGalleryPages, galleryListMode, galleryThumbWidth, galleryThumbHeight, galleryRowHeight, galleryTagPreview, detailTitleFontSize, detailTitleMaxLines, detailHeadingFontSize, readerShowProgress, readerShowClock, readerClockText, padTimeNumber, topListChipColor } from '../shared/EhShared';
 import { GalleryDetailOverlayScene, GalleryListRow, GalleryListScene, GalleryListStateView, PlaceholderScene, ReaderScene } from './GalleryScenes';
 import { FloatingToolbarHost } from './NavigationComponents';
@@ -842,7 +849,7 @@ export struct HistoryScene {
                           }
                           .width('100%')
                           .padding({ right: 8, bottom: 6 })
-                          .backgroundColor(Color.White)
+                          .backgroundColor(themeSurface())
                         }
                         .width(this.historyCardWidth())
                         .borderRadius(6)
@@ -926,7 +933,7 @@ export struct HistoryScene {
         }
         .width('100%')
         .height('100%')
-        .backgroundColor('#F3F5F7')
+        .backgroundColor(themePageBackground())
       }
     }
   }
@@ -1625,13 +1632,13 @@ export struct TopListScene {
           Text(uiText(this.galleryListTitle) + ' / ' + uiText(this.galleryListModeLabel))
             .fontSize(15)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#17202A')
+            .fontColor(themePrimaryText())
             .margin({ left: 12 })
             .layoutWeight(1)
         }
         .width('100%')
         .padding({ left: 12, right: 12, top: this.statusBarVp() + 10, bottom: 8 })
-        .backgroundColor(Color.White)
+        .backgroundColor(themeSurface())
 
         GalleryListScene({
           sceneTitle: this.galleryListTitle,
@@ -1715,7 +1722,7 @@ export struct TopListScene {
         }
         .width('100%')
         .height('100%')
-        .backgroundColor('#F3F5F7')
+        .backgroundColor(themePageBackground())
       }
     }
   }
@@ -1736,9 +1743,9 @@ export struct TopListTabs {
             .stateEffect(false)
             .height(34)
             .fontSize(12)
-            .fontColor(index === this.selectedIndex ? Color.White : '#2F6F8F')
-            .backgroundColor(index === this.selectedIndex ? '#2F6F8F' : Color.Transparent)
-            .border({ width: 1, color: index === this.selectedIndex ? '#2F6F8F' : '#B8CDD8' })
+            .fontColor(index === this.selectedIndex ? Color.White : themePrimaryColor())
+            .backgroundColor(index === this.selectedIndex ? themePrimaryColor() : Color.Transparent)
+            .border({ width: 1, color: index === this.selectedIndex ? themePrimaryColor() : themeSecondaryText() })
             .onClick(() => {
               this.onSelect(index);
             })
@@ -1812,7 +1819,7 @@ export struct TopListBoard {
       .width('100%')
       .height('100%')
       .padding({ left: 12, right: 12, top: this.contentTopPadding(), bottom: 0 })
-      .backgroundColor('#F3F5F7')
+      .backgroundColor(themePageBackground())
       .scrollBar(BarState.Auto)
       .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: false, effectEdge: EffectEdge.START })
       .onAppear(() => {
@@ -1837,7 +1844,7 @@ export struct TopListBoard {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#F3F5F7')
+    .backgroundColor(themePageBackground())
   }
 }
 
@@ -1855,7 +1862,7 @@ export struct TopListBucketCard {
         Text(this.bucket.title)
           .fontSize(16)
           .fontWeight(FontWeight.Bold)
-          .fontColor(this.canOpenBucket ? '#2F6F8F' : '#17202A')
+          .fontColor(this.canOpenBucket ? themePrimaryColor() : themePrimaryText())
           .layoutWeight(1)
           .decoration({ type: this.canOpenBucket ? TextDecorationType.Underline : TextDecorationType.None })
           .onClick(() => {
@@ -1865,7 +1872,7 @@ export struct TopListBucketCard {
           })
         Text(this.bucket.items.length.toString() + ' entries')
           .fontSize(12)
-          .fontColor('#667085')
+          .fontColor(themeSecondaryText())
       }
       .width('100%')
 
@@ -1885,7 +1892,7 @@ export struct TopListBucketCard {
     }
     .width('100%')
     .padding(12)
-    .backgroundColor(Color.White)
+    .backgroundColor(themeSurface())
     .borderRadius(6)
   }
 }
