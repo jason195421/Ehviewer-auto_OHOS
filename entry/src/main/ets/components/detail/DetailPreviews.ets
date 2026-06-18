@@ -1,5 +1,5 @@
 ﻿import { GalleryPreview } from '../../model/GalleryModels';
-import { cacheThumbnailImage, createEmptyPreview, readerLocalImageSource, shouldUseChineseUi, uiText } from '../../shared/EhShared';
+import { cachePreviewThumbnail, createEmptyPreview, readerLocalImageSource, shouldUseChineseUi, uiText } from '../../shared/EhShared';
 import { GalleryThumb } from '../GalleryCards';
 @Component
 export struct DetailPreviews {
@@ -199,15 +199,17 @@ export struct PreviewThumb {
   }
 
   private cacheThumb(): void {
-    const url = this.preview.imageUrl;
-    if (url.length === 0 || (url === this.cachedUrl && (this.localUrl.length > 0 || this.loadFailed))) {
+    const cacheKey = this.preview.imageUrl + '#' + this.preview.xOffset.toString() + ',' +
+      this.preview.yOffset.toString() + ',' + this.preview.width.toString() + 'x' + this.preview.height.toString();
+    if (this.preview.imageUrl.length === 0 ||
+      (cacheKey === this.cachedUrl && (this.localUrl.length > 0 || this.loadFailed))) {
       return;
     }
-    this.cachedUrl = url;
+    this.cachedUrl = cacheKey;
     this.localUrl = '';
     this.loadFailed = false;
-    cacheThumbnailImage(url, (localPath: string) => {
-      if (this.cachedUrl !== url) {
+    cachePreviewThumbnail(this.preview, (localPath: string) => {
+      if (this.cachedUrl !== cacheKey) {
         return;
       }
       if (localPath.length > 0) {
@@ -215,46 +217,11 @@ export struct PreviewThumb {
         this.loadFailed = false;
       }
     }, () => {
-      if (this.cachedUrl === url) {
+      if (this.cachedUrl === cacheKey) {
         this.localUrl = '';
         this.loadFailed = true;
       }
     });
-  }
-
-  private usesSpriteCrop(): boolean {
-    return this.preview.width > 0 && this.preview.height > 0;
-  }
-
-  private spriteScale(): number {
-    const sourceWidth = this.preview.width > 0 ? this.preview.width : this.widthValue;
-    const sourceHeight = this.preview.height > 0 ? this.preview.height : this.heightValue;
-    if (sourceWidth <= 0 || sourceHeight <= 0) {
-      return 1;
-    }
-    return Math.max(this.widthValue / sourceWidth, this.heightValue / sourceHeight);
-  }
-
-  private spriteXPosition(): number {
-    const scale = this.spriteScale();
-    const sourceWidth = this.preview.width > 0 ? this.preview.width : this.widthValue;
-    return Math.round(-this.preview.xOffset * scale + (this.widthValue - sourceWidth * scale) / 2);
-  }
-
-  private spriteYPosition(): number {
-    const scale = this.spriteScale();
-    const sourceHeight = this.preview.height > 0 ? this.preview.height : this.heightValue;
-    return Math.round(-this.preview.yOffset * scale + (this.heightValue - sourceHeight * scale) / 2);
-  }
-
-  private spriteDisplayWidth(): number {
-    const sourceWidth = this.preview.width > 0 ? this.preview.width : this.widthValue;
-    return Math.max(1, Math.round(sourceWidth * this.spriteScale()));
-  }
-
-  private spriteDisplayHeight(): number {
-    const sourceHeight = this.preview.height > 0 ? this.preview.height : this.heightValue;
-    return Math.max(1, Math.round(sourceHeight * this.spriteScale()));
   }
 
   build() {
@@ -279,22 +246,6 @@ export struct PreviewThumb {
           this.cachedUrl = '';
           this.cacheThumb();
         })
-      } else if (this.localUrl.length > 0 && this.usesSpriteCrop()) {
-        Stack() {
-          Image(this.localUrl)
-            .fitOriginalSize(true)
-            .objectFit(ImageFit.None)
-            .width(this.spriteDisplayWidth())
-            .height(this.spriteDisplayHeight())
-            .position({ x: this.spriteXPosition(), y: this.spriteYPosition() })
-            .syncLoad(true)
-            .onError(() => {
-              this.loadFailed = true;
-            })
-        }
-        .width('100%')
-        .height('100%')
-        .clip(true)
       } else if (this.localUrl.length > 0) {
         Image(this.localUrl)
           .width('100%')

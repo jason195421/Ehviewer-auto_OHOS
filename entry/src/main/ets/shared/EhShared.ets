@@ -16,6 +16,7 @@ import { EhHttpClient, GalleryDetailLoadResult, GalleryListLoadResult, GalleryPa
 import { EhUrl, FavListUrlBuilder, ListMode, ListUrlBuilder } from '../services/EhUrl';
 import { galleryPageCache } from '../services/GalleryPageCache';
 import { CacheClearResult, readerImageCache } from '../services/ReaderImageCache';
+import { previewThumbnailCache } from '../services/PreviewThumbnailCache';
 import { ehSpiderInfoStore } from '../services/EhSpiderInfoStore';
 import { MigrationTask, migrationTasks } from '../services/MigrationStatus';
 import { FilterRule, FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, FILTER_MODE_TAG_NAMESPACE, ehFilterStore } from '../services/EhFilterStore';
@@ -1842,6 +1843,35 @@ export function cacheThumbnailImage(url: string, onReady: (path: string) => void
   }
 
   readerImageCache.ensureCached(context, url, EhUrl.getReferer(currentGallerySite())).then((path: string) => {
+    if (path.length > 0) {
+      onReady(path);
+    } else if (onError !== undefined) {
+      onError();
+    }
+  }).catch(() => {
+    if (onError !== undefined) {
+      onError();
+    }
+  });
+}
+
+export function cachePreviewThumbnail(preview: GalleryPreview, onReady: (path: string) => void,
+  onError?: () => void): void {
+  const context = getAbilityContext();
+  if (context === undefined || preview.imageUrl.length === 0) {
+    if (onError !== undefined) {
+      onError();
+    }
+    return;
+  }
+
+  const existing = previewThumbnailCache.getCroppedPath(context, preview);
+  if (existing.length > 0) {
+    onReady(existing);
+    return;
+  }
+
+  previewThumbnailCache.ensureCropped(context, preview, EhUrl.getReferer(currentGallerySite())).then((path: string) => {
     if (path.length > 0) {
       onReady(path);
     } else if (onError !== undefined) {
