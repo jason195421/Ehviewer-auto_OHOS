@@ -353,6 +353,9 @@ export function uiPageText(prefix: string, page: number): string {
 }
 
 export function zhText(text: string): string {
+  if (text.endsWith(' stars and up')) {
+    return text.replace(' stars and up', ' 星以上');
+  }
   switch (text) {
     case 'Homepage': return '主页';
     case 'Subscription': return '订阅';
@@ -396,6 +399,7 @@ export function zhText(text: string): string {
     case 'Search': return '搜索';
     case 'Search current text': return '搜索当前文本';
     case 'Search history': return '搜索历史';
+    case 'Search once to create suggestions': return '搜索一次后会显示历史建议';
     case 'Open gallery': return '打开画廊';
     case 'Open page': return '打开页面';
     case 'Specify tag': return '指定标签';
@@ -408,8 +412,13 @@ export function zhText(text: string): string {
     case 'Pages': return '页数';
     case 'Disable default filter': return '禁用默认过滤器';
     case 'Normal': return '普通';
+    case 'General search': return '一般搜索';
+    case 'Subscription search': return '订阅搜索';
+    case 'Uploader search': return '指定上传者';
+    case 'Tag search': return '标签搜索';
     case 'All categories': return '全部分类';
     case 'Any rating': return '任意评分';
+    case 'No rating limit': return '不限制';
     case 'Name': return '名称';
     case 'Description': return '描述';
     case 'Torrent': return '种子';

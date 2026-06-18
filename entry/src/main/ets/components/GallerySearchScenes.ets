@@ -2,14 +2,14 @@ import { ALL_CATEGORY, GalleryCategory, GalleryRoute } from '../model/GalleryMod
 import { DEFAULT_ADVANCE_SEARCH, ListMode } from '../services/EhUrl';
 import { APP_THEME_COLOR, LANGUAGE_REVISION_KEY, categoryColor, categoryName, themeSurfaceColor, uiText } from '../shared/EhShared';
 
-interface SearchSuggestionItem {
+export interface SearchSuggestionItem {
   kind: string;
   title: string;
   subtitle: string;
   query: string;
 }
 
-interface GalleryUrlMatch {
+export interface GalleryUrlMatch {
   gid: number;
   token: string;
 }
@@ -35,6 +35,88 @@ export function recordSearchHistory(keyword: string): void {
   if (searchHistoryKeywords.length > 128) {
     searchHistoryKeywords.splice(128);
   }
+}
+
+function parseGalleryUrl(text: string): GalleryUrlMatch | null {
+  const match = text.match(/\/g\/(\d+)\/([a-fA-F0-9]+)\/?/);
+  if (match === null) {
+    return null;
+  }
+  const gid = Number.parseInt(match[1]);
+  if (Number.isNaN(gid) || gid <= 0) {
+    return null;
+  }
+  return { gid: gid, token: match[2] };
+}
+
+function parsePageUrl(text: string): string {
+  const match = text.match(/https?:\/\/(?:exhentai\.org|e-hentai\.org)\/s\/[A-Za-z0-9]+\/\d+-\d+/);
+  return match === null ? '' : match[0];
+}
+
+export function gallerySuggestionUrl(text: string): GalleryUrlMatch | null {
+  return parseGalleryUrl(text);
+}
+
+export function pageSuggestionUrl(text: string): string {
+  return parsePageUrl(text);
+}
+
+export function buildSearchSuggestions(keyword: string, limit: number = 10): SearchSuggestionItem[] {
+  const text = keyword.trim();
+  const next: SearchSuggestionItem[] = [];
+  if (text.length > 0) {
+    next.push({
+      kind: 'search',
+      title: 'Search current text',
+      subtitle: text,
+      query: text
+    });
+    next.push({
+      kind: 'tag',
+      title: 'Specify tag',
+      subtitle: text,
+      query: text
+    });
+    next.push({
+      kind: 'uploader',
+      title: 'Specify uploader',
+      subtitle: text,
+      query: text
+    });
+  }
+  const galleryUrl = parseGalleryUrl(text);
+  if (galleryUrl !== null) {
+    next.push({
+      kind: 'gallery',
+      title: 'Open gallery',
+      subtitle: galleryUrl.gid.toString() + ' / ' + galleryUrl.token,
+      query: text
+    });
+  }
+  const pageUrl = parsePageUrl(text);
+  if (pageUrl.length > 0) {
+    next.push({
+      kind: 'page',
+      title: 'Open page',
+      subtitle: pageUrl,
+      query: text
+    });
+  }
+  const lower = text.toLowerCase();
+  for (let i = 0; i < searchHistoryKeywords.length && next.length < limit; i++) {
+    const history = searchHistoryKeywords[i];
+    const historyLower = history.toLowerCase();
+    if (text.length === 0 || (historyLower.indexOf(lower) === 0 && historyLower !== lower)) {
+      next.push({
+        kind: 'history',
+        title: history,
+        subtitle: 'Search history',
+        query: history
+      });
+    }
+  }
+  return next;
 }
 
 @Component
@@ -93,75 +175,7 @@ export struct GallerySearchScene {
   }
 
   private refreshSuggestions(): void {
-    const text = this.keywordDraft.trim();
-    const next: SearchSuggestionItem[] = [];
-    if (text.length > 0) {
-      next.push({
-        kind: 'search',
-        title: 'Search current text',
-        subtitle: text,
-        query: text
-      });
-      next.push({
-        kind: 'tag',
-        title: 'Specify tag',
-        subtitle: text,
-        query: text
-      });
-      next.push({
-        kind: 'uploader',
-        title: 'Specify uploader',
-        subtitle: text,
-        query: text
-      });
-    }
-    const galleryUrl = this.parseGalleryUrl(text);
-    if (galleryUrl !== null) {
-      next.push({
-        kind: 'gallery',
-        title: 'Open gallery',
-        subtitle: galleryUrl.gid.toString() + ' / ' + galleryUrl.token,
-        query: text
-      });
-    }
-    const pageUrl = this.parsePageUrl(text);
-    if (pageUrl.length > 0) {
-      next.push({
-        kind: 'page',
-        title: 'Open page',
-        subtitle: pageUrl,
-        query: text
-      });
-    }
-    for (let i = 0; i < searchHistoryKeywords.length && next.length < 10; i++) {
-      const history = searchHistoryKeywords[i];
-      if (text.length === 0 || history.toLowerCase().indexOf(text.toLowerCase()) >= 0) {
-        next.push({
-          kind: 'history',
-          title: history,
-          subtitle: 'Search history',
-          query: history
-        });
-      }
-    }
-    this.suggestions = next;
-  }
-
-  private parseGalleryUrl(text: string): GalleryUrlMatch | null {
-    const match = text.match(/\/g\/(\d+)\/([a-fA-F0-9]+)\/?/);
-    if (match === null) {
-      return null;
-    }
-    const gid = Number.parseInt(match[1]);
-    if (Number.isNaN(gid) || gid <= 0) {
-      return null;
-    }
-    return { gid: gid, token: match[2] };
-  }
-
-  private parsePageUrl(text: string): string {
-    const match = text.match(/https?:\/\/(?:exhentai\.org|e-hentai\.org)\/s\/[A-Za-z0-9]+\/\d+-\d+/);
-    return match === null ? '' : match[0];
+    this.suggestions = buildSearchSuggestions(this.keywordDraft);
   }
 
   private applySuggestion(suggestion: SearchSuggestionItem): void {
@@ -183,14 +197,14 @@ export struct GallerySearchScene {
       return;
     }
     if (suggestion.kind === 'gallery') {
-      const galleryUrl = this.parseGalleryUrl(suggestion.query);
+      const galleryUrl = parseGalleryUrl(suggestion.query);
       if (galleryUrl !== null) {
         this.onOpenGalleryUrl(galleryUrl.gid, galleryUrl.token);
       }
       return;
     }
     if (suggestion.kind === 'page') {
-      const pageUrl = this.parsePageUrl(suggestion.query);
+      const pageUrl = parsePageUrl(suggestion.query);
       if (pageUrl.length > 0) {
         this.onOpenPageUrl(pageUrl);
       }
@@ -492,6 +506,13 @@ export struct SearchAdvancedPanel {
   @Prop minRating: number = -1;
   @Prop pageFrom: number = -1;
   @Prop pageTo: number = -1;
+  @State modeDraft: ListMode = ListMode.Normal;
+  @State categoryDraft: number = GalleryCategory.None;
+  @State advancedEnabledDraft: boolean = false;
+  @State advanceSearchDraft: number = DEFAULT_ADVANCE_SEARCH;
+  @State minRatingDraft: number = -1;
+  @State pageFromDraft: number = -1;
+  @State pageToDraft: number = -1;
   onSearchModeChange: (mode: ListMode) => void = (_mode: ListMode) => {};
   onSearchCategoryChange: (category: number) => void = (_category: number) => {};
   onAdvancedEnabledChange: (enabled: boolean) => void = (_enabled: boolean) => {};
@@ -502,15 +523,24 @@ export struct SearchAdvancedPanel {
   onClose: () => void = () => {};
   onSearch: () => void = () => {};
 
-  private searchModeOptions(): SelectOption[] {
-    return [
-      { value: uiText('一般搜索') },
-      { value: uiText('订阅搜索') },
-      { value: uiText('指定上传者') },
-      { value: uiText('标签搜索') }
-    ];
+  aboutToAppear(): void {
+    this.modeDraft = this.searchModeValue;
+    this.categoryDraft = this.searchCategory;
+    this.advancedEnabledDraft = this.advancedSearchEnabled;
+    this.advanceSearchDraft = this.advanceSearch;
+    this.minRatingDraft = this.minRating;
+    this.pageFromDraft = this.pageFrom;
+    this.pageToDraft = this.pageTo;
   }
 
+  private searchModeOptions(): SelectOption[] {
+    return [
+      { value: uiText('General search') },
+      { value: uiText('Subscription search') },
+      { value: uiText('Uploader search') },
+      { value: uiText('Tag search') }
+    ];
+  }
   private categoryOptions(): SearchCategoryOption[] {
     return [
       { label: 'Doujinshi', category: GalleryCategory.Doujinshi },
@@ -527,23 +557,23 @@ export struct SearchAdvancedPanel {
   }
 
   private searchModeIndex(): number {
-    if (this.searchModeValue === ListMode.Subscription) {
+    if (this.modeDraft === ListMode.Subscription) {
       return 1;
     }
-    if (this.searchModeValue === ListMode.Uploader) {
+    if (this.modeDraft === ListMode.Uploader) {
       return 2;
     }
-    if (this.searchModeValue === ListMode.Tag) {
+    if (this.modeDraft === ListMode.Tag) {
       return 3;
     }
     return 0;
   }
 
   private selectedCategoryMask(): number {
-    if (this.searchCategory === GalleryCategory.None) {
+    if (this.categoryDraft === GalleryCategory.None) {
       return ALL_CATEGORY;
     }
-    return this.searchCategory & ALL_CATEGORY;
+    return this.categoryDraft & ALL_CATEGORY;
   }
 
   private allCategoriesSelected(): boolean {
@@ -555,7 +585,9 @@ export struct SearchAdvancedPanel {
   }
 
   private emitCategoryMask(mask: number): void {
-    this.onSearchCategoryChange(mask === ALL_CATEGORY ? GalleryCategory.None : mask);
+    const next = mask === ALL_CATEGORY ? GalleryCategory.None : mask;
+    this.categoryDraft = next;
+    this.onSearchCategoryChange(next);
   }
 
   private toggleAllCategories(): void {
@@ -582,22 +614,25 @@ export struct SearchAdvancedPanel {
   }
 
   private ratingLevel(): number {
-    if (this.minRating <= 0) {
+    if (this.minRatingDraft <= 0) {
       return 1;
     }
-    return Math.max(1, Math.min(5, this.minRating));
+    return Math.max(1, Math.min(5, this.minRatingDraft));
   }
 
   private setRatingLevel(level: number): void {
-    this.onMinRatingChange(level <= 1 ? -1 : level);
+    const next = level <= 1 ? -1 : level;
+    this.minRatingDraft = next;
+    this.onMinRatingChange(next);
   }
 
   private flagOn(flag: number): boolean {
-    return (this.advanceSearch & flag) !== 0;
+    return (this.advanceSearchDraft & flag) !== 0;
   }
 
   private setFlag(flag: number, enabled: boolean): void {
-    const next = enabled ? (this.advanceSearch | flag) : (this.advanceSearch & ~flag);
+    const next = enabled ? (this.advanceSearchDraft | flag) : (this.advanceSearchDraft & ~flag);
+    this.advanceSearchDraft = next;
     this.onAdvanceSearchChange(next);
   }
 
@@ -620,7 +655,9 @@ export struct SearchAdvancedPanel {
               .height(38)
               .width('100%')
               .onSelect((index: number) => {
-                this.onSearchModeChange(this.modeForIndex(index));
+                const next = this.modeForIndex(index);
+                this.modeDraft = next;
+                this.onSearchModeChange(next);
               })
           }
           .width('100%')
@@ -660,8 +697,9 @@ export struct SearchAdvancedPanel {
               .fontSize(14)
               .fontColor('#17202A')
             Blank()
-            Toggle({ type: ToggleType.Switch, isOn: this.advancedSearchEnabled })
+            Toggle({ type: ToggleType.Switch, isOn: this.advancedEnabledDraft })
               .onChange((isOn: boolean) => {
+                this.advancedEnabledDraft = isOn;
                 this.onAdvancedEnabledChange(isOn);
               })
           }
@@ -671,7 +709,7 @@ export struct SearchAdvancedPanel {
           .backgroundColor('#F3F6F8')
           .borderRadius(6)
 
-          if (this.advancedSearchEnabled) {
+          if (this.advancedEnabledDraft) {
             this.sectionTitle('Search galleries')
             Row({ space: 8 }) {
               SearchFlagChip({ label: 'Name', isOn: this.flagOn(0x1), onToggle: (isOn: boolean) => { this.setFlag(0x1, isOn); } })
@@ -854,7 +892,7 @@ export struct ActionBubble {
 @Component
 export struct SearchFlagChip {
   label: string = '';
-  isOn: boolean = false;
+  @Prop isOn: boolean = false;
   onToggle: (isOn: boolean) => void = (_isOn: boolean) => {};
 
   build() {
@@ -875,7 +913,7 @@ export struct SearchFlagChip {
 export struct SearchCategoryChip {
   label: string = '';
   category: number = GalleryCategory.Unknown;
-  selected: boolean = false;
+  @Prop selected: boolean = false;
   onToggle: (category: number) => void = (_category: number) => {};
 
   private softColor(): string {
@@ -922,7 +960,7 @@ export struct SearchCategoryChip {
 
 @Component
 export struct RatingStarBar {
-  level: number = 1;
+  @Prop level: number = 1;
   onSelect: (level: number) => void = (_level: number) => {};
 
   private starActive(index: number): boolean {
@@ -930,9 +968,8 @@ export struct RatingStarBar {
   }
 
   private labelText(): string {
-    return this.level <= 1 ? '不限制' : this.level.toString() + ' 星以上';
+    return this.level <= 1 ? 'No rating limit' : this.level.toString() + ' stars and up';
   }
-
   build() {
     Row({ space: 8 }) {
       ForEach([1, 2, 3, 4, 5], (index: number) => {

@@ -13,7 +13,7 @@ import { LANGUAGE_REVISION_KEY, APP_THEME_COLOR } from '../shared/EhShared';
 import { EhNavBar } from '../components/NavigationComponents';
 import { CategoryBadge, GalleryListRow, GalleryThumb, GalleryThumbCard } from './GalleryCards';
 import { GalleryDetailOverlayScene, GalleryDetailScene } from './GalleryDetailScenes';
-import { QuickActionColumn, SearchAdvancedPanel, recordSearchHistory } from './GallerySearchScenes';
+import { buildSearchSuggestions, gallerySuggestionUrl, pageSuggestionUrl, QuickActionColumn, SearchAdvancedPanel, SearchSuggestionItem, SearchSuggestionList, SearchSummaryStrip, recordSearchHistory } from './GallerySearchScenes';
 import { CommentsScene, PlaceholderScene, ReaderScene } from './ReaderScenes';
 import { uiText, uiStatusText, setActiveBackHandler, createEmptyGallery, createDetailFromGallery, createEmptyDetail, createEmptyPage, cloneGalleryInfos, applyGalleryFilters, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, listModeForRoute, routeUsesKeyword, defaultKeywordForRoute, gallerySearchTitle, effectiveListSite, galleryListFailureMessage, readerPageReferer, cacheReaderImageForPage, readerPreloadCount, galleryDisplayTitle, galleryListMode, galleryThumbWidth, galleryThumbHeight } from '../shared/EhShared';
 
@@ -41,6 +41,7 @@ interface GalleryListSceneCache {
   minRating: number;
   pageFrom: number;
   pageTo: number;
+  searchSubmitted: boolean;
   listScrollOffset: number;
 }
 
@@ -197,6 +198,7 @@ export struct GalleryListScene {
   @State minRating: number = -1;
   @State pageFrom: number = -1;
   @State pageTo: number = -1;
+  @State searchSubmitted: boolean = false;
   @State showDetail: boolean = false;
   @State showReader: boolean = false;
   @State showComments: boolean = false;
@@ -256,6 +258,7 @@ export struct GalleryListScene {
     this.minRating = cache.minRating;
     this.pageFrom = cache.pageFrom;
     this.pageTo = cache.pageTo;
+    this.searchSubmitted = cache.searchSubmitted === true;
     this.listScrollOffset = cache.listScrollOffset;
     return true;
   }
@@ -280,6 +283,7 @@ export struct GalleryListScene {
       minRating: this.minRating,
       pageFrom: this.pageFrom,
       pageTo: this.pageTo,
+      searchSubmitted: this.searchSubmitted,
       listScrollOffset: this.listScrollOffset
     });
   }
@@ -300,6 +304,7 @@ export struct GalleryListScene {
       this.minRating = this.initialMinRating;
       this.pageFrom = this.initialPageFrom;
       this.pageTo = this.initialPageTo;
+      this.searchSubmitted = !this.isSearchResultScene;
     }
     const context = getAbilityContext();
     if (context !== undefined) {
@@ -309,10 +314,14 @@ export struct GalleryListScene {
       ]).catch((error: Error) => {
         this.statusText = 'Cookie load failed, using current session: ' + error.message;
       }).finally(() => {
-        this.firstRefresh();
+        if (!this.isSearchResultScene || this.searchSubmitted) {
+          this.firstRefresh();
+        }
       });
     } else {
-      this.firstRefresh();
+      if (!this.isSearchResultScene || this.searchSubmitted) {
+        this.firstRefresh();
+      }
     }
     setActiveBackHandler(() => this.handleSystemBack());
   }
@@ -410,6 +419,9 @@ export struct GalleryListScene {
   }
 
   private loadAppendPage(): void {
+    if (this.isSearchResultScene && !this.searchSubmitted) {
+      return;
+    }
     if (this.isLoadingMore) {
       return;
     }
@@ -524,6 +536,8 @@ export struct GalleryListScene {
   private applySearch(): void {
     this.fabExpanded = false;
     this.rememberSearchKeyword(this.keyword);
+    this.searchSubmitted = true;
+    this.hasFirstRefresh = true;
     this.resetListScroll();
     this.loadRemote(0);
   }
@@ -1201,6 +1215,7 @@ export struct GalleryListScene {
           showSearchButton: routeUsesKeyword(this.sourceRoute) && !this.isSearchResultScene,
           showBackButton: this.isSearchResultScene,
           isSearchResultScene: this.isSearchResultScene,
+          searchSubmitted: this.searchSubmitted,
           searchModeValue: this.searchMode,
           searchCategory: this.searchCategory,
           advancedSearchEnabled: this.advancedSearchEnabled,
@@ -1216,21 +1231,44 @@ export struct GalleryListScene {
           galleries: this.galleries,
           onKeywordChange: (value: string) => {
             this.keyword = value;
+            if (this.isSearchResultScene) {
+              this.searchSubmitted = false;
+              this.galleries = [];
+              this.resultCount = '';
+              this.nextUrl = '';
+              this.statusText = '';
+              this.saveListCache();
+            }
           },
           onSearchModeChange: (mode: ListMode) => {
             this.searchMode = mode;
+            if (this.isSearchResultScene) {
+              this.searchSubmitted = false;
+            }
           },
           onSearchCategoryChange: (category: number) => {
             this.searchCategory = category;
+            if (this.isSearchResultScene) {
+              this.searchSubmitted = false;
+            }
           },
           onAdvancedEnabledChange: (enabled: boolean) => {
             this.advancedSearchEnabled = enabled;
+            if (this.isSearchResultScene) {
+              this.searchSubmitted = false;
+            }
           },
           onAdvanceSearchChange: (flags: number) => {
             this.advanceSearch = flags;
+            if (this.isSearchResultScene) {
+              this.searchSubmitted = false;
+            }
           },
           onMinRatingChange: (rating: number) => {
             this.minRating = rating;
+            if (this.isSearchResultScene) {
+              this.searchSubmitted = false;
+            }
           },
           onPageJump: (page: number) => {
             this.loadRemote(Math.max(0, page - 1));
@@ -1249,9 +1287,18 @@ export struct GalleryListScene {
             }
           },
           onRefresh: () => {
+            if (this.isSearchResultScene && !this.searchSubmitted) {
+              this.applySearch();
+              return;
+            }
             this.loadRemote(0, this.galleries.length > 0);
           },
           onRefreshPull: (done: () => void) => {
+            if (this.isSearchResultScene && !this.searchSubmitted) {
+              this.applySearch();
+              done();
+              return;
+            }
             this.loadRemote(0, this.galleries.length > 0, done);
           },
           onLoadMore: () => {
@@ -1297,6 +1344,7 @@ export struct GalleryListContent {
   @Prop showSearchButton: boolean = false;
   @Prop showBackButton: boolean = false;
   @Prop isSearchResultScene: boolean = false;
+  @Prop searchSubmitted: boolean = true;
   @Prop searchModeValue: ListMode = ListMode.Normal;
   @Prop searchCategory: number = GalleryCategory.None;
   @Prop advancedSearchEnabled: boolean = false;
@@ -1710,6 +1758,92 @@ export struct GalleryListContent {
     return this.searchResultSubtitle();
   }
 
+  private shouldShowSearchSuggestions(): boolean {
+    return this.isSearchResultScene && !this.searchSubmitted;
+  }
+
+  private searchSuggestions(): SearchSuggestionItem[] {
+    return buildSearchSuggestions(this.keyword);
+  }
+
+  private applySearchSuggestion(suggestion: SearchSuggestionItem): void {
+    if (suggestion.kind === 'search') {
+      this.onKeywordChange(suggestion.query);
+      this.closeAdvancedPanel();
+      this.onSearch();
+      return;
+    }
+    if (suggestion.kind === 'tag') {
+      this.onKeywordChange(suggestion.query);
+      this.onSearchModeChange(ListMode.Tag);
+      return;
+    }
+    if (suggestion.kind === 'uploader') {
+      this.onKeywordChange(suggestion.query);
+      this.onSearchModeChange(ListMode.Uploader);
+      return;
+    }
+    if (suggestion.kind === 'gallery') {
+      const galleryUrl = gallerySuggestionUrl(suggestion.query);
+      if (galleryUrl !== null) {
+        const gallery = createEmptyGallery();
+        gallery.gid = galleryUrl.gid;
+        gallery.token = galleryUrl.token;
+        gallery.title = 'Gallery ' + galleryUrl.gid.toString();
+        this.onSelectGallery(gallery);
+      }
+      return;
+    }
+    if (suggestion.kind === 'page') {
+      const pageUrl = pageSuggestionUrl(suggestion.query);
+      if (pageUrl.length > 0) {
+        this.onKeywordChange(pageUrl);
+      }
+      return;
+    }
+    this.onKeywordChange(suggestion.query);
+  }
+
+  @Builder
+  private searchSuggestionPlaceholder() {
+    Column({ space: 10 }) {
+      SearchSummaryStrip({
+        mode: this.searchModeValue,
+        category: this.searchCategory,
+        advancedEnabled: this.advancedSearchEnabled,
+        filterActive: this.filterActive
+      })
+      if (this.searchSuggestions().length > 0) {
+        SearchSuggestionList({
+          suggestions: this.searchSuggestions(),
+          onSelect: (suggestion: SearchSuggestionItem) => {
+            this.applySearchSuggestion(suggestion);
+          }
+        })
+      } else {
+        Column({ space: 8 }) {
+          SymbolGlyph($r('sys.symbol.clock'))
+            .fontSize(28)
+            .fontColor(['#A2AFBA'])
+          Text(uiText('Search history'))
+            .fontSize(15)
+            .fontColor('#40566F')
+          Text(uiText('Search once to create suggestions'))
+            .fontSize(12)
+            .fontColor('#7A8A99')
+        }
+        .width('100%')
+        .height(180)
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .backgroundColor(Color.White)
+        .borderRadius(6)
+      }
+    }
+    .width('100%')
+    .padding({ left: 12, right: 12, top: 10 })
+  }
+
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       Column() {
@@ -1724,8 +1858,11 @@ export struct GalleryListContent {
                 .width('100%')
             }
 
-            // 空状态或画廊列表
-            if (this.galleries.length === 0) {
+            if (this.shouldShowSearchSuggestions()) {
+              ListItem() {
+                this.searchSuggestionPlaceholder()
+              }
+            } else if (this.galleries.length === 0) {
               ListItem() {
                 GalleryListStateView({
                   statusText: this.statusText,
@@ -1802,7 +1939,9 @@ export struct GalleryListContent {
             const yOff = normalizeGalleryListScrollOffset(this.listScroller.currentOffset().yOffset);
             this.handleScrollMove(yOff);
             this.rememberListOffset(yOff);
-            this.triggerLoadMoreByOffset(yOff);
+            if (!this.shouldShowSearchSuggestions()) {
+              this.triggerLoadMoreByOffset(yOff);
+            }
           })
           .onScrollStop(() => {
             const yOff = normalizeGalleryListScrollOffset(this.listScroller.currentOffset().yOffset);
@@ -1818,7 +1957,9 @@ export struct GalleryListContent {
             }
           })
           .onReachEnd(() => {
-            this.triggerLoadMoreIfNear(this.galleries.length);
+            if (!this.shouldShowSearchSuggestions()) {
+              this.triggerLoadMoreIfNear(this.galleries.length);
+            }
           })
         }
         .refreshOffset(this.REFRESH_OFFSET)
@@ -1914,6 +2055,8 @@ export struct GalleryListContent {
           advancedSearchEnabled: this.advancedSearchEnabled,
           advanceSearch: this.advanceSearch,
           minRating: this.minRating,
+          pageFrom: -1,
+          pageTo: -1,
           onSearchModeChange: this.onSearchModeChange,
           onSearchCategoryChange: this.onSearchCategoryChange,
           onAdvancedEnabledChange: this.onAdvancedEnabledChange,
