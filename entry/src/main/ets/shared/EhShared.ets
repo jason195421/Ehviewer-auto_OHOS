@@ -1468,19 +1468,6 @@ export function themeSurfaceColor(amount: number = 0.88): string {
   return mixHexColor(APP_THEME_COLOR, '#FFFFFF', amount);
 }
 
-export function nextFloatingToolbarVisible(scrollOffset: number, contentOffset: number, currentVisible: boolean): boolean {
-  if (contentOffset <= 4) {
-    return true;
-  }
-  if (scrollOffset > 6) {
-    return false;
-  }
-  if (scrollOffset < -6) {
-    return true;
-  }
-  return currentVisible;
-}
-
 export function nextFloatingToolbarOffset(currentOffset: number, scrollOffset: number, contentOffset: number,
   barHeight: number): number {
   if (contentOffset <= 4) {

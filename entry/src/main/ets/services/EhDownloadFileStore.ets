@@ -103,28 +103,6 @@ export class EhDownloadFileStore {
     return restored;
   }
 
-  scanRedundantDirectories(context: common.UIAbilityContext, keepGids: number[]): DownloadDirectoryScanResult {
-    const root = this.downloadRoot(context);
-    let directories = 0;
-    let files = 0;
-    let bytes = 0;
-    try {
-      const names = fs.listFileSync(root);
-      for (let i = 0; i < names.length; i++) {
-        const directory = root + '/' + names[i];
-        const metadata = readMetadata(directory + '/.ehviewer');
-        if (metadata === null || containsNumber(keepGids, metadata.gid)) {
-          continue;
-        }
-        directories++;
-        files += countImageFiles(directory);
-        bytes += this.directorySizeByPath(directory);
-      }
-    } catch (error) {
-    }
-    return { directories: directories, files: files, bytes: bytes };
-  }
-
   removeGalleryDirectory(context: common.UIAbilityContext, gallery: GalleryInfo): DownloadDirectoryScanResult {
     return removeDirectoryTree(this.galleryDirectory(context, gallery));
   }

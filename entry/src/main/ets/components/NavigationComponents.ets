@@ -254,10 +254,6 @@ export struct EhNavBar {
     return 56;
   }
 
-  private totalHeight(): number {
-    return this.statusBarHeight + this.barBodyHeight();
-  }
-
   build() {
     Column() {
       // Status bar spacer (colour-matched)

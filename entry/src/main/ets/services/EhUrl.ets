@@ -114,129 +114,6 @@ export class ListUrlBuilder {
     this.showExpunged = false;
   }
 
-  setQuery(query: string): void {
-    this.reset();
-    if (query.length === 0) {
-      return;
-    }
-
-    const pairs = query.split('&');
-    let category = 0;
-    let advanceSearch = 0;
-    let enableAdvanceSearch = false;
-    let enableMinRating = false;
-    let enablePage = false;
-
-    for (let i = 0; i < pairs.length; i++) {
-      const index = pairs[i].indexOf('=');
-      if (index < 0) {
-        continue;
-      }
-
-      const key = pairs[i].substring(0, index);
-      const value = pairs[i].substring(index + 1);
-      switch (key) {
-        case 'f_cats':
-          category |= (~parseIntSafe(value, ALL_CATEGORY)) & ALL_CATEGORY;
-          break;
-        case 'f_doujinshi':
-          category = addCategory(value, category, GalleryCategory.Doujinshi);
-          break;
-        case 'f_manga':
-          category = addCategory(value, category, GalleryCategory.Manga);
-          break;
-        case 'f_artistcg':
-          category = addCategory(value, category, GalleryCategory.ArtistCg);
-          break;
-        case 'f_gamecg':
-          category = addCategory(value, category, GalleryCategory.GameCg);
-          break;
-        case 'f_western':
-          category = addCategory(value, category, GalleryCategory.Western);
-          break;
-        case 'f_non-h':
-          category = addCategory(value, category, GalleryCategory.NonH);
-          break;
-        case 'f_imageset':
-          category = addCategory(value, category, GalleryCategory.ImageSet);
-          break;
-        case 'f_cosplay':
-          category = addCategory(value, category, GalleryCategory.Cosplay);
-          break;
-        case 'f_asianporn':
-          category = addCategory(value, category, GalleryCategory.AsianPorn);
-          break;
-        case 'f_misc':
-          category = addCategory(value, category, GalleryCategory.Misc);
-          break;
-        case 'f_search':
-          this.keyword = safeDecode(value);
-          break;
-        case 'advsearch':
-          enableAdvanceSearch = value === '1';
-          break;
-        case 'f_sname':
-          advanceSearch |= value === 'on' ? 0x1 : 0;
-          break;
-        case 'f_stags':
-          advanceSearch |= value === 'on' ? 0x2 : 0;
-          break;
-        case 'f_sdesc':
-          advanceSearch |= value === 'on' ? 0x4 : 0;
-          break;
-        case 'f_storr':
-          advanceSearch |= value === 'on' ? 0x8 : 0;
-          break;
-        case 'f_sto':
-          advanceSearch |= value === 'on' ? 0x10 : 0;
-          break;
-        case 'f_sdt1':
-          advanceSearch |= value === 'on' ? 0x20 : 0;
-          break;
-        case 'f_sdt2':
-          advanceSearch |= value === 'on' ? 0x40 : 0;
-          break;
-        case 'f_sh':
-          advanceSearch |= value === 'on' ? 0x80 : 0;
-          break;
-        case 'f_sfl':
-          advanceSearch |= value === 'on' ? 0x100 : 0;
-          break;
-        case 'f_sfu':
-          advanceSearch |= value === 'on' ? 0x200 : 0;
-          break;
-        case 'f_sft':
-          advanceSearch |= value === 'on' ? 0x400 : 0;
-          break;
-        case 'f_sr':
-          enableMinRating = value === 'on';
-          break;
-        case 'f_srdd':
-          this.minRating = parseIntSafe(value, -1);
-          break;
-        case 'f_sp':
-          enablePage = value === 'on';
-          break;
-        case 'f_spf':
-          this.pageFrom = parseIntSafe(value, -1);
-          break;
-        case 'f_spt':
-          this.pageTo = parseIntSafe(value, -1);
-          break;
-      }
-    }
-
-    this.category = category;
-    if (enableAdvanceSearch) {
-      this.advanceSearch = advanceSearch;
-      this.minRating = enableMinRating ? this.minRating : -1;
-      if (!enablePage) {
-        this.pageFrom = -1;
-        this.pageTo = -1;
-      }
-    }
-  }
-
   build(site: GallerySite = GallerySite.E): string {
     switch (this.mode) {
       case ListMode.Uploader:
@@ -323,10 +200,6 @@ export class FavListUrlBuilder {
     return favCat >= 0 && favCat <= 9;
   }
 
-  isLocalFavCat(): boolean {
-    return this.favCat === FavListUrlBuilder.FAV_CAT_LOCAL;
-  }
-
   build(site: GallerySite = GallerySite.E): string {
     const params: QueryParam[] = [];
     if (FavListUrlBuilder.isValidFavCat(this.favCat)) {
@@ -399,19 +272,10 @@ function parseQuery(query: string): QueryParam[] {
   return params;
 }
 
-function addCategory(value: string, category: number, flag: GalleryCategory): number {
-  return value === '1' ? category | flag : category;
-}
-
 function appendFlagParam(params: QueryParam[], flags: number, flag: number, key: string): void {
   if ((flags & flag) !== 0) {
     params.push({ key: key, value: 'on' });
   }
-}
-
-function parseIntSafe(value: string, fallback: number): number {
-  const parsed = Number.parseInt(value);
-  return Number.isNaN(parsed) ? fallback : parsed;
 }
 
 function safeDecode(value: string): string {

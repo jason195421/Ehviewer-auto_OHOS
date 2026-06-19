@@ -2,7 +2,7 @@ import { UIAbility } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { preferences } from '@kit.ArkData';
 import { userAuth } from '@kit.UserAuthenticationKit';
-import { MAIN_WINDOW_KEY, applyAppChromeImmersiveMode, rememberMainWindow } from '../services/EhWindowImmersive';
+import { MAIN_WINDOW_KEY, prepareAppChromeBeforeContent, rememberMainWindow } from '../services/EhWindowImmersive';
 import { applyWindowPrivacyMode, WINDOW_PRIVACY_STATUS_KEY } from '../services/EhWindowPrivacy';
 import { ehSettingsStore } from '../services/EhSettingsStore';
 
@@ -28,19 +28,21 @@ export default class EntryAbility extends UIAbility {
     AppStorage.setOrCreate<window.Window | undefined>(MAIN_WINDOW_KEY, undefined);
     AppStorage.setOrCreate<number>(LANGUAGE_REVISION_KEY, 0);
     AppStorage.setOrCreate<string>(WINDOW_PRIVACY_STATUS_KEY, '');
-    stage.getMainWindow().then((win) => {
+    const windowReady = stage.getMainWindow().then((win) => {
       this.mainWindow = win;
       rememberMainWindow(win);
-      applyAppChromeImmersiveMode(win);
-      this.updateSystemAvoidArea(win);
-      win.on('avoidAreaChange', (data: window.AvoidAreaOptions) => {
-        if (data.type === window.AvoidAreaType.TYPE_SYSTEM) {
-          AppStorage.set<number>(STATUS_BAR_HEIGHT_KEY, data.area.topRect.height);
-        }
+      return prepareAppChromeBeforeContent(win).then(() => {
+        this.updateSystemAvoidArea(win);
+        win.on('avoidAreaChange', (data: window.AvoidAreaOptions) => {
+          if (data.type === window.AvoidAreaType.TYPE_SYSTEM) {
+            AppStorage.set<number>(STATUS_BAR_HEIGHT_KEY, data.area.topRect.height);
+          }
+        });
+        this.applyPersistedSecureScreen();
       });
-      this.applyPersistedSecureScreen();
     }).catch(() => {});
-    ehSettingsStore.load(this.context).then(() => {
+    const settingsReady = ehSettingsStore.load(this.context).catch(() => {});
+    Promise.all([windowReady, settingsReady]).then(() => {
       this.loadIndexContent(stage);
     }).catch(() => {
       this.loadIndexContent(stage);

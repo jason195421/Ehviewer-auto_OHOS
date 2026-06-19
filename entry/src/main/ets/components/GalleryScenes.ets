@@ -26,13 +26,13 @@ import {
 import { EhNavBar } from '../components/NavigationComponents';
 import { CategoryBadge, GalleryListRow, GalleryThumb, GalleryThumbCard } from './GalleryCards';
 import { GalleryDetailOverlayScene, GalleryDetailScene } from './GalleryDetailScenes';
-import { applyTagSuggestionToKeyword, buildSearchSuggestions, QuickActionColumn, SearchAdvancedPanel, SearchSuggestionItem, SearchSuggestionList, SearchSummaryStrip, recordSearchHistory } from './GallerySearchScenes';
+import { applyTagSuggestionToKeyword, buildSearchSuggestions, gallerySuggestionUrl, QuickActionColumn, SearchAdvancedPanel, SearchSuggestionItem, SearchSuggestionList, SearchSummaryStrip, recordSearchHistory } from './GallerySearchScenes';
 import { CommentsScene, PlaceholderScene, ReaderPageState, ReaderScene } from './ReaderScenes';
 import { uiText, uiStatusText, setActiveBackHandler, createEmptyGallery, createDetailFromGallery, createEmptyDetail, createEmptyPage, cloneGalleryInfos, applyGalleryFilters, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, listModeForRoute, routeUsesKeyword, defaultKeywordForRoute, gallerySearchTitle, effectiveListSite, galleryListFailureMessage, readerPageReferer, cacheReaderImageForPage, readerPreloadCount, galleryDisplayTitle, galleryListMode, galleryThumbWidth, galleryThumbHeight } from '../shared/EhShared';
 
 export { CategoryBadge, GalleryListRow, GalleryTagChip, GalleryThumb, GalleryThumbCard } from './GalleryCards';
 export { GalleryDetailOverlayScene, GalleryDetailScene } from './GalleryDetailScenes';
-export { ActionBubble, GallerySearchScene, QuickActionColumn, SearchAdvancedPanel, SearchFlagChip, SearchSuggestionList, SearchSummaryStrip } from './GallerySearchScenes';
+export { ActionBubble, QuickActionColumn, SearchAdvancedPanel, SearchFlagChip, SearchSuggestionList, SearchSummaryStrip } from './GallerySearchScenes';
 export { CommentsScene, PlaceholderScene, ReaderNavButton, ReaderPageState, ReaderScene, ReaderToolButton } from './ReaderScenes';
 
 interface GalleryListSceneCache {
@@ -484,21 +484,17 @@ export struct GalleryListScene {
     return mode === ListMode.Normal || mode === ListMode.Subscription;
   }
 
-  private loadPreviousPage(): void {
-    if (this.pageIndex > 0) {
-      this.loadRemote(this.pageIndex - 1);
-    }
-  }
-
-  private loadNextPage(): void {
-    if (this.totalPages <= 0 || this.pageIndex + 1 < this.totalPages) {
-      this.loadRemote(this.pageIndex + 1);
-    }
-  }
-
   private applySearch(): void {
     this.fabExpanded = false;
     this.rememberSearchKeyword(this.keyword);
+    const directGallery = gallerySuggestionUrl(this.keyword);
+    if (directGallery !== null) {
+      this.searchSubmitted = true;
+      this.hasFirstRefresh = true;
+      this.resetListScroll();
+      this.loadDetailByToken(directGallery.gid, directGallery.token);
+      return;
+    }
     this.searchSubmitted = true;
     this.hasFirstRefresh = true;
     this.resetListScroll();
@@ -529,24 +525,6 @@ export struct GalleryListScene {
     setTimeout(() => {
       setActiveBackHandler(() => this.handleSystemBack());
     }, 0);
-  }
-
-  private applySearchDraft(keyword: string, mode: ListMode, category: number, advancedEnabled: boolean, flags: number,
-    minRating: number, pageFrom: number, pageTo: number): void {
-    const normalizedKeyword = keyword.replace(/\r|\n/g, ' ').trim();
-    this.rememberSearchKeyword(normalizedKeyword);
-    this.searchResultDraft = {
-      keyword: normalizedKeyword,
-      mode: mode,
-      category: category,
-      advancedEnabled: advancedEnabled,
-      advanceSearch: flags,
-      minRating: minRating,
-      pageFrom: -1,
-      pageTo: -1
-    };
-    this.showSearchResultScene = true;
-    this.fabExpanded = false;
   }
 
   private openTagSearch(namespace: string, tag: string): void {
@@ -1487,13 +1465,6 @@ export struct GalleryListContent {
     this.jumpPanelVisible = false;
   }
 
-  private searchResultSubtitle(): string {
-    if (this.totalPages > 0) {
-      return (this.pageIndex + 1).toString() + ' / ' + this.totalPages.toString();
-    }
-    return (this.pageIndex + 1).toString() + ' / -';
-  }
-  
   private totalBarHeight(): number {
     return this.statusBarVp() + this.barHeight;
   }
@@ -1737,62 +1708,6 @@ export struct GalleryListContent {
     .translate({ y: this.toolbarOffsetY })
     .animation({ duration: 200, curve: Curve.EaseOut })
     .zIndex(10)
-  }
-
-  @Builder
-  private searchPageStrip() {
-    Row({ space: 8 }) {
-      Text(uiText('Page'))
-        .fontSize(12)
-        .fontColor(themeSecondaryText())
-      TextInput({ text: this.pageJumpDraft, placeholder: '1' })
-        .width(64)
-        .height(30)
-        .type(InputType.Number)
-        .fontSize(13)
-        .fontColor(themePrimaryText())
-        .backgroundColor(themeFieldBackground())
-        .borderRadius(4)
-        .textAlign(TextAlign.Center)
-        .onChange((value: string) => {
-          this.pageJumpDraft = value;
-        })
-        .onSubmit(() => {
-          this.submitPageJump();
-        })
-      Text('/ ' + (this.totalPages > 0 ? this.totalPages.toString() : '-'))
-        .fontSize(12)
-        .fontColor(themeSecondaryText())
-      Text(this.resultSummaryText())
-        .fontSize(12)
-        .fontColor(themeSecondaryText())
-        .layoutWeight(1)
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-      Button({ type: ButtonType.Circle, stateEffect: true }) {
-        SymbolGlyph($r('sys.symbol.magnifyingglass'))
-          .fontSize(18)
-          .fontColor([Color.White])
-      }
-      .width(32)
-      .height(32)
-      .backgroundColor(themePrimaryColor())
-      .onClick(() => {
-        this.closeAdvancedPanel();
-        this.onSearch();
-      })
-    }
-    .width('100%')
-    .height(42)
-    .padding({ left: 10, right: 10 })
-    .backgroundColor(themeSurface())
-  }
-
-  private resultSummaryText(): string {
-    if (this.statusText.length > 0) {
-      return uiStatusText(this.statusText);
-    }
-    return this.searchResultSubtitle();
   }
 
   private shouldShowSearchSuggestions(): boolean {

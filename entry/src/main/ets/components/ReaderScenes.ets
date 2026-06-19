@@ -550,22 +550,6 @@ export struct ReaderScene {
     this.viewportCommandVersion++;
   }
 
-  private zoomOut(): void {
-    this.issueViewportCommand('zoom_out');
-  }
-
-  private zoomIn(): void {
-    this.issueViewportCommand('zoom_in');
-  }
-
-  private resetZoom(): void {
-    this.issueViewportCommand('reset');
-  }
-
-  private zoomLabel(): string {
-    return this.zoomPercent.toString() + '%';
-  }
-
   private clearSliderTimer(): void {
     if (this.sliderHideTimer !== -1) {
       clearTimeout(this.sliderHideTimer);
@@ -851,10 +835,6 @@ export struct ReaderScene {
     } else {
       this.showSlider();
     }
-  }
-
-  private canGoPrev(): boolean {
-    return this.currentIndex > 0;
   }
 
   private canGoNext(): boolean {

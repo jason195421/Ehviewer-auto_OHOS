@@ -1,14 +1,12 @@
-import { ALL_CATEGORY, GalleryCategory, GalleryRoute } from '../model/GalleryModels';
+import { ALL_CATEGORY, GalleryCategory } from '../model/GalleryModels';
 import { DEFAULT_ADVANCE_SEARCH, ListMode } from '../services/EhUrl';
 import { ehTagTranslationStore } from '../services/EhTagTranslationStore';
-import { applyAppChromeImmersiveMode } from '../services/EhWindowImmersive';
 import { LANGUAGE_REVISION_KEY, categoryColor, uiText } from '../shared/EhShared';
 import {
   themeFieldBackground,
   themePageBackground,
   themePrimaryColor,
   themePrimaryText,
-  themeScrimColor,
   themeSecondaryText,
   themeSurface,
   themeSurfaceVariant
@@ -123,17 +121,8 @@ function parseGalleryUrl(text: string): GalleryUrlMatch | null {
   return { gid: gid, token: match[2] };
 }
 
-function parsePageUrl(text: string): string {
-  const match = text.match(/https?:\/\/(?:exhentai\.org|e-hentai\.org)\/s\/[A-Za-z0-9]+\/\d+-\d+/);
-  return match === null ? '' : match[0];
-}
-
 export function gallerySuggestionUrl(text: string): GalleryUrlMatch | null {
   return parseGalleryUrl(text);
-}
-
-export function pageSuggestionUrl(text: string): string {
-  return parsePageUrl(text);
 }
 
 export function buildSearchSuggestions(keyword: string, limit: number = 0,
@@ -172,242 +161,6 @@ export function buildSearchSuggestions(keyword: string, limit: number = 0,
     });
   }
   return next;
-}
-
-@Component
-export struct GallerySearchScene {
-  @Prop initialKeyword: string = '';
-  @Prop initialMode: ListMode = ListMode.Normal;
-  @Prop initialCategory: number = GalleryCategory.None;
-  @Prop initialAdvancedEnabled: boolean = false;
-  @Prop initialAdvanceSearch: number = DEFAULT_ADVANCE_SEARCH;
-  @Prop initialMinRating: number = -1;
-  @Prop initialPageFrom: number = -1;
-  @Prop initialPageTo: number = -1;
-  @Prop sourceRoute: GalleryRoute = GalleryRoute.Home;
-  @Prop filterActive: boolean = false;
-  onBack: () => void = () => {};
-  onOpenGalleryUrl: (gid: number, token: string) => void = (_gid: number, _token: string) => {};
-  onOpenPageUrl: (pageUrl: string) => void = (_pageUrl: string) => {};
-  onApply: (keyword: string, mode: ListMode, category: number, advancedEnabled: boolean, flags: number,
-    minRating: number, pageFrom: number, pageTo: number) => void =
-    (_keyword: string, _mode: ListMode, _category: number, _advancedEnabled: boolean, _flags: number,
-      _minRating: number, _pageFrom: number, _pageTo: number) => {};
-
-  @State keywordDraft: string = '';
-  @State modeDraft: ListMode = ListMode.Normal;
-  @State categoryDraft: number = GalleryCategory.None;
-  @State advancedEnabledDraft: boolean = false;
-  @State advanceSearchDraft: number = DEFAULT_ADVANCE_SEARCH;
-  @State minRatingDraft: number = -1;
-  @State pageFromDraft: number = -1;
-  @State pageToDraft: number = -1;
-  @State modeLabelDraft: string = '';
-  @State advancedPanelVisible: boolean = false;
-  @State suggestions: SearchSuggestionItem[] = [];
-  @State selectedTagNamespaces: string[] = [];
-  @State suggestionRevision: number = 0;
-  @StorageProp('statusBarHeight') statusBarHeightPx: number = 0;
-  @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
-
-  aboutToAppear(): void {
-    applyAppChromeImmersiveMode();
-    this.keywordDraft = this.initialKeyword;
-    this.modeDraft = this.initialMode;
-    this.categoryDraft = this.initialCategory;
-    this.advancedEnabledDraft = this.initialAdvancedEnabled;
-    this.advanceSearchDraft = this.initialAdvanceSearch;
-    this.minRatingDraft = this.initialMinRating;
-    this.pageFromDraft = this.initialPageFrom;
-    this.pageToDraft = this.initialPageTo;
-    this.refreshSuggestions();
-  }
-
-  private statusBarVp(): number {
-    return this.getUIContext().px2vp(this.statusBarHeightPx);
-  }
-
-  private submitSearch(): void {
-    this.advancedPanelVisible = false;
-    this.onApply(this.keywordDraft, this.modeDraft, this.categoryDraft, this.advancedEnabledDraft,
-      this.advanceSearchDraft, this.minRatingDraft, this.pageFromDraft, this.pageToDraft);
-  }
-
-  private refreshSuggestions(namespaces: string[] = this.selectedTagNamespaces): void {
-    this.suggestions = buildSearchSuggestions(this.keywordDraft, 0, namespaces);
-    this.suggestionRevision++;
-  }
-
-  private selectedTagNamespaceKey(): string {
-    return this.selectedTagNamespaces.slice().sort().join('|');
-  }
-
-  private applySuggestion(suggestion: SearchSuggestionItem): void {
-    if (suggestion.kind === 'tag') {
-      this.keywordDraft = applyTagSuggestionToKeyword(this.keywordDraft, suggestion.query);
-      this.modeDraft = ListMode.Tag;
-      this.refreshSuggestions();
-      return;
-    }
-    this.keywordDraft = suggestion.query;
-    this.refreshSuggestions();
-  }
-
-  private toggleTagNamespace(namespace: string): void {
-    const next = this.selectedTagNamespaces.slice();
-    const index = next.indexOf(namespace);
-    if (index >= 0) {
-      next.splice(index, 1);
-    } else {
-      next.push(namespace);
-    }
-    this.selectedTagNamespaces = next;
-    this.refreshSuggestions(next);
-  }
-
-  build() {
-    Stack({ alignContent: Alignment.TopStart }) {
-      Column() {
-        Column()
-          .height(this.statusBarVp())
-          .width('100%')
-          .backgroundColor(themePrimaryColor())
-
-        Row({ space: 8 }) {
-          Button({ type: ButtonType.Circle, stateEffect: true }) {
-            SymbolGlyph($r('sys.symbol.chevron_left'))
-              .fontSize(22)
-              .fontColor([Color.White])
-          }
-          .width(40)
-          .height(40)
-          .backgroundColor('rgba(255,255,255,0.14)')
-          .flexShrink(0)
-          .onClick(() => {
-            this.onBack();
-          })
-
-          TextInput({ text: this.keywordDraft, placeholder: uiText('Search galleries') })
-            .height(38)
-            .layoutWeight(1)
-            .backgroundColor(themeFieldBackground())
-            .borderRadius(19)
-            .placeholderColor(themeSecondaryText())
-            .fontColor(themePrimaryText())
-            .caretColor(themePrimaryColor())
-            .padding({ left: 16, right: 16 })
-            .onChange((value: string) => {
-              this.keywordDraft = value;
-              this.refreshSuggestions();
-            })
-            .onSubmit(() => {
-              this.submitSearch();
-            })
-
-          Button({ type: ButtonType.Circle, stateEffect: true }) {
-            SymbolGlyph($r('sys.symbol.plus'))
-              .fontSize(20)
-              .fontColor([Color.White])
-          }
-          .width(40)
-          .height(40)
-          .backgroundColor(this.advancedPanelVisible || this.advancedEnabledDraft ? 'rgba(255,255,255,0.28)' :
-            'rgba(255,255,255,0.14)')
-          .flexShrink(0)
-          .onClick(() => {
-            this.advancedPanelVisible = !this.advancedPanelVisible;
-          })
-        }
-        .width('100%')
-        .height(56)
-        .padding({ left: 12, right: 12 })
-        .alignItems(VerticalAlign.Center)
-        .backgroundColor(themePrimaryColor())
-
-        Column() {
-          SearchSummaryStrip({
-            selectedTagNamespaces: this.selectedTagNamespaces,
-            selectedTagNamespaceKey: this.selectedTagNamespaceKey(),
-            revision: this.suggestionRevision,
-            onToggleTagNamespace: (namespace: string) => {
-              this.toggleTagNamespace(namespace);
-            }
-          })
-          if (this.suggestions.length > 0) {
-            SearchSuggestionList({
-              suggestions: this.suggestions,
-              revision: this.suggestionRevision,
-              onSelect: (suggestion: SearchSuggestionItem) => {
-                this.applySuggestion(suggestion);
-              }
-            })
-              .layoutWeight(1)
-              .margin({ top: 4 })
-          }
-        }
-        .width('100%')
-        .padding({ left: 8, right: 8, top: 4 })
-        .layoutWeight(1)
-        .backgroundColor(themePageBackground())
-      }
-      .width('100%')
-      .height('100%')
-      .backgroundColor(themePageBackground())
-
-      if (this.advancedPanelVisible) {
-        Column()
-          .width('100%')
-          .height('100%')
-          .backgroundColor(themeScrimColor())
-          .onClick(() => {
-            this.advancedPanelVisible = false;
-          })
-
-        SearchAdvancedPanel({
-          searchModeValue: this.modeDraft,
-          searchCategory: this.categoryDraft,
-          advancedSearchEnabled: this.advancedEnabledDraft,
-          advanceSearch: this.advanceSearchDraft,
-          minRating: this.minRatingDraft,
-          pageFrom: this.pageFromDraft,
-          pageTo: this.pageToDraft,
-          onSearchModeChange: (mode: ListMode) => {
-            this.modeDraft = mode;
-          },
-          onSearchCategoryChange: (category: number) => {
-            this.categoryDraft = category;
-          },
-          onAdvancedEnabledChange: (enabled: boolean) => {
-            this.advancedEnabledDraft = enabled;
-          },
-          onAdvanceSearchChange: (flags: number) => {
-            this.advanceSearchDraft = flags;
-          },
-          onMinRatingChange: (rating: number) => {
-            this.minRatingDraft = rating;
-          },
-          onPageFromChange: (value: number) => {
-            this.pageFromDraft = value;
-          },
-          onPageToChange: (value: number) => {
-            this.pageToDraft = value;
-          },
-          onClose: () => {
-            this.advancedPanelVisible = false;
-          },
-          onSearch: () => {
-            this.submitSearch();
-          }
-        })
-          .margin({ top: this.statusBarVp() + 62, left: 10, right: 10 })
-          .transition(TransitionEffect.move(TransitionEdge.TOP)
-            .animation({ duration: 180, curve: Curve.EaseOut }))
-      }
-    }
-    .width('100%')
-    .height('100%')
-    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
-  }
 }
 
 @Component

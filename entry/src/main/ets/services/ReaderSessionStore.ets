@@ -1,5 +1,5 @@
 import { GalleryDetail, GalleryPage, GalleryPreview, GallerySite } from '../model/GalleryModels';
-import { cloneGalleryDetail, cloneGalleryPage, cloneGalleryPreviews, createEmptyDetail, createEmptyPage } from '../shared/EhShared';
+import { cloneGalleryDetail, cloneGalleryPage, cloneGalleryPreviews } from '../shared/EhShared';
 
 export const READER_SESSION_REVISION_KEY: string = 'readerSessionRevision';
 
@@ -64,17 +64,5 @@ function cloneReaderSessionState(state: ReaderSessionState): ReaderSessionState 
     listRequestUrl: state.listRequestUrl,
     site: state.site,
     pageIndex: state.pageIndex
-  };
-}
-
-export function createEmptyReaderSessionState(): ReaderSessionState {
-  return {
-    detail: createEmptyDetail(),
-    page: createEmptyPage(),
-    statusText: 'Reader is ready',
-    detailRequestUrl: '',
-    listRequestUrl: '',
-    site: GallerySite.E,
-    pageIndex: 0
   };
 }
