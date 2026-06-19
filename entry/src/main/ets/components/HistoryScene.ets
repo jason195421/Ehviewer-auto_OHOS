@@ -30,7 +30,7 @@ import {
   themeSurface
 } from '../shared/EhTheme';
 import { EhBackupBundle, DrawerItem, SettingsHeaderItem, SettingsRowItem, SessionMode, SettingsPanel, DRAWER_ITEMS, SETTINGS_HEADERS, STATUS_BAR_HEIGHT_KEY, ON_OFF_OPTIONS, shouldUseChineseUi, uiText, uiValue, uiStatusText, uiPageText, zhText, setActiveBackHandler, runActiveBackHandler, createEmptyGallery, createEmptyDownloadInfo, createDetailFromGallery, createEmptyDetail, createEmptyPreview, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneStringArray, cloneRequiredStringArray, cloneGalleryInfo, cloneGalleryInfos, padTwo, applyGalleryFilters, cloneGalleryTagGroups, cloneGalleryComments, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListItem, cloneTopListBucket, cloneTopListInfo, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, saveDownloadsQuietly, filterDownloadItems, downloadItemMatches, sortDownloadItems, nextDownloadStatusFilter, nextDownloadLabelFilter, nextDownloadSortMode, nextStringOption, nextDownloadState, nextDownloadLabel, downloadLabelName, downloadStateLabel, downloadStateColor, downloadProgressText, downloadSizeText, downloadImageUrlForPage, downloadThreadLimit, downloadPageIndexes, downloadQueueSummary, parseHistoryMaxSize, routeTitle, routeSubtitle, launchRouteFromSetting, settingsPanelTitle, settingsRowsForPanel, optionSettingsRow, textSettingsRow, staticSettingsRow, settingEntryValue, cloneStringOptions, settingMigrationMessage, nextOption, isValidProxyPortText, formatNetworkDiagnostics, listModeForRoute, routeUsesKeyword, usesGallerySearchToolbar, usesEmbeddedToolbar, defaultKeywordForRoute, gallerySearchTitle, currentGallerySite, effectiveListSite, gallerySiteName, galleryListFailureMessage, withGalleryListMessage, readerPageReferer, readerDisplayImageUrl, cacheReaderImageForPage, cacheThumbnailImage, cloneGalleryPageWithCache, readerLocalImageSource, readerZoomSize, readerFullImageWidth, readerFullImageHeight, readerImageFit, readerShortUrl, readerPreloadCount, readerIsRightToLeft, categoryName, categoryColor, ratingText, galleryDisplayTitle, showGalleryPages, galleryListMode, galleryThumbWidth, galleryThumbHeight, galleryRowHeight, galleryTagPreview, detailTitleFontSize, detailTitleMaxLines, detailHeadingFontSize, readerShowProgress, readerShowClock, readerClockText, padTimeNumber, topListChipColor } from '../shared/EhShared';
-import { GalleryDetailOverlayScene, GalleryListRow, GalleryListScene, GalleryListStateView, PlaceholderScene, ReaderScene } from './GalleryScenes';
+import { GalleryDetailOverlayScene, GalleryListRow, GalleryListScene, GalleryListStateView, PlaceholderScene, ReaderPageState, ReaderScene } from './GalleryScenes';
 import { FloatingToolbarHost } from './NavigationComponents';
 
 function normalizeSceneScrollOffset(offset: number): number {
@@ -70,6 +70,7 @@ export struct HistoryScene {
   @State favoriteBusy: boolean = false;
   @State readerStatus: string = 'Reader is ready';
   @State readerPage: GalleryPage = createEmptyPage();
+  @State readerPages: ReaderPageState[] = [];
   @State readerPreviewIndex: number = 0;
   @State renderVersion: number = 0;
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
@@ -209,6 +210,7 @@ export struct HistoryScene {
     this.detailPreviewPager.reset();
     this.readerStatus = 'Reader is ready';
     this.readerPage = createEmptyPage();
+    this.readerPages = [];
     this.readerPreviewIndex = 0;
     this.detailScrollOffset = 0;
     this.renderVersion++;
@@ -229,6 +231,7 @@ export struct HistoryScene {
     this.showReader = false;
     this.readerStatus = 'Reader is ready';
     this.readerPage = createEmptyPage();
+    this.readerPages = [];
     this.readerPreviewIndex = 0;
     applyAppChromeImmersiveMode();
     this.renderVersion++;
@@ -245,6 +248,7 @@ export struct HistoryScene {
     saveGalleryReadPosition(this.detail.gid, preview.index);
     this.readerStatus = 'Loading page ' + (preview.index + 1).toString() + '...';
     this.readerPage = createReaderLoadingPage(preview.pageUrl);
+    this.setReaderPage(preview.index, this.readerPage);
     this.renderVersion++;
     this.openReaderAbility(currentGallerySite());
 
@@ -252,6 +256,7 @@ export struct HistoryScene {
     if (cached !== null) {
       this.readerStatus = 'Page loaded from cache';
       this.readerPage = cloneGalleryPage(cached);
+      this.setReaderPage(preview.index, cached);
       this.renderVersion++;
       this.cacheReaderImage(preview.index, cached);
       this.preloadReaderPages(preview.index);
@@ -268,8 +273,14 @@ export struct HistoryScene {
       const cacheUrl = result.page.pageUrl.length > 0 ? result.page.pageUrl : preview.pageUrl;
       galleryPageCache.put(cacheUrl, result.page);
       galleryPageCache.put(preview.pageUrl, result.page);
+      if (this.readerPreviewIndex !== preview.index) {
+        this.setReaderPage(preview.index, result.page);
+        this.cacheReaderImage(preview.index, result.page);
+        return;
+      }
       this.readerStatus = 'Page loaded';
       this.readerPage = cloneGalleryPage(result.page);
+      this.setReaderPage(preview.index, result.page);
       this.renderVersion++;
       this.cacheReaderImage(preview.index, result.page);
       this.preloadReaderPages(preview.index);
@@ -365,6 +376,7 @@ export struct HistoryScene {
   private cacheReaderImage(index: number, page: GalleryPage): void {
     cacheReaderImageForPage(page, (cachedPage: GalleryPage) => {
       galleryPageCache.put(cachedPage.pageUrl.length > 0 ? cachedPage.pageUrl : page.pageUrl, cachedPage);
+      this.setReaderPage(index, cachedPage);
       if (this.showReader && this.readerPreviewIndex === index) {
         this.readerPage = cloneGalleryPage(cachedPage);
         this.readerStatus = 'Page loaded from local cache';
@@ -400,6 +412,7 @@ export struct HistoryScene {
           const cacheUrl = result.page.pageUrl.length > 0 ? result.page.pageUrl : preview.pageUrl;
           galleryPageCache.put(cacheUrl, result.page);
           galleryPageCache.put(preview.pageUrl, result.page);
+          this.setReaderPage(nextIndex, result.page);
           this.cacheReaderImage(nextIndex, result.page);
         }
       } catch (error) {
@@ -427,6 +440,7 @@ export struct HistoryScene {
         const cacheUrl = result.page.pageUrl.length > 0 ? result.page.pageUrl : preview.pageUrl;
         galleryPageCache.put(cacheUrl, result.page);
         galleryPageCache.put(preview.pageUrl, result.page);
+        this.setReaderPage(0, result.page);
         this.cacheReaderImage(0, result.page);
         this.preloadReaderPages(0);
       }
@@ -448,6 +462,7 @@ export struct HistoryScene {
     saveGalleryReadPosition(this.detail.gid, index);
     this.readerStatus = 'Resolving page ' + (index + 1).toString() + '...';
     this.readerPage = createReaderLoadingPage('');
+    this.setReaderPage(index, this.readerPage);
     this.renderVersion++;
     this.openReaderAbility(currentGallerySite());
     this.ensureReaderPreview(index, false).then((resolved: GalleryPreview | null) => {
@@ -485,7 +500,9 @@ export struct HistoryScene {
     this.showReader = false;
     const context = getAbilityContext();
     if (context === undefined) {
-      this.showReader = true;
+      this.readerStatus = 'Reader launch failed: Ability context is not ready';
+      this.renderVersion++;
+      this.persistReaderSession(site);
       return;
     }
     context.startAbility({
@@ -525,6 +542,24 @@ export struct HistoryScene {
       }
     }
     return null;
+  }
+
+  private setReaderPage(index: number, page: GalleryPage): void {
+    const next: ReaderPageState[] = [];
+    let replaced = false;
+    for (let i = 0; i < this.readerPages.length; i++) {
+      if (this.readerPages[i].index === index) {
+        next.push({ index: index, page: cloneGalleryPage(page) });
+        replaced = true;
+      } else {
+        next.push({ index: this.readerPages[i].index, page: cloneGalleryPage(this.readerPages[i].page) });
+      }
+    }
+    if (!replaced) {
+      next.push({ index: index, page: cloneGalleryPage(page) });
+    }
+    next.sort((left: ReaderPageState, right: ReaderPageState) => left.index - right.index);
+    this.readerPages = next;
   }
 
   private readerPreviewPageIndex(index: number): number {
@@ -725,6 +760,7 @@ export struct HistoryScene {
       ReaderScene({
         renderVersion: this.renderVersion,
         page: this.readerPage,
+        readerPages: this.readerPages,
         statusText: this.readerStatus,
         pageIndex: this.readerPreviewIndex,
         totalPages: this.readerTotalPages(),

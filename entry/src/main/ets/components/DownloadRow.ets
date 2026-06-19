@@ -33,6 +33,13 @@ export struct DownloadRow {
   onLabel: () => void = () => {};
   onRemove: () => void = () => {};
 
+  private stateActionText(): string {
+    if (this.item.state === DownloadState.Wait || this.item.state === DownloadState.Downloading) {
+      return uiText('Stop');
+    }
+    return uiText('Start');
+  }
+
   build() {
     Row() {
       GalleryThumb({
@@ -104,7 +111,7 @@ export struct DownloadRow {
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .layoutWeight(1)
-          Button(uiText('State'))
+          Button(this.stateActionText())
             .height(30)
             .onClick(() => {
               this.onState();

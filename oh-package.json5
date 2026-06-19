@@ -1,14 +1,9 @@
 {
   "modelVersion": "6.1.1",
   "name": "ehviewer-harmonyos",
-  "version": "0.2.30",
+  "version": "0.2.31",
   "description": "HarmonyOS native port workspace for EhViewer.",
   "main": "",
-  "author": "xiaojieonly/Ehviewer_CN_SXJ contributors",
+  "author": "suibianqwe/Ehviewer_OHOS contributors",
   "license": "GPL-3.0-or-later",
-  "dependencies": {},
-  "devDependencies": {
-    "@ohos/hvigor": "6.1.1",
-    "@ohos/hvigor-ohos-plugin": "6.1.1"
-  }
 }

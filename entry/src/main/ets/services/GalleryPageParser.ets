@@ -1,7 +1,12 @@
 import { GalleryPage } from '../model/GalleryModels';
 
-const IMAGE_URL_PATTERN: RegExp = /<img[^>]+id=["']img["'][^>]+src=["']([^"']+)["'][^>]*style/i;
-const FALLBACK_IMAGE_URL_PATTERN: RegExp = /<img[^>]*src=["']([^"']+)["'][^>]*style/i;
+const IMAGE_URL_PATTERN: RegExp = /<img[^>]*src=["']([^"']+)["'][^>]*style/i;
+const IMAGE_CONTAINER_SRC_PATTERN: RegExp =
+  /<div[^>]*id=["']i3["'][^>]*>[\s\S]*?<img[^>]*src=["']([^"']+)["'][^>]*>/i;
+const IMAGE_ID_SRC_PATTERN: RegExp = /<img[^>]*id=["']img["'][^>]*src=["']([^"']+)["'][^>]*>/i;
+const IMAGE_SRC_ID_PATTERN: RegExp = /<img[^>]*src=["']([^"']+)["'][^>]*id=["']img["'][^>]*>/i;
+const IMAGE_SRC_ACTION_PATTERN: RegExp = /<img[^>]*src=["']([^"']+)["'][^>]*(onclick|onerror|alt|title)=/i;
+const IMAGE_LINK_PATTERN: RegExp = /<a[^>]+href=["']([^"']+)["'][^>]*>\s*<img/i;
 const SKIP_HATH_KEY_PATTERN: RegExp = /onclick=["']return nl\(['"]([^'")]+)['"]\)/i;
 const ORIGIN_IMAGE_URL_PATTERN: RegExp = /<a[^>]+href=["']([^"']*fullimg[^"']*)["'][^>]*>/i;
 const ORIGIN_IMAGE_PROMPT_PATTERN: RegExp = /prompt\(['"]Copy the URL below\.['"],\s*['"]([^'"]+)['"]\)/i;
@@ -32,13 +37,40 @@ export function parseGalleryPage(body: string, pageUrl: string = ''): GalleryPag
 }
 
 function parseImageUrl(body: string): string {
-  const primary = IMAGE_URL_PATTERN.exec(body);
-  if (primary !== null) {
-    return decodeHtml(primary[1]);
+  const container = IMAGE_CONTAINER_SRC_PATTERN.exec(body);
+  if (container !== null && isImageUrlCandidate(normalizeImageUrl(container[1]))) {
+    return normalizeImageUrl(container[1]);
   }
 
-  const fallback = FALLBACK_IMAGE_URL_PATTERN.exec(body);
-  return fallback === null ? '' : decodeHtml(fallback[1]);
+  const idBeforeSrc = IMAGE_ID_SRC_PATTERN.exec(body);
+  if (idBeforeSrc !== null) {
+    return normalizeImageUrl(idBeforeSrc[1]);
+  }
+
+  const srcBeforeId = IMAGE_SRC_ID_PATTERN.exec(body);
+  if (srcBeforeId !== null) {
+    return normalizeImageUrl(srcBeforeId[1]);
+  }
+
+  const primary = IMAGE_URL_PATTERN.exec(body);
+  if (primary !== null) {
+    return normalizeImageUrl(primary[1]);
+  }
+
+  const actionImage = IMAGE_SRC_ACTION_PATTERN.exec(body);
+  if (actionImage !== null) {
+    return normalizeImageUrl(actionImage[1]);
+  }
+
+  const imageLink = IMAGE_LINK_PATTERN.exec(body);
+  if (imageLink !== null) {
+    const link = normalizeImageUrl(imageLink[1]);
+    if (isImageUrlCandidate(link)) {
+      return link;
+    }
+  }
+
+  return '';
 }
 
 function parseOriginImageUrl(body: string): string {
@@ -63,4 +95,14 @@ function decodeHtml(value: string): string {
     .replace(/&#39;/g, '\'')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>');
+}
+
+function normalizeImageUrl(value: string): string {
+  return decodeHtml(value).trim();
+}
+
+function isImageUrlCandidate(value: string): boolean {
+  const lower = value.split('?')[0].toLowerCase();
+  return lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.webp') ||
+    lower.endsWith('.gif');
 }

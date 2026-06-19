@@ -81,6 +81,10 @@ export class EhHistoryStore {
     this.readPositions = [];
   }
 
+  resetAllReadPositions(): void {
+    this.readPositions = [];
+  }
+
   getReadPage(gid: number): number {
     for (let i = 0; i < this.readPositions.length; i++) {
       if (this.readPositions[i].gid === gid) {

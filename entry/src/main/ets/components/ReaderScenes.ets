@@ -6,10 +6,10 @@ import { KeyEvent } from '@ohos.multimodalInput.keyEvent';
 import { GalleryComment, GalleryPage } from '../model/GalleryModels';
 import {
   applyReaderFullscreenImmersiveMode,
+  enterEmbeddedReaderFullscreen,
   getMainWindow,
   getReaderWindow,
-  leaveEmbeddedReaderFullscreen,
-  setEmbeddedReaderActive
+  leaveEmbeddedReaderFullscreen
 } from '../services/EhWindowImmersive';
 import { ehSettingsStore } from '../services/EhSettingsStore';
 import {
@@ -19,8 +19,7 @@ import {
   readerClockText,
   readerDisplayImageUrl,
   uiStatusText,
-  uiText,
-  uiValue
+  uiText
 } from '../shared/EhShared';
 import { readerSelectColors, selectArrowModifier } from '../shared/EhSelectStyle';
 import { EhSubNavBar } from './NavigationComponents';
@@ -31,28 +30,11 @@ const READER_DOUBLE_TAP_SCALE: number = 2.25;
 const SLIDER_AUTO_HIDE_DELAY: number = 3000;
 const READER_AUTO_TRANSFER_OFF: string = 'Off';
 
-@Component
-struct ReaderInfoRow {
-  label: string = '';
-  value: string = '';
-
-  build() {
-    Row() {
-      Text(this.label)
-        .fontSize(12)
-        .fontColor('#667085')
-        .width(96)
-      Text(this.value.length > 0 ? this.value : '-')
-        .fontSize(12)
-        .fontColor('#17202A')
-        .maxLines(2)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .layoutWeight(1)
-    }
-    .width('100%')
-    .margin({ bottom: 6 })
-  }
+export interface ReaderPageState {
+  index: number;
+  page: GalleryPage;
 }
+
 
 @Observed
 class ReaderPreviewModel {
@@ -348,6 +330,7 @@ export struct CommentsScene {
 export struct ReaderScene {
   @Prop @Watch('onRenderVersionChange') renderVersion: number = 0;
   @Prop page: GalleryPage = createEmptyPage();
+  @Prop readerPages: ReaderPageState[] = [];
   @Prop statusText: string = '';
   @Prop @Watch('onPageIndexChange') pageIndex: number = 0;
   @Prop totalPages: number = 0;
@@ -414,7 +397,7 @@ export struct ReaderScene {
   aboutToAppear(): void {
     this.readerWindowActive = true;
     if (this.restoreAppChromeOnExit) {
-      setEmbeddedReaderActive(true);
+      enterEmbeddedReaderFullscreen();
     }
     this.fitMode = ehSettingsStore.getValue('page_scaling', 'Fit width');
     this.menuVisible = false;
@@ -553,6 +536,11 @@ export struct ReaderScene {
   private pageForIndex(index: number): GalleryPage {
     if (index === this.pageIndex) {
       return this.page;
+    }
+    for (let i = 0; i < this.readerPages.length; i++) {
+      if (this.readerPages[i].index === index) {
+        return this.readerPages[i].page;
+      }
     }
     return createEmptyPage();
   }
@@ -1298,9 +1286,9 @@ struct ReaderMenuToggle {
 
 @Component
 struct ReaderImageViewport {
-  @Prop page: GalleryPage = createEmptyPage();
+  @Prop @Watch('onImageSourceChange') page: GalleryPage = createEmptyPage();
   @Prop statusText: string = '';
-  @Prop preferOriginal: boolean = false;
+  @Prop @Watch('onImageSourceChange') preferOriginal: boolean = false;
   @Prop fitMode: string = 'Fit width';
   @Prop isActive: boolean = false;
   @Prop command: string = '';
@@ -1310,9 +1298,12 @@ struct ReaderImageViewport {
   onZoomChange: (percent: number) => void = (_percent: number) => {};
 
   @State imageModel: ReaderPreviewModel = new ReaderPreviewModel();
+  @State completedImageUrl: string = '';
+  @State failedImageUrl: string = '';
   private lastCommandVersion: number = -1;
 
   aboutToAppear(): void {
+    this.onImageSourceChange();
     this.reportState();
   }
 
@@ -1344,7 +1335,24 @@ struct ReaderImageViewport {
   }
 
   private isFailed(): boolean {
-    return this.statusText.indexOf('failed') >= 0 || this.statusText.indexOf('Failed') >= 0;
+    const url = this.imageUrl();
+    return this.statusText.indexOf('failed') >= 0 || this.statusText.indexOf('Failed') >= 0 ||
+      (url.length > 0 && this.failedImageUrl === url);
+  }
+
+  private isImageLoading(): boolean {
+    const url = this.imageUrl();
+    return url.length > 0 && this.completedImageUrl !== url && this.failedImageUrl !== url;
+  }
+
+  private onImageSourceChange(): void {
+    const url = this.imageUrl();
+    if (this.completedImageUrl !== url) {
+      this.completedImageUrl = '';
+    }
+    if (this.failedImageUrl !== url) {
+      this.failedImageUrl = '';
+    }
   }
 
   private imageFit(): ImageFit {
@@ -1419,9 +1427,38 @@ struct ReaderImageViewport {
           .height(this.imageHeight())
           .objectFit(this.imageFit())
           .backgroundColor('#050608')
+          .opacity(this.failedImageUrl === this.imageUrl() ? 0 : 1)
+          .onComplete(() => {
+            this.completedImageUrl = this.imageUrl();
+            this.failedImageUrl = '';
+          })
+          .onError(() => {
+            this.failedImageUrl = this.imageUrl();
+          })
           .scale({ x: this.imageModel.currentScale, y: this.imageModel.currentScale, centerX: '50%', centerY: '50%' })
           .translate({ x: this.imageModel.currentOffsetX, y: this.imageModel.currentOffsetY })
           .animation({ duration: 120, curve: Curve.EaseOut })
+        if (this.isImageLoading()) {
+          LoadingProgress()
+            .width(44)
+            .height(44)
+            .color('#98A2B3')
+            .padding(8)
+            .backgroundColor('#66000000')
+            .borderRadius(22)
+            .zIndex(2)
+        } else if (this.isFailed()) {
+          Column({ space: 12 }) {
+            SymbolGlyph($r('sys.symbol.exclamationmark_triangle'))
+              .fontSize(32)
+              .fontColor(['#98A2B3'])
+            Text(uiText('Image page failed to load'))
+              .fontSize(16)
+              .fontColor('#98A2B3')
+          }
+          .justifyContent(FlexAlign.Center)
+          .zIndex(2)
+        }
       } else {
         Column({ space: 12 }) {
           if (this.isFailed()) {

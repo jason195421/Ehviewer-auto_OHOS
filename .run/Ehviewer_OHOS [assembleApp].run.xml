@@ -1,0 +1,9 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Ehviewer_OHOS [assembleApp]" type="HvigorRunConfiguration" factoryName="HvigorRunConfiguration">
+    <option name="applicationParameters" value="--mode project -p product=default assembleApp --analyze=normal --parallel --incremental" />
+    <option name="nodeInterpreter" value="$APPLICATION_HOME_DIR$\tools\node" />
+    <option name="scriptFile" value="$APPLICATION_HOME_DIR$\tools\hvigor\bin\hvigorw.js" />
+    <option name="workingDir" value="$PROJECT_DIR$" />
+    <method v="2" />
+  </configuration>
+</component>

@@ -61,6 +61,10 @@ export function enterEmbeddedReaderFullscreen(): void {
     return;
   }
   applyReaderFullscreenImmersiveModeAsync(target).catch(() => {});
+  scheduleReaderFullscreenImmersiveMode(target, 32);
+  scheduleReaderFullscreenImmersiveMode(target, 120);
+  scheduleReaderFullscreenImmersiveMode(target, 320);
+  scheduleReaderFullscreenImmersiveMode(target, 800);
 }
 
 export function leaveEmbeddedReaderFullscreen(): void {
@@ -85,8 +89,18 @@ export function applyReaderStatusVisibleImmersiveMode(win?: window.Window): void
   applyReaderFullscreenImmersiveModeAsync(target).catch(() => {});
 }
 
+export function scheduleReaderFullscreenImmersiveMode(win: window.Window, delayMs: number): void {
+  setTimeout(() => {
+    if (win === getMainWindow() && !isEmbeddedReaderActive()) {
+      return;
+    }
+    applyReaderFullscreenImmersiveModeAsync(win).catch(() => {});
+  }, delayMs);
+}
+
 async function applyAppChromeImmersiveModeAsync(target: window.Window): Promise<void> {
   await ignoreWindowError(() => target.setWindowLayoutFullScreen(true));
+  await ignoreWindowError(() => target.setWindowSystemBarEnable(['status']));
   await ignoreWindowError(() => target.setSpecificSystemBarEnabled('status', true));
   await ignoreWindowError(() => target.setSpecificSystemBarEnabled('navigationIndicator', false));
   await ignoreWindowError(() => target.setWindowSystemBarProperties({
@@ -103,20 +117,25 @@ function opaqueSystemColor(color: string): string {
 }
 
 async function applyReaderFullscreenImmersiveModeAsync(target: window.Window): Promise<void> {
-  await ignoreWindowError(() => target.setWindowLayoutFullScreen(true));
-  await ignoreWindowError(() => target.setSpecificSystemBarEnabled('status', false));
-  await ignoreWindowError(() => target.setSpecificSystemBarEnabled('navigationIndicator', false));
+  await ignoreWindowError(() => target.setWindowLayoutFullScreen(true), 'set reader full-screen layout');
+  await ignoreWindowError(() => target.setSpecificSystemBarEnabled('status', false), 'hide reader status bar');
+  await ignoreWindowError(() => target.setSpecificSystemBarEnabled('navigationIndicator', false),
+    'hide reader navigation indicator');
+  await ignoreWindowError(() => target.setWindowSystemBarEnable([]), 'hide reader system bar set');
 }
 
 async function restoreStatusBarLayoutAsync(target: window.Window): Promise<void> {
-  await ignoreWindowError(() => target.setSpecificSystemBarEnabled('status', true));
-  await ignoreWindowError(() => target.setSpecificSystemBarEnabled('navigationIndicator', false));
-  await ignoreWindowError(() => target.setWindowLayoutFullScreen(false));
+  await ignoreWindowError(() => target.setWindowSystemBarEnable(['status']), 'restore app status bar set');
+  await ignoreWindowError(() => target.setSpecificSystemBarEnabled('status', true), 'show app status bar');
+  await ignoreWindowError(() => target.setSpecificSystemBarEnabled('navigationIndicator', false),
+    'hide app navigation indicator');
+  await ignoreWindowError(() => target.setWindowLayoutFullScreen(false), 'restore app content layout');
 }
 
-async function ignoreWindowError(task: () => Promise<void>): Promise<void> {
+async function ignoreWindowError(task: () => Promise<void>, operation: string = 'update window chrome'): Promise<void> {
   try {
     await task();
   } catch (error) {
+    console.warn('EhWindowImmersive failed to ' + operation + ': ' + String(error));
   }
 }

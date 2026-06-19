@@ -18,7 +18,7 @@ import {
   saveGalleryReadPosition,
   setReaderActiveBackHandler
 } from '../shared/EhShared';
-import { ReaderScene } from './ReaderScenes';
+import { ReaderPageState, ReaderScene } from './ReaderScenes';
 
 @Component
 export struct ReaderHostScene {
@@ -32,6 +32,7 @@ export struct ReaderHostScene {
   @State site: GallerySite = GallerySite.E;
   @State pageIndex: number = 0;
   @State renderVersion: number = 0;
+  @State readerPages: ReaderPageState[] = [];
   @StorageProp(READER_SESSION_REVISION_KEY) @Watch('onSessionRevisionChange') sessionRevision: number = 0;
   private loadedSessionRevision: number = -1;
   private readerPreviewMap: Map<number, GalleryPreview> = new Map();
@@ -61,14 +62,18 @@ export struct ReaderHostScene {
     this.readerPreviewMap.clear();
     this.readerPreviewPageRequests.clear();
     this.readerPreviewPageSize = 0;
+    this.readerPages = [];
     this.detail = cloneGalleryDetail(session.detail);
-    this.page = cloneGalleryPage(session.page);
     this.statusText = session.statusText;
     this.detailRequestUrl = session.detailRequestUrl;
     this.listRequestUrl = session.listRequestUrl;
     this.site = session.site;
     this.pageIndex = session.pageIndex >= 0 ? session.pageIndex : readerStartIndex(this.detail);
     this.seedReaderPreviewCache(this.detail.previewSet);
+    this.page = this.isPageForIndex(session.page, this.pageIndex) ? cloneGalleryPage(session.page) : createEmptyPage();
+    if (this.page.imageUrl.length > 0 || this.page.pageUrl.length > 0) {
+      this.setReaderPage(this.pageIndex, this.page);
+    }
     this.renderVersion++;
     if (this.page.imageUrl.length === 0) {
       this.loadReaderPageByIndex(this.pageIndex);
@@ -112,12 +117,14 @@ export struct ReaderHostScene {
     saveGalleryReadPosition(this.detail.gid, preview.index);
     this.statusText = 'Loading page ' + (preview.index + 1).toString() + '...';
     this.page = createReaderLoadingPage(preview.pageUrl);
+    this.setReaderPage(preview.index, this.page);
     this.renderVersion++;
 
     const cached = galleryPageCache.get(preview.pageUrl);
     if (cached !== null) {
       this.statusText = 'Page loaded from cache';
       this.page = cloneGalleryPage(cached);
+      this.setReaderPage(preview.index, cached);
       this.renderVersion++;
       this.cacheReaderImage(preview.index, cached);
       this.preloadReaderPages(preview.index);
@@ -137,8 +144,14 @@ export struct ReaderHostScene {
         const cacheUrl = result.page.pageUrl.length > 0 ? result.page.pageUrl : preview.pageUrl;
         galleryPageCache.put(cacheUrl, result.page);
         galleryPageCache.put(preview.pageUrl, result.page);
+        if (this.pageIndex !== preview.index) {
+          this.setReaderPage(preview.index, result.page);
+          this.cacheReaderImage(preview.index, result.page);
+          return;
+        }
         this.statusText = 'Page loaded';
         this.page = cloneGalleryPage(result.page);
+        this.setReaderPage(preview.index, result.page);
         this.renderVersion++;
         this.cacheReaderImage(preview.index, result.page);
         this.preloadReaderPages(preview.index);
@@ -153,6 +166,7 @@ export struct ReaderHostScene {
   private cacheReaderImage(index: number, page: GalleryPage): void {
     cacheReaderImageForPage(page, (cachedPage: GalleryPage) => {
       galleryPageCache.put(cachedPage.pageUrl.length > 0 ? cachedPage.pageUrl : page.pageUrl, cachedPage);
+      this.setReaderPage(index, cachedPage);
       if (this.pageIndex === index) {
         this.page = cloneGalleryPage(cachedPage);
         this.statusText = 'Page loaded from local cache';
@@ -183,6 +197,7 @@ export struct ReaderHostScene {
           const cacheUrl = result.page.pageUrl.length > 0 ? result.page.pageUrl : preview.pageUrl;
           galleryPageCache.put(cacheUrl, result.page);
           galleryPageCache.put(preview.pageUrl, result.page);
+          this.setReaderPage(nextIndex, result.page);
           this.cacheReaderImage(nextIndex, result.page);
         }
       } catch (error) {
@@ -203,6 +218,7 @@ export struct ReaderHostScene {
     saveGalleryReadPosition(this.detail.gid, index);
     this.statusText = 'Resolving page ' + (index + 1).toString() + '...';
     this.page = createReaderLoadingPage('');
+    this.setReaderPage(index, this.page);
     this.renderVersion++;
     this.ensureReaderPreview(index, false).then((resolved: GalleryPreview | null) => {
       if (resolved === null) {
@@ -253,6 +269,32 @@ export struct ReaderHostScene {
       }
     }
     return null;
+  }
+
+  private isPageForIndex(page: GalleryPage, index: number): boolean {
+    if (page.pageUrl.length === 0) {
+      return false;
+    }
+    const preview = this.readerPreviewForIndex(index);
+    return preview !== null && preview.pageUrl === page.pageUrl;
+  }
+
+  private setReaderPage(index: number, page: GalleryPage): void {
+    const next: ReaderPageState[] = [];
+    let replaced = false;
+    for (let i = 0; i < this.readerPages.length; i++) {
+      if (this.readerPages[i].index === index) {
+        next.push({ index: index, page: cloneGalleryPage(page) });
+        replaced = true;
+      } else {
+        next.push({ index: this.readerPages[i].index, page: cloneGalleryPage(this.readerPages[i].page) });
+      }
+    }
+    if (!replaced) {
+      next.push({ index: index, page: cloneGalleryPage(page) });
+    }
+    next.sort((left: ReaderPageState, right: ReaderPageState) => left.index - right.index);
+    this.readerPages = next;
   }
 
   private readerPreviewPageIndex(index: number): number {
@@ -324,6 +366,7 @@ export struct ReaderHostScene {
     ReaderScene({
       renderVersion: this.renderVersion,
       page: this.page,
+      readerPages: this.readerPages,
       statusText: this.statusText,
       pageIndex: this.pageIndex,
       totalPages: this.readerTotalPages(),

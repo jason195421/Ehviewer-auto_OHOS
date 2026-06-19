@@ -216,9 +216,30 @@ export class EhDownloadStore {
 
   startAll(): void {
     for (let i = 0; i < this.items.length; i++) {
-      if (this.items[i].state === DownloadState.None || this.items[i].state === DownloadState.Failed) {
+      if (this.items[i].state === DownloadState.None || this.items[i].state === DownloadState.Failed ||
+        this.items[i].state === DownloadState.Finish) {
         this.items[i].state = DownloadState.Wait;
       }
+    }
+  }
+
+  startGallery(gid: number): void {
+    const index = this.findIndex(gid);
+    if (index < 0) {
+      return;
+    }
+    if (this.items[index].state !== DownloadState.Wait && this.items[index].state !== DownloadState.Downloading) {
+      this.items[index].state = DownloadState.Wait;
+    }
+  }
+
+  stopGallery(gid: number): void {
+    const index = this.findIndex(gid);
+    if (index < 0) {
+      return;
+    }
+    if (this.items[index].state === DownloadState.Wait || this.items[index].state === DownloadState.Downloading) {
+      this.items[index].state = DownloadState.None;
     }
   }
 

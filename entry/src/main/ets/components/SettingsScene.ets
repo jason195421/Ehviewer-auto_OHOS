@@ -298,7 +298,7 @@ export struct SettingsScene {
       return true;
     }
     if (key === 'clean_redundancy') {
-      this.scanDownloadRedundancy();
+      this.cleanDownloadRedundancy();
       return true;
     }
     if (key === 'clear_download_path_cache') {
@@ -629,7 +629,7 @@ export struct SettingsScene {
     });
   }
 
-  private scanDownloadRedundancy(): void {
+  private cleanDownloadRedundancy(): void {
     const context = getAbilityContext();
     if (context === undefined) {
       this.statusText = 'Clean redundancy needs an ability context';
@@ -641,12 +641,11 @@ export struct SettingsScene {
       for (let i = 0; i < items.length; i++) {
         keepGids.push(items[i].gid);
       }
-      const result: DownloadDirectoryScanResult = ehDownloadFileStore.scanRedundantDirectories(context, keepGids);
-      this.statusText = 'Redundancy scan: ' + result.directories.toString() + ' folders, ' +
-        result.files.toString() + ' images, ' + downloadSizeText(result.bytes) +
-        '. Restore downloads before deleting any folder manually.';
+      const result: DownloadDirectoryScanResult = ehDownloadFileStore.cleanRedundantDirectories(context, keepGids);
+      this.statusText = 'Cleaned redundancy: ' + result.directories.toString() + ' folders, ' +
+        result.files.toString() + ' files, ' + downloadSizeText(result.bytes) + '.';
     }).catch((error: Error) => {
-      this.statusText = 'Redundancy scan failed: ' + error.message;
+      this.statusText = 'Clean redundancy failed: ' + error.message;
     });
   }
 

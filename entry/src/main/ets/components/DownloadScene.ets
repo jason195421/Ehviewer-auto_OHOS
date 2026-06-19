@@ -23,6 +23,7 @@ import { APP_THEME_COLOR, LANGUAGE_REVISION_KEY } from '../shared/EhShared';
 import { themeDividerColor, themeMutedText, themePageBackground, themePrimaryColor, themePrimaryText, themeSecondaryText, themeSelectedBackgroundLight, themeSurface, themeSurfaceVariant, themeTertiaryText } from '../shared/EhTheme';
 import { EhBackupBundle, DrawerItem, SettingsHeaderItem, SettingsRowItem, SessionMode, SettingsPanel, DRAWER_ITEMS, SETTINGS_HEADERS, STATUS_BAR_HEIGHT_KEY, ON_OFF_OPTIONS, shouldUseChineseUi, uiText, uiValue, uiStatusText, uiPageText, zhText, setActiveBackHandler, runActiveBackHandler, createEmptyGallery, createEmptyDownloadInfo, createDetailFromGallery, createEmptyDetail, createEmptyPreview, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneStringArray, cloneRequiredStringArray, cloneGalleryInfo, cloneGalleryInfos, padTwo, applyGalleryFilters, cloneGalleryTagGroups, cloneGalleryComments, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListItem, cloneTopListBucket, cloneTopListInfo, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, saveDownloadsQuietly, filterDownloadItems, downloadItemMatches, sortDownloadItems, nextDownloadStatusFilter, nextDownloadLabelFilter, nextDownloadSortMode, nextStringOption, nextDownloadState, nextDownloadLabel, downloadLabelName, downloadStateLabel, downloadStateColor, downloadProgressText, downloadSizeText, downloadImageUrlForPage, downloadThreadLimit, downloadPageIndexes, downloadQueueSummary, parseHistoryMaxSize, routeTitle, routeSubtitle, launchRouteFromSetting, settingsPanelTitle, settingsRowsForPanel, optionSettingsRow, textSettingsRow, staticSettingsRow, settingEntryValue, cloneStringOptions, settingMigrationMessage, nextOption, isValidProxyPortText, formatNetworkDiagnostics, listModeForRoute, routeUsesKeyword, usesGallerySearchToolbar, usesEmbeddedToolbar, defaultKeywordForRoute, gallerySearchTitle, currentGallerySite, effectiveListSite, gallerySiteName, galleryListFailureMessage, withGalleryListMessage, readerPageReferer, readerDisplayImageUrl, cacheReaderImageForPage, cacheThumbnailImage, cloneGalleryPageWithCache, readerLocalImageSource, readerZoomSize, readerFullImageWidth, readerFullImageHeight, readerImageFit, readerShortUrl, readerPreloadCount, readerIsRightToLeft, categoryName, categoryColor, ratingText, galleryDisplayTitle, showGalleryPages, galleryListMode, galleryThumbWidth, galleryThumbHeight, galleryRowHeight, galleryTagPreview, detailTitleFontSize, detailTitleMaxLines, detailHeadingFontSize, readerShowProgress, readerShowClock, readerClockText, padTimeNumber, topListChipColor } from '../shared/EhShared';
 import { CategoryBadge, GalleryThumb, PlaceholderScene } from './GalleryScenes';
+import { nextDownloadCategoryFilter } from '../shared/EhShared';
 import { EhNavBar } from './NavigationComponents';
 import { SessionScene, SettingsSubToolbar } from './SessionSettingsScenes';
 import { DownloadRow } from './DownloadRow';
@@ -31,6 +32,7 @@ import { DownloadRow } from './DownloadRow';
 export struct DownloadScene {
   private client: EhHttpClient = new EhHttpClient();
   private shouldStop: boolean = false;
+  private stoppedGids: number[] = [];
   onMenu: () => void = () => {};
 
   @State items: DownloadInfo[] = [];
@@ -39,6 +41,7 @@ export struct DownloadScene {
   @State statusFilter: string = 'All';
   @State labelFilter: string = 'All';
   @State sortMode: string = 'Default';
+  @State categoryFilter: string = 'All';
   @State newLabel: string = '';
   @State statusText: string = 'Download queue is ready';
   @State isProcessing: boolean = false;
@@ -84,11 +87,12 @@ export struct DownloadScene {
   }
 
   private visibleDownloadItems(): DownloadInfo[] {
-    return filterDownloadItems(this.items, this.query, this.statusFilter, this.labelFilter, this.sortMode);
+    return filterDownloadItems(this.items, this.query, this.statusFilter, this.labelFilter, this.sortMode, this.categoryFilter);
   }
 
   private startAll(): void {
     this.shouldStop = false;
+    this.stoppedGids = [];
     ehDownloadStore.startAll();
     this.items = ehDownloadStore.getItems();
     this.statusText = 'Queued idle and failed downloads';
@@ -98,6 +102,7 @@ export struct DownloadScene {
 
   private stopAll(): void {
     this.shouldStop = true;
+    this.stoppedGids = [];
     ehDownloadStore.stopAll();
     this.items = ehDownloadStore.getItems();
     this.statusText = 'Stopped waiting downloads';
@@ -181,7 +186,7 @@ export struct DownloadScene {
       const pageIndexes = downloadPageIndexes(detailResult.detail.previewSet.length);
       for (let orderIndex = 0; orderIndex < pageIndexes.length; orderIndex++) {
         const i = pageIndexes[orderIndex];
-        if (this.shouldStop) {
+        if (this.shouldStop || this.isStopped(item.gid)) {
           ehDownloadStore.setState(item.gid, DownloadState.None);
           this.statusText = 'Stopped: ' + item.title;
           return;
@@ -239,6 +244,56 @@ export struct DownloadScene {
     this.persistDownloads();
   }
 
+  private resetReadingProgress(): void {
+    const context = getAbilityContext();
+    ehHistoryStore.resetAllReadPositions();
+    if (context !== undefined) {
+      ehHistoryStore.save(context).catch((error: Error) => {
+        this.statusText = 'Reset progress save failed: ' + error.message;
+      });
+    }
+    this.statusText = 'Reset all reading progress';
+  }
+
+  private restoreDownloadedItems(): void {
+    const context = getAbilityContext();
+    if (context === undefined) {
+      this.statusText = 'Restore needs app context';
+      return;
+    }
+    const restored: RestoredDownloadGallery[] = ehDownloadFileStore.restoreDownloadedGalleries(context);
+    let added = 0;
+    for (let i = 0; i < restored.length; i++) {
+      if (!ehDownloadStore.contains(restored[i].gallery.gid)) {
+        const item = ehDownloadStore.addGallery(restored[i].gallery, '');
+        if (item !== null) {
+          ehDownloadStore.setState(item.gid, restored[i].finished >= restored[i].total && restored[i].total > 0 ?
+            DownloadState.Finish : DownloadState.None);
+          ehDownloadStore.setProgress(item.gid, restored[i].finished, restored[i].total, restored[i].finished);
+          ehDownloadStore.setStorage(item.gid, restored[i].directory, restored[i].fileSize);
+          added++;
+        }
+      }
+    }
+    this.items = ehDownloadStore.getItems();
+    this.statusText = 'Restored ' + added.toString() + '/' + restored.length.toString() + ' downloaded galleries';
+    this.persistDownloads();
+  }
+
+  private cleanRedundantFiles(): void {
+    const context = getAbilityContext();
+    if (context === undefined) {
+      this.statusText = 'Clean needs app context';
+      return;
+    }
+    const gids: number[] = [];
+    for (let i = 0; i < this.items.length; i++) {
+      gids.push(this.items[i].gid);
+    }
+    const result: DownloadDirectoryScanResult = ehDownloadFileStore.cleanRedundantDirectories(context, gids);
+    this.statusText = 'Cleaned ' + result.directories.toString() + ' dirs, ' + downloadSizeText(result.bytes);
+  }
+
   private addLabel(): void {
     if (ehDownloadStore.addLabel(this.newLabel)) {
       this.labels = ehDownloadStore.getLabels();
@@ -264,6 +319,10 @@ export struct DownloadScene {
   }
 
   private removeItem(item: DownloadInfo): void {
+    const context = getAbilityContext();
+    if (context !== undefined) {
+      ehDownloadFileStore.removeGalleryDirectory(context, item);
+    }
     ehDownloadStore.removeGallery(item.gid);
     this.items = ehDownloadStore.getItems();
     this.statusText = 'Removed: ' + item.title;
@@ -271,10 +330,54 @@ export struct DownloadScene {
   }
 
   private cycleItemState(item: DownloadInfo): void {
-    ehDownloadStore.setState(item.gid, nextDownloadState(item.state));
+    if (item.state === DownloadState.Wait || item.state === DownloadState.Downloading) {
+      this.stopItem(item);
+      return;
+    }
+    this.startItem(item);
+  }
+
+  private startItem(item: DownloadInfo): void {
+    this.shouldStop = false;
+    this.removeStoppedGid(item.gid);
+    ehDownloadStore.startGallery(item.gid);
     this.items = ehDownloadStore.getItems();
-    this.statusText = 'Updated state: ' + item.title;
+    this.statusText = 'Queued: ' + item.title;
     this.persistDownloads();
+    this.runDownloadQueue();
+  }
+
+  private stopItem(item: DownloadInfo): void {
+    this.addStoppedGid(item.gid);
+    ehDownloadStore.stopGallery(item.gid);
+    this.items = ehDownloadStore.getItems();
+    this.statusText = 'Stopped: ' + item.title;
+    this.persistDownloads();
+  }
+
+  private isStopped(gid: number): boolean {
+    for (let i = 0; i < this.stoppedGids.length; i++) {
+      if (this.stoppedGids[i] === gid) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private addStoppedGid(gid: number): void {
+    if (!this.isStopped(gid)) {
+      this.stoppedGids.push(gid);
+    }
+  }
+
+  private removeStoppedGid(gid: number): void {
+    const next: number[] = [];
+    for (let i = 0; i < this.stoppedGids.length; i++) {
+      if (this.stoppedGids[i] !== gid) {
+        next.push(this.stoppedGids[i]);
+      }
+    }
+    this.stoppedGids = next;
   }
 
   private cycleItemLabel(item: DownloadInfo): void {
@@ -325,6 +428,13 @@ export struct DownloadScene {
             .margin({ left: 8 })
             .onClick(() => {
               this.sortMode = nextDownloadSortMode(this.sortMode);
+            })
+          Button(uiText('Category') + ': ' + uiValue(this.categoryFilter))
+            .height(30)
+            .fontSize(12)
+            .margin({ left: 8 })
+            .onClick(() => {
+              this.categoryFilter = nextDownloadCategoryFilter(this.categoryFilter);
             })
           Blank()
           Text(this.visibleDownloadItems().length.toString() + '/' + this.items.length.toString())
@@ -437,6 +547,31 @@ export struct DownloadScene {
           .margin({ left: 8 })
           .onClick(() => {
             this.clearFinished();
+          })
+      }
+      .width('100%')
+      .padding({ left: 12, right: 12, bottom: 12 })
+
+      Row() {
+        Button(uiText('Restore'))
+          .height(36)
+          .layoutWeight(1)
+          .onClick(() => {
+            this.restoreDownloadedItems();
+          })
+        Button(uiText('Reset progress'))
+          .height(36)
+          .layoutWeight(1)
+          .margin({ left: 8 })
+          .onClick(() => {
+            this.resetReadingProgress();
+          })
+        Button(uiText('Clean files'))
+          .height(36)
+          .layoutWeight(1)
+          .margin({ left: 8 })
+          .onClick(() => {
+            this.cleanRedundantFiles();
           })
       }
       .width('100%')

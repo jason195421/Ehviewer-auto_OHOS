@@ -1,6 +1,7 @@
 import { common } from '@kit.AbilityKit';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import { GalleryDetail, GalleryInfo, GalleryPage } from '../model/GalleryModels';
+import { ehSettingsStore } from './EhSettingsStore';
 
 interface GalleryMetadata {
   version: number;
@@ -124,6 +125,33 @@ export class EhDownloadFileStore {
     return { directories: directories, files: files, bytes: bytes };
   }
 
+  removeGalleryDirectory(context: common.UIAbilityContext, gallery: GalleryInfo): DownloadDirectoryScanResult {
+    return removeDirectoryTree(this.galleryDirectory(context, gallery));
+  }
+
+  cleanRedundantDirectories(context: common.UIAbilityContext, keepGids: number[]): DownloadDirectoryScanResult {
+    const root = this.downloadRoot(context);
+    let directories = 0;
+    let files = 0;
+    let bytes = 0;
+    try {
+      const names = fs.listFileSync(root);
+      for (let i = 0; i < names.length; i++) {
+        const directory = root + '/' + names[i];
+        const metadata = readMetadata(directory + '/.ehviewer');
+        if (metadata === null || containsNumber(keepGids, metadata.gid)) {
+          continue;
+        }
+        const removed = removeDirectoryTree(directory);
+        directories += removed.directories;
+        files += removed.files;
+        bytes += removed.bytes;
+      }
+    } catch (error) {
+    }
+    return { directories: directories, files: files, bytes: bytes };
+  }
+
   directorySizeByPath(directory: string): number {
     let total = 0;
     try {
@@ -146,6 +174,10 @@ export class EhDownloadFileStore {
   }
 
   private downloadRoot(context: common.UIAbilityContext): string {
+    const location = ehSettingsStore.getValue('download_location', 'App files');
+    if (location === 'Downloads') {
+      return context.filesDir + '/Downloads';
+    }
     return context.filesDir + '/downloads';
   }
 }
@@ -305,6 +337,31 @@ function exists(path: string): boolean {
   } catch (error) {
     return false;
   }
+}
+
+function removeDirectoryTree(path: string): DownloadDirectoryScanResult {
+  let directories = 0;
+  let files = 0;
+  let bytes = 0;
+  try {
+    const stat = fs.statSync(path);
+    if (!stat.isDirectory()) {
+      const size = stat.size;
+      fs.unlinkSync(path);
+      return { directories: 0, files: 1, bytes: size };
+    }
+    const names = fs.listFileSync(path);
+    for (let i = 0; i < names.length; i++) {
+      const removed = removeDirectoryTree(path + '/' + names[i]);
+      directories += removed.directories;
+      files += removed.files;
+      bytes += removed.bytes;
+    }
+    fs.rmdirSync(path);
+    directories++;
+  } catch (error) {
+  }
+  return { directories: directories, files: files, bytes: bytes };
 }
 
 export const ehDownloadFileStore: EhDownloadFileStore = new EhDownloadFileStore();

@@ -27,13 +27,13 @@ import { EhNavBar } from '../components/NavigationComponents';
 import { CategoryBadge, GalleryListRow, GalleryThumb, GalleryThumbCard } from './GalleryCards';
 import { GalleryDetailOverlayScene, GalleryDetailScene } from './GalleryDetailScenes';
 import { applyTagSuggestionToKeyword, buildSearchSuggestions, QuickActionColumn, SearchAdvancedPanel, SearchSuggestionItem, SearchSuggestionList, SearchSummaryStrip, recordSearchHistory } from './GallerySearchScenes';
-import { CommentsScene, PlaceholderScene, ReaderScene } from './ReaderScenes';
+import { CommentsScene, PlaceholderScene, ReaderPageState, ReaderScene } from './ReaderScenes';
 import { uiText, uiStatusText, setActiveBackHandler, createEmptyGallery, createDetailFromGallery, createEmptyDetail, createEmptyPage, cloneGalleryInfos, applyGalleryFilters, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, listModeForRoute, routeUsesKeyword, defaultKeywordForRoute, gallerySearchTitle, effectiveListSite, galleryListFailureMessage, readerPageReferer, cacheReaderImageForPage, readerPreloadCount, galleryDisplayTitle, galleryListMode, galleryThumbWidth, galleryThumbHeight } from '../shared/EhShared';
 
 export { CategoryBadge, GalleryListRow, GalleryTagChip, GalleryThumb, GalleryThumbCard } from './GalleryCards';
 export { GalleryDetailOverlayScene, GalleryDetailScene } from './GalleryDetailScenes';
 export { ActionBubble, GallerySearchScene, QuickActionColumn, SearchAdvancedPanel, SearchFlagChip, SearchSuggestionList, SearchSummaryStrip } from './GallerySearchScenes';
-export { CommentsScene, PlaceholderScene, ReaderNavButton, ReaderScene, ReaderToolButton } from './ReaderScenes';
+export { CommentsScene, PlaceholderScene, ReaderNavButton, ReaderPageState, ReaderScene, ReaderToolButton } from './ReaderScenes';
 
 interface GalleryListSceneCache {
   keyword: string;
@@ -172,6 +172,7 @@ export struct GalleryListScene {
   @State favoriteBusy: boolean = false;
   @State readerStatus: string = 'Reader is ready';
   @State readerPage: GalleryPage = createEmptyPage();
+  @State readerPages: ReaderPageState[] = [];
   @State readerPreviewIndex: number = 0;
   @State renderVersion: number = 0;
   @State isLoadingMore: boolean = false;
@@ -656,6 +657,7 @@ export struct GalleryListScene {
     this.detailPreviewPager.reset();
     this.readerStatus = 'Reader is ready';
     this.readerPage = createEmptyPage();
+    this.readerPages = [];
     this.readerPreviewIndex = 0;
     this.detailScrollOffset = 0;
     this.renderVersion++;
@@ -675,6 +677,7 @@ export struct GalleryListScene {
     this.showReader = false;
     this.readerStatus = 'Reader is ready';
     this.readerPage = createEmptyPage();
+    this.readerPages = [];
     this.readerPreviewIndex = 0;
     applyAppChromeImmersiveMode();
     this.renderVersion++;
@@ -691,6 +694,7 @@ export struct GalleryListScene {
     saveGalleryReadPosition(this.detail.gid, preview.index);
     this.readerStatus = 'Loading page ' + (preview.index + 1).toString() + '...';
     this.readerPage = createReaderLoadingPage(preview.pageUrl);
+    this.setReaderPage(preview.index, this.readerPage);
     this.renderVersion++;
     this.openReaderAbility();
 
@@ -698,6 +702,7 @@ export struct GalleryListScene {
     if (cached !== null) {
       this.readerStatus = 'Page loaded from cache';
       this.readerPage = cloneGalleryPage(cached);
+      this.setReaderPage(preview.index, cached);
       this.renderVersion++;
       this.cacheReaderImage(preview.index, cached);
       this.preloadReaderPages(preview.index);
@@ -714,8 +719,14 @@ export struct GalleryListScene {
       const cacheUrl = result.page.pageUrl.length > 0 ? result.page.pageUrl : preview.pageUrl;
       galleryPageCache.put(cacheUrl, result.page);
       galleryPageCache.put(preview.pageUrl, result.page);
+      if (this.readerPreviewIndex !== preview.index) {
+        this.setReaderPage(preview.index, result.page);
+        this.cacheReaderImage(preview.index, result.page);
+        return;
+      }
       this.readerStatus = 'Page loaded';
       this.readerPage = cloneGalleryPage(result.page);
+      this.setReaderPage(preview.index, result.page);
       this.renderVersion++;
       this.cacheReaderImage(preview.index, result.page);
       this.preloadReaderPages(preview.index);
@@ -730,6 +741,7 @@ export struct GalleryListScene {
   private cacheReaderImage(index: number, page: GalleryPage): void {
     cacheReaderImageForPage(page, (cachedPage: GalleryPage) => {
       galleryPageCache.put(cachedPage.pageUrl.length > 0 ? cachedPage.pageUrl : page.pageUrl, cachedPage);
+      this.setReaderPage(index, cachedPage);
       if (this.showReader && this.readerPreviewIndex === index) {
         this.readerPage = cloneGalleryPage(cachedPage);
         this.readerStatus = 'Page loaded from local cache';
@@ -765,6 +777,7 @@ export struct GalleryListScene {
           const cacheUrl = result.page.pageUrl.length > 0 ? result.page.pageUrl : preview.pageUrl;
           galleryPageCache.put(cacheUrl, result.page);
           galleryPageCache.put(preview.pageUrl, result.page);
+          this.setReaderPage(nextIndex, result.page);
           this.cacheReaderImage(nextIndex, result.page);
         }
       } catch (error) {
@@ -792,6 +805,7 @@ export struct GalleryListScene {
         const cacheUrl = result.page.pageUrl.length > 0 ? result.page.pageUrl : preview.pageUrl;
         galleryPageCache.put(cacheUrl, result.page);
         galleryPageCache.put(preview.pageUrl, result.page);
+        this.setReaderPage(0, result.page);
         this.cacheReaderImage(0, result.page);
         this.preloadReaderPages(0);
       }
@@ -813,6 +827,7 @@ export struct GalleryListScene {
     saveGalleryReadPosition(this.detail.gid, index);
     this.readerStatus = 'Resolving page ' + (index + 1).toString() + '...';
     this.readerPage = createReaderLoadingPage('');
+    this.setReaderPage(index, this.readerPage);
     this.renderVersion++;
     this.openReaderAbility();
     this.ensureReaderPreview(index, false).then((resolved: GalleryPreview | null) => {
@@ -864,7 +879,9 @@ export struct GalleryListScene {
     this.showReader = false;
     const context = getAbilityContext();
     if (context === undefined) {
-      this.showReader = true;
+      this.readerStatus = 'Reader launch failed: Ability context is not ready';
+      this.renderVersion++;
+      this.persistReaderSession();
       return;
     }
     context.startAbility({
@@ -907,6 +924,24 @@ export struct GalleryListScene {
       }
     }
     return null;
+  }
+
+  private setReaderPage(index: number, page: GalleryPage): void {
+    const next: ReaderPageState[] = [];
+    let replaced = false;
+    for (let i = 0; i < this.readerPages.length; i++) {
+      if (this.readerPages[i].index === index) {
+        next.push({ index: index, page: cloneGalleryPage(page) });
+        replaced = true;
+      } else {
+        next.push({ index: this.readerPages[i].index, page: cloneGalleryPage(this.readerPages[i].page) });
+      }
+    }
+    if (!replaced) {
+      next.push({ index: index, page: cloneGalleryPage(page) });
+    }
+    next.sort((left: ReaderPageState, right: ReaderPageState) => left.index - right.index);
+    this.readerPages = next;
   }
 
   private readerPreviewPageIndex(index: number): number {
@@ -1120,6 +1155,7 @@ export struct GalleryListScene {
         ReaderScene({
           renderVersion: this.renderVersion,
           page: this.readerPage,
+          readerPages: this.readerPages,
           statusText: this.readerStatus,
           pageIndex: this.readerPreviewIndex,
           totalPages: this.readerTotalPages(),

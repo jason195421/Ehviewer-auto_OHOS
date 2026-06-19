@@ -1205,7 +1205,7 @@ export function saveDownloadsQuietly(): void {
 }
 
 export function filterDownloadItems(items: DownloadInfo[], query: string, statusFilter: string, labelFilter: string,
-  sortMode: string): DownloadInfo[] {
+  sortMode: string, categoryFilter: string = 'All'): DownloadInfo[] {
   const normalizedQuery = query.toLowerCase().trim();
   const filtered: DownloadInfo[] = [];
   for (let i = 0; i < items.length; i++) {
@@ -1214,6 +1214,9 @@ export function filterDownloadItems(items: DownloadInfo[], query: string, status
       continue;
     }
     if (labelFilter !== 'All' && downloadLabelName(item.label) !== labelFilter) {
+      continue;
+    }
+    if (categoryFilter !== 'All' && categoryName(item.category) !== categoryFilter) {
       continue;
     }
     if (normalizedQuery.length > 0 && !downloadItemMatches(item, normalizedQuery)) {
@@ -1244,11 +1247,23 @@ export function sortDownloadItems(items: DownloadInfo[], sortMode: string): void
     if (sortMode === 'Rating desc') {
       return right.rating - left.rating;
     }
+    if (sortMode === 'Rating asc') {
+      return left.rating - right.rating;
+    }
     if (sortMode === 'Name asc') {
       return left.title.localeCompare(right.title);
     }
     if (sortMode === 'Name desc') {
       return right.title.localeCompare(left.title);
+    }
+    if (sortMode === 'Size asc') {
+      return left.fileSize - right.fileSize;
+    }
+    if (sortMode === 'Size desc') {
+      return right.fileSize - left.fileSize;
+    }
+    if (sortMode === 'Time asc') {
+      return left.time - right.time;
     }
     return right.time - left.time;
   });
@@ -1268,7 +1283,14 @@ export function nextDownloadLabelFilter(current: string, labels: DownloadLabel[]
 }
 
 export function nextDownloadSortMode(current: string): string {
-  const options: string[] = ['Default', 'GID asc', 'GID desc', 'Rating desc', 'Name asc', 'Name desc'];
+  const options: string[] = ['Default', 'GID asc', 'GID desc', 'Time asc', 'Rating asc', 'Rating desc', 'Name asc', 'Name desc',
+    'Size asc', 'Size desc'];
+  return nextStringOption(current, options);
+}
+
+export function nextDownloadCategoryFilter(current: string): string {
+  const options: string[] = ['All', 'Misc', 'Doujinshi', 'Manga', 'Artist CG', 'Game CG', 'Image Set', 'Cosplay',
+    'Asian Porn', 'Non-H', 'Western', 'Unknown'];
   return nextStringOption(current, options);
 }
 
@@ -1645,7 +1667,7 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
       optionSettingsRow('download_timeout', 'Download timeout', 'Network timeout for image tasks', entries, ['Default', '15s', '30s', '60s']),
       optionSettingsRow('download_order_asc', 'Download order ascending', 'Store pages in ascending page order', entries, ON_OFF_OPTIONS),
       staticSettingsRow('restore_download_items', 'Restore download items', 'Rebuild queue from downloaded folders', 'Run', 'action'),
-      staticSettingsRow('clean_redundancy', 'Clean redundancy', 'Scan downloaded folders not present in queue', 'Scan', 'action')
+      staticSettingsRow('clean_redundancy', 'Clean redundancy', 'Delete downloaded folders not present in queue', 'Clean', 'action')
     ];
   }
 
