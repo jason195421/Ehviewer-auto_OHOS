@@ -2,11 +2,9 @@ import { UIAbility, common } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import {
   applyReaderFullscreenImmersiveMode,
-  applyReaderStatusVisibleImmersiveMode,
   clearReaderWindow,
   rememberReaderWindow
 } from '../services/EhWindowImmersive';
-import { ehSettingsStore } from '../services/EhSettingsStore';
 
 export const READER_ABILITY_CONTEXT_KEY: string = 'readerAbilityContext';
 
@@ -42,11 +40,7 @@ export default class ReaderAbility extends UIAbility {
   }
 
   private applyReaderChrome(win: window.Window): void {
-    if (ehSettingsStore.getValue('reading_fullscreen', 'On') === 'On') {
-      applyReaderFullscreenImmersiveMode(win);
-    } else {
-      applyReaderStatusVisibleImmersiveMode(win);
-    }
+    applyReaderFullscreenImmersiveMode(win);
   }
 
   onWindowStageDestroy(): void {

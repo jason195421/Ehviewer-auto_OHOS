@@ -33,7 +33,8 @@ export function isEmbeddedReaderActive(): boolean {
   return AppStorage.get<boolean>(EMBEDDED_READER_ACTIVE_KEY) === true;
 }
 
-// Normal app pages: full-screen layout, status bar visible, navigation indicator hidden.
+// Normal app pages: component-level immersive layout.
+// Keep the status bar visible and leave layout safety to page components, only hiding the navigation indicator.
 export function applyAppChromeImmersiveMode(win?: window.Window): void {
   const target = win === undefined ? getMainWindow() : win;
   if (target === undefined) {
@@ -63,20 +64,19 @@ export function enterEmbeddedReaderFullscreen(): void {
   applyReaderFullscreenImmersiveModeAsync(target).catch(() => {});
 }
 
-// Reader page with the reader setting disabled: keep the reader window independent,
-// but show the status bar while still hiding the bottom navigation indicator.
+// Reader page always hides both system bars; keep this API as a compatibility wrapper for old callers.
 export function applyReaderStatusVisibleImmersiveMode(win?: window.Window): void {
   const target = win === undefined ? getMainWindow() : win;
   if (target === undefined) {
     return;
   }
-  applyReaderStatusVisibleImmersiveModeAsync(target).catch(() => {});
+  applyReaderFullscreenImmersiveModeAsync(target).catch(() => {});
 }
 
 async function applyAppChromeImmersiveModeAsync(target: window.Window): Promise<void> {
+  await ignoreWindowError(() => target.setWindowLayoutFullScreen(false));
   await ignoreWindowError(() => target.setSpecificSystemBarEnabled('status', true));
   await ignoreWindowError(() => target.setSpecificSystemBarEnabled('navigationIndicator', false));
-  await ignoreWindowError(() => target.setWindowLayoutFullScreen(true));
   await ignoreWindowError(() => target.setWindowSystemBarProperties({
     statusBarColor: opaqueSystemColor(themePrimaryColor()),
     isStatusBarLightIcon: true
@@ -94,16 +94,6 @@ async function applyReaderFullscreenImmersiveModeAsync(target: window.Window): P
   await ignoreWindowError(() => target.setWindowLayoutFullScreen(true));
   await ignoreWindowError(() => target.setSpecificSystemBarEnabled('status', false));
   await ignoreWindowError(() => target.setSpecificSystemBarEnabled('navigationIndicator', false));
-}
-
-async function applyReaderStatusVisibleImmersiveModeAsync(target: window.Window): Promise<void> {
-  await ignoreWindowError(() => target.setWindowLayoutFullScreen(true));
-  await ignoreWindowError(() => target.setSpecificSystemBarEnabled('status', true));
-  await ignoreWindowError(() => target.setSpecificSystemBarEnabled('navigationIndicator', false));
-  await ignoreWindowError(() => target.setWindowSystemBarProperties({
-    statusBarColor: '#00000000',
-    isStatusBarLightIcon: true
-  }));
 }
 
 async function ignoreWindowError(task: () => Promise<void>): Promise<void> {

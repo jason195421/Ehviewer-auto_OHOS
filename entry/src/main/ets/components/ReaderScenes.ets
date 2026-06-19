@@ -6,7 +6,6 @@ import { KeyEvent } from '@ohos.multimodalInput.keyEvent';
 import { GalleryComment, GalleryPage } from '../model/GalleryModels';
 import {
   applyReaderFullscreenImmersiveMode,
-  applyReaderStatusVisibleImmersiveMode,
   applyAppChromeImmersiveMode,
   getMainWindow,
   getReaderWindow,
@@ -490,11 +489,7 @@ export struct ReaderScene {
   }
 
   private applyReaderChromeMode(win: window.Window): void {
-    if (ehSettingsStore.getValue('reading_fullscreen', 'On') === 'On') {
-      applyReaderFullscreenImmersiveMode(win);
-    } else {
-      applyReaderStatusVisibleImmersiveMode(win);
-    }
+    applyReaderFullscreenImmersiveMode(win);
   }
 
   private onRenderVersionChange(): void {
