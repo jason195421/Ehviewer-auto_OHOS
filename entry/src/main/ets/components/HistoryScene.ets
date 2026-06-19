@@ -20,7 +20,7 @@ import { CacheClearResult, readerImageCache } from '../services/ReaderImageCache
 import { ehSpiderInfoStore } from '../services/EhSpiderInfoStore';
 import { MigrationTask, migrationTasks } from '../services/MigrationStatus';
 import { FilterRule, FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, FILTER_MODE_TAG_NAMESPACE, ehFilterStore } from '../services/EhFilterStore';
-import { applyAppChromeImmersiveMode } from '../services/EhWindowImmersive';
+import { applyAppChromeImmersiveMode, enterEmbeddedReaderFullscreen } from '../services/EhWindowImmersive';
 import { APP_THEME_COLOR, LANGUAGE_REVISION_KEY, nextFloatingToolbarOffset } from '../shared/EhShared';
 import {
   themePageBackground,
@@ -478,6 +478,7 @@ export struct HistoryScene {
   private openReaderAbility(site: GallerySite): void {
     this.publishReaderSession(site);
     if (ehSettingsStore.getValue('reader_standalone', 'On') !== 'On') {
+      enterEmbeddedReaderFullscreen();
       this.showReader = true;
       return;
     }

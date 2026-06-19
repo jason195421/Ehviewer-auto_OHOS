@@ -347,7 +347,7 @@ export struct CommentsScene {
 
 @Component
 export struct ReaderScene {
-  @Prop renderVersion: number = 0;
+  @Prop @Watch('onRenderVersionChange') renderVersion: number = 0;
   @Prop page: GalleryPage = createEmptyPage();
   @Prop statusText: string = '';
   @Prop @Watch('onPageIndexChange') pageIndex: number = 0;
@@ -495,6 +495,10 @@ export struct ReaderScene {
     } else {
       applyReaderStatusVisibleImmersiveMode(win);
     }
+  }
+
+  private onRenderVersionChange(): void {
+    this.applyReaderWindowSettings();
   }
 
   private scheduleReaderChromeMode(delay: number): void {

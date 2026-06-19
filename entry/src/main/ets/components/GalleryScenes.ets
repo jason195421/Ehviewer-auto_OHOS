@@ -9,7 +9,7 @@ import { ehFilterStore } from '../services/EhFilterStore';
 import { DetailPreviewPager, mergeGalleryPreviewSets, seedPreviewMap } from '../services/GalleryPreviewLoader';
 import { createReaderSessionState, readerSessionStore } from '../services/ReaderSessionStore';
 import { ehSettingsStore } from '../services/EhSettingsStore';
-import { applyAppChromeImmersiveMode } from '../services/EhWindowImmersive';
+import { applyAppChromeImmersiveMode, enterEmbeddedReaderFullscreen } from '../services/EhWindowImmersive';
 import { LANGUAGE_REVISION_KEY } from '../shared/EhShared';
 import {
   themeFieldBackground,
@@ -857,6 +857,7 @@ export struct GalleryListScene {
   private openReaderAbility(): void {
     this.publishReaderSession();
     if (ehSettingsStore.getValue('reader_standalone', 'On') !== 'On') {
+      enterEmbeddedReaderFullscreen();
       this.showReader = true;
       return;
     }

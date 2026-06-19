@@ -54,6 +54,15 @@ export function applyReaderFullscreenImmersiveMode(win?: window.Window): void {
   applyReaderFullscreenImmersiveModeAsync(target).catch(() => {});
 }
 
+export function enterEmbeddedReaderFullscreen(): void {
+  setEmbeddedReaderActive(true);
+  const target = getMainWindow();
+  if (target === undefined) {
+    return;
+  }
+  applyReaderFullscreenImmersiveModeAsync(target).catch(() => {});
+}
+
 // Reader page with the reader setting disabled: keep the reader window independent,
 // but show the status bar while still hiding the bottom navigation indicator.
 export function applyReaderStatusVisibleImmersiveMode(win?: window.Window): void {
