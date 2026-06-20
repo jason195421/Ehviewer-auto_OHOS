@@ -1,7 +1,7 @@
 import { GalleryRoute } from '../model/GalleryModels';
 import { ehCookieStore } from '../services/EhCookieStore';
 import { ehDownloadStore } from '../services/EhDownloadStore';
-import { LANGUAGE_REVISION_KEY, STATUS_BAR_HEIGHT_KEY, downloadQueueSummary, getAbilityContext, immersiveChromeOpacityFromOffset, uiText, uiStatusText, DrawerItem, DRAWER_ITEMS } from '../shared/EhShared';
+import { LANGUAGE_REVISION_KEY, STATUS_BAR_HEIGHT_KEY, downloadQueueSummary, getAbilityContext, uiText, uiStatusText, DrawerItem, DRAWER_ITEMS } from '../shared/EhShared';
 import {
   themeDividerColor,
   themeFieldBackground,
@@ -258,8 +258,8 @@ export struct EhNavBar {
     return this.statusBarHeight + this.barBodyHeight();
   }
 
-  private barOpacity(): number {
-    return immersiveChromeOpacityFromOffset(this.translateY, this.totalBarHeight());
+  private barVisible(): boolean {
+    return this.translateY > -this.totalBarHeight();
   }
 
   build() {
@@ -410,8 +410,8 @@ export struct EhNavBar {
     }
     .width('100%')
     .translate({ y: this.translateY })
-    .opacity(this.barOpacity())
-    .visibility(this.barOpacity() <= 0 ? Visibility.Hidden : Visibility.Visible)
+    .opacity(1)
+    .visibility(this.barVisible() ? Visibility.Visible : Visibility.Hidden)
     .animation({ duration: 200, curve: Curve.EaseOut })
     .zIndex(10)
   }
@@ -549,8 +549,8 @@ export struct FloatingToolbar {
     return this.visible ? 0 : -this.barHeight;
   }
 
-  private toolbarOpacity(): number {
-    return immersiveChromeOpacityFromOffset(this.toolbarOffset(), this.barHeight);
+  private toolbarVisible(): boolean {
+    return this.toolbarOffset() > -this.barHeight;
   }
 
   build() {
@@ -559,8 +559,8 @@ export struct FloatingToolbar {
     }
     .width('100%')
     .translate({ y: this.toolbarOffset() })
-    .opacity(this.toolbarOpacity())
-    .visibility(this.toolbarOpacity() <= 0 ? Visibility.Hidden : Visibility.Visible)
+    .opacity(1)
+    .visibility(this.toolbarVisible() ? Visibility.Visible : Visibility.Hidden)
     .animation({ duration: 200, curve: Curve.EaseOut })
     .zIndex(10)
   }

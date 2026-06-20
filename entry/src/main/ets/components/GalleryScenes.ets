@@ -71,7 +71,6 @@ import {
   createReaderLoadingPage,
   getAbilityContext,
   immersiveChromeHeightFromOffset,
-  immersiveChromeOpacityFromOffset,
   nextFloatingToolbarOffset,
   saveGalleryToHistory,
   saveGalleryReadPosition,
@@ -1580,8 +1579,8 @@ export struct GalleryListContent {
     return immersiveChromeHeightFromOffset(this.toolbarOffsetY, this.totalBarHeight());
   }
 
-  private toolbarOpacity(): number {
-    return immersiveChromeOpacityFromOffset(this.toolbarOffsetY, this.totalBarHeight());
+  private toolbarVisible(): boolean {
+    return this.visibleBarHeight() > 0;
   }
 
   private handleScrollFrame(scrollOffset: number): number {
@@ -1816,8 +1815,8 @@ export struct GalleryListContent {
     }
     .width('100%')
     .translate({ y: this.toolbarOffsetY })
-    .opacity(this.toolbarOpacity())
-    .visibility(this.toolbarOpacity() <= 0 ? Visibility.Hidden : Visibility.Visible)
+    .opacity(1)
+    .visibility(this.toolbarVisible() ? Visibility.Visible : Visibility.Hidden)
     .animation({ duration: 200, curve: Curve.EaseOut })
     .zIndex(10)
   }
