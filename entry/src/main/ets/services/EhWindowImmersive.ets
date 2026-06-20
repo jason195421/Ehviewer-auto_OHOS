@@ -1,4 +1,5 @@
 import { window } from '@kit.ArkUI';
+import { ehSettingsStore } from './EhSettingsStore';
 import { isDarkTheme, themeSystemBarContentColor, themeTransparentColor } from '../shared/EhTheme';
 
 export const MAIN_WINDOW_KEY: string = 'mainWindow';
@@ -59,7 +60,7 @@ export function applyReaderFullscreenImmersiveMode(win?: window.Window): void {
   if (target === undefined) {
     return;
   }
-  applyReaderWindowState(target, false, window.Orientation.UNSPECIFIED).catch(() => {});
+  applyReaderWindowStateFromSettings(target).catch(() => {});
 }
 
 export function enterEmbeddedReaderFullscreen(): void {
@@ -68,7 +69,7 @@ export function enterEmbeddedReaderFullscreen(): void {
   if (target === undefined) {
     return;
   }
-  applyReaderWindowState(target, false, window.Orientation.UNSPECIFIED).catch(() => {});
+  applyReaderWindowStateFromSettings(target).catch(() => {});
   scheduleReaderFullscreenImmersiveMode(target, 32);
   scheduleReaderFullscreenImmersiveMode(target, 120);
   scheduleReaderFullscreenImmersiveMode(target, 320);
@@ -93,7 +94,7 @@ export function scheduleReaderFullscreenImmersiveMode(win: window.Window, delayM
     if (win === getMainWindow() && !isEmbeddedReaderActive()) {
       return;
     }
-    applyReaderWindowState(win, false, window.Orientation.UNSPECIFIED).catch(() => {});
+    applyReaderWindowStateFromSettings(win).catch(() => {});
   }, delayMs);
 }
 
@@ -123,6 +124,42 @@ export async function applyReaderWindowState(target: window.Window, keepScreenOn
     isStatusBarLightIcon: true,
     isNavigationBarLightIcon: true
   }, 'set reader transparent system bars');
+}
+
+export async function applyReaderWindowStateFromSettings(target: window.Window): Promise<void> {
+  const keepScreenOn = ehSettingsStore.getValue('keep_screen_on', 'Off') === 'On';
+  await applyReaderWindowState(target, keepScreenOn, readerOrientationFromSetting(readerScreenRotationSetting()));
+}
+
+export function readerScreenRotationSetting(): string {
+  return normalizeReaderScreenRotationSetting(ehSettingsStore.getValue('screen_rotation', 'System'));
+}
+
+export function readerOrientationFromSetting(orientation: string): window.Orientation {
+  const normalized = normalizeReaderScreenRotationSetting(orientation);
+  if (normalized === 'Portrait') {
+    return window.Orientation.AUTO_ROTATION_PORTRAIT;
+  }
+  if (normalized === 'Landscape') {
+    return window.Orientation.AUTO_ROTATION_LANDSCAPE;
+  }
+  if (normalized === 'Auto rotate') {
+    return window.Orientation.AUTO_ROTATION;
+  }
+  return window.Orientation.AUTO_ROTATION_UNSPECIFIED;
+}
+
+export function normalizeReaderScreenRotationSetting(value: string): string {
+  if (value === '1' || value === 'Portrait') {
+    return 'Portrait';
+  }
+  if (value === '2' || value === 'Landscape') {
+    return 'Landscape';
+  }
+  if (value === '3' || value === 'Sensor' || value === 'Auto rotate') {
+    return 'Auto rotate';
+  }
+  return 'System';
 }
 
 export async function restoreAppWindowState(target: window.Window): Promise<void> {

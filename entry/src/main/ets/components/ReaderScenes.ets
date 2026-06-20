@@ -10,6 +10,8 @@ import {
   getMainWindow,
   getReaderWindow,
   rememberMainWindow,
+  readerOrientationFromSetting,
+  readerScreenRotationSetting,
   restoreAppWindowState,
   setEmbeddedReaderActive
 } from '../services/EhWindowImmersive';
@@ -434,7 +436,7 @@ export struct ReaderScene {
 
   private applyReaderWindowSettings(): void {
     const keepOn = ehSettingsStore.getValue('keep_screen_on', 'Off') === 'On';
-    const orientation = ehSettingsStore.getValue('screen_rotation', 'System');
+    const orientation = readerScreenRotationSetting();
     this.applyReaderWindowSettingsAsync(keepOn, orientation).catch(() => {});
   }
 
@@ -458,16 +460,6 @@ export struct ReaderScene {
     return getMainWindow();
   }
 
-  private readerOrientation(orientation: string): window.Orientation {
-    if (orientation === 'Portrait') {
-      return window.Orientation.PORTRAIT;
-    }
-    if (orientation === 'Landscape') {
-      return window.Orientation.LANDSCAPE;
-    }
-    return window.Orientation.UNSPECIFIED;
-  }
-
   private async applyReaderWindowSettingsAsync(keepOn: boolean, orientation: string): Promise<void> {
     await this.applyReaderWindowSettingsOnce(keepOn, orientation);
     this.scheduleReaderChromeMode(80);
@@ -483,7 +475,7 @@ export struct ReaderScene {
     if (this.restoreAppChromeOnExit) {
       setEmbeddedReaderActive(true);
     }
-    await applyReaderWindowState(win, keepOn, this.readerOrientation(orientation));
+    await applyReaderWindowState(win, keepOn, readerOrientationFromSetting(orientation));
   }
 
   private async restoreWindowSettingsAsync(): Promise<void> {
@@ -505,7 +497,7 @@ export struct ReaderScene {
         return;
       }
       const keepOn = ehSettingsStore.getValue('keep_screen_on', 'Off') === 'On';
-      const orientation = ehSettingsStore.getValue('screen_rotation', 'System');
+      const orientation = readerScreenRotationSetting();
       this.applyReaderWindowSettingsOnce(keepOn, orientation).catch(() => {});
     }, delay);
   }
@@ -601,7 +593,7 @@ export struct ReaderScene {
   }
 
   private showMenu(): void {
-    this.menuScreenRotation = ehSettingsStore.getValue('screen_rotation', 'System');
+    this.menuScreenRotation = readerScreenRotationSetting();
     this.menuReadingDirection = ehSettingsStore.getValue('reading_direction', 'Right to left');
     this.menuPageScaling = ehSettingsStore.getValue('page_scaling', 'Fit width');
     this.menuStartPosition = ehSettingsStore.getValue('start_position', 'Beginning');
@@ -1079,7 +1071,7 @@ export struct ReaderScene {
 
               ReaderMenuSelect({
                 label: uiText('Screen rotation'),
-                options: ['System', 'Portrait', 'Landscape'],
+                options: ['System', 'Portrait', 'Landscape', 'Auto rotate'],
                 value: this.menuScreenRotation,
                 onChange: (v: string) => { this.menuScreenRotation = v; }
               })

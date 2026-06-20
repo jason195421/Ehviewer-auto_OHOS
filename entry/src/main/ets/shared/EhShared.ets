@@ -571,6 +571,7 @@ export function zhText(text: string): string {
     case 'zh-CN': return '简体中文';
     case 'Portrait': return '竖屏';
     case 'Landscape': return '横屏';
+    case 'Auto rotate': return '自动旋转';
     case 'Left to right': return '从左到右';
     case 'Right to left': return '从右到左';
     case 'Top to bottom': return '从上到下';
@@ -1651,7 +1652,7 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
 
   if (panel === SettingsPanel.Read) {
     return [
-      optionSettingsRow('screen_rotation', 'Screen rotation', 'Reader orientation policy', entries, ['System', 'Portrait', 'Landscape']),
+      optionSettingsRow('screen_rotation', 'Screen rotation', 'Reader orientation policy', entries, ['System', 'Portrait', 'Landscape', 'Auto rotate']),
       optionSettingsRow('reading_direction', 'Reading direction', 'Left-to-right, right-to-left or vertical reader movement', entries, ['Left to right', 'Right to left', 'Top to bottom']),
       optionSettingsRow('page_scaling', 'Page scaling', 'Fit width, fit height or original page scaling', entries, ['Fit width', 'Fit height', 'Original', 'Smart fit']),
       optionSettingsRow('start_position', 'Start position', 'Where a gallery starts when opened', entries, ['Beginning', 'Last read', 'End']),
@@ -1742,14 +1743,28 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
 export const ON_OFF_OPTIONS: string[] = ['On', 'Off'];
 
 export function optionSettingsRow(key: string, title: string, summary: string, entries: SettingEntry[], options: string[]): SettingsRowItem {
+  const rawValue = settingEntryValue(entries, key, options.length > 0 ? options[0] : '');
   return {
     key: key,
     title: title,
     summary: summary,
-    value: settingEntryValue(entries, key, options.length > 0 ? options[0] : ''),
+    value: key === 'screen_rotation' ? normalizeScreenRotationOption(rawValue) : rawValue,
     type: options.length === 2 && options[0] === 'On' && options[1] === 'Off' ? 'switch' : 'list',
     options: options
   };
+}
+
+function normalizeScreenRotationOption(value: string): string {
+  if (value === '1' || value === 'Portrait') {
+    return 'Portrait';
+  }
+  if (value === '2' || value === 'Landscape') {
+    return 'Landscape';
+  }
+  if (value === '3' || value === 'Sensor' || value === 'Auto rotate') {
+    return 'Auto rotate';
+  }
+  return 'System';
 }
 
 export function textSettingsRow(key: string, title: string, summary: string, entries: SettingEntry[], fallback: string): SettingsRowItem {

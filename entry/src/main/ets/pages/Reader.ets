@@ -5,7 +5,7 @@ import {
   applyReaderFullscreenImmersiveMode,
   getReaderWindow,
   rememberReaderWindow,
-  applyReaderWindowState,
+  applyReaderWindowStateFromSettings,
   scheduleReaderFullscreenImmersiveMode
 } from '../services/EhWindowImmersive';
 import { runReaderActiveBackHandler } from '../shared/EhShared';
@@ -35,7 +35,7 @@ struct ReaderPage {
       if (hostContext !== undefined) {
         const win = await window.getLastWindow(hostContext);
         rememberReaderWindow(win);
-        await applyReaderWindowState(win, false, window.Orientation.UNSPECIFIED);
+        await applyReaderWindowStateFromSettings(win);
         scheduleReaderFullscreenImmersiveMode(win, 16);
         scheduleReaderFullscreenImmersiveMode(win, 80);
         scheduleReaderFullscreenImmersiveMode(win, 240);

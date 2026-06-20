@@ -214,7 +214,7 @@ export struct SettingsScene {
     this.optionKey = row.key;
     this.optionTitle = row.title;
     this.optionSummary = row.summary;
-    this.optionValue = settingEntryValue(this.settingEntries, row.key, row.value);
+    this.optionValue = row.key === 'screen_rotation' ? row.value : settingEntryValue(this.settingEntries, row.key, row.value);
     this.optionOptions = cloneStringOptions(row.options);
     this.optionPickerOpen = true;
     this.statusText = '';
