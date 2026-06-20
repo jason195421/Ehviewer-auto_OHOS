@@ -19,7 +19,6 @@ interface SettingEntry {
 export default class EntryAbility extends UIAbility {
   private windowStage: window.WindowStage | undefined = undefined;
   private authPending: boolean = false;
-  private mainWindow: window.Window | undefined = undefined;
 
   onWindowStageCreate(stage: window.WindowStage): void {
     this.windowStage = stage;
@@ -29,7 +28,6 @@ export default class EntryAbility extends UIAbility {
     AppStorage.setOrCreate<number>(LANGUAGE_REVISION_KEY, 0);
     AppStorage.setOrCreate<string>(WINDOW_PRIVACY_STATUS_KEY, '');
     const windowReady = stage.getMainWindow().then((win) => {
-      this.mainWindow = win;
       rememberMainWindow(win);
       return prepareAppChromeBeforeContent(win).then(() => {
         this.updateSystemAvoidArea(win);
@@ -76,7 +74,7 @@ export default class EntryAbility extends UIAbility {
 
   private applyPersistedSecureScreen(): void {
     preferences.getPreferences(this.context, { name: SETTINGS_PREF_NAME }).then((prefs) => {
-      return prefs.get(SETTINGS_VALUES_KEY, '');
+      return prefs.get(SETTINGS_VALUES_KEY, '').catch(() => '');
     }).then((raw) => {
       let enabled = false;
       if (typeof raw === 'string' && raw.length > 0) {
@@ -102,7 +100,7 @@ export default class EntryAbility extends UIAbility {
 
   private checkAndPromptBiometricLock(): void {
     preferences.getPreferences(this.context, { name: SETTINGS_PREF_NAME }).then((prefs) => {
-      return prefs.get(SETTINGS_VALUES_KEY, '');
+      return prefs.get(SETTINGS_VALUES_KEY, '').catch(() => '');
     }).then((raw) => {
       if (typeof raw !== 'string' || raw.length === 0) {
         return;
@@ -161,7 +159,10 @@ export default class EntryAbility extends UIAbility {
     }
     try {
       this.windowStage.getMainWindow().then((win) => {
-        win.minimize();
+        try {
+          win.minimize().catch(() => {});
+        } catch (error) {
+        }
       }).catch(() => {});
     } catch (error) {
     }

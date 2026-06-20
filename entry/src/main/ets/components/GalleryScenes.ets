@@ -1,6 +1,5 @@
-﻿import { common } from '@kit.AbilityKit';
-import { pasteboard } from '@kit.BasicServicesKit';
-import { ALL_CATEGORY, GalleryCategory, GalleryDetail, GalleryInfo, GalleryPage, GalleryPreview, GalleryRoute, GallerySite } from '../model/GalleryModels';
+﻿import { pasteboard } from '@kit.BasicServicesKit';
+import { GalleryCategory, GalleryDetail, GalleryInfo, GalleryPage, GalleryPreview, GalleryRoute, GallerySite } from '../model/GalleryModels';
 import { ehCookieStore } from '../services/EhCookieStore';
 import { EhHttpClient, GalleryDetailLoadResult, GalleryListLoadResult, GalleryPageLoadResult, RateGalleryResult, ToggleFavoriteResult } from '../services/EhHttpClient';
 import { DEFAULT_ADVANCE_SEARCH, EhUrl, FavListUrlBuilder, ListMode, ListUrlBuilder } from '../services/EhUrl';
@@ -11,29 +10,13 @@ import { createReaderSessionState, readerSessionStore } from '../services/Reader
 import { ehSettingsStore } from '../services/EhSettingsStore';
 import { applyAppChromeImmersiveMode, enterEmbeddedReaderFullscreen } from '../services/EhWindowImmersive';
 import { LANGUAGE_REVISION_KEY } from '../shared/EhShared';
-import {
-  themeFieldBackground,
-  themeDangerText,
-  themeOnPrimaryActionBackground,
-  themeOnPrimaryActionStrongBackground,
-  themeOnPrimaryText,
-  themePageBackground,
-  themePlaceholderColor,
-  themePrimaryColor,
-  themePrimaryText,
-  themeScrimColor,
-  themeSecondaryText,
-  themeShadowColor,
-  themeSurface,
-  themeSurfaceVariant,
-  themeTertiaryText
-} from '../shared/EhTheme';
+import { themeFieldBackground, themeDangerText, themeOnPrimaryActionBackground, themeOnPrimaryActionStrongBackground, themeOnPrimaryText, themePageBackground, themePlaceholderColor, themePrimaryColor, themePrimaryText, themeScrimColor, themeSecondaryText, themeShadowColor, themeSurface, themeTertiaryText } from '../shared/EhTheme';
 import { EhNavBar } from '../components/NavigationComponents';
 import { CategoryBadge, GalleryListRow, GalleryThumb, GalleryThumbCard } from './GalleryCards';
 import { GalleryDetailOverlayScene, GalleryDetailScene } from './GalleryDetailScenes';
 import { applyTagSuggestionToKeyword, buildSearchSuggestions, gallerySuggestionUrl, QuickActionColumn, SearchAdvancedPanel, SearchSuggestionItem, SearchSuggestionList, SearchSummaryStrip, recordSearchHistory } from './GallerySearchScenes';
 import { CommentsScene, PlaceholderScene, ReaderPageState, ReaderScene } from './ReaderScenes';
-import { uiText, uiStatusText, setActiveBackHandler, createEmptyGallery, createDetailFromGallery, createEmptyDetail, createEmptyPage, cloneGalleryInfos, applyGalleryFilters, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, listModeForRoute, routeUsesKeyword, defaultKeywordForRoute, gallerySearchTitle, effectiveListSite, galleryListFailureMessage, readerPageReferer, cacheReaderImageForPage, readerPreloadCount, galleryDisplayTitle, galleryListMode, galleryThumbWidth, galleryThumbHeight } from '../shared/EhShared';
+import { uiText, uiStatusText, setActiveBackHandler, createEmptyGallery, createDetailFromGallery, createEmptyDetail, createEmptyPage, cloneGalleryInfos, applyGalleryFilters, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, listModeForRoute, routeUsesKeyword, defaultKeywordForRoute, gallerySearchTitle, effectiveListSite, galleryListFailureMessage, readerPageReferer, cacheReaderImageForPage, readerPreloadCount, galleryListMode, galleryThumbWidth, galleryThumbHeight } from '../shared/EhShared';
 
 export { CategoryBadge, GalleryListRow, GalleryTagChip, GalleryThumb, GalleryThumbCard } from './GalleryCards';
 export { GalleryDetailOverlayScene, GalleryDetailScene } from './GalleryDetailScenes';
@@ -1096,8 +1079,14 @@ export struct GalleryListScene {
     }
     try {
       const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, url);
-      pasteboard.getSystemPasteboard().setData(data);
-      this.detailStatus = label + ' link copied to clipboard';
+      pasteboard.getSystemPasteboard().setData(data).then(() => {
+        this.detailStatus = label + ' link copied to clipboard';
+        this.renderVersion++;
+      }).catch((error: Error) => {
+        this.detailStatus = label + ' copy failed: ' + error.message;
+        this.renderVersion++;
+      });
+      return;
     } catch (error) {
       this.detailStatus = label + ' copy failed: ' + String(error);
     }
@@ -1809,6 +1798,7 @@ export struct GalleryListContent {
                   .height(this.totalBarHeight())
               }
                 .width('100%')
+                .margin({ bottom: this.galleryCardGap() })
             }
 
             if (this.shouldShowSearchSuggestions()) {
@@ -1827,7 +1817,7 @@ export struct GalleryListContent {
               }
             } else {
               // 画廊卡片按行分组，每行 galleryColumnCount() 张
-              ForEach(this.buildRows(), (row: GalleryInfo[], rowIndex: number) => {
+              ForEach(this.buildRows(), (row: GalleryInfo[]) => {
                 ListItem() {
                   Row() {
                     ForEach(row, (gallery: GalleryInfo, colIndex: number) => {

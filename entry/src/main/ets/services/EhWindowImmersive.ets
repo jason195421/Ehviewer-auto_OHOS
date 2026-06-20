@@ -99,52 +99,93 @@ export function scheduleReaderFullscreenImmersiveMode(win: window.Window, delayM
 
 async function applyAppChromeImmersiveModeAsync(target: window.Window): Promise<void> {
   const useLightSystemBarIcons = isDarkTheme();
-  await ignoreWindowError(() => target.setWindowLayoutFullScreen(true));
-  await ignoreWindowError(() => target.setWindowSystemBarEnable(VISIBLE_SYSTEM_BARS));
-  await ignoreWindowError(() => target.setWindowSystemBarProperties({
+  await setWindowLayoutFullScreenQuietly(target, true, 'set app full-screen layout');
+  await setWindowSystemBarEnableQuietly(target, VISIBLE_SYSTEM_BARS, 'show app system bars');
+  await setWindowSystemBarPropertiesQuietly(target, {
     statusBarColor: themeTransparentColor(),
     navigationBarColor: themeTransparentColor(),
     isStatusBarLightIcon: useLightSystemBarIcons,
     isNavigationBarLightIcon: useLightSystemBarIcons,
     statusBarContentColor: themeSystemBarContentColor(),
     navigationBarContentColor: themeSystemBarContentColor()
-  }));
+  }, 'set app transparent system bars');
 }
 
 export async function applyReaderWindowState(target: window.Window, keepScreenOn: boolean,
   orientation: window.Orientation): Promise<void> {
-  await ignoreWindowError(() => target.setWindowKeepScreenOn(keepScreenOn), 'set reader keep screen on');
-  await ignoreWindowError(() => target.setPreferredOrientation(orientation), 'set reader orientation');
-  await ignoreWindowError(() => target.setWindowLayoutFullScreen(true), 'set reader full-screen layout');
-  await ignoreWindowError(() => target.setWindowSystemBarEnable(HIDDEN_SYSTEM_BARS), 'hide reader system bar set');
-  await ignoreWindowError(() => target.setWindowSystemBarProperties({
+  await setWindowKeepScreenOnQuietly(target, keepScreenOn, 'set reader keep screen on');
+  await setPreferredOrientationQuietly(target, orientation, 'set reader orientation');
+  await setWindowLayoutFullScreenQuietly(target, true, 'set reader full-screen layout');
+  await setWindowSystemBarEnableQuietly(target, HIDDEN_SYSTEM_BARS, 'hide reader system bar set');
+  await setWindowSystemBarPropertiesQuietly(target, {
     statusBarColor: themeTransparentColor(),
     navigationBarColor: themeTransparentColor(),
     isStatusBarLightIcon: true,
     isNavigationBarLightIcon: true
-  }), 'set reader transparent system bars');
+  }, 'set reader transparent system bars');
 }
 
 export async function restoreAppWindowState(target: window.Window): Promise<void> {
   const useLightSystemBarIcons = isDarkTheme();
-  await ignoreWindowError(() => target.setWindowKeepScreenOn(false), 'restore app keep screen on');
-  await ignoreWindowError(() => target.setPreferredOrientation(window.Orientation.UNSPECIFIED), 'restore app orientation');
-  await ignoreWindowError(() => target.setWindowLayoutFullScreen(true), 'keep app full-screen layout');
-  await ignoreWindowError(() => target.setWindowSystemBarEnable(VISIBLE_SYSTEM_BARS), 'restore app system bar set');
-  await ignoreWindowError(() => target.setWindowSystemBarProperties({
+  await setWindowKeepScreenOnQuietly(target, false, 'restore app keep screen on');
+  await setPreferredOrientationQuietly(target, window.Orientation.UNSPECIFIED, 'restore app orientation');
+  await setWindowLayoutFullScreenQuietly(target, true, 'keep app full-screen layout');
+  await setWindowSystemBarEnableQuietly(target, VISIBLE_SYSTEM_BARS, 'restore app system bar set');
+  await setWindowSystemBarPropertiesQuietly(target, {
     statusBarColor: themeTransparentColor(),
     navigationBarColor: themeTransparentColor(),
     isStatusBarLightIcon: useLightSystemBarIcons,
     isNavigationBarLightIcon: useLightSystemBarIcons,
     statusBarContentColor: themeSystemBarContentColor(),
     navigationBarContentColor: themeSystemBarContentColor()
-  }), 'restore app transparent system bars');
+  }, 'restore app transparent system bars');
 }
 
-async function ignoreWindowError(task: () => Promise<void>, operation: string = 'update window chrome'): Promise<void> {
+async function setWindowKeepScreenOnQuietly(target: window.Window, keepScreenOn: boolean,
+  operation: string): Promise<void> {
   try {
-    await task();
+    await target.setWindowKeepScreenOn(keepScreenOn);
   } catch (error) {
-    console.warn('EhWindowImmersive failed to ' + operation + ': ' + String(error));
+    logWindowError(operation, error);
   }
+}
+
+async function setPreferredOrientationQuietly(target: window.Window, orientation: window.Orientation,
+  operation: string): Promise<void> {
+  try {
+    await target.setPreferredOrientation(orientation);
+  } catch (error) {
+    logWindowError(operation, error);
+  }
+}
+
+async function setWindowLayoutFullScreenQuietly(target: window.Window, enabled: boolean,
+  operation: string): Promise<void> {
+  try {
+    await target.setWindowLayoutFullScreen(enabled);
+  } catch (error) {
+    logWindowError(operation, error);
+  }
+}
+
+async function setWindowSystemBarEnableQuietly(target: window.Window, names: SystemBarName[],
+  operation: string): Promise<void> {
+  try {
+    await target.setWindowSystemBarEnable(names);
+  } catch (error) {
+    logWindowError(operation, error);
+  }
+}
+
+async function setWindowSystemBarPropertiesQuietly(target: window.Window, properties: window.SystemBarProperties,
+  operation: string): Promise<void> {
+  try {
+    await target.setWindowSystemBarProperties(properties);
+  } catch (error) {
+    logWindowError(operation, error);
+  }
+}
+
+function logWindowError(operation: string, error: Error | Object | string): void {
+  console.warn('EhWindowImmersive failed to ' + operation + ': ' + String(error));
 }

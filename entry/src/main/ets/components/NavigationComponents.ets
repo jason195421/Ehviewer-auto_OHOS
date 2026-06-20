@@ -1,17 +1,7 @@
 import { GalleryRoute } from '../model/GalleryModels';
 import { ehCookieStore } from '../services/EhCookieStore';
 import { ehDownloadStore } from '../services/EhDownloadStore';
-import {
-  LANGUAGE_REVISION_KEY,
-  STATUS_BAR_HEIGHT_KEY,
-  themeSurfaceColor,
-  downloadQueueSummary,
-  getAbilityContext,
-  uiText,
-  uiStatusText,
-  DrawerItem,
-  DRAWER_ITEMS,
-} from '../shared/EhShared';
+import { LANGUAGE_REVISION_KEY, STATUS_BAR_HEIGHT_KEY, downloadQueueSummary, getAbilityContext, uiText, uiStatusText, DrawerItem, DRAWER_ITEMS } from '../shared/EhShared';
 import {
   themeDividerColor,
   themeFieldBackground,

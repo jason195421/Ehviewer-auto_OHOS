@@ -1,25 +1,11 @@
-﻿import { common } from '@kit.AbilityKit';
-import { window } from '@kit.ArkUI';
-import { pasteboard } from '@kit.BasicServicesKit';
-import { picker } from '@kit.CoreFileKit';
-import { fileIo as fs } from '@kit.CoreFileKit';
-import { util } from '@kit.ArkTS';
-import { webview } from '@kit.ArkWeb';
-import { GalleryCategory, GalleryComment, GalleryDetail, GalleryInfo, GalleryPage, GalleryPreview, GalleryRoute, GallerySite, GalleryTagGroup, TopListBucket, TopListDetail, TopListInfo, TopListItem, TopListKind } from '../model/GalleryModels';
-import { ehCookieStore } from '../services/EhCookieStore';
-import { DownloadDirectoryScanResult, RestoredDownloadGallery, ehDownloadFileStore } from '../services/EhDownloadFileStore';
-import { DownloadInfo, DownloadLabel, DownloadState, ehDownloadStore } from '../services/EhDownloadStore';
-import { ehHistoryStore } from '../services/EhHistoryStore';
-import { ehSettingsStore, SettingEntry, defaultSettingEntries } from '../services/EhSettingsStore';
-import { EhHttpClient, GalleryDetailLoadResult, GalleryListLoadResult, GalleryPageLoadResult, NetworkDiagnosticResult, RateGalleryResult, SignInResult, ToggleFavoriteResult, TopListLoadResult } from '../services/EhHttpClient';
-import { EhUrl, FavListUrlBuilder, ListMode, ListUrlBuilder } from '../services/EhUrl';
+﻿import { pasteboard } from '@kit.BasicServicesKit';
+import { GalleryDetail, GalleryPage, GalleryPreview, GalleryRoute, GallerySite, TopListBucket, TopListDetail, TopListInfo, TopListItem, TopListKind } from '../model/GalleryModels';
+import { ehSettingsStore } from '../services/EhSettingsStore';
+import { EhHttpClient, GalleryDetailLoadResult, GalleryPageLoadResult, RateGalleryResult, ToggleFavoriteResult, TopListLoadResult } from '../services/EhHttpClient';
+import { EhUrl, ListMode } from '../services/EhUrl';
 import { galleryPageCache } from '../services/GalleryPageCache';
 import { DetailPreviewPager, mergeGalleryPreviewSets, seedPreviewMap } from '../services/GalleryPreviewLoader';
 import { createReaderSessionState, readerSessionStore } from '../services/ReaderSessionStore';
-import { CacheClearResult, readerImageCache } from '../services/ReaderImageCache';
-import { ehSpiderInfoStore } from '../services/EhSpiderInfoStore';
-import { MigrationTask, migrationTasks } from '../services/MigrationStatus';
-import { FilterRule, FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, FILTER_MODE_TAG_NAMESPACE, ehFilterStore } from '../services/EhFilterStore';
 import { applyAppChromeImmersiveMode, enterEmbeddedReaderFullscreen } from '../services/EhWindowImmersive';
 import { LANGUAGE_REVISION_KEY, nextFloatingToolbarOffset } from '../shared/EhShared';
 import {
@@ -31,8 +17,8 @@ import {
   themeSurface,
   themeTransparentColor
 } from '../shared/EhTheme';
-import { EhBackupBundle, DrawerItem, SettingsHeaderItem, SettingsRowItem, SessionMode, SettingsPanel, DRAWER_ITEMS, SETTINGS_HEADERS, STATUS_BAR_HEIGHT_KEY, ON_OFF_OPTIONS, shouldUseChineseUi, uiText, uiValue, uiStatusText, uiPageText, zhText, setActiveBackHandler, runActiveBackHandler, createEmptyGallery, createEmptyDownloadInfo, createDetailFromGallery, createEmptyDetail, createEmptyPreview, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneStringArray, cloneRequiredStringArray, cloneGalleryInfo, cloneGalleryInfos, padTwo, applyGalleryFilters, cloneGalleryTagGroups, cloneGalleryComments, cloneGalleryPreviews, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListItem, cloneTopListBucket, cloneTopListInfo, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, saveDownloadsQuietly, filterDownloadItems, downloadItemMatches, sortDownloadItems, nextDownloadStatusFilter, nextDownloadLabelFilter, nextDownloadSortMode, nextStringOption, nextDownloadState, nextDownloadLabel, downloadLabelName, downloadStateLabel, downloadStateColor, downloadProgressText, downloadSizeText, downloadImageUrlForPage, downloadThreadLimit, downloadPageIndexes, downloadQueueSummary, parseHistoryMaxSize, routeTitle, routeSubtitle, launchRouteFromSetting, settingsPanelTitle, settingsRowsForPanel, optionSettingsRow, textSettingsRow, staticSettingsRow, settingEntryValue, cloneStringOptions, settingMigrationMessage, nextOption, isValidProxyPortText, formatNetworkDiagnostics, listModeForRoute, routeUsesKeyword, usesGallerySearchToolbar, usesEmbeddedToolbar, defaultKeywordForRoute, gallerySearchTitle, currentGallerySite, effectiveListSite, gallerySiteName, galleryListFailureMessage, withGalleryListMessage, readerPageReferer, readerDisplayImageUrl, cacheReaderImageForPage, cacheThumbnailImage, cloneGalleryPageWithCache, readerLocalImageSource, readerZoomSize, readerFullImageWidth, readerFullImageHeight, readerImageFit, readerShortUrl, readerPreloadCount, readerIsRightToLeft, categoryName, categoryColor, ratingText, galleryDisplayTitle, showGalleryPages, galleryListMode, galleryThumbWidth, galleryThumbHeight, galleryRowHeight, galleryTagPreview, detailTitleFontSize, detailTitleMaxLines, detailHeadingFontSize, readerShowProgress, readerShowClock, readerClockText, padTimeNumber, topListChipColor } from '../shared/EhShared';
-import { GalleryDetailOverlayScene, GalleryListRow, GalleryListScene, GalleryListStateView, PlaceholderScene, ReaderPageState, ReaderScene } from './GalleryScenes';
+import { STATUS_BAR_HEIGHT_KEY, uiText, setActiveBackHandler, createEmptyDetail, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, readerPageReferer, cacheReaderImageForPage, readerPreloadCount, topListChipColor } from '../shared/EhShared';
+import { GalleryDetailOverlayScene, GalleryListScene, GalleryListStateView, ReaderPageState, ReaderScene } from './GalleryScenes';
 import { FloatingToolbarHost } from './NavigationComponents';
 
 function normalizeSceneScrollOffset(offset: number): number {
@@ -88,7 +74,6 @@ export struct TopListScene {
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
   @State toolbarOffsetY: number = 0;
   @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeightPx: number = 0;
-  private topListScroller: Scroller = new Scroller();
   private topListScrollOffset: number = 0;
   private topListToolbarScrollOffset: number = 0;
   private detailScrollOffset: number = 0;
@@ -657,8 +642,14 @@ export struct TopListScene {
     }
     try {
       const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, url);
-      pasteboard.getSystemPasteboard().setData(data);
-      this.detailStatus = label + ' link copied to clipboard';
+      pasteboard.getSystemPasteboard().setData(data).then(() => {
+        this.detailStatus = label + ' link copied to clipboard';
+        this.renderVersion++;
+      }).catch((error: Error) => {
+        this.detailStatus = label + ' copy failed: ' + error.message;
+        this.renderVersion++;
+      });
+      return;
     } catch (error) {
       this.detailStatus = label + ' copy failed: ' + String(error);
     }
@@ -860,7 +851,7 @@ export struct TopListScene {
                   this.openTopListItem(item, info);
                 },
                 initialScrollOffset: this.topListScrollOffset,
-                onScrollUpdate: (offset: number, scrollOffset: number) => {
+                onScrollUpdate: (offset: number) => {
                   this.updateToolbarForScroll(offset);
                   this.topListScrollOffset = offset;
                 }
@@ -978,7 +969,7 @@ export struct TopListBoard {
           this.boardScroller.scrollTo({ xOffset: 0, yOffset: this.initialScrollOffset });
         }
       })
-      .onDidScroll((scrollOffset: number, scrollState: ScrollState) => {
+      .onDidScroll((scrollOffset: number) => {
         this.onScrollUpdate(normalizeSceneScrollOffset(this.boardScroller.currentOffset().yOffset), scrollOffset);
       })
       .onScrollStop(() => {

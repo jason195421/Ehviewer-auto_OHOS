@@ -24,6 +24,7 @@ import {
   uiText
 } from '../shared/EhShared';
 import { readerSelectColors, selectArrowModifier } from '../shared/EhSelectStyle';
+import { themeOnPrimaryText, themeOnPrimarySecondaryText, themeScrimColor } from '../shared/EhTheme';
 import { EhSubNavBar } from './NavigationComponents';
 
 const READER_MIN_SCALE: number = 1;
@@ -494,7 +495,7 @@ export struct ReaderScene {
     await restoreAppWindowState(win);
   }
 
-  private onRenderVersionChange(): void {
+  onRenderVersionChange(): void {
     this.applyReaderWindowSettings();
   }
 
@@ -533,7 +534,7 @@ export struct ReaderScene {
     return this.batteryLevel >= 0 ? this.batteryLevel.toString() + '%' : '--';
   }
 
-  private onPageIndexChange(): void {
+  onPageIndexChange(): void {
     this.currentIndex = this.pageIndex;
     this.isDisableSwipe = false;
     this.zoomPercent = 100;
@@ -944,25 +945,25 @@ export struct ReaderScene {
           if (this.overlayShowProgress) {
             Text(this.progressText())
               .fontSize(12)
-              .fontColor('#F2F4F7')
+              .fontColor(themeOnPrimaryText())
               .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-              .backgroundColor('#66000000')
+              .backgroundColor(themeScrimColor())
               .borderRadius(10)
           }
           if (this.overlayShowClock) {
             Text(readerClockText())
               .fontSize(12)
-              .fontColor('#F2F4F7')
+              .fontColor(themeOnPrimaryText())
               .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-              .backgroundColor('#66000000')
+              .backgroundColor(themeScrimColor())
               .borderRadius(10)
           }
           if (this.overlayShowBattery) {
             Text(this.batteryText())
               .fontSize(12)
-              .fontColor('#F2F4F7')
+              .fontColor(themeOnPrimaryText())
               .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-              .backgroundColor('#66000000')
+              .backgroundColor(themeScrimColor())
               .borderRadius(10)
           }
         }
@@ -1070,7 +1071,7 @@ export struct ReaderScene {
           }
           .width('100%')
           .padding({ left: 12, right: 12, top: 12, bottom: 10 })
-          .backgroundColor('#99000000')
+          .backgroundColor(themeScrimColor())
 
           // Scrollable settings body
           Scroll() {
@@ -1430,9 +1431,9 @@ struct ReaderImageViewport {
           LoadingProgress()
             .width(44)
             .height(44)
-            .color('#98A2B3')
+            .color(themeOnPrimarySecondaryText())
             .padding(8)
-            .backgroundColor('#66000000')
+            .backgroundColor(themeScrimColor())
             .borderRadius(22)
             .zIndex(2)
         } else if (this.isFailed()) {
@@ -1470,7 +1471,7 @@ struct ReaderImageViewport {
     .height('100%')
     .backgroundColor('#050608')
     .clip(true)
-    .onAreaChange((oldValue: Area, newValue: Area) => {
+    .onAreaChange((_oldValue: Area, newValue: Area) => {
       this.updateComponentSize(this.readAreaSize(newValue.width), this.readAreaSize(newValue.height));
     })
     .gesture(

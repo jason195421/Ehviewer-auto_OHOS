@@ -55,7 +55,7 @@ export class EhUrl {
     return EhUrl.getHost(site) + 'popular';
   }
 
-  static getTopListUrl(site: GallerySite = GallerySite.E): string {
+  static getTopListUrl(_site: GallerySite = GallerySite.E): string {
     return EhUrl.HOST_E + 'toplist.php';
   }
 

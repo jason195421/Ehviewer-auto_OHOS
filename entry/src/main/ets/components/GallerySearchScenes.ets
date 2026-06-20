@@ -2,21 +2,7 @@ import { ALL_CATEGORY, GalleryCategory } from '../model/GalleryModels';
 import { DEFAULT_ADVANCE_SEARCH, ListMode } from '../services/EhUrl';
 import { ehTagTranslationStore } from '../services/EhTagTranslationStore';
 import { LANGUAGE_REVISION_KEY, categoryColor, uiText } from '../shared/EhShared';
-import {
-  themeControlMutedBackground,
-  themeControlNeutralBackground,
-  themeFieldBackground,
-  themeInactiveActionText,
-  themeOnPrimaryText,
-  themePageBackground,
-  themePrimaryColor,
-  themePrimaryText,
-  themeSecondaryText,
-  themeSelectedBackgroundLight,
-  themeShadowColor,
-  themeSurface,
-  themeSurfaceVariant
-} from '../shared/EhTheme';
+import { themeControlMutedBackground, themeControlNeutralBackground, themeInactiveActionText, themeOnPrimaryText, themePrimaryColor, themePrimaryText, themeSecondaryText, themeSelectedBackgroundLight, themeShadowColor, themeSurface, themeSurfaceVariant } from '../shared/EhTheme';
 import {
   selectArrowModifier,
   themedSelectButtonBackground,

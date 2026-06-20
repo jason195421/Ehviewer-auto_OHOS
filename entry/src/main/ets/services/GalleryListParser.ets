@@ -510,12 +510,6 @@ function parseFavoriteSlot(style: string): number {
   return -2;
 }
 
-function parseById(row: string, id: string): string {
-  const pattern = new RegExp("<[^>]+id=[\"']" + escapeRegExp(id) + "[\"'][^>]*>([\\s\\S]*?)<\\/[^>]+>", 'i');
-  const match = pattern.exec(row);
-  return match === null ? '' : cleanText(match[1]);
-}
-
 function findClassBlock(source: string, className: string): string {
   const startPattern = new RegExp("<[^>]+class=[\"'][^\"']*\\b" + escapeRegExp(className) + "\\b[^\"']*[\"'][^>]*>", 'i');
   const start = startPattern.exec(source);

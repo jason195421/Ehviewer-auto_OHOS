@@ -1,4 +1,4 @@
-import { GalleryDetail, GalleryPage, GalleryPreview, GallerySite } from '../model/GalleryModels';
+import { GalleryDetail, GalleryPage, GallerySite } from '../model/GalleryModels';
 import { cloneGalleryDetail, cloneGalleryPage, cloneGalleryPreviews } from '../shared/EhShared';
 
 export const READER_SESSION_REVISION_KEY: string = 'readerSessionRevision';

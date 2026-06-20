@@ -1,25 +1,15 @@
 ﻿import { common } from '@kit.AbilityKit';
-import { window } from '@kit.ArkUI';
-import { pasteboard } from '@kit.BasicServicesKit';
-import { picker } from '@kit.CoreFileKit';
-import { fileIo as fs } from '@kit.CoreFileKit';
-import { util } from '@kit.ArkTS';
-import { webview } from '@kit.ArkWeb';
 import { i18n } from '@kit.LocalizationKit';
 import { GalleryCategory, GalleryComment, GalleryDetail, GalleryInfo, GalleryPage, GalleryPreview, GalleryRoute, GallerySite, GalleryTagGroup, TopListBucket, TopListDetail, TopListInfo, TopListItem, TopListKind } from '../model/GalleryModels';
-import { ehCookieStore } from '../services/EhCookieStore';
-import { DownloadDirectoryScanResult, RestoredDownloadGallery, ehDownloadFileStore } from '../services/EhDownloadFileStore';
+import { ehDownloadFileStore } from '../services/EhDownloadFileStore';
 import { DownloadInfo, DownloadLabel, DownloadState, ehDownloadStore } from '../services/EhDownloadStore';
 import { ehHistoryStore } from '../services/EhHistoryStore';
-import { ehSettingsStore, SettingEntry, defaultSettingEntries } from '../services/EhSettingsStore';
-import { EhHttpClient, GalleryDetailLoadResult, GalleryListLoadResult, GalleryPageLoadResult, NetworkDiagnosticResult, RateGalleryResult, SignInResult, ToggleFavoriteResult, TopListLoadResult } from '../services/EhHttpClient';
-import { EhUrl, FavListUrlBuilder, ListMode, ListUrlBuilder } from '../services/EhUrl';
-import { galleryPageCache } from '../services/GalleryPageCache';
-import { CacheClearResult, readerImageCache } from '../services/ReaderImageCache';
+import { ehSettingsStore, SettingEntry } from '../services/EhSettingsStore';
+import { GalleryListLoadResult, NetworkDiagnosticResult } from '../services/EhHttpClient';
+import { EhUrl, ListMode } from '../services/EhUrl';
+import { readerImageCache } from '../services/ReaderImageCache';
 import { previewThumbnailCache } from '../services/PreviewThumbnailCache';
-import { ehSpiderInfoStore } from '../services/EhSpiderInfoStore';
-import { MigrationTask, migrationTasks } from '../services/MigrationStatus';
-import { FilterRule, FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, FILTER_MODE_TAG_NAMESPACE, ehFilterStore } from '../services/EhFilterStore';
+import { FilterRule, ehFilterStore } from '../services/EhFilterStore';
 import { EH_APP_VERSION_NAME, EH_GIT_BRANCH, EH_GIT_COMMIT, EH_GIT_DESCRIBE, EH_RELEASE_TAG } from '../services/EhBuildInfo';
 import {
   EH_THEME_PRIMARY_COLOR,
@@ -1852,7 +1842,7 @@ export function usesEmbeddedToolbar(route: GalleryRoute): boolean {
     route === GalleryRoute.Downloads || route === GalleryRoute.Settings || route === GalleryRoute.Session;
 }
 
-export function defaultKeywordForRoute(route: GalleryRoute): string {
+export function defaultKeywordForRoute(_route: GalleryRoute): string {
   return '';
 }
 
@@ -1877,9 +1867,8 @@ export function currentGallerySite(): GallerySite {
   return ehSettingsStore.getValue('gallery_site', 'E-Hentai') === 'ExHentai' ? GallerySite.Ex : GallerySite.E;
 }
 
-export function effectiveListSite(route: GalleryRoute): GallerySite {
-  const site = currentGallerySite();
-  return site;
+export function effectiveListSite(_route: GalleryRoute): GallerySite {
+  return currentGallerySite();
 }
 
 export function gallerySiteName(site: GallerySite): string {
