@@ -411,6 +411,7 @@ export struct EhNavBar {
     .width('100%')
     .translate({ y: this.translateY })
     .opacity(this.barOpacity())
+    .visibility(this.barOpacity() <= 0 ? Visibility.Hidden : Visibility.Visible)
     .animation({ duration: 200, curve: Curve.EaseOut })
     .zIndex(10)
   }
@@ -559,6 +560,7 @@ export struct FloatingToolbar {
     .width('100%')
     .translate({ y: this.toolbarOffset() })
     .opacity(this.toolbarOpacity())
+    .visibility(this.toolbarOpacity() <= 0 ? Visibility.Hidden : Visibility.Visible)
     .animation({ duration: 200, curve: Curve.EaseOut })
     .zIndex(10)
   }

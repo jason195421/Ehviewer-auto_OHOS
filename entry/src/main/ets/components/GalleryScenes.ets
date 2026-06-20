@@ -1598,7 +1598,7 @@ export struct GalleryListContent {
       this.toolbarOffsetY = nextFloatingToolbarOffset(this.toolbarOffsetY, scrollOffset, yOffset, this.totalBarHeight());
       return;
     }
-    if (scrollOffset < 0 && this.visibleBarHeight() <= 1) {
+    if (scrollOffset < 0 && this.toolbarOffsetY < 0) {
       this.restoreToolbarOnReverseScroll();
     }
   }
@@ -1808,6 +1808,7 @@ export struct GalleryListContent {
     .width('100%')
     .translate({ y: this.toolbarOffsetY })
     .opacity(this.toolbarOpacity())
+    .visibility(this.toolbarOpacity() <= 0 ? Visibility.Hidden : Visibility.Visible)
     .animation({ duration: 200, curve: Curve.EaseOut })
     .zIndex(10)
   }
@@ -2179,6 +2180,7 @@ export struct GalleryListContent {
           })
         }
       }
+      .hitTestBehavior(HitTestMode.Transparent)
     }
     .width('100%')
     .height('100%')

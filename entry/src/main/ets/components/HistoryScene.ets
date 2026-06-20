@@ -285,7 +285,7 @@ export struct HistoryScene {
       this.toolbarOffsetY = nextFloatingToolbarOffset(this.toolbarOffsetY, scrollOffset, offset, this.floatingToolbarHeight());
       return;
     }
-    if (scrollOffset < 0 && this.toolbarVisibleHeight() <= 1) {
+    if (scrollOffset < 0 && this.toolbarOffsetY < 0) {
       this.restoreToolbarOnReverseScroll();
     }
   }
