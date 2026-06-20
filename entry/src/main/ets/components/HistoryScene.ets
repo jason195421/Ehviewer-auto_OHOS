@@ -316,7 +316,7 @@ export struct HistoryScene {
   }
 
   private historyContentTopPadding(): number {
-    return this.floatingToolbarHeight() + 8;
+    return this.toolbarVisibleHeight() + 8;
   }
 
   private historyCardPreferredWidth(): number {

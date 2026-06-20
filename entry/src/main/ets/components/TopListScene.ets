@@ -948,7 +948,7 @@ export struct TopListBoard {
   private readonly TABS_BAR_HEIGHT: number = 42;
 
   private tabsVisualTop(): number {
-    return Math.max(this.statusBarHeight, this.topPadding + this.toolbarOffsetY);
+    return Math.max(0, this.topPadding + this.toolbarOffsetY);
   }
 
   private contentTopPadding(): number {

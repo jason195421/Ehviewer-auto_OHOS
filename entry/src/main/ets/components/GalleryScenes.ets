@@ -1964,7 +1964,7 @@ export struct GalleryListContent {
 
             }
           }
-          .contentStartOffset(this.contentStartOffset())
+          .padding({ top: this.contentStartOffset() })
           .scrollBar(BarState.Auto)
           .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: false, effectEdge: EffectEdge.START | EffectEdge.END })
           .width('100%')
