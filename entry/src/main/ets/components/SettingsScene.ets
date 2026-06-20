@@ -29,6 +29,7 @@ import {
 import { LANGUAGE_REVISION_KEY, notifyLanguageChanged, notifyThemeChanged } from '../shared/EhShared';
 import {
   themeFieldBackground,
+  themeOnPrimaryText,
   themePageBackground,
   themePrimaryColor,
   themePrimaryText,
@@ -56,6 +57,7 @@ import { collectWebCookies, hasLoginCookie, SessionScene, syncCookieHeaderToWebV
 @Component
 export struct SettingsScene {
   @State panel: SettingsPanel = SettingsPanel.Main;
+  @State panelStack: SettingsPanel[] = [SettingsPanel.Main];
   @State signedIn: boolean = ehCookieStore.hasCookies();
   @State statusText: string = '';
   @State themeName: string = 'Light';
@@ -121,12 +123,31 @@ export struct SettingsScene {
 
   private openPanel(panel: SettingsPanel): void {
     this.optionPickerOpen = false;
+    if (this.panel === panel) {
+      return;
+    }
+    const nextStack: SettingsPanel[] = [];
+    for (let i = 0; i < this.panelStack.length; i++) {
+      nextStack.push(this.panelStack[i]);
+    }
+    nextStack.push(panel);
+    this.panelStack = nextStack;
     this.panel = panel;
   }
 
   private closePanel(): void {
     this.optionPickerOpen = false;
-    this.panel = SettingsPanel.Main;
+    if (this.panelStack.length <= 1) {
+      this.panelStack = [SettingsPanel.Main];
+      this.panel = SettingsPanel.Main;
+    } else {
+      const nextStack: SettingsPanel[] = [];
+      for (let i = 0; i < this.panelStack.length - 1; i++) {
+        nextStack.push(this.panelStack[i]);
+      }
+      this.panelStack = nextStack.length > 0 ? nextStack : [SettingsPanel.Main];
+      this.panel = this.panelStack[this.panelStack.length - 1];
+    }
     this.signedIn = ehCookieStore.hasCookies();
   }
 
@@ -307,7 +328,7 @@ export struct SettingsScene {
       return true;
     }
     if (key === 'declaration') {
-      this.statusText = 'EhViewer_CN_SXJ HarmonyOS port repository: ' + EH_REPOSITORY_URL;
+      this.openExternalUrl(EH_REPOSITORY_URL, 'repository');
       return true;
     }
     if (key === 'author') {
@@ -315,11 +336,11 @@ export struct SettingsScene {
       return true;
     }
     if (key === 'latest_release') {
-      this.statusText = 'Latest release: ' + EH_RELEASE_TAG + ' ' + EH_RELEASE_URL;
+      this.openExternalUrl(EH_RELEASE_URL, 'latest release');
       return true;
     }
     if (key === 'issue_help') {
-      this.statusText = 'Issue help: ' + EH_ISSUES_URL;
+      this.openExternalUrl(EH_ISSUES_URL, 'issue tracker');
       return true;
     }
     if (key === 'license') {
@@ -336,7 +357,7 @@ export struct SettingsScene {
       return true;
     }
     if (key === 'check_for_updates') {
-      this.statusText = 'Update check uses the release page for now: ' + EH_RELEASE_URL;
+      this.openExternalUrl(EH_RELEASE_URL, 'release page');
       return true;
     }
     if (key === 'donate') {
@@ -399,6 +420,26 @@ export struct SettingsScene {
       return true;
     }
     return false;
+  }
+
+  private openExternalUrl(url: string, label: string): void {
+    const context = getAbilityContext();
+    if (context === undefined) {
+      this.statusText = 'Open link failed: Ability context is not ready';
+      return;
+    }
+    context.startAbility({
+      action: 'ohos.want.action.viewData',
+      entities: ['entity.system.browsable'],
+      uri: url,
+      parameters: {
+        'ohos.ability.params.showDefaultPicker': true
+      }
+    }).then(() => {
+      this.statusText = 'Opening browser: ' + label;
+    }).catch((error: Error) => {
+      this.statusText = 'Open link failed: ' + error.message;
+    });
   }
 
   private runBiometricLock(): void {
@@ -923,12 +964,15 @@ export struct SettingsHeaderRow {
   onTap: () => void = () => {};
 
   build() {
-    Row() {
-      SettingsTextBlock({ title: uiText(this.item.title), summary: uiText(this.item.summary) })
-      .layoutWeight(1)
-      Text('>')
-        .fontSize(16)
-        .fontColor(themeTertiaryText())
+    Button({ type: ButtonType.Normal, stateEffect: true }) {
+      Row() {
+        SettingsTextBlock({ title: uiText(this.item.title), summary: uiText(this.item.summary) })
+        .layoutWeight(1)
+        Text('>')
+          .fontSize(16)
+          .fontColor(themeTertiaryText())
+      }
+      .width('100%')
     }
     .width('100%')
     .padding(14)
@@ -1147,17 +1191,23 @@ export struct SettingsOptionPanel {
       List({ space: 8 }) {
         ForEach(this.options, (option: string) => {
           ListItem() {
-            Row() {
-              Text(uiValue(option))
-                .fontSize(15)
-                .fontWeight(option === this.value ? FontWeight.Medium : FontWeight.Regular)
-                .fontColor(themePrimaryText())
-                .layoutWeight(1)
-              if (option === this.value) {
-                Text(uiText('Selected'))
-                  .fontSize(12)
-                  .fontColor(themePrimaryColor())
+            Button({ type: ButtonType.Normal, stateEffect: true }) {
+              Row() {
+                Text(uiValue(option))
+                  .fontSize(15)
+                  .fontWeight(option === this.value ? FontWeight.Medium : FontWeight.Regular)
+                  .fontColor(themePrimaryText())
+                  .layoutWeight(1)
+                if (option === this.value) {
+                  Text(uiText('Selected'))
+                    .fontSize(12)
+                    .fontColor(themeOnPrimaryText())
+                    .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+                    .backgroundColor(themePrimaryColor())
+                    .borderRadius(14)
+                }
               }
+              .width('100%')
             }
             .width('100%')
             .padding(14)
@@ -1189,17 +1239,23 @@ export struct SettingsActionRow {
   onTap: () => void = () => {};
 
   build() {
-    Row() {
-      SettingsTextBlock({
-        title: this.title,
-        summary: this.summary,
-        isEnabled: this.isEnabled
-      })
-      .layoutWeight(1)
-      Text(this.value)
-        .fontSize(12)
-        .fontColor(this.isEnabled ? themePrimaryColor() : themeTertiaryText())
-        .margin({ left: 12 })
+    Button({ type: ButtonType.Normal, stateEffect: this.isEnabled }) {
+      Row() {
+        SettingsTextBlock({
+          title: this.title,
+          summary: this.summary,
+          isEnabled: this.isEnabled
+        })
+        .layoutWeight(1)
+        Text(this.value)
+          .fontSize(12)
+          .fontColor(this.isEnabled ? themeOnPrimaryText() : themeTertiaryText())
+          .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+          .backgroundColor(this.isEnabled ? themePrimaryColor() : themeSurfaceVariant())
+          .borderRadius(14)
+          .margin({ left: 12 })
+      }
+      .width('100%')
     }
     .width('100%')
     .padding(14)
@@ -1285,11 +1341,12 @@ export struct SettingsStaticRow {
               }
             })
         } else {
-          Button(settingsRowActionText(this.row))
+          Button(settingsRowActionText(this.row), { type: ButtonType.Normal, stateEffect: true })
             .height(34)
             .fontSize(12)
             .fontColor(themeSecondaryText())
             .backgroundColor(themeSurfaceVariant())
+            .borderRadius(17)
             .margin({ left: 12 })
             .onClick(() => {
               this.onTap();

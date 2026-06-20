@@ -963,7 +963,7 @@ export struct TopListTabs {
         ForEach(this.lists, (info: TopListInfo, index: number) => {
           Button(info.title)
             .type(ButtonType.Normal)
-            .stateEffect(false)
+            .stateEffect(true)
             .height(34)
             .fontSize(12)
             .fontColor(index === this.selectedIndex ? themeOnPrimaryText() : themePrimaryColor())
