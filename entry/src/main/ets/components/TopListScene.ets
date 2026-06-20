@@ -663,23 +663,26 @@ export struct TopListScene {
     return this.topList.lists[this.selectedIndex];
   }
 
-  private updateToolbarForScroll(contentOffset: number, scrollOffset: number): void {
+  private updateToolbarForScroll(contentOffset: number, scrollOffset: number): number {
     if (scrollOffset === 0) {
-      return;
+      return scrollOffset;
     }
     if (contentOffset <= 4) {
       this.toolbarRestoring = false;
       this.toolbarOffsetY = 0;
-      return;
+      return scrollOffset;
     }
     if (scrollOffset > 0 && this.toolbarVisibleHeight() > 0) {
+      const previousOffsetY = this.toolbarOffsetY;
       this.toolbarRestoring = false;
       this.toolbarOffsetY = nextFloatingToolbarOffset(this.toolbarOffsetY, scrollOffset, contentOffset, this.floatingToolbarHeight());
-      return;
+      const consumedOffset = Math.max(0, previousOffsetY - this.toolbarOffsetY);
+      return Math.max(0, scrollOffset - consumedOffset);
     }
     if (scrollOffset < 0 && this.toolbarOffsetY < 0) {
       this.restoreToolbarOnReverseScroll();
     }
+    return scrollOffset;
   }
 
   private toolbarVisibleHeight(): number {
@@ -881,8 +884,9 @@ export struct TopListScene {
                 },
                 initialScrollOffset: this.topListScrollOffset,
                 onScrollUpdate: (offset: number, scrollOffset: number) => {
-                  this.updateToolbarForScroll(offset, scrollOffset);
+                  const offsetRemain = this.updateToolbarForScroll(offset, scrollOffset);
                   this.topListScrollOffset = offset;
+                  return offsetRemain;
                 }
               })
               .layoutWeight(1)
@@ -943,7 +947,9 @@ export struct TopListBoard {
   onOpenBucket: (bucket: TopListBucket) => void = () => {};
   onOpenItem: (item: TopListItem, info: TopListInfo) => void = () => {};
   initialScrollOffset: number = 0;
-  onScrollUpdate: (offset: number, scrollOffset: number) => void = () => {};
+  onScrollUpdate: (offset: number, scrollOffset: number) => number = (_offset: number, scrollOffset: number) => {
+    return scrollOffset;
+  };
   private boardScroller: Scroller = new Scroller();
   private readonly TABS_BAR_HEIGHT: number = 42;
 
@@ -999,8 +1005,9 @@ export struct TopListBoard {
         }
       })
       .onScrollFrameBegin((offset: number, _state: ScrollState) => {
-        this.onScrollUpdate(normalizeSceneScrollOffset(this.boardScroller.currentOffset().yOffset), offset);
-        return { offsetRemain: offset };
+        return {
+          offsetRemain: this.onScrollUpdate(normalizeSceneScrollOffset(this.boardScroller.currentOffset().yOffset), offset)
+        };
       })
       .onScrollStop(() => {
         const offset = normalizeSceneScrollOffset(this.boardScroller.currentOffset().yOffset);

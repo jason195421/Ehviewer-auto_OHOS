@@ -273,21 +273,24 @@ export struct HistoryScene {
     });
   }
 
-  private updateToolbarForScrollFrame(scrollOffset: number): void {
+  private updateToolbarForScrollFrame(scrollOffset: number): number {
     const offset = normalizeSceneScrollOffset(this.historyScroller.currentOffset().yOffset);
     if (offset <= 4) {
       this.toolbarRestoring = false;
       this.toolbarOffsetY = 0;
-      return;
+      return scrollOffset;
     }
     if (scrollOffset > 0 && this.toolbarVisibleHeight() > 0) {
+      const previousOffsetY = this.toolbarOffsetY;
       this.toolbarRestoring = false;
       this.toolbarOffsetY = nextFloatingToolbarOffset(this.toolbarOffsetY, scrollOffset, offset, this.floatingToolbarHeight());
-      return;
+      const consumedOffset = Math.max(0, previousOffsetY - this.toolbarOffsetY);
+      return Math.max(0, scrollOffset - consumedOffset);
     }
     if (scrollOffset < 0 && this.toolbarOffsetY < 0) {
       this.restoreToolbarOnReverseScroll();
     }
+    return scrollOffset;
   }
 
   private toolbarVisibleHeight(): number {
@@ -943,8 +946,7 @@ export struct HistoryScene {
               }
             })
             .onScrollFrameBegin((offset: number, _state: ScrollState) => {
-              this.updateToolbarForScrollFrame(offset);
-              return { offsetRemain: offset };
+              return { offsetRemain: this.updateToolbarForScrollFrame(offset) };
             })
             .onScrollStop(() => {
               const offset = normalizeSceneScrollOffset(this.historyScroller.currentOffset().yOffset);

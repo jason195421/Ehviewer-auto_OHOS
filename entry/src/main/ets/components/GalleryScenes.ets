@@ -1586,21 +1586,24 @@ export struct GalleryListContent {
     return immersiveChromeOpacityFromOffset(this.toolbarOffsetY, this.totalBarHeight());
   }
 
-  private handleScrollFrame(scrollOffset: number): void {
+  private handleScrollFrame(scrollOffset: number): number {
     const yOffset = normalizeGalleryListScrollOffset(this.listScroller.currentOffset().yOffset);
     if (yOffset <= 4) {
       this.toolbarRestoring = false;
       this.toolbarOffsetY = 0;
-      return;
+      return scrollOffset;
     }
     if (scrollOffset > 0 && this.visibleBarHeight() > 0) {
+      const previousOffsetY = this.toolbarOffsetY;
       this.toolbarRestoring = false;
       this.toolbarOffsetY = nextFloatingToolbarOffset(this.toolbarOffsetY, scrollOffset, yOffset, this.totalBarHeight());
-      return;
+      const consumedOffset = Math.max(0, previousOffsetY - this.toolbarOffsetY);
+      return Math.max(0, scrollOffset - consumedOffset);
     }
     if (scrollOffset < 0 && this.toolbarOffsetY < 0) {
       this.restoreToolbarOnReverseScroll();
     }
+    return scrollOffset;
   }
 
   private restoreToolbarOnReverseScroll(): void {
@@ -1986,8 +1989,7 @@ export struct GalleryListContent {
             }
           })
           .onScrollFrameBegin((offset: number, _state: ScrollState) => {
-            this.handleScrollFrame(offset);
-            return { offsetRemain: offset };
+            return { offsetRemain: this.handleScrollFrame(offset) };
           })
           .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) => {
             const yOff = normalizeGalleryListScrollOffset(this.listScroller.currentOffset().yOffset);
