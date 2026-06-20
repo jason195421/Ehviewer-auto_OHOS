@@ -505,9 +505,12 @@ export function zhText(text: string): string {
     case 'Show Key': return '显示密钥';
     case 'Retry Key': return '重试密钥';
     case 'Fit': return '适配';
-    case 'Fit width': return '适应宽度';
-    case 'Fit height': return '适应高度';
-    case 'Smart fit': return '智能适配';
+    case 'Fit width': return '匹配宽度';
+    case 'Fit height': return '匹配长度';
+    case 'Actual size': return '原始尺寸';
+    case 'Fit screen': return '匹配屏幕';
+    case 'Fixed scale': return '固定缩放';
+    case 'Smart fit': return '匹配屏幕';
     case 'Image page failed to load': return '图片页面加载失败';
     case 'Image page is loading': return '图片页面加载中';
     case 'unknown uploader': return '未知上传者';
@@ -572,10 +575,15 @@ export function zhText(text: string): string {
     case 'Portrait': return '竖屏';
     case 'Landscape': return '横屏';
     case 'Auto rotate': return '自动旋转';
-    case 'Left to right': return '从左到右';
-    case 'Right to left': return '从右到左';
-    case 'Top to bottom': return '从上到下';
+    case 'Left to right': return '从左至右';
+    case 'Right to left': return '从右至左';
+    case 'Top to bottom': return '从上至下';
     case 'Vertical': return '纵向';
+    case 'Top left': return '左上角';
+    case 'Top right': return '右上角';
+    case 'Bottom left': return '左下角';
+    case 'Bottom right': return '右下角';
+    case 'Center': return '中心';
     case 'Beginning': return '开头';
     case 'Last read': return '上次阅读';
     case 'End': return '末尾';
@@ -646,9 +654,9 @@ export function zhText(text: string): string {
     case 'Reading direction': return '阅读方向';
     case 'Left-to-right, right-to-left or vertical reader movement': return '从左到右、从右到左或纵向阅读';
     case 'Page scaling': return '页面缩放';
-    case 'Fit width, fit height or original page scaling': return '适应宽度、适应高度或原始大小';
-    case 'Start position': return '起始位置';
-    case 'Where a gallery starts when opened': return '打开画廊时的起始页';
+    case 'Fit width, fit height or original page scaling': return '原始尺寸、匹配宽度、匹配长度、匹配屏幕或固定缩放';
+    case 'Start position': return '开页位置';
+    case 'Where a gallery starts when opened': return '页面打开时的初始对齐位置';
     case 'Auto transfer time': return '自动翻页时间';
     case 'Automatic next-page delay from original seekbar preference': return '原应用滑动条设置的自动下一页延迟';
     case 'Standalone reader': return '独立阅读器';
@@ -1652,10 +1660,10 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
 
   if (panel === SettingsPanel.Read) {
     return [
-      optionSettingsRow('screen_rotation', 'Screen rotation', 'Reader orientation policy', entries, ['System', 'Portrait', 'Landscape', 'Auto rotate']),
+      optionSettingsRow('screen_rotation', 'Screen rotation', 'Reader orientation policy', entries, ['Default', 'Portrait', 'Landscape', 'Auto rotate']),
       optionSettingsRow('reading_direction', 'Reading direction', 'Left-to-right, right-to-left or vertical reader movement', entries, ['Left to right', 'Right to left', 'Top to bottom']),
-      optionSettingsRow('page_scaling', 'Page scaling', 'Fit width, fit height or original page scaling', entries, ['Fit width', 'Fit height', 'Original', 'Smart fit']),
-      optionSettingsRow('start_position', 'Start position', 'Where a gallery starts when opened', entries, ['Beginning', 'Last read', 'End']),
+      optionSettingsRow('page_scaling', 'Page scaling', 'Fit width, fit height or original page scaling', entries, ['Actual size', 'Fit width', 'Fit height', 'Fit screen', 'Fixed scale']),
+      optionSettingsRow('start_position', 'Start position', 'Where a gallery starts when opened', entries, ['Top left', 'Top right', 'Bottom left', 'Bottom right', 'Center']),
       optionSettingsRow('start_transfer_time', 'Auto transfer time', 'Automatic next-page delay from original seekbar preference', entries, ['Off', '2s', '5s', '10s', '15s']),
       optionSettingsRow('reader_standalone', 'Standalone reader', 'Open reader in a standalone ability', entries, ON_OFF_OPTIONS),
       optionSettingsRow('keep_screen_on', 'Keep screen on', 'Prevent screen sleep while reading', entries, ON_OFF_OPTIONS),
@@ -1748,7 +1756,7 @@ export function optionSettingsRow(key: string, title: string, summary: string, e
     key: key,
     title: title,
     summary: summary,
-    value: key === 'screen_rotation' ? normalizeScreenRotationOption(rawValue) : rawValue,
+    value: normalizeReaderSettingOption(key, rawValue),
     type: options.length === 2 && options[0] === 'On' && options[1] === 'Off' ? 'switch' : 'list',
     options: options
   };
@@ -1764,7 +1772,65 @@ function normalizeScreenRotationOption(value: string): string {
   if (value === '3' || value === 'Sensor' || value === 'Auto rotate') {
     return 'Auto rotate';
   }
-  return 'System';
+  return 'Default';
+}
+
+export function normalizeReadingDirectionOption(value: string): string {
+  if (value === '0' || value === 'Left to right') {
+    return 'Left to right';
+  }
+  if (value === '2' || value === 'Top to bottom') {
+    return 'Top to bottom';
+  }
+  return 'Right to left';
+}
+
+export function normalizePageScalingOption(value: string): string {
+  if (value === '0' || value === 'Actual size' || value === 'Original') {
+    return 'Actual size';
+  }
+  if (value === '1' || value === 'Fit width') {
+    return 'Fit width';
+  }
+  if (value === '2' || value === 'Fit height') {
+    return 'Fit height';
+  }
+  if (value === '4' || value === 'Fixed scale') {
+    return 'Fixed scale';
+  }
+  return 'Fit screen';
+}
+
+export function normalizeStartPositionOption(value: string): string {
+  if (value === '0' || value === 'Top left') {
+    return 'Top left';
+  }
+  if (value === '2' || value === 'Bottom left') {
+    return 'Bottom left';
+  }
+  if (value === '3' || value === 'Bottom right' || value === 'End') {
+    return 'Bottom right';
+  }
+  if (value === '4' || value === 'Center') {
+    return 'Center';
+  }
+  return 'Top right';
+}
+
+function normalizeReaderSettingOption(key: string, value: string): string {
+  if (key === 'screen_rotation') {
+    return normalizeScreenRotationOption(value);
+  }
+  if (key === 'reading_direction') {
+    return normalizeReadingDirectionOption(value);
+  }
+  if (key === 'page_scaling') {
+    return normalizePageScalingOption(value);
+  }
+  if (key === 'start_position') {
+    return normalizeStartPositionOption(value);
+  }
+  return value;
 }
 
 export function textSettingsRow(key: string, title: string, summary: string, entries: SettingEntry[], fallback: string): SettingsRowItem {
@@ -2081,14 +2147,9 @@ export function readerFullImageHeight(zoomPercent: number): string {
 }
 
 export function readerImageFit(fitMode: string): ImageFit {
-  if (fitMode === 'Original') {
+  const normalized = normalizePageScalingOption(fitMode);
+  if (normalized === 'Actual size' || normalized === 'Fixed scale') {
     return ImageFit.None;
-  }
-  if (fitMode === 'Fit height') {
-    return ImageFit.Contain;
-  }
-  if (fitMode === 'Smart fit') {
-    return ImageFit.Cover;
   }
   return ImageFit.Contain;
 }
@@ -2109,7 +2170,7 @@ export function readerPreloadCount(): number {
 }
 
 export function readerIsRightToLeft(): boolean {
-  return ehSettingsStore.getValue('reading_direction', 'Left to right') === 'Right to left';
+  return normalizeReadingDirectionOption(ehSettingsStore.getValue('reading_direction', 'Right to left')) === 'Right to left';
 }
 
 export function categoryName(category: number): string {

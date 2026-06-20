@@ -22,6 +22,9 @@ import {
   plainTextFromHtml,
   readerClockText,
   readerDisplayImageUrl,
+  normalizePageScalingOption,
+  normalizeReadingDirectionOption,
+  normalizeStartPositionOption,
   uiStatusText,
   uiText
 } from '../shared/EhShared';
@@ -347,7 +350,8 @@ export struct ReaderScene {
   onRetry: () => void = () => {};
   restoreAppChromeOnExit: boolean = true;
 
-  @State fitMode: string = 'Fit width';
+  @State fitMode: string = 'Fit screen';
+  @State startPosition: string = 'Top right';
   @State showInfo: boolean = false;
   @State preferOriginal: boolean = false;
   @State menuVisible: boolean = false;
@@ -406,7 +410,8 @@ export struct ReaderScene {
     if (this.restoreAppChromeOnExit) {
       setEmbeddedReaderActive(true);
     }
-    this.fitMode = ehSettingsStore.getValue('page_scaling', 'Fit width');
+    this.fitMode = normalizePageScalingOption(ehSettingsStore.getValue('page_scaling', 'Fit screen'));
+    this.startPosition = normalizeStartPositionOption(ehSettingsStore.getValue('start_position', 'Top right'));
     this.menuVisible = false;
     this.sliderVisible = false;
     this.currentIndex = this.pageIndex;
@@ -509,7 +514,7 @@ export struct ReaderScene {
   }
 
   private syncDirectionState(): void {
-    const dir = ehSettingsStore.getValue('reading_direction', 'Right to left');
+    const dir = normalizeReadingDirectionOption(ehSettingsStore.getValue('reading_direction', 'Right to left'));
     this.swiperVertical = dir === 'Top to bottom';
     this.swiperReversed = dir === 'Right to left';
   }
@@ -594,9 +599,9 @@ export struct ReaderScene {
 
   private showMenu(): void {
     this.menuScreenRotation = readerScreenRotationSetting();
-    this.menuReadingDirection = ehSettingsStore.getValue('reading_direction', 'Right to left');
-    this.menuPageScaling = ehSettingsStore.getValue('page_scaling', 'Fit width');
-    this.menuStartPosition = ehSettingsStore.getValue('start_position', 'Beginning');
+    this.menuReadingDirection = normalizeReadingDirectionOption(ehSettingsStore.getValue('reading_direction', 'Right to left'));
+    this.menuPageScaling = normalizePageScalingOption(ehSettingsStore.getValue('page_scaling', 'Fit screen'));
+    this.menuStartPosition = normalizeStartPositionOption(ehSettingsStore.getValue('start_position', 'Top right'));
     this.menuKeepScreenOn = ehSettingsStore.getValue('keep_screen_on', 'Off') === 'On';
     this.menuShowClock = ehSettingsStore.getValue('gallery_show_clock', 'On') === 'On';
     this.menuShowProgress = ehSettingsStore.getValue('gallery_show_progress', 'On') === 'On';
@@ -625,7 +630,8 @@ export struct ReaderScene {
     ehSettingsStore.setValue('start_transfer_time', this.menuAutoTransferTime);
     ehSettingsStore.setValue('custom_screen_lightness', this.menuCustomBrightness ? 'On' : 'Off');
     ehSettingsStore.setValue('screen_lightness', this.menuBrightnessLevel);
-    this.fitMode = this.menuPageScaling;
+    this.fitMode = normalizePageScalingOption(this.menuPageScaling);
+    this.startPosition = normalizeStartPositionOption(this.menuStartPosition);
     this.issueViewportCommand('reset');
     this.syncOverlayState();
     this.syncDirectionState();
@@ -889,6 +895,7 @@ export struct ReaderScene {
             statusText: index === this.pageIndex ? this.statusText : uiText('Image page is loading'),
             preferOriginal: this.preferOriginal,
             fitMode: this.fitMode,
+            startPosition: this.startPosition,
             isActive: index === this.currentIndex,
             command: this.viewportCommand,
             commandVersion: this.viewportCommandVersion,
@@ -1071,7 +1078,7 @@ export struct ReaderScene {
 
               ReaderMenuSelect({
                 label: uiText('Screen rotation'),
-                options: ['System', 'Portrait', 'Landscape', 'Auto rotate'],
+                options: ['Default', 'Portrait', 'Landscape', 'Auto rotate'],
                 value: this.menuScreenRotation,
                 onChange: (v: string) => { this.menuScreenRotation = v; }
               })
@@ -1087,7 +1094,7 @@ export struct ReaderScene {
 
               ReaderMenuSelect({
                 label: uiText('Page scaling'),
-                options: ['Fit width', 'Fit height', 'Original', 'Smart fit'],
+                options: ['Actual size', 'Fit width', 'Fit height', 'Fit screen', 'Fixed scale'],
                 value: this.menuPageScaling,
                 onChange: (v: string) => { this.menuPageScaling = v; }
               })
@@ -1095,7 +1102,7 @@ export struct ReaderScene {
 
               ReaderMenuSelect({
                 label: uiText('Start position'),
-                options: ['Beginning', 'Last read', 'End'],
+                options: ['Top left', 'Top right', 'Bottom left', 'Bottom right', 'Center'],
                 value: this.menuStartPosition,
                 onChange: (v: string) => { this.menuStartPosition = v; }
               })
@@ -1271,7 +1278,8 @@ struct ReaderImageViewport {
   @Prop @Watch('onImageSourceChange') page: GalleryPage = createEmptyPage();
   @Prop statusText: string = '';
   @Prop @Watch('onImageSourceChange') preferOriginal: boolean = false;
-  @Prop fitMode: string = 'Fit width';
+  @Prop fitMode: string = 'Fit screen';
+  @Prop startPosition: string = 'Top right';
   @Prop isActive: boolean = false;
   @Prop command: string = '';
   @Prop @Watch('onCommandChange') commandVersion: number = 0;
@@ -1338,31 +1346,44 @@ struct ReaderImageViewport {
   }
 
   private imageFit(): ImageFit {
-    if (this.fitMode === 'Original') {
+    const normalized = normalizePageScalingOption(this.fitMode);
+    if (normalized === 'Actual size' || normalized === 'Fixed scale') {
       return ImageFit.None;
     }
-    if (this.fitMode === 'Smart fit') {
-      return ImageFit.Cover;
-    }
-    if (this.fitMode === 'Fit height') {
-      return ImageFit.Fill;
-    }
-    // 'Fit width' — default
     return ImageFit.Contain;
   }
 
   private imageWidth(): string {
-    if (this.fitMode === 'Fit height') {
+    const normalized = normalizePageScalingOption(this.fitMode);
+    if (normalized === 'Fit height' || normalized === 'Actual size' || normalized === 'Fixed scale') {
       return 'auto';
     }
     return '100%';
   }
 
   private imageHeight(): string {
-    if (this.fitMode === 'Fit width') {
+    const normalized = normalizePageScalingOption(this.fitMode);
+    if (normalized === 'Fit width' || normalized === 'Actual size' || normalized === 'Fixed scale') {
       return 'auto';
     }
     return '100%';
+  }
+
+  private startAlignment(): Alignment {
+    const normalized = normalizeStartPositionOption(this.startPosition);
+    if (normalized === 'Top left') {
+      return Alignment.TopStart;
+    }
+    if (normalized === 'Top right') {
+      return Alignment.TopEnd;
+    }
+    if (normalized === 'Bottom left') {
+      return Alignment.BottomStart;
+    }
+    if (normalized === 'Bottom right') {
+      return Alignment.BottomEnd;
+    }
+    return Alignment.Center;
   }
 
   private readAreaSize(value: Length): number {
@@ -1402,7 +1423,7 @@ struct ReaderImageViewport {
   }
 
   build() {
-    Stack({ alignContent: Alignment.Center }) {
+    Stack({ alignContent: this.startAlignment() }) {
       if (this.imageUrl().length > 0) {
         Image(this.imageUrl())
           .width(this.imageWidth())

@@ -159,7 +159,7 @@ export function normalizeReaderScreenRotationSetting(value: string): string {
   if (value === '3' || value === 'Sensor' || value === 'Auto rotate') {
     return 'Auto rotate';
   }
-  return 'System';
+  return 'Default';
 }
 
 export async function restoreAppWindowState(target: window.Window): Promise<void> {
