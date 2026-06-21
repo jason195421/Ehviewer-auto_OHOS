@@ -1151,27 +1151,37 @@ export struct DownloadScene {
                       if (galleryListMode() === 'Thumb') {
                         GalleryThumbCard({ gallery: item, selected: this.isDownloadSelected(item.gid) })
                           .width('100%')
+                          .onClick(() => {
+                            this.handleDownloadCardTap(item);
+                          })
+                          .gesture(LongPressGesture({ repeat: false }).onAction(() => {
+                            this.toggleDownloadSelection(item);
+                          }))
                       } else {
                         GalleryListRow({ gallery: item, selected: this.isDownloadSelected(item.gid) })
                           .width('100%')
+                          .onClick(() => {
+                            this.handleDownloadCardTap(item);
+                          })
+                          .gesture(LongPressGesture({ repeat: false }).onAction(() => {
+                            this.toggleDownloadSelection(item);
+                          }))
                       }
-                      DownloadCardStatus({
-                        item: item,
-                        onProgressTap: (downloadItem: DownloadInfo) => {
-                          this.toggleItemFromProgress(downloadItem);
-                        }
-                      })
-                        .margin({ top: 4 })
+                      if (item.state !== DownloadState.Finish) {
+                        DownloadCardStatus({
+                          item: item,
+                          onStatusTap: (downloadItem: DownloadInfo) => {
+                            this.toggleItemFromProgress(downloadItem);
+                          }
+                        })
+                          .margin({ top: 4 })
+                          .transition(TransitionEffect.move(TransitionEdge.TOP)
+                            .animation({ duration: 180, curve: Curve.EaseOut }))
+                      }
                     }
                     .width(this.downloadCardWidth())
                     .margin({ right: colIndex < row.length - 1 ? this.downloadCardGap() : 0 })
                     .animation({ duration: 220, curve: Curve.EaseOut })
-                    .onClick(() => {
-                      this.handleDownloadCardTap(item);
-                    })
-                    .gesture(LongPressGesture({ repeat: false }).onAction(() => {
-                      this.toggleDownloadSelection(item);
-                    }))
                   }, (item: DownloadInfo) => item.gid.toString())
                 }
                 .width('100%')
@@ -1359,15 +1369,11 @@ struct DownloadToolColumn {
 
 @Component
 struct DownloadCardStatus {
-  item: DownloadInfo = createEmptyDownloadInfo();
-  onProgressTap: (item: DownloadInfo) => void = (_item: DownloadInfo) => {};
+  @Prop item: DownloadInfo = createEmptyDownloadInfo();
+  onStatusTap: (item: DownloadInfo) => void = (_item: DownloadInfo) => {};
 
   private isDownloading(): boolean {
     return this.item.state === DownloadState.Downloading;
-  }
-
-  private showProgressBar(): boolean {
-    return this.item.state !== DownloadState.Finish;
   }
 
   private progressPercent(): string {
@@ -1414,34 +1420,30 @@ struct DownloadCardStatus {
       }
       .width('100%')
 
-      if (this.showProgressBar()) {
-        Stack({ alignContent: Alignment.Start }) {
-          Row()
-            .height(4)
-            .width('100%')
-            .backgroundColor(themeDividerColor())
-            .borderRadius(2)
-          Row()
-            .height(4)
-            .width(this.progressPercent())
-            .backgroundColor(downloadStateColor(this.item.state))
-            .borderRadius(2)
-        }
-        .width('100%')
-        .height(14)
-        .margin({ top: 1 })
-        .clip(true)
-        .onClick(() => {
-          this.onProgressTap(this.item);
-        })
-        .transition(TransitionEffect.move(TransitionEdge.TOP)
-          .animation({ duration: 180, curve: Curve.EaseOut }))
+      Stack({ alignContent: Alignment.Start }) {
+        Row()
+          .height(4)
+          .width('100%')
+          .backgroundColor(themeDividerColor())
+          .borderRadius(2)
+        Row()
+          .height(4)
+          .width(this.progressPercent())
+          .backgroundColor(downloadStateColor(this.item.state))
+          .borderRadius(2)
       }
+      .width('100%')
+      .height(14)
+      .margin({ top: 1 })
+      .clip(true)
     }
     .width('100%')
     .padding({ left: 8, right: 8, top: 6, bottom: 7 })
     .backgroundColor(themeSurface())
     .borderRadius(6)
+    .onClick(() => {
+      this.onStatusTap(this.item);
+    })
     .animation({ duration: 180, curve: Curve.EaseOut })
   }
 }

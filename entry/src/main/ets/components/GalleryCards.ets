@@ -27,7 +27,7 @@ import {
 @Component
 export struct GalleryListRow {
   gallery: GalleryInfo = createEmptyGallery();
-  selected: boolean = false;
+  @Prop selected: boolean = false;
 
   private cardHeight(): number {
     return galleryThumbHeight();
@@ -349,7 +349,7 @@ export struct GalleryThumb {
 @Component
 export struct GalleryThumbCard {
   gallery: GalleryInfo = createEmptyGallery();
-  selected: boolean = false;
+  @Prop selected: boolean = false;
 
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
