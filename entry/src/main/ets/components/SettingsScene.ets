@@ -49,7 +49,7 @@ import {
   themedSelectSelectedOptionBackground,
   themedSelectSelectedOptionText
 } from '../shared/EhSelectStyle';
-import { EhBackupBundle, SettingsHeaderItem, SettingsRowItem, SettingsPanel, SETTINGS_HEADERS, uiText, uiValue, uiStatusText, setActiveBackHandler, padTwo, getAbilityContext, downloadSizeText, settingsPanelTitle, settingsRowsForPanel, settingEntryValue, cloneStringOptions, settingMigrationMessage, isValidProxyPortText, formatNetworkDiagnostics } from '../shared/EhShared';
+import { EhBackupBundle, SettingsHeaderItem, SettingsRowItem, SettingsPanel, SETTINGS_HEADERS, uiText, uiValue, uiStatusText, setActiveBackHandler, padTwo, getAbilityContext, downloadSizeText, settingsPanelTitle, settingsRowsForPanel, settingEntryValue, cloneStringOptions, settingMigrationMessage, isValidProxyPortText, formatNetworkDiagnostics, normalizeAutoTransferTimeOption, normalizeBrightnessLevelOption } from '../shared/EhShared';
 import { FilterPanel, MigrationScene } from './DownloadMigrationScenes';
 import { AppSubToolbar, AppToolbar } from './NavigationComponents';
 import { collectWebCookies, hasLoginCookie, SessionScene, syncCookieHeaderToWebView } from './SessionScene';
@@ -1347,6 +1347,12 @@ export struct SettingsStaticRow {
           }
           .alignItems(VerticalAlign.Center)
           .margin({ left: 12 })
+        } else if (this.row.type === 'slider') {
+          SettingsInlineSlider({
+            row: this.row,
+            onOptionSelect: this.onOptionSelect
+          })
+            .margin({ left: 12 })
         } else if (this.row.type === 'list' && this.row.options !== undefined && this.row.options.length > 0) {
           Select(buildSelectOptions(this.row.options))
             .id('settings-select-' + this.renderRevision.toString() + '-' + this.row.key + '-' + this.row.value)
@@ -1390,10 +1396,46 @@ export struct SettingsStaticRow {
     .backgroundColor(themeSurface())
     .borderRadius(6)
     .onClick(() => {
-      if (this.row.type !== 'input' && this.row.type !== 'switch' && this.row.type !== 'list' && this.row.key !== 'theme') {
+      if (this.row.type !== 'input' && this.row.type !== 'switch' && this.row.type !== 'list' &&
+        this.row.type !== 'slider' && this.row.key !== 'theme') {
         this.onTap();
       }
     })
+  }
+}
+
+@Component
+struct SettingsInlineSlider {
+  row: SettingsRowItem = { title: '', summary: '', value: '', type: '' };
+  onOptionSelect: (key: string, value: string) => void = () => {};
+  @State liveValue: number = 0;
+
+  aboutToAppear(): void {
+    this.liveValue = settingsSliderNumberValue(this.row);
+  }
+
+  build() {
+    Row() {
+      Slider({
+        value: this.liveValue,
+        min: settingsSliderMin(this.row),
+        max: settingsSliderMax(this.row),
+        step: 1
+      })
+        .width(150)
+        .onChange((value: number, _mode: SliderChangeMode) => {
+          this.liveValue = Math.round(value);
+          if (this.row.key !== undefined) {
+            this.onOptionSelect(this.row.key, settingsSliderTextValue(this.row, this.liveValue));
+          }
+        })
+      Text(settingsSliderDisplayText(this.row, this.liveValue))
+        .fontSize(12)
+        .fontColor(themePrimaryColor())
+        .width(42)
+        .textAlign(TextAlign.End)
+    }
+    .alignItems(VerticalAlign.Center)
   }
 }
 
@@ -1402,6 +1444,35 @@ function settingsRowActionText(row: SettingsRowItem): string {
     return uiValue(row.value);
   }
   return uiText('Open');
+}
+
+function settingsSliderNumberValue(row: SettingsRowItem): number {
+  if (row.key === 'start_transfer_time') {
+    return Number.parseInt(normalizeAutoTransferTimeOption(row.value));
+  }
+  if (row.key === 'screen_lightness') {
+    return Number.parseInt(normalizeBrightnessLevelOption(row.value));
+  }
+  return 0;
+}
+
+function settingsSliderMin(row: SettingsRowItem): number {
+  return row.key === 'start_transfer_time' ? 1 : 0;
+}
+
+function settingsSliderMax(row: SettingsRowItem): number {
+  return row.key === 'start_transfer_time' ? 20 : 100;
+}
+
+function settingsSliderTextValue(row: SettingsRowItem, value: number): string {
+  if (row.key === 'start_transfer_time') {
+    return normalizeAutoTransferTimeOption(Math.max(1, Math.min(20, Math.round(value))).toString() + 's');
+  }
+  return normalizeBrightnessLevelOption(Math.max(0, Math.min(100, Math.round(value))).toString() + '%');
+}
+
+function settingsSliderDisplayText(row: SettingsRowItem, value: number): string {
+  return uiValue(settingsSliderTextValue(row, value));
 }
 
 function buildSelectOptions(options: string[]): SelectOption[] {
@@ -1422,6 +1493,9 @@ function optionIndex(options: string[], value: string): number {
 }
 
 function settingsRowRenderKey(row: SettingsRowItem): string {
+  if (row.type === 'slider') {
+    return row.title + ':' + row.type;
+  }
   return row.title + ':' + row.value + ':' + row.type;
 }
 

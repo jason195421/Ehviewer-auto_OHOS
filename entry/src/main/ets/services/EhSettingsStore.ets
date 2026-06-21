@@ -32,7 +32,7 @@ export function defaultSettingEntries(): SettingEntry[] {
     { key: 'reading_direction', value: 'Right to left' },
     { key: 'page_scaling', value: 'Fit screen' },
     { key: 'start_position', value: 'Top right' },
-    { key: 'start_transfer_time', value: 'Off' },
+    { key: 'start_transfer_time', value: '5s' },
     { key: 'reader_standalone', value: 'On' },
     { key: 'keep_screen_on', value: 'Off' },
     { key: 'gallery_show_clock', value: 'On' },

@@ -27,6 +27,8 @@ import {
   normalizePageScalingOption,
   normalizeReadingDirectionOption,
   normalizeStartPositionOption,
+  normalizeAutoTransferTimeOption,
+  normalizeBrightnessLevelOption,
   uiStatusText,
   uiText,
   uiValue
@@ -40,7 +42,6 @@ const READER_MIN_SCALE: number = 1;
 const READER_MAX_SCALE: number = 4;
 const READER_DOUBLE_TAP_SCALE: number = 2.25;
 const SLIDER_AUTO_HIDE_DELAY: number = 3000;
-const READER_AUTO_TRANSFER_OFF: string = 'Off';
 const READER_OFFSCREEN_RENDER_COUNT: number = 2;
 
 export interface ReaderPageState {
@@ -48,6 +49,13 @@ export interface ReaderPageState {
   page: GalleryPage;
 }
 
+interface ReaderImageCompleteEvent {
+  width: number;
+  height: number;
+  componentWidth: number;
+  componentHeight: number;
+  loadingStatus: number;
+}
 
 @Observed
 class ReaderPreviewModel {
@@ -383,6 +391,7 @@ export struct ReaderScene {
   private sliderHideTimer: number = -1;
   private readerPageIndexesSource: ArrayDataSource<number> = new ArrayDataSource<number>([]);
   private readerPageIndexesCount: number = -1;
+  private readerPageIndexesReversed: boolean = false;
 
   // Menu settings state (reflects ehSettingsStore, applied on menu close)
   @State menuScreenRotation: string = 'Default';
@@ -395,7 +404,7 @@ export struct ReaderScene {
   @State menuShowBattery: boolean = true;
   @State menuReadingFullscreen: boolean = true;
   @State menuVolumePage: boolean = false;
-  @State menuAutoTransferTime: string = READER_AUTO_TRANSFER_OFF;
+  @State menuAutoTransferTime: string = '5s';
   @State menuCustomBrightness: boolean = false;
   @State menuBrightnessLevel: string = '50%';
   private readerWindowActive: boolean = false;
@@ -455,7 +464,8 @@ export struct ReaderScene {
   private applyReaderWindowSettings(): void {
     const keepOn = ehSettingsStore.getValue('keep_screen_on', 'Off') === 'On';
     const orientation = readerScreenRotationSetting();
-    this.applyReaderWindowSettingsAsync(keepOn, orientation).catch(() => {});
+    const fullscreen = ehSettingsStore.getValue('reading_fullscreen', 'On') === 'On';
+    this.applyReaderWindowSettingsAsync(keepOn, orientation, fullscreen).catch(() => {});
   }
 
   private async obtainReaderWindow(): Promise<window.Window | undefined> {
@@ -478,14 +488,14 @@ export struct ReaderScene {
     return getMainWindow();
   }
 
-  private async applyReaderWindowSettingsAsync(keepOn: boolean, orientation: string): Promise<void> {
-    await this.applyReaderWindowSettingsOnce(keepOn, orientation);
+  private async applyReaderWindowSettingsAsync(keepOn: boolean, orientation: string, fullscreen: boolean): Promise<void> {
+    await this.applyReaderWindowSettingsOnce(keepOn, orientation, fullscreen);
     this.scheduleReaderChromeMode(80);
     this.scheduleReaderChromeMode(260);
     this.scheduleReaderChromeMode(620);
   }
 
-  private async applyReaderWindowSettingsOnce(keepOn: boolean, orientation: string): Promise<void> {
+  private async applyReaderWindowSettingsOnce(keepOn: boolean, orientation: string, fullscreen: boolean): Promise<void> {
     const win = await this.obtainReaderWindow();
     if (win === undefined) {
       return;
@@ -493,7 +503,7 @@ export struct ReaderScene {
     if (this.restoreAppChromeOnExit) {
       setEmbeddedReaderActive(true);
     }
-    await applyReaderWindowState(win, keepOn, readerOrientationFromSetting(orientation));
+    await applyReaderWindowState(win, keepOn, readerOrientationFromSetting(orientation), fullscreen);
   }
 
   private async restoreWindowSettingsAsync(): Promise<void> {
@@ -520,7 +530,8 @@ export struct ReaderScene {
       }
       const keepOn = ehSettingsStore.getValue('keep_screen_on', 'Off') === 'On';
       const orientation = readerScreenRotationSetting();
-      this.applyReaderWindowSettingsOnce(keepOn, orientation).catch(() => {});
+      const fullscreen = ehSettingsStore.getValue('reading_fullscreen', 'On') === 'On';
+      this.applyReaderWindowSettingsOnce(keepOn, orientation, fullscreen).catch(() => {});
     }, delay);
   }
 
@@ -532,8 +543,16 @@ export struct ReaderScene {
 
   private syncDirectionState(): void {
     const dir = normalizeReadingDirectionOption(ehSettingsStore.getValue('reading_direction', 'Right to left'));
+    const oldReversed = this.swiperReversed;
     this.swiperVertical = dir === 'Top to bottom';
     this.swiperReversed = dir === 'Right to left';
+    if (oldReversed !== this.swiperReversed) {
+      this.readerPageIndexesCount = -1;
+      this.syncReaderPageIndexSource();
+      try {
+        this.swiperController.changeIndex(this.visualIndexForPageIndex(this.currentIndex), false);
+      } catch (e) {}
+    }
   }
 
   private refreshBattery(): void {
@@ -555,15 +574,21 @@ export struct ReaderScene {
     this.imageActionsVisible = false;
     this.scheduleAutoTransfer();
     try {
-      this.swiperController.changeIndex(this.pageIndex, false);
+      this.swiperController.changeIndex(this.visualIndexForPageIndex(this.pageIndex), false);
     } catch (e) {}
   }
 
   private pageIndexes(): number[] {
     const count = this.totalPages <= 0 ? 1 : this.totalPages;
     const pages: number[] = [];
-    for (let i = 0; i < count; i++) {
-      pages.push(i);
+    if (this.swiperReversed) {
+      for (let i = count - 1; i >= 0; i--) {
+        pages.push(i);
+      }
+    } else {
+      for (let i = 0; i < count; i++) {
+        pages.push(i);
+      }
     }
     return pages;
   }
@@ -591,11 +616,24 @@ export struct ReaderScene {
 
   private syncReaderPageIndexSource(): void {
     const count = this.totalPages <= 0 ? 1 : this.totalPages;
-    if (count === this.readerPageIndexesCount) {
+    if (count === this.readerPageIndexesCount && this.readerPageIndexesReversed === this.swiperReversed) {
       return;
     }
     this.readerPageIndexesCount = count;
+    this.readerPageIndexesReversed = this.swiperReversed;
     this.readerPageIndexesSource.setItems(this.pageIndexes());
+  }
+
+  private visualIndexForPageIndex(index: number): number {
+    const count = this.totalPages <= 0 ? 1 : this.totalPages;
+    const pageIndex = Math.max(0, Math.min(count - 1, index));
+    return this.swiperReversed ? count - 1 - pageIndex : pageIndex;
+  }
+
+  private pageIndexForVisualIndex(index: number): number {
+    const count = this.totalPages <= 0 ? 1 : this.totalPages;
+    const visualIndex = Math.max(0, Math.min(count - 1, index));
+    return this.swiperReversed ? count - 1 - visualIndex : visualIndex;
   }
 
   private issueViewportCommand(command: string): void {
@@ -646,9 +684,9 @@ export struct ReaderScene {
     this.menuShowBattery = ehSettingsStore.getValue('gallery_show_battery', 'On') === 'On';
     this.menuReadingFullscreen = ehSettingsStore.getValue('reading_fullscreen', 'On') === 'On';
     this.menuVolumePage = ehSettingsStore.getValue('volume_page', 'Off') === 'On';
-    this.menuAutoTransferTime = ehSettingsStore.getValue('start_transfer_time', READER_AUTO_TRANSFER_OFF);
+    this.menuAutoTransferTime = normalizeAutoTransferTimeOption(ehSettingsStore.getValue('start_transfer_time', '5s'));
     this.menuCustomBrightness = ehSettingsStore.getValue('custom_screen_lightness', 'Off') === 'On';
-    this.menuBrightnessLevel = ehSettingsStore.getValue('screen_lightness', '50%');
+    this.menuBrightnessLevel = normalizeBrightnessLevelOption(ehSettingsStore.getValue('screen_lightness', '50%'));
     this.menuVisible = true;
     this.clearAutoTransferTimer();
     this.autoTransferPlaying = false;
@@ -665,9 +703,9 @@ export struct ReaderScene {
     ehSettingsStore.setValue('gallery_show_battery', this.menuShowBattery ? 'On' : 'Off');
     ehSettingsStore.setValue('reading_fullscreen', this.menuReadingFullscreen ? 'On' : 'Off');
     ehSettingsStore.setValue('volume_page', this.menuVolumePage ? 'On' : 'Off');
-    ehSettingsStore.setValue('start_transfer_time', this.menuAutoTransferTime);
+    ehSettingsStore.setValue('start_transfer_time', normalizeAutoTransferTimeOption(this.menuAutoTransferTime));
     ehSettingsStore.setValue('custom_screen_lightness', this.menuCustomBrightness ? 'On' : 'Off');
-    ehSettingsStore.setValue('screen_lightness', this.menuBrightnessLevel);
+    ehSettingsStore.setValue('screen_lightness', normalizeBrightnessLevelOption(this.menuBrightnessLevel));
     this.fitMode = normalizePageScalingOption(this.menuPageScaling);
     this.startPosition = normalizeStartPositionOption(this.menuStartPosition);
     this.issueViewportCommand('reset');
@@ -729,10 +767,7 @@ export struct ReaderScene {
   }
 
   private autoTransferDelayMs(): number {
-    const value = ehSettingsStore.getValue('start_transfer_time', READER_AUTO_TRANSFER_OFF);
-    if (value === READER_AUTO_TRANSFER_OFF) {
-      return 0;
-    }
+    const value = normalizeAutoTransferTimeOption(ehSettingsStore.getValue('start_transfer_time', '5s'));
     const seconds = Number.parseInt(value);
     if (Number.isNaN(seconds) || seconds <= 0) {
       return 0;
@@ -1003,12 +1038,13 @@ export struct ReaderScene {
       this.scheduleAutoTransfer();
     }
     try {
-      this.swiperController.changeIndex(target, true);
+      this.swiperController.changeIndex(this.visualIndexForPageIndex(target), true);
     } catch (e) {}
     this.onJump(target);
   }
 
-  private onSwiperChange(index: number): void {
+  private onSwiperChange(visualIndex: number): void {
+    const index = this.pageIndexForVisualIndex(visualIndex);
     if (index === this.currentIndex) {
       return;
     }
@@ -1070,7 +1106,7 @@ export struct ReaderScene {
             .height('100%')
         }, (index: number) => index.toString())
       }
-      .index(this.currentIndex)
+      .index(this.visualIndexForPageIndex(this.currentIndex))
       .cachedCount(this.readerRenderCacheCount())
       .indicator(false)
       .loop(false)
@@ -1284,10 +1320,12 @@ export struct ReaderScene {
               ReaderMenuSlider({
                 label: uiText('Auto transfer time'),
                 value: readerAutoTransferSliderValue(this.menuAutoTransferTime),
-                min: 0,
-                max: readerAutoTransferOptions().length - 1,
+                min: 1,
+                max: 20,
                 step: 1,
-                displayText: uiValue(this.menuAutoTransferTime),
+                valueText: (value: number) => {
+                  return uiValue(readerAutoTransferValue(value));
+                },
                 onChange: (value: number) => {
                   this.menuAutoTransferTime = readerAutoTransferValue(value);
                 }
@@ -1350,7 +1388,9 @@ export struct ReaderScene {
                   min: 0,
                   max: 100,
                   step: 1,
-                  displayText: readerBrightnessDisplayText(this.menuBrightnessLevel),
+                  valueText: (value: number) => {
+                    return readerBrightnessValue(value);
+                  },
                   onChange: (value: number) => {
                     this.menuBrightnessLevel = readerBrightnessValue(value);
                     this.applyBrightness().catch(() => {});
@@ -1518,12 +1558,21 @@ struct ReaderMenuSelect {
 @Component
 struct ReaderMenuSlider {
   label: string = '';
-  value: number = 0;
+  @Prop @Watch('onValueChange') value: number = 0;
   min: number = 0;
   max: number = 100;
   step: number = 1;
-  displayText: string = '';
+  valueText: (v: number) => string = (v: number): string => v.toString();
   onChange: (v: number) => void = () => {};
+  @State liveValue: number = 0;
+
+  aboutToAppear(): void {
+    this.liveValue = this.value;
+  }
+
+  onValueChange(): void {
+    this.liveValue = this.value;
+  }
 
   build() {
     Column({ space: 8 }) {
@@ -1532,7 +1581,7 @@ struct ReaderMenuSlider {
           .fontSize(14)
           .fontColor('#E5E7EB')
           .layoutWeight(1)
-        Text(this.displayText)
+        Text(this.valueText(this.liveValue))
           .fontSize(13)
           .fontColor('#CBD5E1')
           .width(54)
@@ -1542,14 +1591,15 @@ struct ReaderMenuSlider {
       .alignItems(VerticalAlign.Center)
 
       Slider({
-        value: this.value,
+        value: this.liveValue,
         min: this.min,
         max: this.max,
         step: this.step
       })
         .width('100%')
         .onChange((value: number, _mode: SliderChangeMode) => {
-          this.onChange(value);
+          this.liveValue = Math.max(this.min, Math.min(this.max, Math.round(value)));
+          this.onChange(this.liveValue);
         })
     }
     .width('100%')
@@ -1566,24 +1616,12 @@ function readerMenuOptionIndex(options: string[], value: string): number {
   return 0;
 }
 
-function readerAutoTransferOptions(): string[] {
-  return [READER_AUTO_TRANSFER_OFF, '2s', '5s', '10s', '15s'];
-}
-
 function readerAutoTransferSliderValue(value: string): number {
-  const options = readerAutoTransferOptions();
-  for (let i = 0; i < options.length; i++) {
-    if (options[i] === value) {
-      return i;
-    }
-  }
-  return 0;
+  return Number.parseInt(normalizeAutoTransferTimeOption(value));
 }
 
 function readerAutoTransferValue(value: number): string {
-  const options = readerAutoTransferOptions();
-  const index = Math.max(0, Math.min(options.length - 1, Math.round(value)));
-  return options[index];
+  return Math.max(1, Math.min(20, Math.round(value))).toString() + 's';
 }
 
 function readerBrightnessSliderValue(value: string): number {
@@ -1595,11 +1633,7 @@ function readerBrightnessSliderValue(value: string): number {
 }
 
 function readerBrightnessValue(value: number): string {
-  return Math.max(0, Math.min(100, Math.round(value))).toString() + '%';
-}
-
-function readerBrightnessDisplayText(value: string): string {
-  return readerBrightnessSliderValue(value).toString() + '%';
+  return normalizeBrightnessLevelOption(Math.max(0, Math.min(100, Math.round(value))).toString() + '%');
 }
 
 function stripFileScheme(path: string): string {
@@ -1653,7 +1687,7 @@ struct ReaderImageViewport {
   @Prop @Watch('onImageSourceChange') page: GalleryPage = createEmptyPage();
   @Prop statusText: string = '';
   @Prop @Watch('onImageSourceChange') preferOriginal: boolean = false;
-  @Prop fitMode: string = 'Fit screen';
+  @Prop @Watch('onFitModeChange') fitMode: string = 'Fit screen';
   @Prop startPosition: string = 'Top right';
   @Prop isActive: boolean = false;
   @Prop command: string = '';
@@ -1667,6 +1701,10 @@ struct ReaderImageViewport {
   @State imageModel: ReaderPreviewModel = new ReaderPreviewModel();
   @State completedImageUrl: string = '';
   @State failedImageUrl: string = '';
+  @State sourceImageWidth: number = 0;
+  @State sourceImageHeight: number = 0;
+  @State displayImageWidth: number = 1;
+  @State displayImageHeight: number = 1;
   private lastCommandVersion: number = -1;
 
   aboutToAppear(): void {
@@ -1725,30 +1763,63 @@ struct ReaderImageViewport {
     if (this.failedImageUrl !== url) {
       this.failedImageUrl = '';
     }
+    this.sourceImageWidth = 0;
+    this.sourceImageHeight = 0;
+    this.updateDisplayImageSize();
+  }
+
+  private onFitModeChange(): void {
+    this.imageModel.reset();
+    this.updateDisplayImageSize();
+    this.reportState();
   }
 
   private imageFit(): ImageFit {
-    const normalized = normalizePageScalingOption(this.fitMode);
-    if (normalized === 'Actual size' || normalized === 'Fixed scale') {
-      return ImageFit.None;
-    }
-    return ImageFit.Contain;
+    return ImageFit.Fill;
   }
 
-  private imageWidth(): string {
-    const normalized = normalizePageScalingOption(this.fitMode);
-    if (normalized === 'Fit height' || normalized === 'Actual size' || normalized === 'Fixed scale') {
-      return 'auto';
+  private imageDisplayWidth(): number | string {
+    if (this.displayImageWidth <= 1) {
+      return '100%';
     }
-    return '100%';
+    return this.displayImageWidth;
   }
 
-  private imageHeight(): string {
-    const normalized = normalizePageScalingOption(this.fitMode);
-    if (normalized === 'Fit width' || normalized === 'Actual size' || normalized === 'Fixed scale') {
-      return 'auto';
+  private imageDisplayHeight(): number | string {
+    if (this.displayImageHeight <= 1) {
+      return '100%';
     }
-    return '100%';
+    return this.displayImageHeight;
+  }
+
+  private updateDisplayImageSize(): void {
+    const componentWidth = this.imageModel.componentWidth;
+    const componentHeight = this.imageModel.componentHeight;
+    if (componentWidth <= 0 || componentHeight <= 0) {
+      return;
+    }
+    const sourceWidth = this.sourceImageWidth > 0 ? this.sourceImageWidth : componentWidth;
+    const sourceHeight = this.sourceImageHeight > 0 ? this.sourceImageHeight : componentHeight;
+    let displayWidth = componentWidth;
+    let displayHeight = componentHeight;
+    const normalized = normalizePageScalingOption(this.fitMode);
+    if (normalized === 'Fit width') {
+      displayWidth = componentWidth;
+      displayHeight = componentWidth * sourceHeight / sourceWidth;
+    } else if (normalized === 'Fit height') {
+      displayHeight = componentHeight;
+      displayWidth = componentHeight * sourceWidth / sourceHeight;
+    } else if (normalized === 'Fit screen') {
+      const scale = Math.min(componentWidth / sourceWidth, componentHeight / sourceHeight);
+      displayWidth = sourceWidth * scale;
+      displayHeight = sourceHeight * scale;
+    } else {
+      displayWidth = sourceWidth;
+      displayHeight = sourceHeight;
+    }
+    this.displayImageWidth = Math.max(1, displayWidth);
+    this.displayImageHeight = Math.max(1, displayHeight);
+    this.imageModel.setImageSize(this.displayImageWidth, this.displayImageHeight);
   }
 
   private startAlignment(): Alignment {
@@ -1778,7 +1849,7 @@ struct ReaderImageViewport {
       return;
     }
     this.imageModel.setComponentSize(width, height);
-    this.imageModel.setImageSize(width, height);
+    this.updateDisplayImageSize();
     this.reportState();
   }
 
@@ -1808,12 +1879,17 @@ struct ReaderImageViewport {
     Stack({ alignContent: this.startAlignment() }) {
       if (this.imageUrl().length > 0) {
         Image(this.imageUrl())
-          .width(this.imageWidth())
-          .height(this.imageHeight())
+          .width(this.imageDisplayWidth())
+          .height(this.imageDisplayHeight())
           .objectFit(this.imageFit())
           .backgroundColor('#050608')
           .opacity(this.failedImageUrl === this.imageUrl() ? 0 : 1)
-          .onComplete(() => {
+          .onComplete((event?: ReaderImageCompleteEvent) => {
+            if (event !== undefined && event.width > 0 && event.height > 0) {
+              this.sourceImageWidth = event.width;
+              this.sourceImageHeight = event.height;
+              this.updateDisplayImageSize();
+            }
             this.completedImageUrl = this.imageUrl();
             this.failedImageUrl = '';
           })

@@ -1667,7 +1667,7 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
       optionSettingsRow('reading_direction', 'Reading direction', 'Left-to-right, right-to-left or vertical reader movement', entries, ['Left to right', 'Right to left', 'Top to bottom']),
       optionSettingsRow('page_scaling', 'Page scaling', 'Fit width, fit height or original page scaling', entries, ['Actual size', 'Fit width', 'Fit height', 'Fit screen', 'Fixed scale']),
       optionSettingsRow('start_position', 'Start position', 'Where a gallery starts when opened', entries, ['Top left', 'Top right', 'Bottom left', 'Bottom right', 'Center']),
-      optionSettingsRow('start_transfer_time', 'Auto transfer time', 'Automatic next-page delay from original seekbar preference', entries, ['Off', '2s', '5s', '10s', '15s']),
+      optionSettingsRow('start_transfer_time', 'Auto transfer time', 'Automatic next-page delay from original seekbar preference', entries, readerAutoTransferTimeOptions()),
       optionSettingsRow('reader_standalone', 'Standalone reader', 'Open reader in a standalone ability', entries, ON_OFF_OPTIONS),
       optionSettingsRow('keep_screen_on', 'Keep screen on', 'Prevent screen sleep while reading', entries, ON_OFF_OPTIONS),
       optionSettingsRow('gallery_show_clock', 'Show clock', 'Show clock overlay in the reader', entries, ON_OFF_OPTIONS),
@@ -1676,7 +1676,7 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
       optionSettingsRow('volume_page', 'Volume page', 'Use volume buttons to turn pages', entries, ON_OFF_OPTIONS),
       optionSettingsRow('reading_fullscreen', 'Reading fullscreen', 'Hide system chrome while reading', entries, ON_OFF_OPTIONS),
       optionSettingsRow('custom_screen_lightness', 'Custom brightness', 'Enable custom reader brightness', entries, ON_OFF_OPTIONS),
-      optionSettingsRow('screen_lightness', 'Screen lightness', 'Custom reader brightness when enabled', entries, ['0%', '25%', '50%', '75%', '100%'])
+      optionSettingsRow('screen_lightness', 'Screen lightness', 'Custom reader brightness when enabled', entries, readerBrightnessLevelOptions())
     ];
   }
 
@@ -1753,14 +1753,31 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
 
 export const ON_OFF_OPTIONS: string[] = ['On', 'Off'];
 
+export function readerAutoTransferTimeOptions(): string[] {
+  const options: string[] = [];
+  for (let i = 1; i <= 20; i++) {
+    options.push(i.toString() + 's');
+  }
+  return options;
+}
+
+export function readerBrightnessLevelOptions(): string[] {
+  const options: string[] = [];
+  for (let i = 0; i <= 100; i++) {
+    options.push(i.toString() + '%');
+  }
+  return options;
+}
+
 export function optionSettingsRow(key: string, title: string, summary: string, entries: SettingEntry[], options: string[]): SettingsRowItem {
   const rawValue = settingEntryValue(entries, key, options.length > 0 ? options[0] : '');
+  const sliderRow = key === 'start_transfer_time' || key === 'screen_lightness';
   return {
     key: key,
     title: title,
     summary: summary,
     value: normalizeReaderSettingOption(key, rawValue),
-    type: options.length === 2 && options[0] === 'On' && options[1] === 'Off' ? 'switch' : 'list',
+    type: sliderRow ? 'slider' : options.length === 2 && options[0] === 'On' && options[1] === 'Off' ? 'switch' : 'list',
     options: options
   };
 }
@@ -1833,7 +1850,29 @@ function normalizeReaderSettingOption(key: string, value: string): string {
   if (key === 'start_position') {
     return normalizeStartPositionOption(value);
   }
+  if (key === 'start_transfer_time') {
+    return normalizeAutoTransferTimeOption(value);
+  }
+  if (key === 'screen_lightness') {
+    return normalizeBrightnessLevelOption(value);
+  }
   return value;
+}
+
+export function normalizeAutoTransferTimeOption(value: string): string {
+  const seconds = Number.parseInt(value);
+  if (Number.isNaN(seconds)) {
+    return '5s';
+  }
+  return Math.max(1, Math.min(20, seconds)).toString() + 's';
+}
+
+export function normalizeBrightnessLevelOption(value: string): string {
+  const percent = Number.parseInt(value);
+  if (Number.isNaN(percent)) {
+    return '50%';
+  }
+  return Math.max(0, Math.min(100, percent)).toString() + '%';
 }
 
 export function textSettingsRow(key: string, title: string, summary: string, entries: SettingEntry[], fallback: string): SettingsRowItem {

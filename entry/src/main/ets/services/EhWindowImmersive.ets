@@ -10,6 +10,7 @@ type SystemBarName = 'status' | 'navigation';
 
 const VISIBLE_SYSTEM_BARS: SystemBarName[] = ['status', 'navigation'];
 const HIDDEN_SYSTEM_BARS: SystemBarName[] = [];
+const READER_STATUS_BAR_VISIBLE_SYSTEM_BARS: SystemBarName[] = ['status'];
 const savedReaderPreferredOrientations: Map<number, window.Orientation> = new Map();
 
 export function rememberMainWindow(win: window.Window): void {
@@ -158,23 +159,26 @@ async function applyAppChromeImmersiveModeAsync(target: window.Window): Promise<
 }
 
 export async function applyReaderWindowState(target: window.Window, keepScreenOn: boolean,
-  orientation: window.Orientation): Promise<void> {
+  orientation: window.Orientation, fullscreen: boolean = true): Promise<void> {
   rememberWindowPreferredOrientation(target);
   await setWindowKeepScreenOnQuietly(target, keepScreenOn, 'set reader keep screen on');
   await setPreferredOrientationQuietly(target, orientation, 'set reader orientation');
   await setWindowLayoutFullScreenQuietly(target, true, 'set reader full-screen layout');
-  await setWindowSystemBarEnableQuietly(target, HIDDEN_SYSTEM_BARS, 'hide reader system bar set');
+  await setWindowSystemBarEnableQuietly(target, fullscreen ? HIDDEN_SYSTEM_BARS : READER_STATUS_BAR_VISIBLE_SYSTEM_BARS,
+    fullscreen ? 'hide reader system bar set' : 'show reader status bar');
   await setWindowSystemBarPropertiesQuietly(target, {
     statusBarColor: themeTransparentColor(),
     navigationBarColor: themeTransparentColor(),
-    isStatusBarLightIcon: true,
-    isNavigationBarLightIcon: true
+    isStatusBarLightIcon: fullscreen || isDarkTheme(),
+    isNavigationBarLightIcon: true,
+    statusBarContentColor: themeSystemBarContentColor()
   }, 'set reader transparent system bars');
 }
 
 export async function applyReaderWindowStateFromSettings(target: window.Window): Promise<void> {
   const keepScreenOn = ehSettingsStore.getValue('keep_screen_on', 'Off') === 'On';
-  await applyReaderWindowState(target, keepScreenOn, readerOrientationFromSetting(readerScreenRotationSetting()));
+  const fullscreen = ehSettingsStore.getValue('reading_fullscreen', 'On') === 'On';
+  await applyReaderWindowState(target, keepScreenOn, readerOrientationFromSetting(readerScreenRotationSetting()), fullscreen);
 }
 
 export function rememberWindowPreferredOrientation(target: window.Window): void {
