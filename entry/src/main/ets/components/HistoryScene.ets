@@ -67,6 +67,7 @@ export struct HistoryScene {
   @State selectedHistoryGids: string = '';
   @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeightPx: number = 0;
   @State historyContentWidth: number = 0;
+  @State viewportHeight: number = 0;
   private historyScroller: Scroller = new Scroller();
   private historyScrollOffset: number = 0;
   private detailScrollOffset: number = 0;
@@ -407,8 +408,15 @@ export struct HistoryScene {
     return this.statusBarVp() + 56;
   }
 
-  private historyContentTopPadding(): number {
-    return this.toolbarVisibleHeight() + 8;
+  private historyContentStartOffset(): number {
+    return this.toolbarVisibleHeight();
+  }
+
+  private historyListViewportHeight(): number {
+    if (this.viewportHeight <= 0) {
+      return 1;
+    }
+    return Math.max(1, this.viewportHeight - this.historyContentStartOffset());
   }
 
   private historyCardPreferredWidth(): number {
@@ -1022,14 +1030,14 @@ export struct HistoryScene {
             .scrollBar(BarState.Auto)
             .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: false, effectEdge: EffectEdge.START | EffectEdge.END })
             .width('100%')
-            .height('100%')
+            .height(this.historyListViewportHeight())
             .cachedCount(4)
             .padding({
               left: this.historyContentHorizontalPadding(),
               right: this.historyContentHorizontalPadding(),
-              top: this.historyContentTopPadding(),
               bottom: this.historyCardGap()
             })
+            .translate({ y: this.historyContentStartOffset() })
             .onAreaChange((_oldArea: Area, newArea: Area) => {
               this.updateHistoryContentWidth(newArea.width as number);
             })
@@ -1052,6 +1060,15 @@ export struct HistoryScene {
               this.historyScrollOffset = offset;
             })
         }
+        .width('100%')
+        .height('100%')
+        .onAreaChange((_oldArea: Area, newArea: Area) => {
+          this.updateHistoryContentWidth(newArea.width as number);
+          const height = newArea.height as number;
+          if (height > 0 && !Number.isNaN(height)) {
+            this.viewportHeight = height;
+          }
+        })
         Column() {
           if (this.historySelectionCount() > 0) {
             Button({ type: ButtonType.Circle, stateEffect: true }) {

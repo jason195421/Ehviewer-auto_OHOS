@@ -4,7 +4,9 @@ import { GalleryCategory, GalleryInfo } from '../model/GalleryModels';
 
 const PREFERENCES_NAME: string = 'ehviewer_history';
 const VALUES_KEY: string = 'items';
+const VALUES_BACKUP_KEY: string = 'items_backup';
 const READ_POSITIONS_KEY: string = 'read_positions';
+const READ_POSITIONS_BACKUP_KEY: string = 'read_positions_backup';
 const DEFAULT_MAX_SIZE: number = 100;
 
 interface StoredGalleryInfo {
@@ -43,6 +45,8 @@ interface ReadPosition {
 export class EhHistoryStore {
   private items: GalleryInfo[] = [];
   private readPositions: ReadPosition[] = [];
+  private context: common.UIAbilityContext | undefined = undefined;
+  private saveChain: Promise<void> = Promise.resolve();
 
   getItems(): GalleryInfo[] {
     return cloneGalleryInfos(this.items);
@@ -63,6 +67,7 @@ export class EhHistoryStore {
       }
     }
     this.items = next;
+    this.queueSave();
   }
 
   removeGallery(gid: number): void {
@@ -74,15 +79,18 @@ export class EhHistoryStore {
     }
     this.items = next;
     this.removeReadPosition(gid);
+    this.queueSave();
   }
 
   clear(): void {
     this.items = [];
     this.readPositions = [];
+    this.queueSave();
   }
 
   resetAllReadPositions(): void {
     this.readPositions = [];
+    this.queueSave();
   }
 
   getReadPage(gid: number): number {
@@ -102,69 +110,113 @@ export class EhHistoryStore {
       if (this.readPositions[i].gid === gid) {
         this.readPositions[i].pageIndex = pageIndex;
         this.readPositions[i].updatedAt = Date.now();
+        this.queueSave();
         return;
       }
     }
     this.readPositions.push({ gid: gid, pageIndex: pageIndex, updatedAt: Date.now() });
+    this.queueSave();
   }
 
   async load(context: common.UIAbilityContext): Promise<void> {
+    this.context = context;
     try {
       const prefs = await preferences.getPreferences(context, { name: PREFERENCES_NAME });
       const raw = await prefs.get(VALUES_KEY, '');
+      const rawBackup = await prefs.get(VALUES_BACKUP_KEY, '');
       const rawPositions = await prefs.get(READ_POSITIONS_KEY, '');
-      this.items = [];
-      this.readPositions = [];
-      if (typeof raw !== 'string' || raw.length === 0) {
-        this.loadReadPositions(rawPositions);
-        return;
-      }
-
-      const parsed = JSON.parse(raw) as StoredGalleryInfo[];
-      if (!Array.isArray(parsed)) {
-        return;
-      }
-
-      for (let i = 0; i < parsed.length; i++) {
-        const item = storedToGalleryInfo(parsed[i]);
-        if (item.gid > 0 && item.token.length > 0) {
-          this.items.push(item);
-        }
-      }
-      this.loadReadPositions(rawPositions);
+      const rawPositionsBackup = await prefs.get(READ_POSITIONS_BACKUP_KEY, '');
+      this.items = this.parseStoredItems(raw, rawBackup);
+      this.readPositions = this.parseReadPositions(rawPositions, rawPositionsBackup);
     } catch (error) {
       throw new Error(String(error));
     }
   }
 
   async save(context: common.UIAbilityContext): Promise<void> {
+    this.context = context;
+    await this.saveNow(context);
+  }
+
+  private queueSave(): void {
+    const context = this.context;
+    if (context === undefined) {
+      return;
+    }
+    this.saveChain = this.saveChain.then(() => this.saveNow(context)).catch(() => {});
+  }
+
+  private async saveNow(context: common.UIAbilityContext): Promise<void> {
     try {
       const prefs = await preferences.getPreferences(context, { name: PREFERENCES_NAME });
-      await prefs.put(VALUES_KEY, JSON.stringify(this.items));
-      await prefs.put(READ_POSITIONS_KEY, JSON.stringify(this.readPositions));
+      const itemsJson = JSON.stringify(this.items);
+      const readPositionsJson = JSON.stringify(this.readPositions);
+      await prefs.put(VALUES_KEY, itemsJson);
+      await prefs.put(VALUES_BACKUP_KEY, itemsJson);
+      await prefs.put(READ_POSITIONS_KEY, readPositionsJson);
+      await prefs.put(READ_POSITIONS_BACKUP_KEY, readPositionsJson);
       await prefs.flush();
     } catch (error) {
       throw new Error(String(error));
     }
   }
 
-  private loadReadPositions(raw: preferences.ValueType): void {
+  private parseStoredItems(raw: preferences.ValueType, backup: preferences.ValueType): GalleryInfo[] {
+    const fromMain = this.parseStoredItemsOnce(raw);
+    if (fromMain.length > 0 || typeof backup !== 'string' || backup.length === 0) {
+      return fromMain;
+    }
+    return this.parseStoredItemsOnce(backup);
+  }
+
+  private parseStoredItemsOnce(raw: preferences.ValueType): GalleryInfo[] {
+    const items: GalleryInfo[] = [];
     if (typeof raw !== 'string' || raw.length === 0) {
-      return;
+      return items;
     }
     try {
-      const parsed = JSON.parse(raw) as StoredReadPosition[];
+      const parsed = JSON.parse(raw) as StoredGalleryInfo[];
       if (!Array.isArray(parsed)) {
-        return;
+        return items;
       }
       for (let i = 0; i < parsed.length; i++) {
-        const item = storedToReadPosition(parsed[i]);
-        if (item.gid > 0 && item.pageIndex >= 0) {
-          this.readPositions.push(item);
+        const item = storedToGalleryInfo(parsed[i]);
+        if (item.gid > 0 && item.token.length > 0) {
+          items.push(item);
         }
       }
     } catch (error) {
     }
+    return items;
+  }
+
+  private parseReadPositions(raw: preferences.ValueType, backup: preferences.ValueType): ReadPosition[] {
+    const fromMain = this.parseReadPositionsOnce(raw);
+    if (fromMain.length > 0 || typeof backup !== 'string' || backup.length === 0) {
+      return fromMain;
+    }
+    return this.parseReadPositionsOnce(backup);
+  }
+
+  private parseReadPositionsOnce(raw: preferences.ValueType): ReadPosition[] {
+    const positions: ReadPosition[] = [];
+    if (typeof raw !== 'string' || raw.length === 0) {
+      return positions;
+    }
+    try {
+      const parsed = JSON.parse(raw) as StoredReadPosition[];
+      if (!Array.isArray(parsed)) {
+        return positions;
+      }
+      for (let i = 0; i < parsed.length; i++) {
+        const item = storedToReadPosition(parsed[i]);
+        if (item.gid > 0 && item.pageIndex >= 0) {
+          positions.push(item);
+        }
+      }
+    } catch (error) {
+    }
+    return positions;
   }
 
   private removeReadPosition(gid: number): void {

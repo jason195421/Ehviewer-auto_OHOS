@@ -102,6 +102,7 @@ export struct DownloadScene {
   @State toolbarOffsetY: number = 0;
   @State downloadActionsExpanded: boolean = false;
   @State downloadProgressRevision: number = 0;
+  @State viewportHeight: number = 0;
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
   @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeightPx: number = 0;
   private detailItem: DownloadInfo | null = null;
@@ -167,8 +168,15 @@ export struct DownloadScene {
     return Math.max(0, Math.min(this.floatingToolbarHeight(), this.floatingToolbarHeight() + this.toolbarOffsetY));
   }
 
-  private downloadContentTopPadding(): number {
+  private downloadContentStartOffset(): number {
     return this.toolbarVisibleHeight();
+  }
+
+  private downloadListViewportHeight(): number {
+    if (this.viewportHeight <= 0) {
+      return 1;
+    }
+    return Math.max(1, this.viewportHeight - this.downloadContentStartOffset());
   }
 
   private updateToolbarForScrollFrame(scrollOffset: number): number {
@@ -1171,106 +1179,117 @@ export struct DownloadScene {
         onSearch: () => {}
       }) {
       Stack({ alignContent: Alignment.BottomEnd }) {
-        if (this.visibleDownloadItems().length === 0) {
-          Column() {
-            Text(uiText('Downloads'))
-              .fontSize(22)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(themePrimaryText())
-            Text(this.items.length === 0 ? uiText('Download items will be shown here') :
-              uiText('No items match the current filter'))
-              .fontSize(14)
-              .fontColor(themeSecondaryText())
-              .margin({ top: 10 })
-          }
-          .width('100%')
-          .height('100%')
-          .justifyContent(FlexAlign.Center)
-          .padding({ top: this.downloadContentTopPadding() })
-        } else {
-          List({ space: 8, scroller: this.downloadScroller }) {
-            LazyForEach(this.downloadRowsSource(), (row: DownloadInfo[]) => {
-              ListItem() {
-                Row() {
-                  ForEach(row, (item: DownloadInfo, colIndex: number) => {
-                    Column() {
-                      if (galleryListMode() === 'Thumb') {
-                        GalleryThumbCard({ gallery: item, selected: this.isDownloadSelected(item.gid) })
-                          .width('100%')
-                          .onClick(() => {
-                            this.handleDownloadCardTap(item);
+        Column() {
+          if (this.visibleDownloadItems().length === 0) {
+            Column() {
+              Text(uiText('Downloads'))
+                .fontSize(22)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(themePrimaryText())
+              Text(this.items.length === 0 ? uiText('Download items will be shown here') :
+                uiText('No items match the current filter'))
+                .fontSize(14)
+                .fontColor(themeSecondaryText())
+                .margin({ top: 10 })
+            }
+            .width('100%')
+            .height(this.downloadListViewportHeight())
+            .justifyContent(FlexAlign.Center)
+            .translate({ y: this.downloadContentStartOffset() })
+          } else {
+            List({ space: 8, scroller: this.downloadScroller }) {
+              LazyForEach(this.downloadRowsSource(), (row: DownloadInfo[]) => {
+                ListItem() {
+                  Row() {
+                    ForEach(row, (item: DownloadInfo, colIndex: number) => {
+                      Column() {
+                        if (galleryListMode() === 'Thumb') {
+                          GalleryThumbCard({ gallery: item, selected: this.isDownloadSelected(item.gid) })
+                            .width('100%')
+                            .onClick(() => {
+                              this.handleDownloadCardTap(item);
+                            })
+                            .gesture(LongPressGesture({ repeat: false }).onAction(() => {
+                              this.toggleDownloadSelection(item);
+                            }))
+                        } else {
+                          GalleryListRow({ gallery: item, selected: this.isDownloadSelected(item.gid) })
+                            .width('100%')
+                            .onClick(() => {
+                              this.handleDownloadCardTap(item);
+                            })
+                            .gesture(LongPressGesture({ repeat: false }).onAction(() => {
+                              this.toggleDownloadSelection(item);
+                            }))
+                        }
+                        if (item.state !== DownloadState.Finish) {
+                          DownloadCardStatus({
+                            item: item,
+                            revision: this.downloadProgressRevision,
+                            onStatusTap: (downloadItem: DownloadInfo) => {
+                              this.toggleItemFromProgress(downloadItem);
+                            }
                           })
-                          .gesture(LongPressGesture({ repeat: false }).onAction(() => {
-                            this.toggleDownloadSelection(item);
-                          }))
-                      } else {
-                        GalleryListRow({ gallery: item, selected: this.isDownloadSelected(item.gid) })
-                          .width('100%')
-                          .onClick(() => {
-                            this.handleDownloadCardTap(item);
-                          })
-                          .gesture(LongPressGesture({ repeat: false }).onAction(() => {
-                            this.toggleDownloadSelection(item);
-                          }))
+                            .margin({ top: 4 })
+                            .transition(TransitionEffect.move(TransitionEdge.TOP)
+                              .animation({ duration: 180, curve: Curve.EaseOut }))
+                        }
                       }
-                      if (item.state !== DownloadState.Finish) {
-                        DownloadCardStatus({
-                          item: item,
-                          revision: this.downloadProgressRevision,
-                          onStatusTap: (downloadItem: DownloadInfo) => {
-                            this.toggleItemFromProgress(downloadItem);
-                          }
-                        })
-                          .margin({ top: 4 })
-                          .transition(TransitionEffect.move(TransitionEdge.TOP)
-                            .animation({ duration: 180, curve: Curve.EaseOut }))
-                      }
-                    }
-                    .width(this.downloadCardWidth())
-                    .margin({ right: colIndex < row.length - 1 ? this.downloadCardGap() : 0 })
-                    .animation({ duration: 220, curve: Curve.EaseOut })
-                  }, (item: DownloadInfo) => item.gid.toString())
+                      .width(this.downloadCardWidth())
+                      .margin({ right: colIndex < row.length - 1 ? this.downloadCardGap() : 0 })
+                      .animation({ duration: 220, curve: Curve.EaseOut })
+                    }, (item: DownloadInfo) => item.gid.toString())
+                  }
+                  .width('100%')
+                  .justifyContent(FlexAlign.Start)
+                  .animation({ duration: 220, curve: Curve.EaseOut })
                 }
-                .width('100%')
-                .justifyContent(FlexAlign.Start)
-                .animation({ duration: 220, curve: Curve.EaseOut })
+                .margin({ bottom: this.downloadCardGap() })
+                .reuseId('download-row')
+              }, (row: DownloadInfo[], rowIndex: number) => {
+                return this.downloadColumnCount().toString() + ':' + rowIndex.toString() + ':' + this.downloadRowKey(row);
+              })
+            }
+            .width('100%')
+            .height(this.downloadListViewportHeight())
+            .cachedCount(4)
+            .padding({
+              left: this.downloadContentPadding(),
+              right: this.downloadContentPadding(),
+              bottom: this.downloadCardGap()
+            })
+            .translate({ y: this.downloadContentStartOffset() })
+            .onAreaChange((_oldArea: Area, newArea: Area) => {
+              this.updateDownloadContentWidth(newArea.width as number);
+            })
+            .onAppear(() => {
+              this.syncDownloadContentWidthFromWindow();
+              if (this.downloadScrollOffset > 0) {
+                setTimeout(() => {
+                  this.downloadScroller.scrollTo({ xOffset: 0, yOffset: this.downloadScrollOffset });
+                }, 0);
               }
-              .margin({ bottom: this.downloadCardGap() })
-              .reuseId('download-row')
-            }, (row: DownloadInfo[], rowIndex: number) => {
-              return this.downloadColumnCount().toString() + ':' + rowIndex.toString() + ':' + this.downloadRowKey(row);
+            })
+            .onScrollFrameBegin((offset: number, _state: ScrollState) => {
+              return { offsetRemain: this.updateToolbarForScrollFrame(offset) };
+            })
+            .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) => {
+              this.downloadScrollOffset = normalizeSceneScrollOffset(this.downloadScroller.currentOffset().yOffset);
+            })
+            .onScrollStop(() => {
+              this.downloadScrollOffset = normalizeSceneScrollOffset(this.downloadScroller.currentOffset().yOffset);
             })
           }
-          .width('100%')
-          .height('100%')
-          .cachedCount(4)
-          .padding({
-            left: this.downloadContentPadding(),
-            right: this.downloadContentPadding(),
-            top: this.downloadContentTopPadding() + 8,
-            bottom: this.downloadCardGap()
-          })
-          .onAreaChange((_oldArea: Area, newArea: Area) => {
-            this.updateDownloadContentWidth(newArea.width as number);
-          })
-          .onAppear(() => {
-            this.syncDownloadContentWidthFromWindow();
-            if (this.downloadScrollOffset > 0) {
-              setTimeout(() => {
-                this.downloadScroller.scrollTo({ xOffset: 0, yOffset: this.downloadScrollOffset });
-              }, 0);
-            }
-          })
-          .onScrollFrameBegin((offset: number, _state: ScrollState) => {
-            return { offsetRemain: this.updateToolbarForScrollFrame(offset) };
-          })
-          .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) => {
-            this.downloadScrollOffset = normalizeSceneScrollOffset(this.downloadScroller.currentOffset().yOffset);
-          })
-          .onScrollStop(() => {
-            this.downloadScrollOffset = normalizeSceneScrollOffset(this.downloadScroller.currentOffset().yOffset);
-          })
         }
+        .width('100%')
+        .height('100%')
+        .onAreaChange((_oldArea: Area, newArea: Area) => {
+          this.updateDownloadContentWidth(newArea.width as number);
+          const height = newArea.height as number;
+          if (height > 0 && !Number.isNaN(height)) {
+            this.viewportHeight = height;
+          }
+        })
 
         Column() {
           DownloadToolColumn({
