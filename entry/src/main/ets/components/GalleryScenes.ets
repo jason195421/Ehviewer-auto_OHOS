@@ -41,6 +41,7 @@ import {
   themeSurface,
   themeTertiaryText
 } from '../shared/EhTheme';
+import { ArrayDataSource } from '../shared/ListDataSource';
 import { EhNavBar } from '../components/NavigationComponents';
 import { CategoryBadge, GalleryListRow, GalleryThumb, GalleryThumbCard } from './GalleryCards';
 import { GalleryDetailOverlayScene, GalleryDetailScene } from './GalleryDetailScenes';
@@ -1926,7 +1927,7 @@ export struct GalleryListContent {
               }
             } else {
               // 画廊卡片按行分组，每行 galleryColumnCount() 张
-              ForEach(this.buildRows(), (row: GalleryInfo[]) => {
+              LazyForEach(new ArrayDataSource<GalleryInfo[]>(this.buildRows()), (row: GalleryInfo[]) => {
                 ListItem() {
                   Row() {
                     ForEach(row, (gallery: GalleryInfo, colIndex: number) => {
@@ -1959,6 +1960,7 @@ export struct GalleryListContent {
                   .animation({ duration: 220, curve: Curve.EaseOut })
                 }
                 .margin({ bottom: this.galleryCardGap() })
+                .reuseId('gallery-row')
               }, (_row: GalleryInfo[], rowIndex: number) => {
                 return this.galleryColumnCount().toString() + ':' + rowIndex.toString() + ':' +
                   this.galleryRowKey(_row);
@@ -1980,6 +1982,7 @@ export struct GalleryListContent {
           }
           .scrollBar(BarState.Auto)
           .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: false, effectEdge: EffectEdge.START | EffectEdge.END })
+          .cachedCount(4)
           .width('100%')
           .height(this.listViewportHeight())
           .onAppear(() => {

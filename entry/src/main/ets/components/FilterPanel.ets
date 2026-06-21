@@ -1,6 +1,7 @@
 import { FilterRule, FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, FILTER_MODE_TAG_NAMESPACE } from '../services/EhFilterStore';
 import { uiStatusText, uiText } from '../shared/EhShared';
 import { themeDangerText, themeDividerColor, themeMutedText, themePageBackground, themePrimaryColor, themePrimaryText, themeSecondaryText, themeSelectedBackgroundLight, themeSurface, themeSurfaceVariant } from '../shared/EhTheme';
+import { ArrayDataSource } from '../shared/ListDataSource';
 import { PlaceholderScene } from './GalleryScenes';
 import { SettingsSubToolbar } from './SessionSettingsScenes';
 
@@ -90,7 +91,7 @@ export struct FilterPanel {
         })
       } else {
         List({ space: 0 }) {
-          ForEach(this.rules, (rule: FilterRule) => {
+          LazyForEach(new ArrayDataSource<FilterRule>(this.rules), (rule: FilterRule) => {
             ListItem() {
               Row() {
                 Column() {
@@ -129,9 +130,11 @@ export struct FilterPanel {
               .padding({ left: 16, right: 12, top: 12, bottom: 12 })
               .backgroundColor(themeSurface())
             }
+            .reuseId('filter-rule')
           }, (rule: FilterRule) => rule.id.toString())
         }
         .divider({ strokeWidth: 1, color: themeDividerColor() })
+        .cachedCount(4)
         .width('100%')
         .height('100%')
         .layoutWeight(1)

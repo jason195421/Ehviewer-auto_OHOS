@@ -25,8 +25,9 @@ import {
 } from '../shared/EhTheme';
 
 @Component
+@Reusable
 export struct GalleryListRow {
-  gallery: GalleryInfo = createEmptyGallery();
+  @Prop gallery: GalleryInfo = createEmptyGallery();
   @Prop selected: boolean = false;
 
   private cardHeight(): number {
@@ -347,8 +348,9 @@ export struct GalleryThumb {
 }
 
 @Component
+@Reusable
 export struct GalleryThumbCard {
-  gallery: GalleryInfo = createEmptyGallery();
+  @Prop gallery: GalleryInfo = createEmptyGallery();
   @Prop selected: boolean = false;
 
   build() {

@@ -10,6 +10,7 @@ import { createReaderSessionState, readerSessionStore } from '../services/Reader
 import { applyAppChromeImmersiveMode, enterEmbeddedReaderFullscreen } from '../services/EhWindowImmersive';
 import { LANGUAGE_REVISION_KEY, nextFloatingToolbarOffset } from '../shared/EhShared';
 import { themeOnPrimaryText, themeOnPrimaryDangerBackground, themePageBackground, themeShadowColor } from '../shared/EhTheme';
+import { ArrayDataSource } from '../shared/ListDataSource';
 import { STATUS_BAR_HEIGHT_KEY, uiText, setActiveBackHandler, createDetailFromGallery, createEmptyDetail, createEmptyPage, cloneGalleryInfos, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, currentGallerySite, readerPageReferer, cacheReaderImageForPage, readerPreloadCount, galleryListMode, galleryThumbWidth } from '../shared/EhShared';
 import { GalleryDetailOverlayScene, GalleryListRow, GalleryListScene, GalleryThumbCard, PlaceholderScene, ReaderPageState, ReaderScene } from './GalleryScenes';
 import { FloatingToolbarHost } from './NavigationComponents';
@@ -950,70 +951,71 @@ export struct HistoryScene {
       }) {
         Stack({ alignContent: Alignment.BottomEnd }) {
         Column() {
-          Scroll(this.historyScroller) {
-              Column({ space: 8 }) {
-                if (this.histories.length === 0) {
-                  PlaceholderScene({
-                    title: 'History',
-                    detail: 'Viewed gallery details will appear here. Open a gallery from Homepage, Favorites or Top Lists to add it.'
-                  })
-                    .layoutWeight(1)
-                } else {
-                  ForEach(this.buildHistoryRows(), (row: GalleryInfo[]) => {
-                    Row() {
-                      ForEach(row, (gallery: GalleryInfo, colIndex: number) => {
-                        if (galleryListMode() === 'Thumb') {
-                          GalleryThumbCard({ gallery: gallery, selected: this.isHistorySelected(gallery.gid) })
-                            .width(this.historyCardWidth())
-                            .margin({ right: colIndex < row.length - 1 ? this.historyCardGap() : 0 })
-                            .animation({ duration: 220, curve: Curve.EaseOut })
-                            .onClick(() => {
-                              this.handleHistoryCardTap(gallery);
-                            })
-                            .gesture(LongPressGesture({ repeat: false }).onAction(() => {
-                              this.toggleHistorySelection(gallery);
-                            }))
-                        } else {
-                          GalleryListRow({ gallery: gallery, selected: this.isHistorySelected(gallery.gid) })
-                            .width(this.historyCardWidth())
-                            .margin({ right: colIndex < row.length - 1 ? this.historyCardGap() : 0 })
-                            .animation({ duration: 220, curve: Curve.EaseOut })
-                            .onClick(() => {
-                              this.handleHistoryCardTap(gallery);
-                            })
-                            .gesture(LongPressGesture({ repeat: false }).onAction(() => {
-                              this.toggleHistorySelection(gallery);
-                            }))
-                        }
-                      }, (gallery: GalleryInfo) => gallery.gid.toString())
-                    }
-                    .width('100%')
-                    .justifyContent(FlexAlign.Start)
-                    .animation({ duration: 220, curve: Curve.EaseOut })
-                  }, (row: GalleryInfo[], rowIndex: number) => {
-                    return this.historyColumnCount().toString() + ':' + rowIndex.toString() + ':' +
-                      this.selectedHistoryGids + ':' + this.historyRowKey(row);
-                  })
-                }
+          List({ space: 8, scroller: this.historyScroller }) {
+            if (this.histories.length === 0) {
+              ListItem() {
+                PlaceholderScene({
+                  title: 'History',
+                  detail: 'Viewed gallery details will appear here. Open a gallery from Homepage, Favorites or Top Lists to add it.'
+                })
+                  .height('100%')
               }
-              .width('100%')
-              .justifyContent(FlexAlign.Start)
-              .alignItems(HorizontalAlign.Start)
-              .padding({
-                left: this.historyContentHorizontalPadding(),
-                right: this.historyContentHorizontalPadding(),
-                top: this.historyContentTopPadding(),
-                bottom: this.historyCardGap()
-              })
-              .onAreaChange((_oldArea: Area, newArea: Area) => {
-                this.updateHistoryContentWidth(newArea.width as number);
+              .reuseId('history-empty')
+            } else {
+              LazyForEach(new ArrayDataSource<GalleryInfo[]>(this.buildHistoryRows()), (row: GalleryInfo[]) => {
+                ListItem() {
+                  Row() {
+                    ForEach(row, (gallery: GalleryInfo, colIndex: number) => {
+                      if (galleryListMode() === 'Thumb') {
+                        GalleryThumbCard({ gallery: gallery, selected: this.isHistorySelected(gallery.gid) })
+                          .width(this.historyCardWidth())
+                          .margin({ right: colIndex < row.length - 1 ? this.historyCardGap() : 0 })
+                          .animation({ duration: 220, curve: Curve.EaseOut })
+                          .onClick(() => {
+                            this.handleHistoryCardTap(gallery);
+                          })
+                          .gesture(LongPressGesture({ repeat: false }).onAction(() => {
+                            this.toggleHistorySelection(gallery);
+                          }))
+                      } else {
+                        GalleryListRow({ gallery: gallery, selected: this.isHistorySelected(gallery.gid) })
+                          .width(this.historyCardWidth())
+                          .margin({ right: colIndex < row.length - 1 ? this.historyCardGap() : 0 })
+                          .animation({ duration: 220, curve: Curve.EaseOut })
+                          .onClick(() => {
+                            this.handleHistoryCardTap(gallery);
+                          })
+                          .gesture(LongPressGesture({ repeat: false }).onAction(() => {
+                            this.toggleHistorySelection(gallery);
+                          }))
+                      }
+                    }, (gallery: GalleryInfo) => gallery.gid.toString())
+                  }
+                  .width('100%')
+                  .justifyContent(FlexAlign.Start)
+                  .animation({ duration: 220, curve: Curve.EaseOut })
+                }
+                .margin({ bottom: this.historyCardGap() })
+                .reuseId('history-row')
+              }, (row: GalleryInfo[], rowIndex: number) => {
+                return this.historyColumnCount().toString() + ':' + rowIndex.toString() + ':' + this.historyRowKey(row);
               })
             }
-            .scrollable(ScrollDirection.Vertical)
+          }
             .scrollBar(BarState.Auto)
             .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: false, effectEdge: EffectEdge.START | EffectEdge.END })
             .width('100%')
             .height('100%')
+            .cachedCount(4)
+            .padding({
+              left: this.historyContentHorizontalPadding(),
+              right: this.historyContentHorizontalPadding(),
+              top: this.historyContentTopPadding(),
+              bottom: this.historyCardGap()
+            })
+            .onAreaChange((_oldArea: Area, newArea: Area) => {
+              this.updateHistoryContentWidth(newArea.width as number);
+            })
             .onAppear(() => {
               if (this.historyScrollOffset > 0) {
                 setTimeout(() => {
@@ -1031,7 +1033,7 @@ export struct HistoryScene {
               const offset = normalizeSceneScrollOffset(this.historyScroller.currentOffset().yOffset);
               this.historyScrollOffset = offset;
             })
-          }
+        }
         Column() {
           if (this.historySelectionCount() > 0) {
             Button({ type: ButtonType.Circle, stateEffect: true }) {

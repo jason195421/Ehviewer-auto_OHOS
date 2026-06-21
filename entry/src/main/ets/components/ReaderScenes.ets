@@ -317,17 +317,20 @@ export struct CommentsScene {
               .padding({ left: 16, right: 16, top: 14, bottom: 14 })
               .backgroundColor(Color.White)
             }
+            .reuseId('comment-row')
           }, (comment: GalleryComment) => comment.id)
           ListItem() {
             Divider()
               .height(1)
               .color('#F0F0F0')
           }
+          .reuseId('comment-divider')
         }
         .divider({ strokeWidth: 1, color: '#F0F0F0' })
         .width('100%')
         .height('100%')
         .layoutWeight(1)
+        .cachedCount(4)
       }
     }
     .width('100%')

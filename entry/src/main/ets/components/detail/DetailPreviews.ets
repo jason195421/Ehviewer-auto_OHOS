@@ -13,6 +13,7 @@ import {
   themeSurface,
   themeSurfaceVariant
 } from '../../shared/EhTheme';
+import { ArrayDataSource } from '../../shared/ListDataSource';
 import { GalleryThumb } from '../GalleryCards';
 @Component
 export struct DetailPreviews {
@@ -80,7 +81,7 @@ export struct DetailPreviews {
           .fontColor(themeSecondaryText())
       } else {
         Column() {
-          ForEach(this.previewRows(), (row: GalleryPreview[], rowIndex: number) => {
+          LazyForEach(new ArrayDataSource<GalleryPreview[]>(this.previewRows()), (row: GalleryPreview[], rowIndex: number) => {
             Row() {
               ForEach(row, (preview: GalleryPreview, colIndex: number) => {
                 PreviewTile({
@@ -98,8 +99,8 @@ export struct DetailPreviews {
             .justifyContent(FlexAlign.Start)
             .margin({ bottom: rowIndex < this.previewRows().length - 1 ? 12 : 0 })
             .animation({ duration: 220, curve: Curve.EaseOut })
-          }, (row: GalleryPreview[], rowIndex: number) => rowIndex.toString() + ':' +
-            row.map((preview: GalleryPreview) => preview.index.toString()).join('-'))
+            .reuseId('preview-row')
+          }, (_row: GalleryPreview[], rowIndex: number) => this.previewColumns().toString() + ':' + rowIndex.toString())
         }
         .width('100%')
         .animation({ duration: 220, curve: Curve.EaseOut })

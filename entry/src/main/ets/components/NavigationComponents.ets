@@ -115,11 +115,13 @@ export struct EhDrawer {
               onTap: () => { this.onSelect(item.route); }
             })
           }
+          .reuseId('drawer-nav-item')
         }, (item: DrawerItem) => item.route + ':' + this.activeRoute.toString())
       }
       .width('100%')
       .height('100%')
       .layoutWeight(1)
+      .cachedCount(4)
       .divider({ strokeWidth: 0.5, color: themeDividerColor(), startMargin: 56, endMargin: 0 })
 
       // ---- Footer: download summary ----

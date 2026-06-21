@@ -50,6 +50,7 @@ import {
   themeSurface,
   themeTertiaryText
 } from '../shared/EhTheme';
+import { ArrayDataSource } from '../shared/ListDataSource';
 import { FloatingToolbarHost } from './NavigationComponents';
 import { ActionBubble, GalleryListRow, GalleryListScene, GalleryThumbCard, ReaderPageState, ReaderScene } from './GalleryScenes';
 import { GalleryDetailOverlayScene } from './GalleryDetailScenes';
@@ -1169,7 +1170,7 @@ export struct DownloadScene {
           .padding({ top: this.downloadContentTopPadding() })
         } else {
           List({ space: 8, scroller: this.downloadScroller }) {
-            ForEach(this.buildDownloadRows(), (row: DownloadInfo[]) => {
+            LazyForEach(new ArrayDataSource<DownloadInfo[]>(this.buildDownloadRows()), (row: DownloadInfo[]) => {
               ListItem() {
                 Row() {
                   ForEach(row, (item: DownloadInfo, colIndex: number) => {
@@ -1215,12 +1216,14 @@ export struct DownloadScene {
                 .animation({ duration: 220, curve: Curve.EaseOut })
               }
               .margin({ bottom: this.downloadCardGap() })
+              .reuseId('download-row')
             }, (row: DownloadInfo[], rowIndex: number) => {
               return this.downloadColumnCount().toString() + ':' + rowIndex.toString() + ':' + this.downloadRowKey(row);
             })
           }
           .width('100%')
           .height('100%')
+          .cachedCount(4)
           .padding({
             left: this.downloadContentPadding(),
             right: this.downloadContentPadding(),

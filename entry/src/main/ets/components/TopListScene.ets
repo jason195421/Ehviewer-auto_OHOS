@@ -17,6 +17,7 @@ import {
   themeSurface,
   themeTransparentColor
 } from '../shared/EhTheme';
+import { ArrayDataSource } from '../shared/ListDataSource';
 import { STATUS_BAR_HEIGHT_KEY, uiText, setActiveBackHandler, createEmptyDetail, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, readerPageReferer, cacheReaderImageForPage, readerPreloadCount, topListChipColor } from '../shared/EhShared';
 import { GalleryDetailOverlayScene, GalleryListScene, GalleryListStateView, ReaderPageState, ReaderScene } from './GalleryScenes';
 import { FloatingToolbarHost } from './NavigationComponents';
@@ -1029,7 +1030,7 @@ export struct TopListBoard {
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       List({ space: 10, scroller: this.boardScroller }) {
-        ForEach(this.info.buckets, (bucket: TopListBucket) => {
+        LazyForEach(new ArrayDataSource<TopListBucket>(this.info.buckets), (bucket: TopListBucket) => {
           ListItem() {
             TopListBucketCard({
               bucket: bucket,
@@ -1039,6 +1040,7 @@ export struct TopListBoard {
               onOpenItem: this.onOpenItem
             })
           }
+          .reuseId('top-list-bucket')
         }, (bucket: TopListBucket) => this.selectedIndex.toString() + ':' + bucket.title)
       }
       .width('100%')
@@ -1046,6 +1048,7 @@ export struct TopListBoard {
       .padding({ left: 12, right: 12, top: this.contentTopPadding(), bottom: 0 })
       .backgroundColor(themePageBackground())
       .scrollBar(BarState.Auto)
+      .cachedCount(3)
       .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: false, effectEdge: EffectEdge.START | EffectEdge.END })
       .onAppear(() => {
         if (this.initialScrollOffset > 0) {
@@ -1078,9 +1081,9 @@ export struct TopListBoard {
 
 @Component
 export struct TopListBucketCard {
-  bucket: TopListBucket = createEmptyTopListBucket();
-  info: TopListInfo = createEmptyTopListInfo();
-  canOpenBucket: boolean = false;
+  @Prop bucket: TopListBucket = createEmptyTopListBucket();
+  @Prop info: TopListInfo = createEmptyTopListInfo();
+  @Prop canOpenBucket: boolean = false;
   onOpenBucket: (bucket: TopListBucket) => void = () => {};
   onOpenItem: (item: TopListItem, info: TopListInfo) => void = () => {};
 

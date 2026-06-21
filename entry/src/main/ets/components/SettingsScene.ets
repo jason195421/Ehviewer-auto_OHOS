@@ -922,6 +922,7 @@ export struct SettingsHomePanel {
           ListItem() {
             SettingsStatusBlock({ statusText: this.statusText })
           }
+          .reuseId('settings-status')
         }
         ForEach(SETTINGS_HEADERS, (item: SettingsHeaderItem) => {
           ListItem() {
@@ -937,6 +938,7 @@ export struct SettingsHomePanel {
       .width('100%')
       .height('100%')
       .layoutWeight(1)
+      .cachedCount(3)
       .padding({ left: 12, right: 12, top: 0, bottom: 0 })
     }
     .width('100%')
@@ -1058,6 +1060,7 @@ export struct SettingsDetailPanel {
           ListItem() {
             SettingsStatusBlock({ statusText: this.statusText })
           }
+          .reuseId('settings-status')
         }
         if (this.panel === SettingsPanel.Eh) {
           ListItem() {
@@ -1069,6 +1072,7 @@ export struct SettingsDetailPanel {
               onTap: this.onOpenSession
             })
           }
+          .reuseId('settings-session-action')
           ListItem() {
             SettingsActionRow({
               title: uiText('Sign out'),
@@ -1078,6 +1082,7 @@ export struct SettingsDetailPanel {
               onTap: this.onSignOut
             })
           }
+          .reuseId('settings-signout-action')
           ForEach(settingsRowsForPanel(this.panel, this.themeName, this.settingEntries), (row: SettingsRowItem) => {
             ListItem() {
               SettingsStaticRow({
@@ -1097,6 +1102,7 @@ export struct SettingsDetailPanel {
                 }
               })
             }
+            .reuseId('settings-static-row')
           }, (row: SettingsRowItem) => settingsRowRenderKey(row))
         } else if (this.panel === SettingsPanel.About) {
           ForEach(settingsRowsForPanel(this.panel, this.themeName, this.settingEntries), (row: SettingsRowItem) => {
@@ -1118,6 +1124,7 @@ export struct SettingsDetailPanel {
                 }
               })
             }
+            .reuseId('settings-static-row')
           }, (row: SettingsRowItem) => settingsRowRenderKey(row))
           ListItem() {
             SettingsActionRow({
@@ -1127,6 +1134,7 @@ export struct SettingsDetailPanel {
               onTap: this.onOpenMigration
             })
           }
+          .reuseId('settings-migration-action')
         } else {
           ForEach(settingsRowsForPanel(this.panel, this.themeName, this.settingEntries), (row: SettingsRowItem) => {
             ListItem() {
@@ -1147,6 +1155,7 @@ export struct SettingsDetailPanel {
                 }
               })
             }
+            .reuseId('settings-static-row')
           }, (row: SettingsRowItem) => settingsRowRenderKey(row))
         }
 
@@ -1154,6 +1163,7 @@ export struct SettingsDetailPanel {
       .width('100%')
       .height('100%')
       .layoutWeight(1)
+      .cachedCount(4)
       .padding({ left: 12, right: 12, top: 0, bottom: 0 })
     }
     .width('100%')
@@ -1217,11 +1227,13 @@ export struct SettingsOptionPanel {
               this.onSelect(option);
             })
           }
+          .reuseId('settings-option-row')
         }, (option: string) => option)
       }
       .width('100%')
       .height('100%')
       .layoutWeight(1)
+      .cachedCount(4)
       .padding({ left: 12, right: 12, top: 0, bottom: 0 })
     }
     .width('100%')

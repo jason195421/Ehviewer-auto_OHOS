@@ -38,10 +38,12 @@ export struct MigrationScene {
           .backgroundColor(themeSurface())
           .borderRadius(6)
         }
+        .reuseId('migration-task')
       })
     }
     .width('100%')
     .height('100%')
+    .cachedCount(4)
     .padding({ left: 12, right: 12, top: 12, bottom: 16 })
   }
 }

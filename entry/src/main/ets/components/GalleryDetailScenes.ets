@@ -140,6 +140,7 @@ export struct GalleryDetailScene {
               onRead: this.onRead
             })
           }
+          .reuseId('detail-header')
           if (this.statusText.length > 0 && (!this.isDetailLoaded || this.statusText.indexOf('failed') >= 0 ||
             this.statusText.indexOf('Failed') >= 0)) {
             ListItem() {
@@ -148,10 +149,12 @@ export struct GalleryDetailScene {
                 isError: this.statusText.indexOf('failed') >= 0 || this.statusText.indexOf('Failed') >= 0
               })
             }
+            .reuseId('detail-status')
           }
           ListItem() {
             DetailInfoBlock({ detail: this.detail, requestUrl: this.requestUrl, isDetailLoaded: this.isDetailLoaded })
           }
+          .reuseId('detail-info')
           ListItem() {
             DetailActions({
               detail: this.detail,
@@ -166,6 +169,7 @@ export struct GalleryDetailScene {
               onArchive: this.onArchive
             })
           }
+          .reuseId('detail-actions')
           ListItem() {
             DetailTags({
               tags: this.detail.tags,
@@ -173,6 +177,7 @@ export struct GalleryDetailScene {
               onTagSearch: this.onTagSearch
             })
           }
+          .reuseId('detail-tags')
           ListItem() {
             DetailComments({
               comments: this.detail.comments,
@@ -180,6 +185,7 @@ export struct GalleryDetailScene {
               onComments: this.onComments
             })
           }
+          .reuseId('detail-comments')
           ListItem() {
             DetailPreviews({
               previews: this.detail.previewSet,
@@ -188,10 +194,12 @@ export struct GalleryDetailScene {
               onSelectPreview: this.onSelectPreview
             })
           }
+          .reuseId('detail-previews')
         }
         .width('100%')
         .height('100%')
         .layoutWeight(1)
+        .cachedCount(3)
         .onAppear(() => {
           if (this.initialDetailScrollOffset > 0) {
             this.detailScroller.scrollTo({ xOffset: 0, yOffset: this.initialDetailScrollOffset });
