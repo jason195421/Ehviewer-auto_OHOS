@@ -42,7 +42,6 @@ const READER_MIN_SCALE: number = 0.25;
 const READER_BASE_SCALE: number = 1;
 const READER_MAX_SCALE: number = 4;
 const READER_DOUBLE_TAP_SCALE: number = 2.25;
-const READER_EDGE_PAGE_DRAG_THRESHOLD: number = 44;
 const READER_INERTIA_DURATION: number = 180;
 const SLIDER_AUTO_HIDE_DELAY: number = 3000;
 const READER_OFFSCREEN_RENDER_COUNT: number = 2;
@@ -144,16 +143,14 @@ class ReaderPreviewModel {
     this.disableSwipe = this.canPanHorizontally() && !this.isHorizontalBoundary();
   }
 
-  panUpdate(offsetX: number, offsetY: number): number {
+  panUpdate(offsetX: number, offsetY: number): void {
     if (!this.canPan()) {
       this.disableSwipe = false;
-      return 0;
+      return;
     }
-    const edgeDirection = this.edgePageDirection(offsetX);
     this.currentOffsetX = this.lastOffsetX + offsetX;
     this.currentOffsetY = this.lastOffsetY + offsetY;
     this.restrictBoundary();
-    return edgeDirection;
   }
 
   panEnd(velocityX: number = 0, velocityY: number = 0): void {
@@ -261,19 +258,19 @@ class ReaderPreviewModel {
     return this.maxOffsetX() > 0;
   }
 
-  private edgePageDirection(offsetX: number): number {
+  shouldLetSwiperHandlePan(offsetX: number, velocityX: number): boolean {
     const maxX = this.maxOffsetX();
     if (maxX <= 0) {
-      return 0;
+      return false;
     }
-    const targetX = this.lastOffsetX + offsetX;
-    if (targetX < -maxX - READER_EDGE_PAGE_DRAG_THRESHOLD) {
-      return 1;
+    const direction = Math.abs(offsetX) >= 1 ? offsetX : velocityX;
+    if (direction < -0.5 && this.currentOffsetX <= -maxX + 0.5) {
+      return true;
     }
-    if (targetX > maxX + READER_EDGE_PAGE_DRAG_THRESHOLD) {
-      return -1;
+    if (direction > 0.5 && this.currentOffsetX >= maxX - 0.5) {
+      return true;
     }
-    return 0;
+    return false;
   }
 }
 
@@ -663,16 +660,6 @@ export struct ReaderScene {
 
   private isFixedScaleMode(): boolean {
     return normalizePageScalingOption(this.fitMode) === 'Fixed scale';
-  }
-
-  private jumpByVisualDirection(direction: number): void {
-    const visualIndex = this.visualIndexForPageIndex(this.currentIndex);
-    const targetVisualIndex = visualIndex + direction;
-    const count = this.totalPages <= 0 ? 1 : this.totalPages;
-    if (targetVisualIndex < 0 || targetVisualIndex >= count) {
-      return;
-    }
-    this.jumpTo(this.pageIndexForVisualIndex(targetVisualIndex));
   }
 
   private issueViewportCommand(command: string): void {
@@ -1149,11 +1136,6 @@ export struct ReaderScene {
                 if (this.isFixedScaleMode()) {
                   this.fixedScale = Math.max(READER_MIN_SCALE, Math.min(READER_MAX_SCALE, percent / 100));
                 }
-              }
-            },
-            onEdgePan: (direction: number) => {
-              if (index === this.currentIndex) {
-                this.jumpByVisualDirection(direction);
               }
             }
           })
@@ -1755,7 +1737,6 @@ struct ReaderImageViewport {
   onImageLongPress: () => void = () => {};
   onSwipeLockChange: (locked: boolean) => void = (_locked: boolean) => {};
   onZoomChange: (percent: number) => void = (_percent: number) => {};
-  onEdgePan: (direction: number) => void = (_direction: number) => {};
 
   @State imageModel: ReaderPreviewModel = new ReaderPreviewModel();
   @State completedImageUrl: string = '';
@@ -1764,7 +1745,6 @@ struct ReaderImageViewport {
   @State sourceImageHeight: number = 0;
   @State displayImageWidth: number = 1;
   @State displayImageHeight: number = 1;
-  @State edgePanTriggered: boolean = false;
   private lastCommandVersion: number = -1;
 
   aboutToAppear(): void {
@@ -1892,6 +1872,9 @@ struct ReaderImageViewport {
       const scale = Math.min(componentWidth / sourceWidth, componentHeight / sourceHeight);
       displayWidth = sourceWidth * scale;
       displayHeight = sourceHeight * scale;
+    } else if (normalized === 'Actual size') {
+      displayWidth = this.imageSourceWidthVp(sourceWidth);
+      displayHeight = this.imageSourceHeightVp(sourceHeight);
     } else {
       displayWidth = sourceWidth;
       displayHeight = sourceHeight;
@@ -1899,6 +1882,20 @@ struct ReaderImageViewport {
     this.displayImageWidth = Math.max(1, displayWidth);
     this.displayImageHeight = Math.max(1, displayHeight);
     this.imageModel.setImageSize(this.displayImageWidth, this.displayImageHeight);
+  }
+
+  private imageSourceWidthVp(sourceWidth: number): number {
+    if (this.sourceImageWidth > 0) {
+      return this.getUIContext().px2vp(this.sourceImageWidth);
+    }
+    return sourceWidth;
+  }
+
+  private imageSourceHeightVp(sourceHeight: number): number {
+    if (this.sourceImageHeight > 0) {
+      return this.getUIContext().px2vp(this.sourceImageHeight);
+    }
+    return sourceHeight;
   }
 
   private startAlignment(): Alignment {
@@ -1952,6 +1949,11 @@ struct ReaderImageViewport {
     }
     this.onSwipeLockChange(this.imageModel.disableSwipe);
     this.onZoomChange(this.imageModel.zoomPercent());
+  }
+
+  private shouldLetSwiperHandlePan(event: BaseGestureEvent): boolean {
+    const panEvent = event as PanGestureEvent;
+    return this.imageModel.shouldLetSwiperHandlePan(panEvent.offsetX, panEvent.velocityX);
   }
 
   build() {
@@ -2061,19 +2063,11 @@ struct ReaderImageViewport {
             }),
           PanGesture({ fingers: 1, distance: this.imageModel.disableSwipe ? 3 : 50 })
             .onActionStart(() => {
-              this.edgePanTriggered = false;
               this.imageModel.panStart();
               this.reportState();
             })
             .onActionUpdate((event: GestureEvent) => {
-              if (this.edgePanTriggered) {
-                return;
-              }
-              const direction = this.imageModel.panUpdate(event.offsetX, event.offsetY);
-              if (direction !== 0) {
-                this.edgePanTriggered = true;
-                this.onEdgePan(direction);
-              }
+              this.imageModel.panUpdate(event.offsetX, event.offsetY);
               this.reportState();
             })
             .onActionEnd((event: GestureEvent) => {
@@ -2081,7 +2075,6 @@ struct ReaderImageViewport {
               this.reportState();
             })
             .onActionCancel(() => {
-              this.edgePanTriggered = false;
               this.imageModel.panEnd();
               this.reportState();
             }),
@@ -2105,6 +2098,15 @@ struct ReaderImageViewport {
         )
       )
     )
+    .onGestureJudgeBegin((gestureInfo: GestureInfo, event: BaseGestureEvent) => {
+      if (gestureInfo.type === GestureControl.GestureType.DRAG) {
+        return GestureJudgeResult.REJECT;
+      }
+      if (gestureInfo.type === GestureControl.GestureType.PAN_GESTURE && this.shouldLetSwiperHandlePan(event)) {
+        return GestureJudgeResult.REJECT;
+      }
+      return GestureJudgeResult.CONTINUE;
+    })
     .draggable(false)
   }
 }
