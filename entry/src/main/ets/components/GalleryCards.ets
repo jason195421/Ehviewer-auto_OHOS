@@ -106,16 +106,17 @@ export struct GalleryListRow {
   }
 
   build() {
-    Row() {
-      GalleryThumb({
-        url: this.gallery.thumb === undefined ? '' : this.gallery.thumb,
-        widthValue: galleryThumbWidth(),
-        heightValue: this.cardHeight(),
-        radiusValue: 6
-      })
-        .height('100%')
+    Stack({ alignContent: Alignment.TopEnd }) {
+      Row() {
+        GalleryThumb({
+          url: this.gallery.thumb === undefined ? '' : this.gallery.thumb,
+          widthValue: galleryThumbWidth(),
+          heightValue: this.cardHeight(),
+          radiusValue: 6
+        })
+          .height('100%')
 
-      Column() {
+        Column() {
         Column() {
           Column() {
             Text(galleryDisplayTitle(this.gallery))
@@ -205,11 +206,21 @@ export struct GalleryListRow {
           .clip(true)
           .margin({ top: this.metaGap() })
         }
+        }
+        .height('100%')
+        .layoutWeight(1)
+        .padding({ left: 10, right: 8, top: this.cardGap(), bottom: this.cardGap() })
+        .alignItems(HorizontalAlign.Start)
       }
+      .width('100%')
       .height('100%')
-      .layoutWeight(1)
-      .padding({ left: 10, right: 8, top: this.cardGap(), bottom: this.cardGap() })
-      .alignItems(HorizontalAlign.Start)
+
+      if (this.selected) {
+        SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
+          .fontSize(24)
+          .fontColor([themeSelectedIndicatorColor()])
+          .margin({ top: 6, right: 6 })
+      }
     }
     .width('100%')
     .height(this.cardHeight())

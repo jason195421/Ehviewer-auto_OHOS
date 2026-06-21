@@ -983,12 +983,12 @@ export struct HistoryScene {
                     .justifyContent(FlexAlign.Start)
                     .animation({ duration: 220, curve: Curve.EaseOut })
                   }, (row: GalleryInfo[], rowIndex: number) => {
-                    return this.historyColumnCount().toString() + ':' + rowIndex.toString() + ':' + this.historyRowKey(row);
+                    return this.historyColumnCount().toString() + ':' + rowIndex.toString() + ':' +
+                      this.selectedHistoryGids + ':' + this.historyRowKey(row);
                   })
                 }
               }
               .width('100%')
-              .height('100%')
               .justifyContent(FlexAlign.Start)
               .alignItems(HorizontalAlign.Start)
               .padding({

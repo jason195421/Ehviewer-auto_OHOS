@@ -37,25 +37,20 @@ import {
   nextDownloadStatusFilter,
   readerPageReferer,
   saveGalleryReadPosition,
-  uiStatusText,
   uiText,
   uiValue
 } from '../shared/EhShared';
 import {
-  themeControlMutedBackground,
-  themeControlNeutralBackground,
   themeDividerColor,
-  themeOnPrimaryDangerBackground,
   themeOnPrimaryText,
   themePageBackground,
-  themePrimaryColor,
   themePrimaryText,
   themeSecondaryText,
   themeSurface,
   themeTertiaryText
 } from '../shared/EhTheme';
 import { FloatingToolbarHost } from './NavigationComponents';
-import { GalleryListRow, GalleryListScene, GalleryThumbCard, ReaderPageState, ReaderScene } from './GalleryScenes';
+import { ActionBubble, GalleryListRow, GalleryListScene, GalleryThumbCard, ReaderPageState, ReaderScene } from './GalleryScenes';
 import { GalleryDetailOverlayScene } from './GalleryDetailScenes';
 
 function normalizeSceneScrollOffset(offset: number): number {
@@ -98,6 +93,7 @@ export struct DownloadScene {
   @State downloadContentWidth: number = 0;
   @State selectedDownloadGids: string = '';
   @State toolbarOffsetY: number = 0;
+  @State downloadActionsExpanded: boolean = false;
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
   @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeightPx: number = 0;
   private detailItem: DownloadInfo | null = null;
@@ -249,6 +245,7 @@ export struct DownloadScene {
     } else {
       this.selectedDownloadGids += item.gid.toString() + '|';
     }
+    this.downloadActionsExpanded = true;
   }
 
   private handleDownloadCardTap(item: DownloadInfo): void {
@@ -268,26 +265,6 @@ export struct DownloadScene {
       }
     }
     return selected;
-  }
-
-  private activeSummary(): string {
-    let wait = 0;
-    let active = 0;
-    let done = 0;
-    let failed = 0;
-    for (let i = 0; i < this.items.length; i++) {
-      if (this.items[i].state === DownloadState.Wait) {
-        wait++;
-      } else if (this.items[i].state === DownloadState.Downloading) {
-        active++;
-      } else if (this.items[i].state === DownloadState.Finish) {
-        done++;
-      } else if (this.items[i].state === DownloadState.Failed) {
-        failed++;
-      }
-    }
-    return wait.toString() + ' waiting  ' + active.toString() + ' active  ' + done.toString() + ' done  ' +
-      failed.toString() + ' failed';
   }
 
   private downloadCardPreferredWidth(): number {
@@ -1131,59 +1108,6 @@ export struct DownloadScene {
         },
         onSearch: () => {}
       }) {
-      Column() {
-      Column() {
-        Row() {
-          Button(uiText('Status') + ': ' + uiValue(this.statusFilter))
-            .height(30)
-            .fontSize(12)
-            .onClick(() => {
-              this.statusFilter = nextDownloadStatusFilter(this.statusFilter);
-            })
-          Button(uiText('Category') + ': ' + uiValue(this.categoryFilter))
-            .height(30)
-            .fontSize(12)
-            .margin({ left: 8 })
-            .onClick(() => {
-              this.categoryFilter = nextDownloadCategoryFilter(this.categoryFilter);
-            })
-          Button(uiText('Sort') + ': ' + uiValue(this.sortMode))
-            .height(30)
-            .fontSize(12)
-            .margin({ left: 8 })
-            .onClick(() => {
-              this.sortMode = nextDownloadSortMode(this.sortMode);
-            })
-        }
-        .width('100%')
-
-        Row() {
-          Text(uiStatusText(this.statusText))
-            .fontSize(12)
-            .fontColor(themeSecondaryText())
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .layoutWeight(1)
-          Text(this.visibleDownloadItems().length.toString() + '/' + this.items.length.toString())
-            .fontSize(12)
-            .fontColor(themeSecondaryText())
-            .margin({ left: 8 })
-        }
-        .width('100%')
-        .margin({ top: 8 })
-
-        Text(this.activeSummary())
-          .fontSize(11)
-          .fontColor(themeSecondaryText())
-          .width('100%')
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .margin({ top: 4 })
-      }
-      .width('100%')
-      .padding({ left: 12, right: 12, top: this.downloadContentTopPadding() + 10, bottom: 10 })
-      .backgroundColor(themeSurface())
-
       Stack({ alignContent: Alignment.BottomEnd }) {
         if (this.visibleDownloadItems().length === 0) {
           Column() {
@@ -1200,6 +1124,7 @@ export struct DownloadScene {
           .width('100%')
           .height('100%')
           .justifyContent(FlexAlign.Center)
+          .padding({ top: this.downloadContentTopPadding() })
         } else {
           List({ space: 8, scroller: this.downloadScroller }) {
             ForEach(this.buildDownloadRows(), (row: DownloadInfo[]) => {
@@ -1234,7 +1159,8 @@ export struct DownloadScene {
               }
               .margin({ bottom: this.downloadCardGap() })
             }, (row: DownloadInfo[], rowIndex: number) => {
-              return this.downloadColumnCount().toString() + ':' + rowIndex.toString() + ':' + this.downloadRowKey(row);
+              return this.downloadColumnCount().toString() + ':' + rowIndex.toString() + ':' +
+                this.selectedDownloadGids + ':' + this.downloadRowKey(row);
             })
           }
           .width('100%')
@@ -1242,7 +1168,7 @@ export struct DownloadScene {
           .padding({
             left: this.downloadContentPadding(),
             right: this.downloadContentPadding(),
-            top: 8,
+            top: this.downloadContentTopPadding() + 8,
             bottom: 82
           })
           .onAreaChange((_oldArea: Area, newArea: Area) => {
@@ -1266,74 +1192,42 @@ export struct DownloadScene {
           })
         }
 
-        Column({ space: 10 }) {
-          if (this.downloadSelectionCount() > 0) {
-            Button({ type: ButtonType.Circle, stateEffect: true }) {
-              SymbolGlyph($r('sys.symbol.trash'))
-                .fontSize(22)
-                .fontColor([themeOnPrimaryText()])
-            }
-            .width(52)
-            .height(52)
-            .backgroundColor(themeOnPrimaryDangerBackground())
-            .onClick(() => {
-              this.deleteSelectedDownloads();
-            })
-          }
-
-          Button({ type: ButtonType.Circle, stateEffect: true }) {
-            SymbolGlyph($r('sys.symbol.play_fill'))
-              .fontSize(20)
-              .fontColor([themeOnPrimaryText()])
-          }
-          .width(52)
-          .height(52)
-          .backgroundColor(themePrimaryColor())
-          .onClick(() => {
+        DownloadToolColumn({
+          expanded: this.downloadActionsExpanded,
+          hasSelection: this.downloadSelectionCount() > 0,
+          canOperate: this.items.length > 0,
+          statusFilter: this.statusFilter,
+          categoryFilter: this.categoryFilter,
+          sortMode: this.sortMode,
+          onToggle: () => {
+            this.downloadActionsExpanded = !this.downloadActionsExpanded;
+          },
+          onStatus: () => {
+            this.statusFilter = nextDownloadStatusFilter(this.statusFilter);
+          },
+          onCategory: () => {
+            this.categoryFilter = nextDownloadCategoryFilter(this.categoryFilter);
+          },
+          onSort: () => {
+            this.sortMode = nextDownloadSortMode(this.sortMode);
+          },
+          onStart: () => {
             this.startSelectedOrAll();
-          })
-
-          Button({ type: ButtonType.Circle, stateEffect: true }) {
-            SymbolGlyph($r('sys.symbol.pause_fill'))
-              .fontSize(20)
-              .fontColor([themeOnPrimaryText()])
-          }
-          .width(52)
-          .height(52)
-          .backgroundColor(themeControlMutedBackground())
-          .onClick(() => {
+          },
+          onStop: () => {
             this.stopSelectedOrAll();
-          })
-
-          Button({ type: ButtonType.Circle, stateEffect: true }) {
-            SymbolGlyph($r('sys.symbol.play_arrow_triangle_2_circlepath'))
-              .fontSize(19)
-              .fontColor([themeOnPrimaryText()])
-          }
-          .width(52)
-          .height(52)
-          .backgroundColor(themeControlNeutralBackground())
-          .onClick(() => {
+          },
+          onRestore: () => {
             this.restoreDownloadedItems();
-          })
-
-          Button({ type: ButtonType.Circle, stateEffect: true }) {
-            SymbolGlyph($r('sys.symbol.checkmark_circle'))
-              .fontSize(20)
-              .fontColor([themeOnPrimaryText()])
-          }
-          .width(52)
-          .height(52)
-          .enabled(this.items.length > 0)
-          .backgroundColor(themeControlNeutralBackground())
-          .onClick(() => {
+          },
+          onClearDone: () => {
             this.clearFinished();
-          })
-        }
+          },
+          onDelete: () => {
+            this.deleteSelectedDownloads();
+          }
+        })
         .margin({ right: 18, bottom: 18 })
-      }
-      .width('100%')
-      .layoutWeight(1)
       }
       .width('100%')
       .height('100%')
@@ -1351,6 +1245,95 @@ interface LocalReaderSession {
   index: number;
   status: string;
   detailRequestUrl: string;
+}
+
+@Component
+struct DownloadToolColumn {
+  @Prop expanded: boolean = false;
+  @Prop hasSelection: boolean = false;
+  @Prop canOperate: boolean = false;
+  statusFilter: string = 'All';
+  categoryFilter: string = 'All';
+  sortMode: string = 'Default';
+  onToggle: () => void = () => {};
+  onStatus: () => void = () => {};
+  onCategory: () => void = () => {};
+  onSort: () => void = () => {};
+  onStart: () => void = () => {};
+  onStop: () => void = () => {};
+  onRestore: () => void = () => {};
+  onClearDone: () => void = () => {};
+  onDelete: () => void = () => {};
+
+  build() {
+    Column() {
+      if (this.expanded) {
+        Column({ space: 8 }) {
+          if (this.hasSelection) {
+            ActionBubble({
+              label: uiText('Delete'),
+              symbolIcon: $r('sys.symbol.trash'),
+              isEnabled: true,
+              onTapAction: this.onDelete
+            })
+          }
+          ActionBubble({
+            label: uiText('Status') + ': ' + uiValue(this.statusFilter),
+            symbolIcon: $r('sys.symbol.magnifyingglass'),
+            isEnabled: true,
+            onTapAction: this.onStatus
+          })
+          ActionBubble({
+            label: uiText('Category') + ': ' + uiValue(this.categoryFilter),
+            symbolIcon: $r('sys.symbol.list_number'),
+            isEnabled: true,
+            onTapAction: this.onCategory
+          })
+          ActionBubble({
+            label: uiText('Sort') + ': ' + uiValue(this.sortMode),
+            symbolIcon: $r('sys.symbol.chevron_forward'),
+            isEnabled: true,
+            onTapAction: this.onSort
+          })
+          ActionBubble({
+            label: uiText('Start'),
+            symbolIcon: $r('sys.symbol.play_fill'),
+            isEnabled: true,
+            onTapAction: this.onStart
+          })
+          ActionBubble({
+            label: uiText('Stop'),
+            symbolIcon: $r('sys.symbol.pause_fill'),
+            isEnabled: this.canOperate,
+            onTapAction: this.onStop
+          })
+          ActionBubble({
+            label: uiText('Restore'),
+            symbolIcon: $r('sys.symbol.play_arrow_triangle_2_circlepath'),
+            isEnabled: true,
+            onTapAction: this.onRestore
+          })
+          ActionBubble({
+            label: uiText('Clear done'),
+            symbolIcon: $r('sys.symbol.checkmark_circle'),
+            isEnabled: this.canOperate,
+            onTapAction: this.onClearDone
+          })
+        }
+        .alignItems(HorizontalAlign.End)
+        .margin({ bottom: 10 })
+      }
+
+      ActionBubble({
+        label: '',
+        symbolIcon: this.expanded ? $r('sys.symbol.xmark') : $r('sys.symbol.more'),
+        isEnabled: true,
+        primary: true,
+        onTapAction: this.onToggle
+      })
+    }
+    .alignItems(HorizontalAlign.End)
+  }
 }
 
 @Component
