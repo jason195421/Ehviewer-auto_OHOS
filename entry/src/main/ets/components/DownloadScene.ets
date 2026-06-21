@@ -96,6 +96,7 @@ export struct DownloadScene {
   @State selectedDownloadGids: string = '';
   @State toolbarOffsetY: number = 0;
   @State downloadActionsExpanded: boolean = false;
+  @State downloadProgressRevision: number = 0;
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
   @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeightPx: number = 0;
   private detailItem: DownloadInfo | null = null;
@@ -109,6 +110,7 @@ export struct DownloadScene {
     setActiveBackHandler(() => this.handleSystemBack());
     this.unsubscribeStore = ehDownloadStore.subscribe((items: DownloadInfo[]) => {
       this.items = items;
+      this.downloadProgressRevision++;
     });
     this.loadDownloads();
   }
@@ -331,18 +333,12 @@ export struct DownloadScene {
   }
 
   private updateDownloadContentWidth(width: number): void {
-    if (width <= 0 || Number.isNaN(width) || this.downloadContentWidth === width) {
+    const normalizedWidth = Math.floor(width);
+    if (normalizedWidth <= 0 || Number.isNaN(normalizedWidth) ||
+      Math.abs(this.downloadContentWidth - normalizedWidth) < 1) {
       return;
     }
-    const oldColumns = this.downloadColumnCount();
-    const nextColumns = this.downloadColumnCountForWidth(width);
-    if (this.downloadContentWidth <= 0 || oldColumns === nextColumns) {
-      this.downloadContentWidth = width;
-      return;
-    }
-    this.getUIContext().animateTo({ duration: 220, curve: Curve.EaseOut }, () => {
-      this.downloadContentWidth = width;
-    });
+    this.downloadContentWidth = normalizedWidth;
   }
 
   private buildDownloadRows(): DownloadInfo[][] {
@@ -1197,6 +1193,7 @@ export struct DownloadScene {
                       if (item.state !== DownloadState.Finish) {
                         DownloadCardStatus({
                           item: item,
+                          revision: this.downloadProgressRevision,
                           onStatusTap: (downloadItem: DownloadInfo) => {
                             this.toggleItemFromProgress(downloadItem);
                           }
@@ -1399,6 +1396,7 @@ struct DownloadToolColumn {
 @Component
 struct DownloadCardStatus {
   @Prop item: DownloadInfo = createEmptyDownloadInfo();
+  @Prop revision: number = 0;
   onStatusTap: (item: DownloadInfo) => void = (_item: DownloadInfo) => {};
 
   private isDownloading(): boolean {
@@ -1465,6 +1463,7 @@ struct DownloadCardStatus {
       .height(14)
       .margin({ top: 1 })
       .clip(true)
+      .id('download-progress-' + this.item.gid.toString() + '-' + this.revision.toString())
     }
     .width('100%')
     .padding({ left: 8, right: 8, top: 6, bottom: 7 })

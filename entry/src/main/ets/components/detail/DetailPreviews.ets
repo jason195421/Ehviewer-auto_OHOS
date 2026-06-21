@@ -111,8 +111,8 @@ export struct DetailPreviews {
     .padding(16)
     .backgroundColor(themeSurface())
     .onAreaChange((_oldArea: Area, newArea: Area) => {
-      const width = newArea.width as number;
-      if (width > 0 && !Number.isNaN(width) && this.contentWidth !== width) {
+      const width = Math.floor(newArea.width as number);
+      if (width > 0 && !Number.isNaN(width) && Math.abs(this.contentWidth - width) >= 1) {
         this.contentWidth = width;
       }
     })

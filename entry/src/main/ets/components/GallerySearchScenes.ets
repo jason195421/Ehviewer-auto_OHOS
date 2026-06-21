@@ -276,7 +276,7 @@ export struct SearchSuggestionList {
       this.loadMoreVisibleSuggestions();
     })
     .onAreaChange((_oldArea: Area, newArea: Area) => {
-      const width = newArea.width as number;
+      const width = Math.floor(newArea.width as number);
       if (width > 0 && !Number.isNaN(width) && Math.abs(width - this.contentWidth) >= 1) {
         this.contentWidth = width;
       }

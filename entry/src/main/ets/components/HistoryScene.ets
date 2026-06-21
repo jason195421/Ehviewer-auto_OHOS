@@ -450,18 +450,12 @@ export struct HistoryScene {
   }
 
   private updateHistoryContentWidth(width: number): void {
-    if (width <= 0 || Number.isNaN(width) || this.historyContentWidth === width) {
+    const normalizedWidth = Math.floor(width);
+    if (normalizedWidth <= 0 || Number.isNaN(normalizedWidth) ||
+      Math.abs(this.historyContentWidth - normalizedWidth) < 1) {
       return;
     }
-    const oldColumns = this.historyColumnCount();
-    const nextColumns = this.historyColumnCountForWidth(width);
-    if (this.historyContentWidth <= 0 || oldColumns === nextColumns) {
-      this.historyContentWidth = width;
-      return;
-    }
-    this.getUIContext().animateTo({ duration: 220, curve: Curve.EaseOut }, () => {
-      this.historyContentWidth = width;
-    });
+    this.historyContentWidth = normalizedWidth;
   }
 
   private buildHistoryRows(): GalleryInfo[][] {

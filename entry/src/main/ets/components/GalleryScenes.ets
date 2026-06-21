@@ -1740,18 +1740,12 @@ export struct GalleryListContent {
   }
 
   private updateContentWidth(width: number): void {
-    if (width <= 0 || Number.isNaN(width) || this.contentWidth === width) {
+    const normalizedWidth = Math.floor(width);
+    if (normalizedWidth <= 0 || Number.isNaN(normalizedWidth) ||
+      Math.abs(this.contentWidth - normalizedWidth) < 1) {
       return;
     }
-    const oldColumns = this.galleryColumnCount();
-    const nextColumns = this.galleryColumnCountForWidth(width);
-    if (this.contentWidth <= 0 || oldColumns === nextColumns) {
-      this.contentWidth = width;
-      return;
-    }
-    this.getUIContext().animateTo({ duration: 220, curve: Curve.EaseOut }, () => {
-      this.contentWidth = width;
-    });
+    this.contentWidth = normalizedWidth;
   }
 
   @Builder
