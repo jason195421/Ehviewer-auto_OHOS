@@ -1777,7 +1777,7 @@ struct ReaderImageViewport {
   }
 
   private imageFit(): ImageFit {
-    return ImageFit.Fill;
+    return ImageFit.Contain;
   }
 
   private imageDisplayWidth(): number | string {
