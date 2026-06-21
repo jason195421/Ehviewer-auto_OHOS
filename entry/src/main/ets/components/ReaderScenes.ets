@@ -1,6 +1,7 @@
 ﻿import { window } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
-import { batteryInfo } from '@kit.BasicServicesKit';
+import { batteryInfo, pasteboard } from '@kit.BasicServicesKit';
+import { fileIo as fs, picker } from '@kit.CoreFileKit';
 import inputConsumer from '@ohos.multimodalInput.inputConsumer';
 import { KeyCode } from '@ohos.multimodalInput.keyCode';
 import { KeyEvent } from '@ohos.multimodalInput.keyEvent';
@@ -16,6 +17,7 @@ import {
   setEmbeddedReaderActive
 } from '../services/EhWindowImmersive';
 import { ehSettingsStore } from '../services/EhSettingsStore';
+import { readerImageCache } from '../services/ReaderImageCache';
 import {
   createEmptyPage,
   getAbilityContext,
@@ -361,6 +363,7 @@ export struct ReaderScene {
   @State showInfo: boolean = false;
   @State preferOriginal: boolean = false;
   @State menuVisible: boolean = false;
+  @State imageActionsVisible: boolean = false;
   @State sliderVisible: boolean = false;
   @State autoTransferPlaying: boolean = false;
   @State currentIndex: number = 0;
@@ -422,6 +425,7 @@ export struct ReaderScene {
     this.fitMode = normalizePageScalingOption(ehSettingsStore.getValue('page_scaling', 'Fit screen'));
     this.startPosition = normalizeStartPositionOption(ehSettingsStore.getValue('start_position', 'Top right'));
     this.menuVisible = false;
+    this.imageActionsVisible = false;
     this.sliderVisible = false;
     this.currentIndex = this.pageIndex;
     this.syncOverlayState();
@@ -548,6 +552,7 @@ export struct ReaderScene {
     this.currentIndex = this.pageIndex;
     this.isDisableSwipe = false;
     this.zoomPercent = 100;
+    this.imageActionsVisible = false;
     this.scheduleAutoTransfer();
     try {
       this.swiperController.changeIndex(this.pageIndex, false);
@@ -614,6 +619,7 @@ export struct ReaderScene {
   }
 
   private showSlider(): void {
+    this.imageActionsVisible = false;
     this.sliderVisible = true;
     this.scheduleSliderHide();
   }
@@ -629,6 +635,7 @@ export struct ReaderScene {
   }
 
   private showMenu(): void {
+    this.imageActionsVisible = false;
     this.menuScreenRotation = readerScreenRotationSetting();
     this.menuReadingDirection = normalizeReadingDirectionOption(ehSettingsStore.getValue('reading_direction', 'Right to left'));
     this.menuPageScaling = normalizePageScalingOption(ehSettingsStore.getValue('page_scaling', 'Fit screen'));
@@ -830,8 +837,105 @@ export struct ReaderScene {
   }
 
   private hideAll(): void {
-    this.hideMenu();
+    if (this.menuVisible) {
+      this.hideMenu();
+    }
+    this.imageActionsVisible = false;
     this.hideSliderAndStopPlayback();
+  }
+
+  private showImageActions(): void {
+    if (readerDisplayImageUrl(this.pageForIndex(this.currentIndex), this.preferOriginal).length === 0) {
+      return;
+    }
+    this.hideSliderAndStopPlayback();
+    this.menuVisible = false;
+    this.imageActionsVisible = true;
+  }
+
+  private hideImageActions(): void {
+    this.imageActionsVisible = false;
+  }
+
+  private refreshCurrentImage(): void {
+    this.hideImageActions();
+    this.onRetry();
+  }
+
+  private shareCurrentImage(): void {
+    const target = this.currentImageShareTarget();
+    this.hideImageActions();
+    if (target.length === 0) {
+      return;
+    }
+    try {
+      const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, target);
+      pasteboard.getSystemPasteboard().setData(data).catch(() => {});
+    } catch (error) {
+    }
+  }
+
+  private saveCurrentImage(): void {
+    const page = this.pageForIndex(this.currentIndex);
+    this.hideImageActions();
+    this.saveReaderImageAsync(page).catch(() => {});
+  }
+
+  private currentImageShareTarget(): string {
+    const page = this.pageForIndex(this.currentIndex);
+    const path = this.localImagePathForPage(page);
+    if (path.length > 0) {
+      return path;
+    }
+    if (this.preferOriginal && page.originImageUrl.length > 0) {
+      return page.originImageUrl;
+    }
+    return page.imageUrl;
+  }
+
+  private localImagePathForPage(page: GalleryPage): string {
+    if (this.preferOriginal && page.cachedOriginImagePath !== undefined && page.cachedOriginImagePath.length > 0) {
+      return stripFileScheme(page.cachedOriginImagePath);
+    }
+    if (!this.preferOriginal && page.cachedImagePath !== undefined && page.cachedImagePath.length > 0) {
+      return stripFileScheme(page.cachedImagePath);
+    }
+    if (page.cachedImagePath !== undefined && page.cachedImagePath.length > 0) {
+      return stripFileScheme(page.cachedImagePath);
+    }
+    if (page.cachedOriginImagePath !== undefined && page.cachedOriginImagePath.length > 0) {
+      return stripFileScheme(page.cachedOriginImagePath);
+    }
+    return '';
+  }
+
+  private async saveReaderImageAsync(page: GalleryPage): Promise<void> {
+    const context = getAbilityContext();
+    if (context === undefined) {
+      return;
+    }
+    let sourcePath = this.localImagePathForPage(page);
+    if (sourcePath.length === 0) {
+      const imageUrl = this.preferOriginal && page.originImageUrl.length > 0 ? page.originImageUrl : page.imageUrl;
+      if (imageUrl.length === 0) {
+        return;
+      }
+      sourcePath = await readerImageCache.ensureCached(context, imageUrl, page.pageUrl, true);
+    }
+    if (sourcePath.length === 0) {
+      return;
+    }
+    const options = new picker.DocumentSaveOptions();
+    options.newFileNames = [readerImageFileName(this.currentIndex, sourcePath, this.currentImageShareTarget())];
+    const documentPicker = new picker.DocumentViewPicker(context);
+    const uris = await documentPicker.save(options);
+    if (uris.length === 0) {
+      return;
+    }
+    try {
+      fs.copyFileSync(sourcePath, uris[0]);
+    } catch (error) {
+    }
   }
 
   // Called from ReaderImageViewport with tap coordinates (vp units)
@@ -842,6 +946,10 @@ export struct ReaderScene {
     }
     if (this.menuVisible) {
       this.hideAll();
+      return;
+    }
+    if (this.imageActionsVisible) {
+      this.hideImageActions();
       return;
     }
     if (this.sliderVisible) {
@@ -890,6 +998,7 @@ export struct ReaderScene {
     this.currentIndex = target;
     this.isDisableSwipe = false;
     this.zoomPercent = 100;
+    this.imageActionsVisible = false;
     if (this.autoTransferPlaying) {
       this.scheduleAutoTransfer();
     }
@@ -906,6 +1015,7 @@ export struct ReaderScene {
     this.currentIndex = index;
     this.isDisableSwipe = false;
     this.zoomPercent = 100;
+    this.imageActionsVisible = false;
     if (this.autoTransferPlaying) {
       this.scheduleAutoTransfer();
     }
@@ -933,6 +1043,16 @@ export struct ReaderScene {
             onTap: (x: number, y: number, w: number, h: number) => {
               if (index === this.currentIndex) {
                 this.onTap(x, y, w, h);
+              }
+            },
+            onRetry: () => {
+              if (index === this.currentIndex) {
+                this.onRetry();
+              }
+            },
+            onImageLongPress: () => {
+              if (index === this.currentIndex) {
+                this.showImageActions();
               }
             },
             onSwipeLockChange: (locked: boolean) => {
@@ -1057,13 +1177,35 @@ export struct ReaderScene {
         .zIndex(5)
       }
 
+      if (this.imageActionsVisible) {
+        ReaderPopupBackdrop({
+          onDismiss: () => {
+            this.hideImageActions();
+          }
+        })
+          .zIndex(6)
+
+        ReaderImageActionDialog({
+          onRefresh: () => {
+            this.refreshCurrentImage();
+          },
+          onShare: () => {
+            this.shareCurrentImage();
+          },
+          onSave: () => {
+            this.saveCurrentImage();
+          }
+        })
+          .zIndex(7)
+      }
+
       // ── Settings menu (upper 2/3 tap) ──
       if (this.menuVisible) {
-        // Full-screen backdrop to dismiss on outside tap
-        Stack() {}
-          .width('100%')
-          .height('100%')
-          .onClick(() => { this.hideMenu(); })
+        ReaderPopupBackdrop({
+          onDismiss: () => {
+            this.hideMenu();
+          }
+        })
           .zIndex(6)
 
         Column() {
@@ -1222,9 +1364,12 @@ export struct ReaderScene {
           .scrollBar(BarState.Off)
           .layoutWeight(1)
         }
-        .width('100%')
-        .constraintSize({ maxHeight: '80%' })
+        .width('92%')
+        .constraintSize({ maxWidth: 520, maxHeight: '82%' })
         .backgroundColor('#EE111827')
+        .borderRadius(12)
+        .clip(true)
+        .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
         .zIndex(7)
       }
     }
@@ -1234,6 +1379,90 @@ export struct ReaderScene {
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
   }
 
+}
+
+@Component
+struct ReaderPopupBackdrop {
+  onDismiss: () => void = () => {};
+
+  build() {
+    Stack() {}
+      .width('100%')
+      .height('100%')
+      .backgroundColor('#99000000')
+      .onClick(() => {
+        this.onDismiss();
+      })
+      .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
+  }
+}
+
+@Component
+struct ReaderImageActionDialog {
+  onRefresh: () => void = () => {};
+  onShare: () => void = () => {};
+  onSave: () => void = () => {};
+
+  build() {
+    Column({ space: 0 }) {
+      ReaderImageActionButton({
+        label: uiText('Refresh'),
+        symbolIcon: $r('sys.symbol.arrow_clockwise'),
+        onTap: this.onRefresh
+      })
+      ReaderMenuDivider()
+      ReaderImageActionButton({
+        label: uiText('Share'),
+        symbolIcon: $r('sys.symbol.share'),
+        onTap: this.onShare
+      })
+      ReaderMenuDivider()
+      ReaderImageActionButton({
+        label: uiText('Save'),
+        symbolIcon: $r('sys.symbol.save'),
+        onTap: this.onSave
+      })
+    }
+    .width('78%')
+    .constraintSize({ maxWidth: 360 })
+    .padding({ top: 6, bottom: 6 })
+    .backgroundColor('#F0111827')
+    .borderRadius(12)
+    .clip(true)
+    .shadow({ radius: 18, color: '#66000000', offsetY: 8 })
+    .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
+  }
+}
+
+@Component
+struct ReaderImageActionButton {
+  label: string = '';
+  symbolIcon: Resource = $r('sys.symbol.circle');
+  onTap: () => void = () => {};
+
+  build() {
+    Button({ type: ButtonType.Normal, stateEffect: true }) {
+      Row() {
+        SymbolGlyph(this.symbolIcon)
+          .fontSize(20)
+          .fontColor([Color.White])
+        Text(this.label)
+          .fontSize(15)
+          .fontColor(Color.White)
+          .margin({ left: 12 })
+          .layoutWeight(1)
+      }
+      .width('100%')
+      .padding({ left: 16, right: 16 })
+    }
+    .width('100%')
+    .height(48)
+    .backgroundColor(Color.Transparent)
+    .borderRadius(0)
+    .onClick(() => {
+      this.onTap();
+    })
+  }
 }
 
 @Component
@@ -1296,6 +1525,30 @@ function readerMenuOptionIndex(options: string[], value: string): number {
   return 0;
 }
 
+function stripFileScheme(path: string): string {
+  return path.indexOf('file://') === 0 ? path.substring('file://'.length) : path;
+}
+
+function readerImageFileName(index: number, sourcePath: string, sourceUrl: string): string {
+  const ext = readerImageExtension(sourcePath.length > 0 ? sourcePath : sourceUrl);
+  return 'ehviewer_page_' + (index + 1).toString() + ext;
+}
+
+function readerImageExtension(value: string): string {
+  const lower = value.toLowerCase();
+  const queryIndex = lower.indexOf('?');
+  const clean = queryIndex >= 0 ? lower.substring(0, queryIndex) : lower;
+  const slash = clean.lastIndexOf('/');
+  const dot = clean.lastIndexOf('.');
+  if (dot > slash && dot >= 0) {
+    const ext = clean.substring(dot);
+    if (ext === '.jpg' || ext === '.jpeg' || ext === '.png' || ext === '.webp' || ext === '.gif') {
+      return ext;
+    }
+  }
+  return '.jpg';
+}
+
 @Component
 struct ReaderMenuToggle {
   label: string = '';
@@ -1329,6 +1582,8 @@ struct ReaderImageViewport {
   @Prop command: string = '';
   @Prop @Watch('onCommandChange') commandVersion: number = 0;
   onTap: (x: number, y: number, w: number, h: number) => void = () => {};
+  onRetry: () => void = () => {};
+  onImageLongPress: () => void = () => {};
   onSwipeLockChange: (locked: boolean) => void = (_locked: boolean) => {};
   onZoomChange: (percent: number) => void = (_percent: number) => {};
 
@@ -1378,6 +1633,11 @@ struct ReaderImageViewport {
   private isImageLoading(): boolean {
     const url = this.imageUrl();
     return url.length > 0 && this.completedImageUrl !== url && this.failedImageUrl !== url;
+  }
+
+  private isImageReady(): boolean {
+    const url = this.imageUrl();
+    return url.length > 0 && this.completedImageUrl === url && this.failedImageUrl !== url;
   }
 
   private onImageSourceChange(): void {
@@ -1505,6 +1765,11 @@ struct ReaderImageViewport {
               .fontColor('#98A2B3')
           }
           .justifyContent(FlexAlign.Center)
+          .onClick(() => {
+            this.failedImageUrl = '';
+            this.completedImageUrl = '';
+            this.onRetry();
+          })
           .zIndex(2)
         }
       } else {
@@ -1524,6 +1789,11 @@ struct ReaderImageViewport {
             .fontColor('#98A2B3')
         }
         .justifyContent(FlexAlign.Center)
+        .onClick(() => {
+          if (this.isFailed()) {
+            this.onRetry();
+          }
+        })
       }
     }
     .width('100%')
@@ -1550,6 +1820,12 @@ struct ReaderImageViewport {
             );
           }),
         GestureGroup(GestureMode.Parallel,
+          LongPressGesture({ repeat: false })
+            .onAction(() => {
+              if (this.isImageReady()) {
+                this.onImageLongPress();
+              }
+            }),
           PanGesture({ fingers: 1, distance: this.imageModel.disableSwipe ? 3 : 50 })
             .onActionStart(() => {
               this.imageModel.panStart();
