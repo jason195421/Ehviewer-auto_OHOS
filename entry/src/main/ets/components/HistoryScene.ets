@@ -878,6 +878,8 @@ export struct HistoryScene {
           this.closeTagSearch();
         }
       })
+        .transition(TransitionEffect.move(TransitionEdge.END)
+          .animation({ duration: 300, curve: Curve.EaseOut }))
     } else if (this.showReader) {
       ReaderScene({
         renderVersion: this.renderVersion,
@@ -1095,6 +1097,9 @@ export struct HistoryScene {
         .width('100%')
         .height('100%')
         .backgroundColor(themePageBackground())
+        .transition(TransitionEffect.asymmetric(
+          TransitionEffect.OPACITY.animation({ duration: 160, curve: Curve.EaseOut }),
+          TransitionEffect.OPACITY.animation({ duration: 1, delay: 300, curve: Curve.Linear })))
       }
     }
   }

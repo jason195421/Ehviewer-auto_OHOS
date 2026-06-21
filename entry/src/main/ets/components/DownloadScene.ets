@@ -1102,6 +1102,8 @@ export struct DownloadScene {
           this.closeTagSearch();
         }
       })
+        .transition(TransitionEffect.move(TransitionEdge.END)
+          .animation({ duration: 300, curve: Curve.EaseOut }))
     } else if (this.showReader) {
       ReaderScene({
         renderVersion: this.localReaderRenderVersion,
@@ -1127,6 +1129,8 @@ export struct DownloadScene {
           this.jumpLocalReader(this.localReaderIndex);
         }
       })
+        .transition(TransitionEffect.move(TransitionEdge.BOTTOM)
+          .animation({ duration: 300, curve: Curve.EaseOut }))
     } else if (this.showDetail) {
       GalleryDetailOverlayScene({
         renderVersion: this.detailRenderVersion,
@@ -1164,6 +1168,8 @@ export struct DownloadScene {
           this.openTagSearch(namespace, tag);
         }
       })
+        .transition(TransitionEffect.move(TransitionEdge.END)
+          .animation({ duration: 300, curve: Curve.EaseOut }))
     } else {
       FloatingToolbarHost({
         kind: 'search',
@@ -1335,6 +1341,9 @@ export struct DownloadScene {
       .width('100%')
       .height('100%')
       .backgroundColor(themePageBackground())
+      .transition(TransitionEffect.asymmetric(
+        TransitionEffect.OPACITY.animation({ duration: 160, curve: Curve.EaseOut }),
+        TransitionEffect.OPACITY.animation({ duration: 1, delay: 300, curve: Curve.Linear })))
     }
   }
 }

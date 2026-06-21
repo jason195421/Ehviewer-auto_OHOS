@@ -151,29 +151,39 @@ struct Index {
   private RouteContent() {
     if (this.activeRoute === GalleryRoute.Home) {
       HomeGalleryScene({ onMenu: () => { this.openDrawer(); } })
+        .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
     } else if (this.activeRoute === GalleryRoute.Subscription) {
       SubscriptionGalleryScene({ onMenu: () => { this.openDrawer(); } })
+        .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
     } else if (this.activeRoute === GalleryRoute.WhatsHot) {
       HotGalleryScene({ onMenu: () => { this.openDrawer(); } })
+        .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
     } else if (this.activeRoute === GalleryRoute.TopLists) {
       TopListScene({ onMenu: () => { this.openDrawer(); } })
+        .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
     } else if (this.activeRoute === GalleryRoute.Favorites) {
       FavoriteGalleryScene({ onMenu: () => { this.openDrawer(); } })
+        .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
     } else if (this.activeRoute === GalleryRoute.History) {
       HistoryScene({ onMenu: () => { this.openDrawer(); } })
+        .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
     } else if (this.activeRoute === GalleryRoute.Downloads) {
       DownloadScene({ onMenu: () => { this.openDrawer(); } })
+        .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
     } else if (this.activeRoute === GalleryRoute.Session) {
       SessionScene({
         onSignedIn: () => { this.activeRoute = this.routeAfterSignIn(); }
       })
+        .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
     } else if (this.activeRoute === GalleryRoute.Migration) {
       MigrationScene()
+        .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
     } else {
       SettingsScene({
         onMenu: () => { this.openDrawer(); },
         onSignedIn: () => { this.activeRoute = this.routeAfterSignIn(); }
       })
+        .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
     }
   }
 }

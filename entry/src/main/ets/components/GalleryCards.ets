@@ -367,6 +367,19 @@ export struct GalleryThumbCard {
   @Prop gallery: GalleryInfo = createEmptyGallery();
   @Prop selected: boolean = false;
 
+  private readPageText(): string {
+    if (this.gallery.pages <= 0) {
+      return '';
+    }
+    const readIndex = ehHistoryStore.getReadPage(this.gallery.gid);
+    const readPages = readIndex >= 0 ? Math.min(this.gallery.pages, readIndex + 1) : 0;
+    return readPages.toString() + '/' + this.gallery.pages.toString() + ' P';
+  }
+
+  private showReadPageText(): boolean {
+    return showGalleryPages() && this.gallery.pages > 0;
+  }
+
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       Column() {
@@ -397,9 +410,13 @@ export struct GalleryThumbCard {
           Row() {
             CategoryBadge({ category: this.gallery.category })
             Blank()
-            Text(this.gallery.pages.toString() + 'p')
-              .fontSize(11)
-              .fontColor(themeTertiaryText())
+            if (this.showReadPageText()) {
+              Text(this.readPageText())
+                .fontSize(11)
+                .fontColor(themeTertiaryText())
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+            }
           }
           .width('100%')
           .margin({ top: 4 })

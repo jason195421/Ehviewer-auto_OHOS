@@ -1430,6 +1430,9 @@ export struct GalleryListScene {
             updateGalleryListScrollCache(this.cacheKey(), this.listScrollOffset);
           }
         })
+          .transition(TransitionEffect.asymmetric(
+            TransitionEffect.OPACITY.animation({ duration: 160, curve: Curve.EaseOut }),
+            TransitionEffect.OPACITY.animation({ duration: 1, delay: 300, curve: Curve.Linear })))
       }
     }
     .width('100%')

@@ -785,6 +785,8 @@ export struct SettingsScene {
           this.selectOptionValue(value);
         }
       })
+        .transition(TransitionEffect.move(TransitionEdge.END)
+          .animation({ duration: 300, curve: Curve.EaseOut }))
     } else if (this.panel === SettingsPanel.Filter) {
       FilterPanel({
         rules: this.filterRules,
@@ -810,6 +812,8 @@ export struct SettingsScene {
           this.toggleFilterRule(id);
         }
       })
+        .transition(TransitionEffect.move(TransitionEdge.END)
+          .animation({ duration: 300, curve: Curve.EaseOut }))
     } else if (this.panel === SettingsPanel.WebView) {
       Column() {
         SettingsSubToolbar({
@@ -829,6 +833,8 @@ export struct SettingsScene {
       }
       .width('100%')
       .height('100%')
+      .transition(TransitionEffect.move(TransitionEdge.END)
+        .animation({ duration: 300, curve: Curve.EaseOut }))
     } else if (this.panel === SettingsPanel.Session) {
       Column() {
         SettingsSubToolbar({
@@ -849,6 +855,8 @@ export struct SettingsScene {
       }
       .width('100%')
       .height('100%')
+      .transition(TransitionEffect.move(TransitionEdge.END)
+        .animation({ duration: 300, curve: Curve.EaseOut }))
     } else if (this.panel === SettingsPanel.Migration) {
       Column() {
         SettingsSubToolbar({
@@ -862,6 +870,8 @@ export struct SettingsScene {
       }
       .width('100%')
       .height('100%')
+      .transition(TransitionEffect.move(TransitionEdge.END)
+        .animation({ duration: 300, curve: Curve.EaseOut }))
     } else if (this.panel === SettingsPanel.Main) {
       SettingsHomePanel({
         signedIn: this.signedIn,
@@ -871,6 +881,9 @@ export struct SettingsScene {
           this.openPanel(panel);
         }
       })
+        .transition(TransitionEffect.asymmetric(
+          TransitionEffect.OPACITY.animation({ duration: 160, curve: Curve.EaseOut }),
+          TransitionEffect.OPACITY.animation({ duration: 1, delay: 300, curve: Curve.Linear })))
     } else {
       SettingsDetailPanel({
         panel: this.panel,
@@ -898,6 +911,9 @@ export struct SettingsScene {
           this.saveSettingValue(key, value);
         }
       })
+        .transition(TransitionEffect.asymmetric(
+          TransitionEffect.OPACITY.animation({ duration: 160, curve: Curve.EaseOut }),
+          TransitionEffect.OPACITY.animation({ duration: 1, delay: 300, curve: Curve.Linear })))
     }
   }
 }
