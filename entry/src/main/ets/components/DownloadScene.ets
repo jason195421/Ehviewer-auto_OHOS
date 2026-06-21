@@ -386,6 +386,22 @@ export struct DownloadScene {
     return row.map((item: DownloadInfo) => item.gid.toString()).join('-');
   }
 
+  private downloadProgressPercent(item: DownloadInfo): string {
+    const total = item.total > 0 ? item.total : item.pages;
+    if (total <= 0) {
+      return '0%';
+    }
+    const value = Math.max(0, Math.min(100, Math.round(item.finished * 100 / total)));
+    return value.toString() + '%';
+  }
+
+  private downloadSpeedLabel(item: DownloadInfo): string {
+    if (item.speed <= 0) {
+      return '';
+    }
+    return downloadSizeText(item.speed) + '/s';
+  }
+
   private startAll(): void {
     this.shouldStop = false;
     this.stoppedGids = [];
@@ -1215,38 +1231,47 @@ export struct DownloadScene {
                   Row() {
                     ForEach(row, (item: DownloadInfo, colIndex: number) => {
                       Column() {
-                        if (galleryListMode() === 'Thumb') {
-                          GalleryThumbCard({ gallery: item, selected: this.isDownloadSelected(item.gid) })
-                            .width('100%')
-                            .onClick(() => {
-                              this.handleDownloadCardTap(item);
-                            })
+                      if (galleryListMode() === 'Thumb') {
+                        GalleryThumbCard({ gallery: item, selected: this.isDownloadSelected(item.gid) })
+                          .width('100%')
+                          .zIndex(2)
+                          .onClick(() => {
+                            this.handleDownloadCardTap(item);
+                          })
                             .gesture(LongPressGesture({ repeat: false }).onAction(() => {
                               this.toggleDownloadSelection(item);
                             }))
-                        } else {
-                          GalleryListRow({ gallery: item, selected: this.isDownloadSelected(item.gid) })
-                            .width('100%')
-                            .onClick(() => {
-                              this.handleDownloadCardTap(item);
-                            })
+                      } else {
+                        GalleryListRow({ gallery: item, selected: this.isDownloadSelected(item.gid) })
+                          .width('100%')
+                          .zIndex(2)
+                          .onClick(() => {
+                            this.handleDownloadCardTap(item);
+                          })
                             .gesture(LongPressGesture({ repeat: false }).onAction(() => {
                               this.toggleDownloadSelection(item);
                             }))
                         }
                         if (item.state !== DownloadState.Finish) {
-                          DownloadCardStatus({
-                            item: item,
-                            revision: this.downloadProgressRevision,
-                            onStatusTap: (downloadItem: DownloadInfo) => {
-                              this.toggleItemFromProgress(downloadItem);
+                        DownloadCardStatus({
+                          item: item,
+                          state: item.state,
+                          progressText: downloadProgressText(item),
+                          progressPercentValue: this.downloadProgressPercent(item),
+                          speedTextValue: this.downloadSpeedLabel(item),
+                          revision: this.downloadProgressRevision,
+                          onStatusTap: (downloadItem: DownloadInfo) => {
+                            this.toggleItemFromProgress(downloadItem);
                             }
-                          })
-                            .margin({ top: 4 })
-                            .transition(TransitionEffect.move(TransitionEdge.TOP)
-                              .animation({ duration: 180, curve: Curve.EaseOut }))
-                        }
+                        })
+                          .margin({ top: 4 })
+                          .zIndex(1)
+                          .transition(TransitionEffect.asymmetric(
+                            TransitionEffect.OPACITY.animation({ duration: 160, curve: Curve.EaseOut }),
+                            TransitionEffect.move(TransitionEdge.TOP)
+                              .animation({ duration: 180, curve: Curve.EaseIn })))
                       }
+                    }
                       .width(this.downloadCardWidth())
                       .margin({ right: colIndex < row.length - 1 ? this.downloadCardGap() : 0 })
                       .animation({ duration: 220, curve: Curve.EaseOut })
@@ -1267,8 +1292,7 @@ export struct DownloadScene {
             .cachedCount(4)
             .padding({
               left: this.downloadContentPadding(),
-              right: this.downloadContentPadding(),
-              bottom: this.downloadCardGap()
+              right: this.downloadContentPadding()
             })
             .translate({ y: this.downloadContentStartOffset() })
             .onAreaChange((_oldArea: Area, newArea: Area) => {
@@ -1454,49 +1478,37 @@ struct DownloadToolColumn {
 @Component
 struct DownloadCardStatus {
   @Prop item: DownloadInfo = createEmptyDownloadInfo();
+  @Prop state: DownloadState = DownloadState.None;
+  @Prop progressText: string = '';
+  @Prop progressPercentValue: string = '0%';
+  @Prop speedTextValue: string = '';
   @Prop revision: number = 0;
   onStatusTap: (item: DownloadInfo) => void = (_item: DownloadInfo) => {};
 
   private isDownloading(): boolean {
-    return this.item.state === DownloadState.Downloading;
-  }
-
-  private progressPercent(): string {
-    const total = this.item.total > 0 ? this.item.total : this.item.pages;
-    if (total <= 0) {
-      return '0%';
-    }
-    const value = Math.max(0, Math.min(100, Math.round(this.item.finished * 100 / total)));
-    return value.toString() + '%';
-  }
-
-  private speedText(): string {
-    if (this.item.speed <= 0) {
-      return '';
-    }
-    return downloadSizeText(this.item.speed) + '/s';
+    return this.state === DownloadState.Downloading;
   }
 
   build() {
     Column() {
       Row() {
-        Text(uiValue(downloadStateLabel(this.item.state)))
+        Text(uiValue(downloadStateLabel(this.state)))
           .fontSize(10)
           .fontColor(themeOnPrimaryText())
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-          .backgroundColor(downloadStateColor(this.item.state))
+          .backgroundColor(downloadStateColor(this.state))
           .borderRadius(3)
-        Text(downloadProgressText(this.item))
+        Text(this.progressText)
           .fontSize(11)
           .fontColor(themeSecondaryText())
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .margin({ left: 6 })
           .layoutWeight(1)
-        if (this.isDownloading() && this.speedText().length > 0) {
-          Text(this.speedText())
+        if (this.isDownloading() && this.speedTextValue.length > 0) {
+          Text(this.speedTextValue)
             .fontSize(11)
             .fontColor(themeTertiaryText())
             .maxLines(1)
@@ -1513,8 +1525,8 @@ struct DownloadCardStatus {
           .borderRadius(2)
         Row()
           .height(4)
-          .width(this.progressPercent())
-          .backgroundColor(downloadStateColor(this.item.state))
+          .width(this.progressPercentValue)
+          .backgroundColor(downloadStateColor(this.state))
           .borderRadius(2)
       }
       .width('100%')
