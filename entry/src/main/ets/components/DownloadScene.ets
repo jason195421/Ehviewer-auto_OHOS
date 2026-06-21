@@ -111,6 +111,8 @@ export struct DownloadScene {
   private toolbarRestoring: boolean = false;
   private localReaderPreviewPageSize: number = 0;
   private downloadRowsDataSource: ArrayDataSource<DownloadInfo[]> = new ArrayDataSource<DownloadInfo[]>([]);
+  private downloadRowStructureKeys: string[] = [];
+  private downloadRowProgressKeys: string[] = [];
 
   aboutToAppear(): void {
     applyAppChromeImmersiveMode();
@@ -384,16 +386,46 @@ export struct DownloadScene {
   }
 
   private refreshDownloadRows(): void {
-    this.downloadRowsDataSource.setItems(this.buildDownloadRows());
+    const rows = this.buildDownloadRows();
+    const structureKeys: string[] = [];
+    const progressKeys: string[] = [];
+    let structureChanged = rows.length !== this.downloadRowStructureKeys.length;
+    for (let i = 0; i < rows.length; i++) {
+      const structureKey = this.downloadRowKey(rows[i]);
+      const progressKey = this.downloadRowProgressKey(rows[i]);
+      structureKeys.push(structureKey);
+      progressKeys.push(progressKey);
+      if (!structureChanged && structureKey !== this.downloadRowStructureKeys[i]) {
+        structureChanged = true;
+      }
+    }
+    this.downloadRowsDataSource.replaceItems(rows);
+    if (structureChanged) {
+      this.downloadRowStructureKeys = structureKeys;
+      this.downloadRowProgressKeys = progressKeys;
+      this.downloadRowsDataSource.notifyReload();
+      return;
+    }
+    for (let i = 0; i < progressKeys.length; i++) {
+      if (progressKeys[i] !== this.downloadRowProgressKeys[i]) {
+        this.downloadRowsDataSource.notifyChange(i);
+      }
+    }
+    this.downloadRowStructureKeys = structureKeys;
+    this.downloadRowProgressKeys = progressKeys;
   }
 
   private downloadRowKey(row: DownloadInfo[]): string {
-    return row.map((item: DownloadInfo) => this.downloadItemRenderKey(item)).join('-');
+    return row.map((item: DownloadInfo) => item.gid.toString()).join('-');
   }
 
-  private downloadItemRenderKey(item: DownloadInfo): string {
+  private downloadItemProgressKey(item: DownloadInfo): string {
     return item.gid.toString() + ':' + item.state + ':' + item.finished.toString() + ':' +
       item.total.toString() + ':' + item.downloaded.toString() + ':' + item.speed.toString();
+  }
+
+  private downloadRowProgressKey(row: DownloadInfo[]): string {
+    return row.map((item: DownloadInfo) => this.downloadItemProgressKey(item)).join('|');
   }
 
   private downloadProgressPercent(item: DownloadInfo): string {
@@ -1286,7 +1318,7 @@ export struct DownloadScene {
                       .width(this.downloadCardWidth())
                       .margin({ right: colIndex < row.length - 1 ? this.downloadCardGap() : 0 })
                       .animation({ duration: 220, curve: Curve.EaseOut })
-                    }, (item: DownloadInfo) => this.downloadItemRenderKey(item))
+                    }, (item: DownloadInfo) => item.gid.toString())
                   }
                   .width('100%')
                   .justifyContent(FlexAlign.Start)

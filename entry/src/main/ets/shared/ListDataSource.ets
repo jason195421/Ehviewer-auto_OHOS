@@ -11,6 +11,23 @@ export class ArrayDataSource<T> implements IDataSource {
     this.notifyReloaded();
   }
 
+  replaceItems(items: T[]): void {
+    this.items = items;
+  }
+
+  notifyChange(index: number): void {
+    if (index < 0 || index >= this.items.length) {
+      return;
+    }
+    for (let i = 0; i < this.listeners.length; i++) {
+      this.listeners[i].onDataChange(index);
+    }
+  }
+
+  notifyReload(): void {
+    this.notifyReloaded();
+  }
+
   totalCount(): number {
     return this.items.length;
   }
