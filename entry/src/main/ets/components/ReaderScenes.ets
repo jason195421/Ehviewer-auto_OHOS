@@ -38,9 +38,12 @@ import { readerSelectColors, selectArrowModifier } from '../shared/EhSelectStyle
 import { themeOnPrimaryText, themeOnPrimarySecondaryText, themeScrimColor } from '../shared/EhTheme';
 import { EhSubNavBar } from './NavigationComponents';
 
-const READER_MIN_SCALE: number = 1;
+const READER_MIN_SCALE: number = 0.25;
+const READER_BASE_SCALE: number = 1;
 const READER_MAX_SCALE: number = 4;
 const READER_DOUBLE_TAP_SCALE: number = 2.25;
+const READER_EDGE_PAGE_DRAG_THRESHOLD: number = 44;
+const READER_INERTIA_DURATION: number = 180;
 const SLIDER_AUTO_HIDE_DELAY: number = 3000;
 const READER_OFFSCREEN_RENDER_COUNT: number = 2;
 
@@ -59,8 +62,8 @@ interface ReaderImageCompleteEvent {
 
 @Observed
 class ReaderPreviewModel {
-  currentScale: number = READER_MIN_SCALE;
-  lastScale: number = READER_MIN_SCALE;
+  currentScale: number = READER_BASE_SCALE;
+  lastScale: number = READER_BASE_SCALE;
   currentOffsetX: number = 0;
   currentOffsetY: number = 0;
   lastOffsetX: number = 0;
@@ -74,8 +77,8 @@ class ReaderPreviewModel {
   disableSwipe: boolean = false;
 
   reset(): void {
-    this.currentScale = READER_MIN_SCALE;
-    this.lastScale = READER_MIN_SCALE;
+    this.currentScale = READER_BASE_SCALE;
+    this.lastScale = READER_BASE_SCALE;
     this.currentOffsetX = 0;
     this.currentOffsetY = 0;
     this.lastOffsetX = 0;
@@ -130,10 +133,6 @@ class ReaderPreviewModel {
   }
 
   pinchEnd(): void {
-    if (this.currentScale <= READER_MIN_SCALE + 0.01) {
-      this.reset();
-      return;
-    }
     this.restrictBoundary();
     this.commit();
   }
@@ -142,33 +141,41 @@ class ReaderPreviewModel {
     this.lastOffsetX = this.currentOffsetX;
     this.lastOffsetY = this.currentOffsetY;
     this.lastScale = this.currentScale;
-    this.disableSwipe = this.currentScale > READER_MIN_SCALE + 0.01 && !this.isHorizontalBoundary();
+    this.disableSwipe = this.canPanHorizontally() && !this.isHorizontalBoundary();
   }
 
-  panUpdate(offsetX: number, offsetY: number): void {
-    if (this.currentScale <= READER_MIN_SCALE + 0.01) {
+  panUpdate(offsetX: number, offsetY: number): number {
+    if (!this.canPan()) {
       this.disableSwipe = false;
-      return;
+      return 0;
     }
+    const edgeDirection = this.edgePageDirection(offsetX);
     this.currentOffsetX = this.lastOffsetX + offsetX;
     this.currentOffsetY = this.lastOffsetY + offsetY;
     this.restrictBoundary();
+    return edgeDirection;
   }
 
-  panEnd(): void {
+  panEnd(velocityX: number = 0, velocityY: number = 0): void {
+    if (this.canPan() && (Math.abs(velocityX) > 20 || Math.abs(velocityY) > 20)) {
+      const inertiaX = Math.max(-180, Math.min(180, velocityX * 0.12));
+      const inertiaY = Math.max(-180, Math.min(180, velocityY * 0.12));
+      this.currentOffsetX += inertiaX;
+      this.currentOffsetY += inertiaY;
+    }
     this.restrictBoundary();
     this.commit();
   }
 
   toggleDoubleTap(centerX: number, centerY: number): void {
-    if (this.currentScale > READER_MIN_SCALE + 0.01) {
+    if (Math.abs(this.currentScale - READER_BASE_SCALE) > 0.01) {
       this.reset();
       return;
     }
     const center = this.evaluateCenter(centerX, centerY);
     this.centerX = center[0];
     this.centerY = center[1];
-    this.lastScale = READER_MIN_SCALE;
+    this.lastScale = READER_BASE_SCALE;
     this.lastOffsetX = 0;
     this.lastOffsetY = 0;
     this.currentScale = READER_DOUBLE_TAP_SCALE;
@@ -180,7 +187,7 @@ class ReaderPreviewModel {
 
   zoomBy(factor: number): void {
     const target = this.clampScale(this.currentScale * factor);
-    if (Math.abs(target - READER_MIN_SCALE) < 0.01) {
+    if (Math.abs(target - READER_BASE_SCALE) < 0.01) {
       this.reset();
       return;
     }
@@ -203,7 +210,7 @@ class ReaderPreviewModel {
     this.lastScale = this.currentScale;
     this.lastOffsetX = this.currentOffsetX;
     this.lastOffsetY = this.currentOffsetY;
-    this.disableSwipe = this.currentScale > READER_MIN_SCALE + 0.01 && !this.isHorizontalBoundary();
+    this.disableSwipe = this.canPanHorizontally() && !this.isHorizontalBoundary();
   }
 
   private clampScale(value: number): number {
@@ -235,13 +242,7 @@ class ReaderPreviewModel {
     const maxY = this.maxOffsetY();
     this.currentOffsetX = Math.max(-maxX, Math.min(maxX, this.currentOffsetX));
     this.currentOffsetY = Math.max(-maxY, Math.min(maxY, this.currentOffsetY));
-    if (this.currentScale <= READER_MIN_SCALE + 0.01) {
-      this.currentOffsetX = 0;
-      this.currentOffsetY = 0;
-      this.disableSwipe = false;
-    } else {
-      this.disableSwipe = !this.isHorizontalBoundary();
-    }
+    this.disableSwipe = this.canPanHorizontally() && !this.isHorizontalBoundary();
   }
 
   private isHorizontalBoundary(): boolean {
@@ -250,6 +251,29 @@ class ReaderPreviewModel {
       return true;
     }
     return Math.abs(this.currentOffsetX) >= maxX - 0.5;
+  }
+
+  private canPan(): boolean {
+    return this.maxOffsetX() > 0 || this.maxOffsetY() > 0;
+  }
+
+  private canPanHorizontally(): boolean {
+    return this.maxOffsetX() > 0;
+  }
+
+  private edgePageDirection(offsetX: number): number {
+    const maxX = this.maxOffsetX();
+    if (maxX <= 0) {
+      return 0;
+    }
+    const targetX = this.lastOffsetX + offsetX;
+    if (targetX < -maxX - READER_EDGE_PAGE_DRAG_THRESHOLD) {
+      return 1;
+    }
+    if (targetX > maxX + READER_EDGE_PAGE_DRAG_THRESHOLD) {
+      return -1;
+    }
+    return 0;
   }
 }
 
@@ -377,6 +401,7 @@ export struct ReaderScene {
   @State currentIndex: number = 0;
   @State isDisableSwipe: boolean = false;
   @State zoomPercent: number = 100;
+  @State fixedScale: number = READER_BASE_SCALE;
   @State viewportCommand: string = '';
   @State viewportCommandVersion: number = 0;
   // Swiper direction state (applied from menu)
@@ -570,7 +595,7 @@ export struct ReaderScene {
   onPageIndexChange(): void {
     this.currentIndex = this.pageIndex;
     this.isDisableSwipe = false;
-    this.zoomPercent = 100;
+    this.zoomPercent = this.isFixedScaleMode() ? Math.round(this.fixedScale * 100) : 100;
     this.imageActionsVisible = false;
     this.scheduleAutoTransfer();
     try {
@@ -634,6 +659,20 @@ export struct ReaderScene {
     const count = this.totalPages <= 0 ? 1 : this.totalPages;
     const visualIndex = Math.max(0, Math.min(count - 1, index));
     return this.swiperReversed ? count - 1 - visualIndex : visualIndex;
+  }
+
+  private isFixedScaleMode(): boolean {
+    return normalizePageScalingOption(this.fitMode) === 'Fixed scale';
+  }
+
+  private jumpByVisualDirection(direction: number): void {
+    const visualIndex = this.visualIndexForPageIndex(this.currentIndex);
+    const targetVisualIndex = visualIndex + direction;
+    const count = this.totalPages <= 0 ? 1 : this.totalPages;
+    if (targetVisualIndex < 0 || targetVisualIndex >= count) {
+      return;
+    }
+    this.jumpTo(this.pageIndexForVisualIndex(targetVisualIndex));
   }
 
   private issueViewportCommand(command: string): void {
@@ -706,9 +745,16 @@ export struct ReaderScene {
     ehSettingsStore.setValue('start_transfer_time', normalizeAutoTransferTimeOption(this.menuAutoTransferTime));
     ehSettingsStore.setValue('custom_screen_lightness', this.menuCustomBrightness ? 'On' : 'Off');
     ehSettingsStore.setValue('screen_lightness', normalizeBrightnessLevelOption(this.menuBrightnessLevel));
-    this.fitMode = normalizePageScalingOption(this.menuPageScaling);
+    const nextFitMode = normalizePageScalingOption(this.menuPageScaling);
+    if (nextFitMode === 'Fixed scale') {
+      this.fixedScale = Math.max(READER_MIN_SCALE, Math.min(READER_MAX_SCALE, this.zoomPercent / 100));
+      this.zoomPercent = Math.round(this.fixedScale * 100);
+    } else {
+      this.zoomPercent = 100;
+    }
+    this.fitMode = nextFitMode;
     this.startPosition = normalizeStartPositionOption(this.menuStartPosition);
-    this.issueViewportCommand('reset');
+    this.issueViewportCommand(nextFitMode === 'Fixed scale' ? 'fixed_scale' : 'reset');
     this.syncOverlayState();
     this.syncDirectionState();
     this.refreshBattery();
@@ -1032,7 +1078,7 @@ export struct ReaderScene {
     }
     this.currentIndex = target;
     this.isDisableSwipe = false;
-    this.zoomPercent = 100;
+    this.zoomPercent = this.isFixedScaleMode() ? Math.round(this.fixedScale * 100) : 100;
     this.imageActionsVisible = false;
     if (this.autoTransferPlaying) {
       this.scheduleAutoTransfer();
@@ -1050,7 +1096,7 @@ export struct ReaderScene {
     }
     this.currentIndex = index;
     this.isDisableSwipe = false;
-    this.zoomPercent = 100;
+    this.zoomPercent = this.isFixedScaleMode() ? Math.round(this.fixedScale * 100) : 100;
     this.imageActionsVisible = false;
     if (this.autoTransferPlaying) {
       this.scheduleAutoTransfer();
@@ -1072,6 +1118,7 @@ export struct ReaderScene {
             statusText: index === this.pageIndex ? this.statusText : uiText('Image page is loading'),
             preferOriginal: this.preferOriginal,
             fitMode: this.fitMode,
+            fixedScale: this.fixedScale,
             startPosition: this.startPosition,
             isActive: index === this.currentIndex,
             command: this.viewportCommand,
@@ -1099,6 +1146,14 @@ export struct ReaderScene {
             onZoomChange: (percent: number) => {
               if (index === this.currentIndex) {
                 this.zoomPercent = percent;
+                if (this.isFixedScaleMode()) {
+                  this.fixedScale = Math.max(READER_MIN_SCALE, Math.min(READER_MAX_SCALE, percent / 100));
+                }
+              }
+            },
+            onEdgePan: (direction: number) => {
+              if (index === this.currentIndex) {
+                this.jumpByVisualDirection(direction);
               }
             }
           })
@@ -1690,8 +1745,9 @@ struct ReaderImageViewport {
   @Prop statusText: string = '';
   @Prop @Watch('onImageSourceChange') preferOriginal: boolean = false;
   @Prop @Watch('onFitModeChange') fitMode: string = 'Fit screen';
+  @Prop fixedScale: number = READER_BASE_SCALE;
   @Prop startPosition: string = 'Top right';
-  @Prop isActive: boolean = false;
+  @Prop @Watch('onActiveChange') isActive: boolean = false;
   @Prop command: string = '';
   @Prop @Watch('onCommandChange') commandVersion: number = 0;
   onTap: (x: number, y: number, w: number, h: number) => void = () => {};
@@ -1699,6 +1755,7 @@ struct ReaderImageViewport {
   onImageLongPress: () => void = () => {};
   onSwipeLockChange: (locked: boolean) => void = (_locked: boolean) => {};
   onZoomChange: (percent: number) => void = (_percent: number) => {};
+  onEdgePan: (direction: number) => void = (_direction: number) => {};
 
   @State imageModel: ReaderPreviewModel = new ReaderPreviewModel();
   @State completedImageUrl: string = '';
@@ -1707,6 +1764,7 @@ struct ReaderImageViewport {
   @State sourceImageHeight: number = 0;
   @State displayImageWidth: number = 1;
   @State displayImageHeight: number = 1;
+  @State edgePanTriggered: boolean = false;
   private lastCommandVersion: number = -1;
 
   aboutToAppear(): void {
@@ -1733,8 +1791,16 @@ struct ReaderImageViewport {
       this.imageModel.setScale(READER_DOUBLE_TAP_SCALE);
     } else if (this.command === 'reset') {
       this.imageModel.reset();
+    } else if (this.command === 'fixed_scale') {
+      this.syncFixedScale();
     }
     this.reportState();
+  }
+
+  onActiveChange(): void {
+    if (this.isActive) {
+      this.syncFixedScale();
+    }
   }
 
   private imageUrl(): string {
@@ -1768,12 +1834,23 @@ struct ReaderImageViewport {
     this.sourceImageWidth = 0;
     this.sourceImageHeight = 0;
     this.updateDisplayImageSize();
+    this.syncFixedScale();
   }
 
   private onFitModeChange(): void {
-    this.imageModel.reset();
     this.updateDisplayImageSize();
+    if (!this.syncFixedScale()) {
+      this.imageModel.reset();
+    }
     this.reportState();
+  }
+
+  private syncFixedScale(): boolean {
+    if (normalizePageScalingOption(this.fitMode) !== 'Fixed scale') {
+      return false;
+    }
+    this.imageModel.setScale(this.fixedScale);
+    return true;
   }
 
   private imageFit(): ImageFit {
@@ -1901,7 +1978,7 @@ struct ReaderImageViewport {
           })
           .scale({ x: this.imageModel.currentScale, y: this.imageModel.currentScale, centerX: '50%', centerY: '50%' })
           .translate({ x: this.imageModel.currentOffsetX, y: this.imageModel.currentOffsetY })
-          .animation({ duration: 120, curve: Curve.EaseOut })
+          .animation({ duration: READER_INERTIA_DURATION, curve: Curve.EaseOut })
         if (this.isImageLoading()) {
           LoadingProgress()
             .width(44)
@@ -1984,18 +2061,27 @@ struct ReaderImageViewport {
             }),
           PanGesture({ fingers: 1, distance: this.imageModel.disableSwipe ? 3 : 50 })
             .onActionStart(() => {
+              this.edgePanTriggered = false;
               this.imageModel.panStart();
               this.reportState();
             })
             .onActionUpdate((event: GestureEvent) => {
-              this.imageModel.panUpdate(event.offsetX, event.offsetY);
+              if (this.edgePanTriggered) {
+                return;
+              }
+              const direction = this.imageModel.panUpdate(event.offsetX, event.offsetY);
+              if (direction !== 0) {
+                this.edgePanTriggered = true;
+                this.onEdgePan(direction);
+              }
               this.reportState();
             })
-            .onActionEnd(() => {
-              this.imageModel.panEnd();
+            .onActionEnd((event: GestureEvent) => {
+              this.imageModel.panEnd(event.velocityX, event.velocityY);
               this.reportState();
             })
             .onActionCancel(() => {
+              this.edgePanTriggered = false;
               this.imageModel.panEnd();
               this.reportState();
             }),
