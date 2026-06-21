@@ -28,6 +28,13 @@ export interface CacheClearResult {
   bytes: number;
 }
 
+export interface ImageDownloadProgress {
+  receivedBytes: number;
+  totalBytes: number;
+}
+
+export type ImageDownloadProgressCallback = (progress: ImageDownloadProgress) => void;
+
 interface ImageRequestHeader {
   'User-Agent': string;
   'Accept': string;
@@ -39,7 +46,7 @@ interface ImageRequestHeader {
 
 export class ReaderImageCache {
   async ensureCached(context: common.UIAbilityContext, imageUrl: string, referer: string,
-    priority: boolean = false): Promise<string> {
+    priority: boolean = false, onProgress?: ImageDownloadProgressCallback): Promise<string> {
     if (imageUrl.length === 0) {
       return '';
     }
@@ -54,7 +61,7 @@ export class ReaderImageCache {
       return pending;
     }
 
-    const promise = this.download(context, imageUrl, referer, path, priority);
+    const promise = this.download(context, imageUrl, referer, path, priority, onProgress);
     putPending(imageUrl, promise);
     try {
       return await promise;
@@ -92,11 +99,11 @@ export class ReaderImageCache {
   }
 
   private async download(context: common.UIAbilityContext, imageUrl: string, referer: string, path: string,
-    priority: boolean): Promise<string> {
+    priority: boolean, onProgress?: ImageDownloadProgressCallback): Promise<string> {
     ensureDirectory(context.cacheDir + '/reader_images');
     await acquireImageSlot(priority);
     try {
-      await this.downloadWithRetry(imageUrl, referer, path);
+      await this.downloadWithRetry(imageUrl, referer, path, onProgress);
       pruneImageCache(context.cacheDir + '/reader_images');
       return path;
     } finally {
@@ -104,11 +111,12 @@ export class ReaderImageCache {
     }
   }
 
-  private async downloadWithRetry(imageUrl: string, referer: string, path: string): Promise<void> {
+  private async downloadWithRetry(imageUrl: string, referer: string, path: string,
+    onProgress?: ImageDownloadProgressCallback): Promise<void> {
     let lastError = '';
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        await this.downloadOnce(imageUrl, referer, path);
+        await this.downloadOnce(imageUrl, referer, path, onProgress);
         return;
       } catch (error) {
         removeFileQuietly(path);
@@ -122,7 +130,12 @@ export class ReaderImageCache {
     throw new Error(lastError.length > 0 ? lastError : 'Image download failed');
   }
 
-  private async downloadOnce(imageUrl: string, referer: string, path: string): Promise<void> {
+  private async downloadOnce(imageUrl: string, referer: string, path: string,
+    onProgress?: ImageDownloadProgressCallback): Promise<void> {
+    if (onProgress !== undefined) {
+      await this.downloadOnceInStream(imageUrl, referer, path, onProgress);
+      return;
+    }
     const request = http.createHttp();
     try {
       const header = buildImageRequestHeader(referer, ehCookieStore.getCookieHeader());
@@ -152,6 +165,63 @@ export class ReaderImageCache {
       throw new Error(imageNetworkErrorMessage(error));
     } finally {
       try {
+        request.destroy();
+      } catch (error) {
+      }
+    }
+  }
+
+  private async downloadOnceInStream(imageUrl: string, referer: string, path: string,
+    onProgress: ImageDownloadProgressCallback): Promise<void> {
+    const request = http.createHttp();
+    let fd = -1;
+    try {
+      const file = fs.openSync(path, fs.OpenMode.CREATE | fs.OpenMode.TRUNC | fs.OpenMode.READ_WRITE);
+      fd = file.fd;
+      const header = buildImageRequestHeader(referer, ehCookieStore.getCookieHeader());
+      const timeout = imageRequestTimeoutMs();
+      await ensureEhHostRules();
+      const options: http.HttpRequestOptions = {
+        method: http.RequestMethod.GET,
+        header: header,
+        expectDataType: http.HttpDataType.ARRAY_BUFFER,
+        connectTimeout: timeout,
+        readTimeout: timeout
+      };
+      applyEhNetworkOptions(options);
+      request.on('dataReceive', (data: ArrayBuffer) => {
+        if (data.byteLength > 0 && fd >= 0) {
+          fs.writeSync(fd, data);
+        }
+      });
+      request.on('dataReceiveProgress', (data: http.DataReceiveProgressInfo) => {
+        onProgress({
+          receivedBytes: Math.max(0, data.receiveSize),
+          totalBytes: Math.max(0, data.totalSize)
+        });
+      });
+      const statusCode = Number(await request.requestInStream(imageUrl, options));
+      if (statusCode < 200 || statusCode >= 300) {
+        throw new Error(imageStatusMessage(statusCode));
+      }
+      const size = statFileSize(path);
+      if (size <= 0) {
+        throw new Error('Empty image response');
+      }
+      onProgress({ receivedBytes: size, totalBytes: size });
+    } catch (error) {
+      throw new Error(imageNetworkErrorMessage(error));
+    } finally {
+      if (fd >= 0) {
+        try {
+          fs.closeSync(fd);
+        } catch (error) {
+        }
+      }
+      try {
+        request.off('dataReceive');
+        request.off('dataReceiveProgress');
+        request.off('dataEnd');
         request.destroy();
       } catch (error) {
       }

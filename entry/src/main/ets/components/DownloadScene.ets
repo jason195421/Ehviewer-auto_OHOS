@@ -8,7 +8,7 @@ import { ehSettingsStore } from '../services/EhSettingsStore';
 import { DEFAULT_ADVANCE_SEARCH, EhUrl, ListMode } from '../services/EhUrl';
 import { galleryPageCache } from '../services/GalleryPageCache';
 import { mergeGalleryPreviewSets } from '../services/GalleryPreviewLoader';
-import { readerImageCache } from '../services/ReaderImageCache';
+import { ImageDownloadProgress, readerImageCache } from '../services/ReaderImageCache';
 import { createReaderSessionState, readerSessionStore } from '../services/ReaderSessionStore';
 import {
   applyAppChromeImmersiveMode,
@@ -67,6 +67,9 @@ function normalizeSceneScrollOffset(offset: number): number {
   return offset;
 }
 
+const DOWNLOAD_PAGE_PROGRESS_SCALE: number = 1000;
+const DOWNLOAD_PROGRESS_UPDATE_INTERVAL_MS: number = 250;
+
 @Component
 export struct DownloadScene {
   private client: EhHttpClient = new EhHttpClient();
@@ -101,7 +104,6 @@ export struct DownloadScene {
   @State selectedDownloadGids: string = '';
   @State toolbarOffsetY: number = 0;
   @State downloadActionsExpanded: boolean = false;
-  @State downloadProgressRevision: number = 0;
   @State viewportHeight: number = 0;
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
   @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeightPx: number = 0;
@@ -121,7 +123,6 @@ export struct DownloadScene {
     this.unsubscribeStore = ehDownloadStore.subscribe((items: DownloadInfo[]) => {
       this.items = items;
       this.refreshDownloadRows();
-      this.downloadProgressRevision++;
     });
     this.loadDownloads();
     setTimeout(() => {
@@ -428,13 +429,21 @@ export struct DownloadScene {
     return row.map((item: DownloadInfo) => this.downloadItemProgressKey(item)).join('|');
   }
 
-  private downloadProgressPercent(item: DownloadInfo): string {
+  private downloadProgressValue(item: DownloadInfo): number {
     const total = item.total > 0 ? item.total : item.pages;
     if (total <= 0) {
-      return '0%';
+      return 0;
     }
-    const value = Math.max(0, Math.min(100, Math.round(item.finished * 100 / total)));
-    return value.toString() + '%';
+    const units = this.downloadProgressUnits(item);
+    return Math.max(0, Math.min(100, Math.round(units * 100 / Math.max(1, total * DOWNLOAD_PAGE_PROGRESS_SCALE))));
+  }
+
+  private downloadProgressUnits(item: DownloadInfo): number {
+    const finishedUnits = Math.max(0, item.finished) * DOWNLOAD_PAGE_PROGRESS_SCALE;
+    if (item.downloaded > item.total && item.downloaded >= finishedUnits) {
+      return item.downloaded;
+    }
+    return finishedUnits;
   }
 
   private downloadSpeedLabel(item: DownloadInfo): string {
@@ -710,7 +719,7 @@ export struct DownloadScene {
         }
       }
       if (finished > 0) {
-        ehDownloadStore.setProgress(item.gid, finished, total, finished);
+        ehDownloadStore.setProgress(item.gid, finished, total, finished * DOWNLOAD_PAGE_PROGRESS_SCALE);
         ehDownloadStore.setStorage(item.gid, downloadDirectory, fileSize);
         this.statusText = 'Resumed ' + finished.toString() + '/' + total.toString() + ': ' + item.title;
         this.persistDownloads();
@@ -744,9 +753,36 @@ export struct DownloadScene {
           throw new Error('Image URL missing');
         }
 
+        let progressBytes = 0;
+        let progressTime = Date.now();
+        let progressUiTime = 0;
         const existingCachedPath = readerImageCache.getCachedPath(context, imageUrl);
         const cachedPath = existingCachedPath.length > 0 ? existingCachedPath :
-          await readerImageCache.ensureCached(context, imageUrl, pageResult.page.pageUrl, false);
+          await readerImageCache.ensureCached(context, imageUrl, pageResult.page.pageUrl, false,
+            (progress: ImageDownloadProgress) => {
+              const now = Date.now();
+              const receivedBytes = Math.max(0, progress.receivedBytes);
+              const totalBytes = Math.max(0, progress.totalBytes);
+              const isCompleteProgress = totalBytes > 0 && receivedBytes >= totalBytes;
+              if (now - progressUiTime < DOWNLOAD_PROGRESS_UPDATE_INTERVAL_MS && !isCompleteProgress) {
+                return;
+              }
+              const deltaBytes = Math.max(0, receivedBytes - progressBytes);
+              const deltaMs = Math.max(1, now - progressTime);
+              const speed = Math.round(deltaBytes * 1000 / deltaMs);
+              progressBytes = receivedBytes;
+              progressTime = now;
+              progressUiTime = now;
+
+              const pageUnits = totalBytes > 0 ?
+                Math.min(DOWNLOAD_PAGE_PROGRESS_SCALE - 1, Math.floor(receivedBytes * DOWNLOAD_PAGE_PROGRESS_SCALE / totalBytes)) : 0;
+              const currentProgress = finished * DOWNLOAD_PAGE_PROGRESS_SCALE + pageUnits;
+              const averageBytes = finished > 0 ? Math.max(1, Math.round(fileSize / finished)) : Math.max(1, totalBytes);
+              const currentRemainingBytes = totalBytes > receivedBytes ? totalBytes - receivedBytes : 0;
+              const remainingBytes = currentRemainingBytes + Math.max(0, total - finished - 1) * averageBytes;
+              ehDownloadStore.setProgress(item.gid, finished, total, currentProgress);
+              ehDownloadStore.setTransfer(item.gid, speed, speed > 0 ? Math.round(remainingBytes / speed) : 0);
+            });
         const savedPath = ehDownloadFileStore.savePageImage(context, detail, pageResult.page, i, cachedPath);
         fileSize += ehDownloadFileStore.statFileSize(savedPath);
         finished++;
@@ -758,7 +794,7 @@ export struct DownloadScene {
         const averageBytes = finished > 0 ? Math.round(fileSize / finished) : 0;
         const remaining = speed > 0 ? Math.round(Math.max(0, total - finished) * averageBytes / speed) : 0;
 
-        ehDownloadStore.setProgress(item.gid, finished, total, finished);
+        ehDownloadStore.setProgress(item.gid, finished, total, finished * DOWNLOAD_PAGE_PROGRESS_SCALE);
         ehDownloadStore.setStorage(item.gid, downloadDirectory, fileSize);
         ehDownloadStore.setTransfer(item.gid, speed, remaining);
         this.statusText = 'Downloaded ' + finished.toString() + '/' + total.toString() + ': ' + item.title;
@@ -1300,9 +1336,8 @@ export struct DownloadScene {
                           item: item,
                           state: item.state,
                           progressText: downloadProgressText(item),
-                          progressPercentValue: this.downloadProgressPercent(item),
+                          progressValue: this.downloadProgressValue(item),
                           speedTextValue: this.downloadSpeedLabel(item),
-                          revision: this.downloadProgressRevision,
                           onStatusTap: (downloadItem: DownloadInfo) => {
                             this.toggleItemFromProgress(downloadItem);
                             }
@@ -1526,9 +1561,8 @@ struct DownloadCardStatus {
   @Prop item: DownloadInfo = createEmptyDownloadInfo();
   @Prop state: DownloadState = DownloadState.None;
   @Prop progressText: string = '';
-  @Prop progressPercentValue: string = '0%';
+  @Prop progressValue: number = 0;
   @Prop speedTextValue: string = '';
-  @Prop revision: number = 0;
   onStatusTap: (item: DownloadInfo) => void = (_item: DownloadInfo) => {};
 
   private isDownloading(): boolean {
@@ -1563,23 +1597,18 @@ struct DownloadCardStatus {
       }
       .width('100%')
 
-      Stack({ alignContent: Alignment.Start }) {
-        Row()
-          .height(4)
+      Row() {
+        Progress({ value: this.progressValue, total: 100, type: ProgressType.Linear })
           .width('100%')
-          .backgroundColor(themeDividerColor())
-          .borderRadius(2)
-        Row()
           .height(4)
-          .width(this.progressPercentValue)
-          .backgroundColor(downloadStateColor(this.state))
-          .borderRadius(2)
+          .color(downloadStateColor(this.state))
+          .backgroundColor(themeDividerColor())
       }
-      .width('100%')
-      .height(14)
-      .margin({ top: 1 })
-      .clip(true)
-      .id('download-progress-' + this.item.gid.toString() + '-' + this.revision.toString())
+        .width('100%')
+        .height(14)
+        .margin({ top: 1 })
+        .clip(true)
+        .id('download-progress-' + this.item.gid.toString())
     }
     .width('100%')
     .padding({ left: 8, right: 8, top: 6, bottom: 7 })
