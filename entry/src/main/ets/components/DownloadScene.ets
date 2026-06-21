@@ -1599,6 +1599,7 @@ struct DownloadCardStatus {
 
       Row() {
         Progress({ value: this.progressValue, total: 100, type: ProgressType.Linear })
+          .value(this.progressValue)
           .width('100%')
           .height(4)
           .color(downloadStateColor(this.state))

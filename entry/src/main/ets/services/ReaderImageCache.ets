@@ -175,6 +175,8 @@ export class ReaderImageCache {
     onProgress: ImageDownloadProgressCallback): Promise<void> {
     const request = http.createHttp();
     let fd = -1;
+    let receivedBytes = 0;
+    let totalBytes = 0;
     try {
       const file = fs.openSync(path, fs.OpenMode.CREATE | fs.OpenMode.TRUNC | fs.OpenMode.READ_WRITE);
       fd = file.fd;
@@ -192,12 +194,19 @@ export class ReaderImageCache {
       request.on('dataReceive', (data: ArrayBuffer) => {
         if (data.byteLength > 0 && fd >= 0) {
           fs.writeSync(fd, data);
+          receivedBytes += data.byteLength;
+          onProgress({
+            receivedBytes: receivedBytes,
+            totalBytes: totalBytes
+          });
         }
       });
       request.on('dataReceiveProgress', (data: http.DataReceiveProgressInfo) => {
+        receivedBytes = Math.max(receivedBytes, data.receiveSize);
+        totalBytes = Math.max(totalBytes, data.totalSize);
         onProgress({
-          receivedBytes: Math.max(0, data.receiveSize),
-          totalBytes: Math.max(0, data.totalSize)
+          receivedBytes: receivedBytes,
+          totalBytes: totalBytes
         });
       });
       const statusCode = Number(await request.requestInStream(imageUrl, options));

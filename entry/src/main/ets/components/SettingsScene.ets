@@ -956,6 +956,7 @@ export struct SettingsHomePanel {
       .layoutWeight(1)
       .cachedCount(3)
       .padding({ left: 12, right: 12, top: 0, bottom: 0 })
+      .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true, effectEdge: EffectEdge.START | EffectEdge.END })
     }
     .width('100%')
     .height('100%')
@@ -1176,6 +1177,7 @@ export struct SettingsDetailPanel {
         }
 
       }
+      .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true, effectEdge: EffectEdge.START | EffectEdge.END })
       .width('100%')
       .height('100%')
       .layoutWeight(1)
