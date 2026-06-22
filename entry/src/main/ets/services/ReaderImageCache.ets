@@ -79,6 +79,18 @@ export class ReaderImageCache {
     return exists(path) ? path : '';
   }
 
+  removeCached(context: common.UIAbilityContext, imageUrl: string): string {
+    if (imageUrl.length === 0) {
+      return '';
+    }
+
+    const path = this.pathFor(context, imageUrl);
+    if (!exists(path)) {
+      return '';
+    }
+    return removeFile(path) ? path : '';
+  }
+
   clear(context: common.UIAbilityContext): CacheClearResult {
     const directory = context.cacheDir + '/reader_images';
     let files = 0;

@@ -1,8 +1,11 @@
 ﻿import { window } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
-import { batteryInfo, pasteboard } from '@kit.BasicServicesKit';
-import { fileIo as fs, picker } from '@kit.CoreFileKit';
+import { uniformTypeDescriptor as utd } from '@kit.ArkData';
+import { batteryInfo } from '@kit.BasicServicesKit';
+import { fileIo as fs, fileUri, picker } from '@kit.CoreFileKit';
 import { image } from '@kit.ImageKit';
+import { photoAccessHelper } from '@kit.MediaLibraryKit';
+import { systemShare } from '@kit.ShareKit';
 import inputConsumer from '@ohos.multimodalInput.inputConsumer';
 import { KeyCode } from '@ohos.multimodalInput.keyCode';
 import { KeyEvent } from '@ohos.multimodalInput.keyEvent';
@@ -18,6 +21,7 @@ import {
   setEmbeddedReaderActive
 } from '../services/EhWindowImmersive';
 import { ehSettingsStore } from '../services/EhSettingsStore';
+import { galleryPageCache } from '../services/GalleryPageCache';
 import { readerImageCache } from '../services/ReaderImageCache';
 import {
   createEmptyPage,
@@ -932,27 +936,94 @@ export struct ReaderScene {
   }
 
   private refreshCurrentImage(): void {
+    const page = this.pageForIndex(this.currentIndex);
     this.hideImageActions();
+    this.removeCurrentImageFiles(page);
     this.onRetry();
   }
 
   private shareCurrentImage(): void {
-    const target = this.currentImageShareTarget();
+    const page = this.pageForIndex(this.currentIndex);
+    const index = this.currentIndex;
     this.hideImageActions();
-    if (target.length === 0) {
+    this.shareCurrentImageAsync(page, index).catch(() => {});
+  }
+
+  private saveCurrentImageToAlbum(): void {
+    const page = this.pageForIndex(this.currentIndex);
+    const index = this.currentIndex;
+    this.hideImageActions();
+    this.saveReaderImageToAlbumAsync(page, index).catch(() => {});
+  }
+
+  private saveCurrentImageToPicker(): void {
+    const page = this.pageForIndex(this.currentIndex);
+    const index = this.currentIndex;
+    this.hideImageActions();
+    this.saveReaderImageAsync(page, index).catch(() => {});
+  }
+
+  private removeCurrentImageFiles(page: GalleryPage): void {
+    const context = getAbilityContext();
+    const paths: string[] = [];
+    addUniquePath(paths, page.cachedImagePath);
+    addUniquePath(paths, page.cachedOriginImagePath);
+    if (context !== undefined) {
+      addUniquePath(paths, readerImageCache.removeCached(context, page.imageUrl));
+      addUniquePath(paths, readerImageCache.removeCached(context, page.originImageUrl));
+    }
+    for (let i = 0; i < paths.length; i++) {
+      removeFileIfExists(paths[i]);
+    }
+    galleryPageCache.remove(page.pageUrl);
+  }
+
+  private async shareCurrentImageAsync(page: GalleryPage, index: number): Promise<void> {
+    const context = getAbilityContext();
+    if (context === undefined) {
       return;
     }
+    const sourcePath = await this.ensureLocalImagePathForPage(page);
+    if (sourcePath.length === 0) {
+      return;
+    }
+    const extension = readerImageExtension(sourcePath);
+    const utdTypeId = utd.getUniformDataTypeByFilenameExtension(extension);
+    const shareData: systemShare.SharedData = new systemShare.SharedData({
+      utd: utdTypeId,
+      uri: fileUri.getUriFromPath(sourcePath),
+      title: readerImageFileName(index, sourcePath, this.currentImageShareTarget()),
+      description: 'EhViewer'
+    });
+    const controller = new systemShare.ShareController(shareData);
     try {
-      const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, target);
-      pasteboard.getSystemPasteboard().setData(data).catch(() => {});
+      await controller.show(context, {
+        selectionMode: systemShare.SelectionMode.SINGLE,
+        previewMode: systemShare.SharePreviewMode.DETAIL
+      });
     } catch (error) {
     }
   }
 
-  private saveCurrentImage(): void {
-    const page = this.pageForIndex(this.currentIndex);
-    this.hideImageActions();
-    this.saveReaderImageAsync(page).catch(() => {});
+  private async saveReaderImageToAlbumAsync(page: GalleryPage, index: number): Promise<void> {
+    const context = getAbilityContext();
+    if (context === undefined) {
+      return;
+    }
+    const sourcePath = await this.ensureLocalImagePathForPage(page);
+    if (sourcePath.length === 0) {
+      return;
+    }
+    try {
+      const helper = photoAccessHelper.getPhotoAccessHelper(context);
+      const uri = await helper.createAsset(photoAccessHelper.PhotoType.IMAGE, albumImageFileType(sourcePath));
+      if (copyFileContent(sourcePath, uri)) {
+        this.getUIContext().getPromptAction().showToast({
+          message: uiText('Saved to album') + ': ' + readerImageFileName(index, sourcePath, this.currentImageShareTarget())
+        });
+      }
+    } catch (error) {
+    }
   }
 
   private currentImageShareTarget(): string {
@@ -983,31 +1054,40 @@ export struct ReaderScene {
     return '';
   }
 
-  private async saveReaderImageAsync(page: GalleryPage): Promise<void> {
+  private async ensureLocalImagePathForPage(page: GalleryPage): Promise<string> {
     const context = getAbilityContext();
     if (context === undefined) {
-      return;
+      return '';
     }
     let sourcePath = this.localImagePathForPage(page);
     if (sourcePath.length === 0) {
       const imageUrl = this.preferOriginal && page.originImageUrl.length > 0 ? page.originImageUrl : page.imageUrl;
       if (imageUrl.length === 0) {
-        return;
+        return '';
       }
       sourcePath = await readerImageCache.ensureCached(context, imageUrl, page.pageUrl, true);
     }
+    return sourcePath;
+  }
+
+  private async saveReaderImageAsync(page: GalleryPage, index: number): Promise<void> {
+    const context = getAbilityContext();
+    if (context === undefined) {
+      return;
+    }
+    const sourcePath = await this.ensureLocalImagePathForPage(page);
     if (sourcePath.length === 0) {
       return;
     }
     const options = new picker.DocumentSaveOptions();
-    options.newFileNames = [readerImageFileName(this.currentIndex, sourcePath, this.currentImageShareTarget())];
+    options.newFileNames = [readerImageFileName(index, sourcePath, this.currentImageShareTarget())];
     const documentPicker = new picker.DocumentViewPicker(context);
     const uris = await documentPicker.save(options);
     if (uris.length === 0) {
       return;
     }
     try {
-      fs.copyFileSync(sourcePath, uris[0]);
+      copyFileContent(sourcePath, uris[0]);
     } catch (error) {
     }
   }
@@ -1273,8 +1353,11 @@ export struct ReaderScene {
           onShare: () => {
             this.shareCurrentImage();
           },
+          onSaveToAlbum: () => {
+            this.saveCurrentImageToAlbum();
+          },
           onSave: () => {
-            this.saveCurrentImage();
+            this.saveCurrentImageToPicker();
           }
         })
           .zIndex(7)
@@ -1485,6 +1568,7 @@ struct ReaderPopupBackdrop {
 struct ReaderImageActionDialog {
   onRefresh: () => void = () => {};
   onShare: () => void = () => {};
+  onSaveToAlbum: () => void = () => {};
   onSave: () => void = () => {};
 
   build() {
@@ -1502,7 +1586,13 @@ struct ReaderImageActionDialog {
       })
       ReaderMenuDivider()
       ReaderImageActionButton({
-        label: uiText('Save'),
+        label: uiText('Save to album'),
+        symbolIcon: $r('sys.symbol.save'),
+        onTap: this.onSaveToAlbum
+      })
+      ReaderMenuDivider()
+      ReaderImageActionButton({
+        label: uiText('Save to...'),
         symbolIcon: $r('sys.symbol.save'),
         onTap: this.onSave
       })
@@ -1703,6 +1793,88 @@ function readerImageExtension(value: string): string {
     }
   }
   return '.jpg';
+}
+
+function albumImageFileType(sourcePath: string): string {
+  const extension = readerImageExtension(sourcePath);
+  if (extension === '.jpeg') {
+    return 'jpeg';
+  }
+  if (extension === '.jpg') {
+    return 'jpeg';
+  }
+  if (extension === '.png') {
+    return 'png';
+  }
+  if (extension === '.webp') {
+    return 'webp';
+  }
+  if (extension === '.gif') {
+    return 'gif';
+  }
+  return 'jpeg';
+}
+
+function addUniquePath(paths: string[], path?: string): void {
+  if (path === undefined || path.length === 0) {
+    return;
+  }
+  const clean = stripFileScheme(path);
+  if (clean.length === 0) {
+    return;
+  }
+  for (let i = 0; i < paths.length; i++) {
+    if (paths[i] === clean) {
+      return;
+    }
+  }
+  paths.push(clean);
+}
+
+function removeFileIfExists(path: string): boolean {
+  if (path.length === 0) {
+    return false;
+  }
+  try {
+    if (!fs.accessSync(path)) {
+      return false;
+    }
+    fs.unlinkSync(path);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function copyFileContent(sourcePath: string, targetUri: string): boolean {
+  let sourceFd = -1;
+  let targetFd = -1;
+  try {
+    const sourceFile = fs.openSync(sourcePath, fs.OpenMode.READ_ONLY);
+    sourceFd = sourceFile.fd;
+    const stat = fs.statSync(sourceFd);
+    const buffer = new ArrayBuffer(stat.size);
+    fs.readSync(sourceFd, buffer);
+    const targetFile = fs.openSync(targetUri, fs.OpenMode.READ_WRITE | fs.OpenMode.TRUNC);
+    targetFd = targetFile.fd;
+    fs.writeSync(targetFd, buffer);
+    return true;
+  } catch (error) {
+    return false;
+  } finally {
+    if (sourceFd >= 0) {
+      try {
+        fs.closeSync(sourceFd);
+      } catch (error) {
+      }
+    }
+    if (targetFd >= 0) {
+      try {
+        fs.closeSync(targetFd);
+      } catch (error) {
+      }
+    }
+  }
 }
 
 @Component

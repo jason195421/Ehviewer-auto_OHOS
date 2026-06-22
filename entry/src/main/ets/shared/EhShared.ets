@@ -492,6 +492,9 @@ export function zhText(text: string): string {
     case 'Archive -': return '归档 -';
     case 'Share': return '分享';
     case 'Save': return '保存';
+    case 'Save to album': return '保存到相册';
+    case 'Save to...': return '保存到…';
+    case 'Saved to album': return '已保存到相册';
     case 'Rate': return '评分';
     case 'Cancel': return '取消';
     case 'Submit': return '提交';

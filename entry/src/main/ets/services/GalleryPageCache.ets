@@ -55,6 +55,20 @@ export class GalleryPageCache {
     }
   }
 
+  remove(url: string): boolean {
+    if (url.length === 0) {
+      return false;
+    }
+
+    for (let i = 0; i < this.entries.length; i++) {
+      if (this.entries[i].url === url) {
+        this.entries.splice(i, 1);
+        return true;
+      }
+    }
+    return false;
+  }
+
   clear(): number {
     const count = this.entries.length;
     this.entries = [];
