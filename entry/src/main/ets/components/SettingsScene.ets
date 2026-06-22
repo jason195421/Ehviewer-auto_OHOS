@@ -1,4 +1,4 @@
-import { abilityAccessCtrl, common, Permissions } from '@kit.AbilityKit';
+import { common } from '@kit.AbilityKit';
 import { fileUri, picker } from '@kit.CoreFileKit';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
@@ -261,10 +261,6 @@ export struct SettingsScene {
     if (ehDownloadFileStore.canUseLocation(context, target)) {
       return true;
     }
-    const granted = await this.requestDownloadDirectoryPermission(context);
-    if (granted && ehDownloadFileStore.canUseLocation(context, target)) {
-      return true;
-    }
     const pickedRoot = await this.pickDownloadDirectoryRoot(context);
     if (pickedRoot.length > 0) {
       ehDownloadFileStore.rememberPublicDownloadRoot(pickedRoot + '/EhViewer');
@@ -274,18 +270,6 @@ export struct SettingsScene {
     }
     this.statusText = 'Downloads access was not granted';
     return false;
-  }
-
-  private async requestDownloadDirectoryPermission(context: common.UIAbilityContext): Promise<boolean> {
-    try {
-      const atManager = abilityAccessCtrl.createAtManager();
-      const result = await atManager.requestPermissionsFromUser(context, [
-        'ohos.permission.READ_WRITE_DOWNLOAD_DIRECTORY' as Permissions
-      ]);
-      return result.authResults.length > 0 && result.authResults[0] === 0;
-    } catch (error) {
-      return false;
-    }
   }
 
   private async pickDownloadDirectoryRoot(context: common.UIAbilityContext): Promise<string> {

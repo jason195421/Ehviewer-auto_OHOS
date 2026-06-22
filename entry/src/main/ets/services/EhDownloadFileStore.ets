@@ -1,6 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { zlib } from '@kit.BasicServicesKit';
-import { Environment, fileIo as fs } from '@kit.CoreFileKit';
+import { fileIo as fs } from '@kit.CoreFileKit';
 import { GalleryDetail, GalleryInfo, GalleryPage } from '../model/GalleryModels';
 import { parseGalleryPageUrl } from './GalleryPageUrlParser';
 import { ehSettingsStore } from './EhSettingsStore';
@@ -79,14 +79,7 @@ export class EhDownloadFileStore {
     if (pickedRoot.length > 0) {
       return pickedRoot;
     }
-    try {
-      const root = Environment.getUserDownloadDir();
-      if (root.length > 0) {
-        return root + '/EhViewer';
-      }
-    } catch (error) {
-    }
-    throw new Error('Download directory access is not available');
+    throw new Error('Download directory access needs picker selection');
   }
 
   rememberPublicDownloadRoot(root: string): void {
