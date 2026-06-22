@@ -588,10 +588,6 @@ export struct ReaderScene {
     return this.readingFullscreenEnabled() ? 12 : this.statusBarHeightVp() + 8;
   }
 
-  private readerStatusShadeHeight(): number {
-    return Math.max(0, this.statusBarHeightVp()) + 34;
-  }
-
   private scheduleReaderChromeMode(delay: number): void {
     setTimeout(() => {
       if (!this.readerWindowActive) {
@@ -1339,27 +1335,6 @@ export struct ReaderScene {
           .opacity(this.ultraDarkOverlayOpacity())
           .hitTestBehavior(HitTestMode.Transparent)
           .zIndex(2)
-      }
-
-      if (!this.readingFullscreenEnabled()) {
-        Column() {
-          Column() {}
-            .width('100%')
-            .height(Math.max(0, this.statusBarHeightVp()) + 10)
-            .backgroundColor(themeScrimColor())
-            .backgroundBlurStyle(BlurStyle.Thin)
-          Column() {}
-            .width('100%')
-            .height(24)
-            .backgroundColor(themeScrimColor())
-            .opacity(0.34)
-            .backgroundBlurStyle(BlurStyle.Thin)
-        }
-        .width('100%')
-        .height(this.readerStatusShadeHeight())
-        .position({ x: 0, y: 0 })
-        .hitTestBehavior(HitTestMode.Transparent)
-        .zIndex(3)
       }
 
       // Floating progress / clock / battery overlay (when no panel shown)
