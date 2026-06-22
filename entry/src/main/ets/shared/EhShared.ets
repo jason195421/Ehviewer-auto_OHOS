@@ -1166,22 +1166,29 @@ export function getAbilityContext(): common.UIAbilityContext | undefined {
 }
 
 export function saveGalleryToHistory(gallery: GalleryInfo): void {
-  const maxSize = parseHistoryMaxSize(ehSettingsStore.getValue('history_info_size', '100'));
-  ehHistoryStore.addGallery(gallery, maxSize);
   const context = getAbilityContext();
   if (context === undefined) {
+    const maxSize = parseHistoryMaxSize(ehSettingsStore.getValue('history_info_size', '100'));
+    ehHistoryStore.addGallery(gallery, maxSize);
     return;
   }
-  ehHistoryStore.save(context).catch(() => {});
+  ehHistoryStore.ensureLoaded(context).then(() => {
+    const maxSize = parseHistoryMaxSize(ehSettingsStore.getValue('history_info_size', '100'));
+    ehHistoryStore.addGallery(gallery, maxSize);
+    ehHistoryStore.save(context).catch(() => {});
+  }).catch(() => {});
 }
 
 export function saveGalleryReadPosition(gid: number, pageIndex: number): void {
-  ehHistoryStore.setReadPage(gid, pageIndex);
   const context = getAbilityContext();
   if (context === undefined) {
+    ehHistoryStore.setReadPage(gid, pageIndex);
     return;
   }
-  ehHistoryStore.save(context).catch(() => {});
+  ehHistoryStore.ensureLoaded(context).then(() => {
+    ehHistoryStore.setReadPage(gid, pageIndex);
+    ehHistoryStore.save(context).catch(() => {});
+  }).catch(() => {});
 }
 
 export function readerStartIndex(detail: GalleryDetail): number {

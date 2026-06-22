@@ -1,5 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
+import { fileIo as fs } from '@kit.CoreFileKit';
 import { GalleryCategory, GalleryInfo } from '../model/GalleryModels';
 
 const PREFERENCES_NAME: string = 'ehviewer_history';
@@ -7,6 +8,8 @@ const VALUES_KEY: string = 'items';
 const VALUES_BACKUP_KEY: string = 'items_backup';
 const READ_POSITIONS_KEY: string = 'read_positions';
 const READ_POSITIONS_BACKUP_KEY: string = 'read_positions_backup';
+const FILE_BACKUP_NAME: string = 'ehviewer_history.json';
+const FILE_BACKUP_FALLBACK_NAME: string = 'ehviewer_history.backup.json';
 const DEFAULT_MAX_SIZE: number = 100;
 
 interface StoredGalleryInfo {
@@ -42,11 +45,25 @@ interface ReadPosition {
   updatedAt: number;
 }
 
+interface HistoryBackupFile {
+  version?: number;
+  items?: StoredGalleryInfo[];
+  readPositions?: StoredReadPosition[];
+  updatedAt?: number;
+}
+
+interface HistoryFileState {
+  items: GalleryInfo[];
+  readPositions: ReadPosition[];
+}
+
 export class EhHistoryStore {
   private items: GalleryInfo[] = [];
   private readPositions: ReadPosition[] = [];
   private context: common.UIAbilityContext | undefined = undefined;
   private saveChain: Promise<void> = Promise.resolve();
+  private loaded: boolean = false;
+  private loadPromise: Promise<void> | null = null;
 
   getItems(): GalleryInfo[] {
     return cloneGalleryInfos(this.items);
@@ -120,6 +137,27 @@ export class EhHistoryStore {
 
   async load(context: common.UIAbilityContext): Promise<void> {
     this.context = context;
+    if (this.loadPromise !== null) {
+      await this.loadPromise;
+      return;
+    }
+    this.loadPromise = this.loadNow(context);
+    try {
+      await this.loadPromise;
+    } finally {
+      this.loadPromise = null;
+    }
+  }
+
+  async ensureLoaded(context: common.UIAbilityContext): Promise<void> {
+    this.context = context;
+    if (this.loaded) {
+      return;
+    }
+    await this.load(context);
+  }
+
+  private async loadNow(context: common.UIAbilityContext): Promise<void> {
     try {
       const prefs = await preferences.getPreferences(context, { name: PREFERENCES_NAME });
       const raw = await prefs.get(VALUES_KEY, '');
@@ -128,6 +166,13 @@ export class EhHistoryStore {
       const rawPositionsBackup = await prefs.get(READ_POSITIONS_BACKUP_KEY, '');
       this.items = this.parseStoredItems(raw, rawBackup);
       this.readPositions = this.parseReadPositions(rawPositions, rawPositionsBackup);
+      if (this.items.length === 0 && this.readPositions.length === 0) {
+        this.restoreFromFileBackup(context);
+      }
+      this.loaded = true;
+      if (this.items.length > 0 || this.readPositions.length > 0) {
+        await this.saveNow(context);
+      }
     } catch (error) {
       throw new Error(String(error));
     }
@@ -156,9 +201,42 @@ export class EhHistoryStore {
       await prefs.put(READ_POSITIONS_KEY, readPositionsJson);
       await prefs.put(READ_POSITIONS_BACKUP_KEY, readPositionsJson);
       await prefs.flush();
+      this.saveFileBackup(context, itemsJson, readPositionsJson);
     } catch (error) {
       throw new Error(String(error));
     }
+  }
+
+  private restoreFromFileBackup(context: common.UIAbilityContext): void {
+    const main = this.readFileBackup(context.filesDir + '/' + FILE_BACKUP_NAME);
+    const backup = this.readFileBackup(context.filesDir + '/' + FILE_BACKUP_FALLBACK_NAME);
+    const chosen = main.items.length > 0 || main.readPositions.length > 0 ? main : backup;
+    this.items = chosen.items;
+    this.readPositions = chosen.readPositions;
+  }
+
+  private readFileBackup(path: string): HistoryFileState {
+    try {
+      const parsed = JSON.parse(fs.readTextSync(path)) as HistoryBackupFile;
+      return {
+        items: this.parseStoredItemsOnce(JSON.stringify(parsed.items === undefined ? [] : parsed.items)),
+        readPositions: this.parseReadPositionsOnce(JSON.stringify(parsed.readPositions === undefined ? [] :
+          parsed.readPositions))
+      };
+    } catch (error) {
+      return { items: [], readPositions: [] };
+    }
+  }
+
+  private saveFileBackup(context: common.UIAbilityContext, itemsJson: string, readPositionsJson: string): void {
+    const payload = JSON.stringify({
+      version: 1,
+      items: JSON.parse(itemsJson) as StoredGalleryInfo[],
+      readPositions: JSON.parse(readPositionsJson) as StoredReadPosition[],
+      updatedAt: Date.now()
+    });
+    writeTextFileQuietly(context.filesDir + '/' + FILE_BACKUP_NAME, payload);
+    writeTextFileQuietly(context.filesDir + '/' + FILE_BACKUP_FALLBACK_NAME, payload);
   }
 
   private parseStoredItems(raw: preferences.ValueType, backup: preferences.ValueType): GalleryInfo[] {
@@ -290,6 +368,23 @@ function cloneGalleryInfo(item: GalleryInfo): GalleryInfo {
     favoriteName: item.favoriteName,
     tagList: item.tagList
   };
+}
+
+function writeTextFileQuietly(path: string, value: string): void {
+  let fd = -1;
+  try {
+    const file = fs.openSync(path, fs.OpenMode.CREATE | fs.OpenMode.TRUNC | fs.OpenMode.READ_WRITE);
+    fd = file.fd;
+    fs.writeSync(fd, value);
+  } catch (error) {
+  } finally {
+    if (fd >= 0) {
+      try {
+        fs.closeSync(fd);
+      } catch (error) {
+      }
+    }
+  }
 }
 
 export const ehHistoryStore: EhHistoryStore = new EhHistoryStore();

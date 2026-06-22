@@ -1061,7 +1061,7 @@ export struct ReaderScene {
     if (!this.menuUltraDarkMode) {
       return 0;
     }
-    return readerUltraDarkSliderValue(this.menuUltraDarkBrightness) / 100;
+    return 1 - readerUltraDarkSliderValue(this.menuUltraDarkBrightness) / 100;
   }
 
   private async saveReaderImageToAlbumAsync(page: GalleryPage, index: number): Promise<void> {
@@ -1396,7 +1396,8 @@ export struct ReaderScene {
                   .padding({ left: 8, right: 8, top: 3, bottom: 3 })
                   .backgroundColor(themeScrimColor())
                   .borderRadius(8)
-                  .position({ x: this.sliderBubbleX(), y: 0 })
+                  .position({ x: this.sliderBubbleX(), y: -24 })
+                  .zIndex(2)
               }
               Slider({
                 value: this.sliderLiveIndex,
@@ -1405,21 +1406,21 @@ export struct ReaderScene {
                 step: 1
               })
                 .width('100%')
-                .margin({ top: 26 })
+                .margin({ top: 30 })
                 .enabled(this.totalPages > 1)
                 .onChange((value: number, mode: SliderChangeMode) => {
+                  this.clearSliderTimer();
                   this.sliderLiveIndex = this.clampReaderPageIndex(value);
                   this.sliderDragging = mode !== SliderChangeMode.End && mode !== SliderChangeMode.Click;
                   if (mode === SliderChangeMode.End || mode === SliderChangeMode.Click) {
                     this.stopAutoTransferPlayback();
-                    this.clearSliderTimer();
                     this.jumpTo(value);
                     this.scheduleSliderHide();
                   }
                 })
             }
               .layoutWeight(1)
-              .height(54)
+              .height(64)
               .onAreaChange((_oldArea: Area, newArea: Area) => {
                 const width = newArea.width as number;
                 if (width > 0 && !Number.isNaN(width)) {
@@ -1443,7 +1444,7 @@ export struct ReaderScene {
           .alignItems(VerticalAlign.Center)
         }
         .width('100%')
-        .padding({ left: 12, right: 12, top: 10, bottom: 16 })
+        .padding({ left: 12, right: 12, top: 14, bottom: 18 })
         .backgroundColor('#CC111827')
         .position({ x: 0, y: '100%' })
         .translate({ y: '-100%' })
