@@ -681,6 +681,8 @@ export function zhText(text: string): string {
     case 'Enable custom reader brightness': return '启用阅读器自定义亮度';
     case 'Screen lightness': return '屏幕亮度';
     case 'Custom reader brightness when enabled': return '启用后使用自定义阅读亮度';
+    case 'Ultra dark mode': return '超暗模式';
+    case 'Ultra dark brightness': return '超暗模式亮度';
     case 'Download location': return '下载位置';
     case 'HarmonyOS file picker/storage mapping for downloaded galleries': return '下载画廊的 HarmonyOS 文件选择器/存储映射';
     case 'Media scan': return '媒体扫描';

@@ -439,6 +439,8 @@ export struct ReaderScene {
   @State menuAutoTransferTime: string = '5s';
   @State menuCustomBrightness: boolean = false;
   @State menuBrightnessLevel: string = '50%';
+  @State menuUltraDarkMode: boolean = false;
+  @State menuUltraDarkBrightness: string = '50%';
   private readerWindowActive: boolean = false;
   private hostReaderWindow: window.Window | undefined = undefined;
   private autoTransferTimer: number = -1;
@@ -471,6 +473,7 @@ export struct ReaderScene {
     this.currentIndex = this.pageIndex;
     this.syncOverlayState();
     this.syncDirectionState();
+    this.syncUltraDarkState();
     this.refreshBattery();
     this.applyReaderWindowSettings();
     this.applyBrightnessFromSettings().catch(() => {});
@@ -723,6 +726,8 @@ export struct ReaderScene {
     this.menuAutoTransferTime = normalizeAutoTransferTimeOption(ehSettingsStore.getValue('start_transfer_time', '5s'));
     this.menuCustomBrightness = ehSettingsStore.getValue('custom_screen_lightness', 'Off') === 'On';
     this.menuBrightnessLevel = normalizeBrightnessLevelOption(ehSettingsStore.getValue('screen_lightness', '50%'));
+    this.menuUltraDarkMode = ehSettingsStore.getValue('ultra_dark_mode', 'Off') === 'On';
+    this.menuUltraDarkBrightness = normalizeUltraDarkBrightnessOption(ehSettingsStore.getValue('ultra_dark_lightness', '50%'));
     this.menuVisible = true;
     this.clearAutoTransferTimer();
     this.autoTransferPlaying = false;
@@ -742,6 +747,8 @@ export struct ReaderScene {
     ehSettingsStore.setValue('start_transfer_time', normalizeAutoTransferTimeOption(this.menuAutoTransferTime));
     ehSettingsStore.setValue('custom_screen_lightness', this.menuCustomBrightness ? 'On' : 'Off');
     ehSettingsStore.setValue('screen_lightness', normalizeBrightnessLevelOption(this.menuBrightnessLevel));
+    ehSettingsStore.setValue('ultra_dark_mode', this.menuUltraDarkMode ? 'On' : 'Off');
+    ehSettingsStore.setValue('ultra_dark_lightness', normalizeUltraDarkBrightnessOption(this.menuUltraDarkBrightness));
     const nextFitMode = normalizePageScalingOption(this.menuPageScaling);
     if (nextFitMode === 'Fixed scale') {
       this.fixedScale = Math.max(READER_MIN_SCALE, Math.min(READER_MAX_SCALE, this.zoomPercent / 100));
@@ -772,6 +779,10 @@ export struct ReaderScene {
     if (win === undefined) {
       return;
     }
+    if (this.menuUltraDarkMode) {
+      win.setWindowBrightness(0).catch(() => {});
+      return;
+    }
     if (!this.menuCustomBrightness) {
       win.setWindowBrightness(-1).catch(() => {});
       return;
@@ -784,6 +795,10 @@ export struct ReaderScene {
   private async applyBrightnessFromSettings(): Promise<void> {
     const win = await this.obtainReaderWindow();
     if (win === undefined) {
+      return;
+    }
+    if (ehSettingsStore.getValue('ultra_dark_mode', 'Off') === 'On') {
+      win.setWindowBrightness(0).catch(() => {});
       return;
     }
     if (ehSettingsStore.getValue('custom_screen_lightness', 'Off') !== 'On') {
@@ -1003,6 +1018,18 @@ export struct ReaderScene {
       });
     } catch (error) {
     }
+  }
+
+  private syncUltraDarkState(): void {
+    this.menuUltraDarkMode = ehSettingsStore.getValue('ultra_dark_mode', 'Off') === 'On';
+    this.menuUltraDarkBrightness = normalizeUltraDarkBrightnessOption(ehSettingsStore.getValue('ultra_dark_lightness', '50%'));
+  }
+
+  private ultraDarkOverlayOpacity(): number {
+    if (!this.menuUltraDarkMode) {
+      return 0;
+    }
+    return readerUltraDarkSliderValue(this.menuUltraDarkBrightness) / 100;
   }
 
   private async saveReaderImageToAlbumAsync(page: GalleryPage, index: number): Promise<void> {
@@ -1247,6 +1274,16 @@ export struct ReaderScene {
       .width('100%')
       .height('100%')
       .backgroundColor('#050608')
+
+      if (this.menuUltraDarkMode) {
+        Stack() {}
+          .width('100%')
+          .height('100%')
+          .backgroundColor(Color.Black)
+          .opacity(this.ultraDarkOverlayOpacity())
+          .hitTestBehavior(HitTestMode.Transparent)
+          .zIndex(2)
+      }
 
       // Floating progress / clock / battery overlay (when no panel shown)
       if (!this.menuVisible && !this.sliderVisible) {
@@ -1525,6 +1562,33 @@ export struct ReaderScene {
                   }
                 })
               }
+              ReaderMenuDivider()
+
+              ReaderMenuToggle({
+                label: uiText('Ultra dark mode'),
+                value: this.menuUltraDarkMode,
+                onChange: (v: boolean) => {
+                  this.menuUltraDarkMode = v;
+                  this.applyBrightness().catch(() => {});
+                }
+              })
+
+              if (this.menuUltraDarkMode) {
+                ReaderMenuDivider()
+                ReaderMenuSlider({
+                  label: uiText('Ultra dark brightness'),
+                  value: readerUltraDarkSliderValue(this.menuUltraDarkBrightness),
+                  min: 1,
+                  max: 100,
+                  step: 1,
+                  valueText: (value: number) => {
+                    return readerUltraDarkValue(value);
+                  },
+                  onChange: (value: number) => {
+                    this.menuUltraDarkBrightness = readerUltraDarkValue(value);
+                  }
+                })
+              }
             }
             .width('100%')
           }
@@ -1769,6 +1833,26 @@ function readerBrightnessSliderValue(value: string): number {
 
 function readerBrightnessValue(value: number): string {
   return normalizeBrightnessLevelOption(Math.max(0, Math.min(100, Math.round(value))).toString() + '%');
+}
+
+function readerUltraDarkSliderValue(value: string): number {
+  const numberValue = Number.parseInt(value);
+  if (Number.isNaN(numberValue)) {
+    return 50;
+  }
+  return Math.max(1, Math.min(100, numberValue));
+}
+
+function readerUltraDarkValue(value: number): string {
+  return normalizeUltraDarkBrightnessOption(Math.max(1, Math.min(100, Math.round(value))).toString() + '%');
+}
+
+function normalizeUltraDarkBrightnessOption(value: string): string {
+  const percent = Number.parseInt(value);
+  if (Number.isNaN(percent)) {
+    return '50%';
+  }
+  return Math.max(1, Math.min(100, percent)).toString() + '%';
 }
 
 function stripFileScheme(path: string): string {
