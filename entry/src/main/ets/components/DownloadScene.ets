@@ -43,6 +43,7 @@ import {
   nextDownloadSortMode,
   nextDownloadStatusFilter,
   readerPageReferer,
+  readerPreloadCount,
   saveGalleryReadPosition,
   uiText,
   uiValue
@@ -122,6 +123,7 @@ export struct DownloadScene {
   private downloadScrollOffset: number = 0;
   private toolbarRestoring: boolean = false;
   private localReaderPreviewPageSize: number = 0;
+  private localReaderLoadingIndexes: number[] = [];
   private downloadRowsDataSource: ArrayDataSource<DownloadInfo[]> = new ArrayDataSource<DownloadInfo[]>([]);
   private downloadRowStructureKeys: string[] = [];
   private downloadCardStates: Map<number, DownloadCardState> = new Map<number, DownloadCardState>();
@@ -970,6 +972,8 @@ export struct DownloadScene {
       this.showReader = true;
       if (!this.pageHasLocalImage(this.localReaderPage)) {
         this.loadMissingLocalReaderPage(session.index);
+      } else {
+        this.preloadLocalReaderPages(session.index);
       }
       return;
     }
@@ -1107,6 +1111,7 @@ export struct DownloadScene {
     readerSessionStore.updateSession(createReaderSessionState(this.localReaderDetail, this.localReaderPage,
       this.localReaderStatus, '', '', GallerySite.E, this.localReaderIndex));
     if (this.pageHasLocalImage(this.localReaderPage)) {
+      this.preloadLocalReaderPages(index);
       return;
     }
     this.loadMissingLocalReaderPage(index);
@@ -1122,48 +1127,8 @@ export struct DownloadScene {
   }
 
   private async loadMissingLocalReaderPageAsync(index: number): Promise<void> {
-    const context = getAbilityContext();
-    if (context === undefined || index < 0 || index >= this.localReaderPages.length) {
-      return;
-    }
-    const downloadedPath = ehDownloadFileStore.findPageImage(context, this.localReaderDetail, index);
-    if (downloadedPath.length > 0) {
-      const existing = this.localReaderPages[index].page;
-      this.setLocalReaderPage(index, this.createLocalReaderPage(existing.pageUrl, existing.imageUrl, downloadedPath),
-        'Page loaded from downloads');
-      return;
-    }
-
-    const preview = await this.resolveLocalReaderPreview(index);
-    if (preview.pageUrl.length === 0) {
-      throw new Error('Page URL is unavailable');
-    }
-
-    if (this.localReaderIndex === index) {
-      this.localReaderStatus = 'Loading page ' + (index + 1).toString() + '...';
-      this.localReaderRenderVersion++;
-    }
-
-    const result = await this.client.loadGalleryPage(preview.pageUrl, currentGallerySite(),
-      readerPageReferer('', this.localReaderDetail.previewSet, index, currentGallerySite()));
-    if (!result.ok || result.page === null) {
-      throw new Error(result.message);
-    }
-
-    const imageUrl = downloadImageUrlForPage(result.page);
-    if (imageUrl.length === 0) {
-      throw new Error('Image URL missing');
-    }
-
-    const cachedPath = readerImageCache.getCachedPath(context, imageUrl);
-    const readyPath = cachedPath.length > 0 ? cachedPath :
-      await readerImageCache.ensureCached(context, imageUrl, result.page.pageUrl, false);
-    const savedPath = ehDownloadFileStore.savePageImage(context, this.localReaderDetail, result.page, index, readyPath);
-    this.refreshDownloadProgressAfterRead(context, this.localReaderDetail);
-    const page = this.createLocalReaderPage(result.page.pageUrl.length > 0 ? result.page.pageUrl : preview.pageUrl,
-      result.page.imageUrl, savedPath);
-    galleryPageCache.put(page.pageUrl, page);
-    this.setLocalReaderPage(index, page, 'Page loaded from downloads');
+    await this.loadAndSaveLocalReaderPage(index, false, true);
+    this.preloadLocalReaderPages(index);
   }
 
   private refreshLocalReaderPage(index: number): void {
@@ -1180,41 +1145,127 @@ export struct DownloadScene {
     if (context === undefined || index < 0 || index >= this.localReaderPages.length) {
       return;
     }
-    ehDownloadFileStore.removePageImage(context, this.localReaderDetail, index);
     const current = this.localReaderPages[index].page;
+    const loadingUrl = current.pageUrl.length > 0 ? current.pageUrl : this.previewForIndex(this.localReaderDetail, index).pageUrl;
+    this.setLocalReaderPage(index, createReaderLoadingPage(loadingUrl), 'Refreshing page ' +
+      (index + 1).toString() + '...');
+    ehDownloadFileStore.removePageImage(context, this.localReaderDetail, index);
     if (current.pageUrl.length > 0) {
       galleryPageCache.remove(current.pageUrl);
     }
-    if (this.localReaderIndex === index) {
-      this.localReaderStatus = 'Refreshing page ' + (index + 1).toString() + '...';
-      this.localReaderRenderVersion++;
-    }
+    await this.loadAndSaveLocalReaderPage(index, true, true);
+    this.preloadLocalReaderPages(index);
+  }
 
-    const preview = await this.refreshLocalReaderPreview(index);
-    if (preview.pageUrl.length === 0) {
-      throw new Error('Page URL is unavailable');
-    }
+  private preloadLocalReaderPages(index: number): void {
+    this.preloadLocalReaderPagesAsync(index).catch(() => {});
+  }
 
-    const pageResult = await this.client.loadGalleryPage(preview.pageUrl, currentGallerySite(),
-      readerPageReferer('', this.localReaderDetail.previewSet, index, currentGallerySite()));
-    if (!pageResult.ok || pageResult.page === null) {
-      throw new Error(pageResult.message);
+  private async preloadLocalReaderPagesAsync(index: number): Promise<void> {
+    const count = readerPreloadCount();
+    if (count <= 0) {
+      return;
     }
-
-    const imageUrl = downloadImageUrlForPage(pageResult.page);
-    if (imageUrl.length === 0) {
-      throw new Error('Image URL missing');
+    for (let offset = 1; offset <= count; offset++) {
+      const nextIndex = index + offset;
+      if (nextIndex < 0 || nextIndex >= this.localReaderPages.length) {
+        return;
+      }
+      if (this.pageHasLocalImage(this.localReaderPages[nextIndex].page) ||
+        this.isLocalReaderPageLoading(nextIndex)) {
+        continue;
+      }
+      try {
+        await this.loadAndSaveLocalReaderPage(nextIndex, false, false);
+      } catch (error) {
+      }
     }
+  }
 
-    const readyPath = await readerImageCache.ensureCached(context, imageUrl, pageResult.page.pageUrl, false);
-    const savedPath = ehDownloadFileStore.savePageImage(context, this.localReaderDetail, pageResult.page, index, readyPath);
-    const pageUrl = pageResult.page.pageUrl.length > 0 ? pageResult.page.pageUrl : preview.pageUrl;
-    const page = this.createLocalReaderPage(pageUrl, pageResult.page.imageUrl, savedPath);
-    galleryPageCache.put(page.pageUrl, page);
-    this.updateLocalReaderPreview(index, pageUrl, preview.imageUrl);
-    ehDownloadFileStore.rewriteGalleryMetadata(context, this.localReaderDetail);
-    this.refreshDownloadProgressAfterRead(context, this.localReaderDetail);
-    this.setLocalReaderPage(index, page, 'Page loaded from downloads');
+  private async loadAndSaveLocalReaderPage(index: number, forceRefresh: boolean,
+    updateVisibleStatus: boolean): Promise<void> {
+    const context = getAbilityContext();
+    if (context === undefined || index < 0 || index >= this.localReaderPages.length) {
+      return;
+    }
+    if (!forceRefresh && this.isLocalReaderPageLoading(index)) {
+      return;
+    }
+    this.markLocalReaderPageLoading(index);
+    try {
+      if (!forceRefresh) {
+        const downloadedPath = ehDownloadFileStore.findPageImage(context, this.localReaderDetail, index);
+        if (downloadedPath.length > 0) {
+          const existing = this.localReaderPages[index].page;
+          this.setLocalReaderPage(index, this.createLocalReaderPage(existing.pageUrl, existing.imageUrl, downloadedPath),
+            'Page loaded from downloads');
+          return;
+        }
+      }
+
+      const preview = forceRefresh ? await this.refreshLocalReaderPreview(index) :
+        await this.resolveLocalReaderPreview(index);
+      if (preview.pageUrl.length === 0) {
+        throw new Error('Page URL is unavailable');
+      }
+
+      if (updateVisibleStatus && this.localReaderIndex === index) {
+        this.localReaderStatus = (forceRefresh ? 'Refreshing page ' : 'Loading page ') +
+          (index + 1).toString() + '...';
+        this.localReaderRenderVersion++;
+      }
+
+      const result = await this.client.loadGalleryPage(preview.pageUrl, currentGallerySite(),
+        readerPageReferer('', this.localReaderDetail.previewSet, index, currentGallerySite()));
+      if (!result.ok || result.page === null) {
+        throw new Error(result.message);
+      }
+
+      const imageUrl = downloadImageUrlForPage(result.page);
+      if (imageUrl.length === 0) {
+        throw new Error('Image URL missing');
+      }
+
+      const cachedPath = forceRefresh ? '' : readerImageCache.getCachedPath(context, imageUrl);
+      const readyPath = cachedPath.length > 0 ? cachedPath :
+        await readerImageCache.ensureCached(context, imageUrl, result.page.pageUrl, false);
+      const savedPath = ehDownloadFileStore.savePageImage(context, this.localReaderDetail, result.page, index, readyPath);
+      const pageUrl = result.page.pageUrl.length > 0 ? result.page.pageUrl : preview.pageUrl;
+      const page = this.createLocalReaderPage(pageUrl, result.page.imageUrl, savedPath);
+      galleryPageCache.put(page.pageUrl, page);
+      galleryPageCache.put(preview.pageUrl, page);
+      this.updateLocalReaderPreview(index, pageUrl, preview.imageUrl);
+      ehDownloadFileStore.rewriteGalleryMetadata(context, this.localReaderDetail);
+      this.refreshDownloadProgressAfterRead(context, this.localReaderDetail);
+      this.setLocalReaderPage(index, page, 'Page loaded from downloads');
+    } finally {
+      this.unmarkLocalReaderPageLoading(index);
+    }
+  }
+
+  private isLocalReaderPageLoading(index: number): boolean {
+    for (let i = 0; i < this.localReaderLoadingIndexes.length; i++) {
+      if (this.localReaderLoadingIndexes[i] === index) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private markLocalReaderPageLoading(index: number): void {
+    if (!this.isLocalReaderPageLoading(index)) {
+      this.localReaderLoadingIndexes.push(index);
+    }
+  }
+
+  private unmarkLocalReaderPageLoading(index: number): void {
+    const next: number[] = [];
+    for (let i = 0; i < this.localReaderLoadingIndexes.length; i++) {
+      if (this.localReaderLoadingIndexes[i] !== index) {
+        next.push(this.localReaderLoadingIndexes[i]);
+      }
+    }
+    this.localReaderLoadingIndexes = next;
   }
 
   private setLocalReaderPage(index: number, page: GalleryPage, status: string): void {
