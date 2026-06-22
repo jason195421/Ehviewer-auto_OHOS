@@ -1,4 +1,5 @@
 import { common } from '@kit.AbilityKit';
+import { zlib } from '@kit.BasicServicesKit';
 import { Environment, fileIo as fs } from '@kit.CoreFileKit';
 import { GalleryDetail, GalleryInfo, GalleryPage } from '../model/GalleryModels';
 import { parseGalleryPageUrl } from './GalleryPageUrlParser';
@@ -43,6 +44,13 @@ export interface RestoredDownloadGallery {
 
 export interface DownloadDirectoryScanResult {
   directories: number;
+  files: number;
+  bytes: number;
+}
+
+export interface DownloadZipExportResult {
+  path: string;
+  folders: number;
   files: number;
   bytes: number;
 }
@@ -114,6 +122,74 @@ export class EhDownloadFileStore {
   galleryDirectory(context: common.UIAbilityContext, gallery: GalleryInfo): string {
     const root = this.downloadRoot(context);
     return root + '/' + sanitizePathSegment(gallery.gid.toString() + '-' + gallery.title);
+  }
+
+  downloadedGalleryDirectory(context: common.UIAbilityContext, gallery: GalleryInfo): string {
+    const archiveUri = galleryArchiveUri(gallery);
+    if (archiveUri.length > 0 && exists(archiveUri)) {
+      return archiveUri;
+    }
+    const directory = this.galleryDirectory(context, gallery);
+    if (exists(directory)) {
+      return directory;
+    }
+    return this.findGalleryDirectoryByGid(context, gallery.gid);
+  }
+
+  async exportGalleriesZip(context: common.UIAbilityContext, galleries: GalleryInfo[]): Promise<DownloadZipExportResult> {
+    if (galleries.length <= 0) {
+      throw new Error('No downloads selected');
+    }
+
+    const root = this.downloadRoot(context);
+    ensureDirectory(root);
+    const stagingRoot = context.cacheDir + '/download_zip_export_' + Date.now().toString();
+    removeDirectoryTree(stagingRoot);
+    ensureDirectory(stagingRoot);
+
+    let folders = 0;
+    let files = 0;
+    try {
+      for (let i = 0; i < galleries.length; i++) {
+        const source = this.downloadedGalleryDirectory(context, galleries[i]);
+        if (source.length === 0 || !isDirectory(source)) {
+          continue;
+        }
+        const target = uniqueChildPath(stagingRoot, pathBaseName(source));
+        const copied = copyDirectoryTree(source, target);
+        if (copied.files > 0) {
+          folders++;
+          files += copied.files;
+        } else {
+          removeDirectoryTree(target);
+        }
+      }
+
+      if (folders <= 0 || files <= 0) {
+        throw new Error('Selected downloaded folders are missing');
+      }
+
+      const outputPath = uniqueZipPath(root, 'EhViewer_downloads_' + zipTimestamp() + '.zip');
+      const options: zlib.Options = {
+        level: zlib.CompressLevel.COMPRESS_LEVEL_DEFAULT_COMPRESSION,
+        memLevel: zlib.MemLevel.MEM_LEVEL_DEFAULT,
+        strategy: zlib.CompressStrategy.COMPRESS_STRATEGY_DEFAULT_STRATEGY
+      };
+      try {
+        await zlib.compressFile(stagingRoot, outputPath, options);
+      } catch (error) {
+        throw new Error('Zip compression failed: ' + String(error));
+      }
+      const bytes = this.statFileSize(outputPath);
+      return {
+        path: outputPath,
+        folders: folders,
+        files: files,
+        bytes: bytes
+      };
+    } finally {
+      removeDirectoryTree(stagingRoot);
+    }
   }
 
   prepareGallery(context: common.UIAbilityContext, detail: GalleryDetail): string {
@@ -254,6 +330,24 @@ export class EhDownloadFileStore {
 
   private downloadRoot(context: common.UIAbilityContext): string {
     return this.rootForLocation(context, ehSettingsStore.getValue('download_location', DOWNLOAD_LOCATION_APP_FILES));
+  }
+
+  private findGalleryDirectoryByGid(context: common.UIAbilityContext, gid: number): string {
+    const root = this.downloadRoot(context);
+    const prefix = gid.toString() + '-';
+    try {
+      const names = fs.listFileSync(root);
+      let best = '';
+      for (let i = 0; i < names.length; i++) {
+        const path = root + '/' + names[i];
+        if (names[i].startsWith(prefix) && isDirectory(path) && names[i].length > best.length) {
+          best = path;
+        }
+      }
+      return best;
+    } catch (error) {
+      return '';
+    }
   }
 }
 
@@ -489,6 +583,18 @@ function containsNumber(values: number[], value: number): boolean {
   return false;
 }
 
+function galleryArchiveUri(gallery: GalleryInfo): string {
+  const downloadInfo = gallery as DownloadArchiveLocation;
+  if (downloadInfo.archiveUri !== undefined && downloadInfo.archiveUri.length > 0) {
+    return downloadInfo.archiveUri;
+  }
+  return '';
+}
+
+interface DownloadArchiveLocation extends GalleryInfo {
+  archiveUri?: string;
+}
+
 function sanitizePathSegment(value: string): string {
   let result = value
     .replace(/[\\/:*?"<>|]/g, '_')
@@ -501,6 +607,48 @@ function sanitizePathSegment(value: string): string {
     result = result.substring(0, 120).trim();
   }
   return result;
+}
+
+function pathBaseName(path: string): string {
+  const normalized = normalizePath(path);
+  const index = normalized.lastIndexOf('/');
+  if (index >= 0 && index < normalized.length - 1) {
+    return normalized.substring(index + 1);
+  }
+  return normalized.length > 0 ? normalized : 'downloads';
+}
+
+function uniqueChildPath(parent: string, childName: string): string {
+  const safeName = sanitizePathSegment(childName);
+  let candidate = parent + '/' + safeName;
+  let index = 2;
+  while (exists(candidate)) {
+    candidate = parent + '/' + safeName + '-' + index.toString();
+    index++;
+  }
+  return candidate;
+}
+
+function uniqueZipPath(parent: string, fileName: string): string {
+  const dot = fileName.toLowerCase().endsWith('.zip') ? fileName.length - 4 : fileName.length;
+  const base = sanitizePathSegment(fileName.substring(0, dot));
+  let candidate = parent + '/' + base + '.zip';
+  let index = 2;
+  while (exists(candidate)) {
+    candidate = parent + '/' + base + '-' + index.toString() + '.zip';
+    index++;
+  }
+  return candidate;
+}
+
+function zipTimestamp(): string {
+  const date = new Date();
+  return date.getFullYear().toString() + padTwoDigits(date.getMonth() + 1) + padTwoDigits(date.getDate()) + '_' +
+    padTwoDigits(date.getHours()) + padTwoDigits(date.getMinutes()) + padTwoDigits(date.getSeconds());
+}
+
+function padTwoDigits(value: number): string {
+  return value < 10 ? '0' + value.toString() : value.toString();
 }
 
 function pageFileName(index: number, extension: string): string {
@@ -564,6 +712,14 @@ function writeTextFileQuietly(path: string, value: string): void {
 function exists(path: string): boolean {
   try {
     return fs.accessSync(path);
+  } catch (error) {
+    return false;
+  }
+}
+
+function isDirectory(path: string): boolean {
+  try {
+    return fs.statSync(path).isDirectory();
   } catch (error) {
     return false;
   }

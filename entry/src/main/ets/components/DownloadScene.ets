@@ -631,6 +631,27 @@ export struct DownloadScene {
     this.persistDownloads();
   }
 
+  private exportSelectedDownloadsZip(): void {
+    const selected = this.selectedDownloadItems();
+    if (selected.length === 0) {
+      this.statusText = 'Long press cards to select downloads';
+      return;
+    }
+    const context = getAbilityContext();
+    if (context === undefined) {
+      this.statusText = 'Export needs app context';
+      return;
+    }
+    this.statusText = 'Exporting ' + selected.length.toString() + ' selected downloads...';
+    ehDownloadFileStore.exportGalleriesZip(context, selected).then((result) => {
+      this.clearDownloadSelection();
+      this.statusText = 'Exported ' + result.folders.toString() + ' folders to ' + result.path + ' (' +
+        downloadSizeText(result.bytes) + ')';
+    }).catch((error: Error) => {
+      this.statusText = 'Export failed: ' + error.message;
+    });
+  }
+
   private openDetail(item: DownloadInfo): void {
     this.detailItem = item;
     this.showDetail = true;
@@ -1520,6 +1541,9 @@ export struct DownloadScene {
             },
             onDelete: () => {
               this.deleteSelectedDownloads();
+            },
+            onExportZip: () => {
+              this.exportSelectedDownloadsZip();
             }
           })
         }
@@ -1565,12 +1589,19 @@ struct DownloadToolColumn {
   onRestore: () => void = () => {};
   onClearDone: () => void = () => {};
   onDelete: () => void = () => {};
+  onExportZip: () => void = () => {};
 
   build() {
     Column() {
       if (this.expanded) {
         Column({ space: 8 }) {
           if (this.hasSelection) {
+            ActionBubble({
+              label: '',
+              symbolIcon: $r('sys.symbol.share'),
+              isEnabled: true,
+              onTapAction: this.onExportZip
+            })
             ActionBubble({
               label: '',
               symbolIcon: $r('sys.symbol.trash'),
