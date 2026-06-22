@@ -34,6 +34,7 @@ import {
   normalizeStartPositionOption,
   normalizeAutoTransferTimeOption,
   normalizeBrightnessLevelOption,
+  normalizeUltraDarkLightnessOption,
   uiStatusText,
   uiText,
   uiValue
@@ -727,7 +728,7 @@ export struct ReaderScene {
     this.menuCustomBrightness = ehSettingsStore.getValue('custom_screen_lightness', 'Off') === 'On';
     this.menuBrightnessLevel = normalizeBrightnessLevelOption(ehSettingsStore.getValue('screen_lightness', '50%'));
     this.menuUltraDarkMode = ehSettingsStore.getValue('ultra_dark_mode', 'Off') === 'On';
-    this.menuUltraDarkBrightness = normalizeUltraDarkBrightnessOption(ehSettingsStore.getValue('ultra_dark_lightness', '50%'));
+    this.menuUltraDarkBrightness = normalizeUltraDarkLightnessOption(ehSettingsStore.getValue('ultra_dark_lightness', '50%'));
     this.menuVisible = true;
     this.clearAutoTransferTimer();
     this.autoTransferPlaying = false;
@@ -747,8 +748,6 @@ export struct ReaderScene {
     ehSettingsStore.setValue('start_transfer_time', normalizeAutoTransferTimeOption(this.menuAutoTransferTime));
     ehSettingsStore.setValue('custom_screen_lightness', this.menuCustomBrightness ? 'On' : 'Off');
     ehSettingsStore.setValue('screen_lightness', normalizeBrightnessLevelOption(this.menuBrightnessLevel));
-    ehSettingsStore.setValue('ultra_dark_mode', this.menuUltraDarkMode ? 'On' : 'Off');
-    ehSettingsStore.setValue('ultra_dark_lightness', normalizeUltraDarkBrightnessOption(this.menuUltraDarkBrightness));
     const nextFitMode = normalizePageScalingOption(this.menuPageScaling);
     if (nextFitMode === 'Fixed scale') {
       this.fixedScale = Math.max(READER_MIN_SCALE, Math.min(READER_MAX_SCALE, this.zoomPercent / 100));
@@ -1022,7 +1021,7 @@ export struct ReaderScene {
 
   private syncUltraDarkState(): void {
     this.menuUltraDarkMode = ehSettingsStore.getValue('ultra_dark_mode', 'Off') === 'On';
-    this.menuUltraDarkBrightness = normalizeUltraDarkBrightnessOption(ehSettingsStore.getValue('ultra_dark_lightness', '50%'));
+    this.menuUltraDarkBrightness = normalizeUltraDarkLightnessOption(ehSettingsStore.getValue('ultra_dark_lightness', '50%'));
   }
 
   private ultraDarkOverlayOpacity(): number {
@@ -1844,15 +1843,7 @@ function readerUltraDarkSliderValue(value: string): number {
 }
 
 function readerUltraDarkValue(value: number): string {
-  return normalizeUltraDarkBrightnessOption(Math.max(1, Math.min(100, Math.round(value))).toString() + '%');
-}
-
-function normalizeUltraDarkBrightnessOption(value: string): string {
-  const percent = Number.parseInt(value);
-  if (Number.isNaN(percent)) {
-    return '50%';
-  }
-  return Math.max(1, Math.min(100, percent)).toString() + '%';
+  return normalizeUltraDarkLightnessOption(Math.max(1, Math.min(100, Math.round(value))).toString() + '%');
 }
 
 function stripFileScheme(path: string): string {

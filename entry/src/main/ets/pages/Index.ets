@@ -50,8 +50,8 @@ struct Index {
       this.popRoute();
       return true;
     }
-    if (this.activeRoute === GalleryRoute.Settings || this.activeRoute === GalleryRoute.Downloads) {
-      this.setRootRoute(this.routeAfterSignIn());
+    if (this.activeRoute !== GalleryRoute.Home) {
+      this.setRootRoute(GalleryRoute.Home);
       return true;
     }
     return false;

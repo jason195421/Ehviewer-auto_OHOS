@@ -912,8 +912,8 @@ export struct SettingsScene {
         }
       })
         .transition(TransitionEffect.asymmetric(
-          TransitionEffect.OPACITY.animation({ duration: 160, curve: Curve.EaseOut }),
-          TransitionEffect.OPACITY.animation({ duration: 1, delay: 300, curve: Curve.Linear })))
+          TransitionEffect.move(TransitionEdge.END).animation({ duration: 300, curve: Curve.EaseOut }),
+          TransitionEffect.move(TransitionEdge.END).animation({ duration: 240, curve: Curve.EaseIn })))
     }
   }
 }

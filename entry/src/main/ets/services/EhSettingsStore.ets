@@ -42,6 +42,8 @@ export function defaultSettingEntries(): SettingEntry[] {
     { key: 'reading_fullscreen', value: 'On' },
     { key: 'screen_lightness', value: '50%' },
     { key: 'custom_screen_lightness', value: 'Off' },
+    { key: 'ultra_dark_mode', value: 'Off' },
+    { key: 'ultra_dark_lightness', value: '50%' },
     { key: 'download_location', value: 'Not set' },
     { key: 'media_scan', value: 'Off' },
     { key: 'download_thread', value: '3' },

@@ -683,6 +683,8 @@ export function zhText(text: string): string {
     case 'Custom reader brightness when enabled': return '启用后使用自定义阅读亮度';
     case 'Ultra dark mode': return '超暗模式';
     case 'Ultra dark brightness': return '超暗模式亮度';
+    case 'Dim reader with a black overlay and minimum system brightness': return '将系统亮度降到最低，并使用黑色遮罩压暗阅读器';
+    case 'Black overlay opacity while ultra dark mode is enabled': return '超暗模式开启时黑色遮罩的透明度';
     case 'Download location': return '下载位置';
     case 'HarmonyOS file picker/storage mapping for downloaded galleries': return '下载画廊的 HarmonyOS 文件选择器/存储映射';
     case 'Media scan': return '媒体扫描';
@@ -1681,7 +1683,9 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
       optionSettingsRow('volume_page', 'Volume page', 'Use volume buttons to turn pages', entries, ON_OFF_OPTIONS),
       optionSettingsRow('reading_fullscreen', 'Reading fullscreen', 'Hide system chrome while reading', entries, ON_OFF_OPTIONS),
       optionSettingsRow('custom_screen_lightness', 'Custom brightness', 'Enable custom reader brightness', entries, ON_OFF_OPTIONS),
-      optionSettingsRow('screen_lightness', 'Screen lightness', 'Custom reader brightness when enabled', entries, readerBrightnessLevelOptions())
+      optionSettingsRow('screen_lightness', 'Screen lightness', 'Custom reader brightness when enabled', entries, readerBrightnessLevelOptions()),
+      optionSettingsRow('ultra_dark_mode', 'Ultra dark mode', 'Dim reader with a black overlay and minimum system brightness', entries, ON_OFF_OPTIONS),
+      optionSettingsRow('ultra_dark_lightness', 'Ultra dark brightness', 'Black overlay opacity while ultra dark mode is enabled', entries, readerUltraDarkLightnessOptions())
     ];
   }
 
@@ -1774,9 +1778,17 @@ export function readerBrightnessLevelOptions(): string[] {
   return options;
 }
 
+export function readerUltraDarkLightnessOptions(): string[] {
+  const options: string[] = [];
+  for (let i = 1; i <= 100; i++) {
+    options.push(i.toString() + '%');
+  }
+  return options;
+}
+
 export function optionSettingsRow(key: string, title: string, summary: string, entries: SettingEntry[], options: string[]): SettingsRowItem {
   const rawValue = settingEntryValue(entries, key, options.length > 0 ? options[0] : '');
-  const sliderRow = key === 'start_transfer_time' || key === 'screen_lightness';
+  const sliderRow = key === 'start_transfer_time' || key === 'screen_lightness' || key === 'ultra_dark_lightness';
   return {
     key: key,
     title: title,
@@ -1861,6 +1873,9 @@ function normalizeReaderSettingOption(key: string, value: string): string {
   if (key === 'screen_lightness') {
     return normalizeBrightnessLevelOption(value);
   }
+  if (key === 'ultra_dark_lightness') {
+    return normalizeUltraDarkLightnessOption(value);
+  }
   return value;
 }
 
@@ -1878,6 +1893,14 @@ export function normalizeBrightnessLevelOption(value: string): string {
     return '50%';
   }
   return Math.max(0, Math.min(100, percent)).toString() + '%';
+}
+
+export function normalizeUltraDarkLightnessOption(value: string): string {
+  const percent = Number.parseInt(value);
+  if (Number.isNaN(percent)) {
+    return '50%';
+  }
+  return Math.max(1, Math.min(100, percent)).toString() + '%';
 }
 
 export function textSettingsRow(key: string, title: string, summary: string, entries: SettingEntry[], fallback: string): SettingsRowItem {
