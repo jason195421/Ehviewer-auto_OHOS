@@ -22,7 +22,14 @@ struct ReaderPage {
   }
 
   onBackPress(): boolean {
-    return runReaderActiveBackHandler();
+    if (runReaderActiveBackHandler()) {
+      return true;
+    }
+    const hostContext = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (hostContext !== undefined) {
+      hostContext.terminateSelf().catch(() => {});
+    }
+    return true;
   }
 
   private applyReaderEntryChrome(): void {

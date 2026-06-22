@@ -6,7 +6,7 @@ import { DEFAULT_ADVANCE_SEARCH, EhUrl, ListMode } from '../services/EhUrl';
 import { galleryPageCache } from '../services/GalleryPageCache';
 import { DetailPreviewPager, mergeGalleryPreviewSets, seedPreviewMap } from '../services/GalleryPreviewLoader';
 import { createReaderSessionState, readerSessionStore } from '../services/ReaderSessionStore';
-import { applyAppChromeImmersiveMode, enterEmbeddedReaderFullscreen } from '../services/EhWindowImmersive';
+import { applyAppChromeImmersiveMode, enterEmbeddedReaderFullscreen, leaveEmbeddedReaderFullscreen } from '../services/EhWindowImmersive';
 import { LANGUAGE_REVISION_KEY, nextFloatingToolbarOffset } from '../shared/EhShared';
 import {
   themeOnPrimaryText,
@@ -268,8 +268,15 @@ export struct TopListScene {
     this.readerPage = createEmptyPage();
     this.readerPages = [];
     this.readerPreviewIndex = 0;
-    applyAppChromeImmersiveMode();
+    leaveEmbeddedReaderFullscreen();
+    this.restoreBackHandler();
     this.renderVersion++;
+  }
+
+  private restoreBackHandler(): void {
+    setTimeout(() => {
+      setActiveBackHandler(() => this.handleSystemBack());
+    }, 0);
   }
 
   private loadReaderPage(preview: GalleryPreview): void {

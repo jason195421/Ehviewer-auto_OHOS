@@ -111,7 +111,7 @@ export struct SettingsScene {
 
   private handleSystemBack(): boolean {
     if (this.optionPickerOpen) {
-      this.optionPickerOpen = false;
+      this.closeOptionPicker();
       return true;
     }
     if (this.panel !== SettingsPanel.Main) {
@@ -133,6 +133,7 @@ export struct SettingsScene {
     nextStack.push(panel);
     this.panelStack = nextStack;
     this.panel = panel;
+    this.restoreBackHandler();
   }
 
   private closePanel(): void {
@@ -149,6 +150,13 @@ export struct SettingsScene {
       this.panel = this.panelStack[this.panelStack.length - 1];
     }
     this.signedIn = ehCookieStore.hasCookies();
+    this.restoreBackHandler();
+  }
+
+  private restoreBackHandler(): void {
+    setTimeout(() => {
+      setActiveBackHandler(() => this.handleSystemBack());
+    }, 0);
   }
 
   private signOut(): void {
@@ -287,6 +295,7 @@ export struct SettingsScene {
     this.optionSummary = '';
     this.optionValue = '';
     this.optionOptions = [];
+    this.restoreBackHandler();
   }
 
   private selectOptionValue(value: string): void {

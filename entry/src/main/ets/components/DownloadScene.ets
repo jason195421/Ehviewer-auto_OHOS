@@ -13,6 +13,7 @@ import { createReaderSessionState, readerSessionStore } from '../services/Reader
 import {
   applyAppChromeImmersiveMode,
   enterEmbeddedReaderFullscreen,
+  leaveEmbeddedReaderFullscreen,
   mainContentWidthFallbackVp,
   rememberMainContentWidthVp
 } from '../services/EhWindowImmersive';
@@ -992,6 +993,14 @@ export struct DownloadScene {
   private closeLocalReader(): void {
     this.showReader = false;
     this.localReaderStatus = 'Page loaded from downloads';
+    leaveEmbeddedReaderFullscreen();
+    this.restoreBackHandler();
+  }
+
+  private restoreBackHandler(): void {
+    setTimeout(() => {
+      setActiveBackHandler(() => this.handleSystemBack());
+    }, 0);
   }
 
   private jumpLocalReader(index: number): void {

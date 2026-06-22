@@ -10,6 +10,7 @@ import { createReaderSessionState, readerSessionStore } from '../services/Reader
 import {
   applyAppChromeImmersiveMode,
   enterEmbeddedReaderFullscreen,
+  leaveEmbeddedReaderFullscreen,
   mainContentWidthFallbackVp,
   rememberMainContentWidthVp
 } from '../services/EhWindowImmersive';
@@ -304,8 +305,15 @@ export struct HistoryScene {
     this.readerPage = createEmptyPage();
     this.readerPages = [];
     this.readerPreviewIndex = 0;
-    applyAppChromeImmersiveMode();
+    leaveEmbeddedReaderFullscreen();
+    this.restoreBackHandler();
     this.renderVersion++;
+  }
+
+  private restoreBackHandler(): void {
+    setTimeout(() => {
+      setActiveBackHandler(() => this.handleSystemBack());
+    }, 0);
   }
 
   private loadReaderPage(preview: GalleryPreview): void {

@@ -727,8 +727,6 @@ export struct ReaderScene {
     this.menuAutoTransferTime = normalizeAutoTransferTimeOption(ehSettingsStore.getValue('start_transfer_time', '5s'));
     this.menuCustomBrightness = ehSettingsStore.getValue('custom_screen_lightness', 'Off') === 'On';
     this.menuBrightnessLevel = normalizeBrightnessLevelOption(ehSettingsStore.getValue('screen_lightness', '50%'));
-    this.menuUltraDarkMode = ehSettingsStore.getValue('ultra_dark_mode', 'Off') === 'On';
-    this.menuUltraDarkBrightness = normalizeUltraDarkLightnessOption(ehSettingsStore.getValue('ultra_dark_lightness', '50%'));
     this.menuVisible = true;
     this.clearAutoTransferTimer();
     this.autoTransferPlaying = false;
@@ -1442,7 +1440,8 @@ export struct ReaderScene {
             }
           }
           .width('100%')
-          .padding({ left: 12, right: 12, top: 12, bottom: 10 })
+          .height(48)
+          .padding({ left: 12, right: 12, top: 6, bottom: 6 })
           .backgroundColor(themeScrimColor())
 
           // Scrollable settings body
@@ -1593,9 +1592,11 @@ export struct ReaderScene {
           }
           .scrollable(ScrollDirection.Vertical)
           .scrollBar(BarState.Off)
+          .width('100%')
+          .layoutWeight(1)
         }
         .width('92%')
-        .constraintSize({ maxWidth: 520, maxHeight: '82%' })
+        .constraintSize({ maxWidth: 520, maxHeight: '76%' })
         .backgroundColor('#EE111827')
         .borderRadius(12)
         .clip(true)
@@ -1754,9 +1755,12 @@ struct ReaderMenuSelect {
             this.onChange(this.options[idx]);
           }
         })
+        .height(32)
+        .constraintSize({ minWidth: 136, maxWidth: 188 })
     }
     .width('100%')
-    .padding({ left: 16, right: 16, top: 8, bottom: 8 })
+    .height(44)
+    .padding({ left: 16, right: 16, top: 6, bottom: 6 })
     .alignItems(VerticalAlign.Center)
   }
 }
@@ -1781,7 +1785,7 @@ struct ReaderMenuSlider {
   }
 
   build() {
-    Column({ space: 8 }) {
+    Column({ space: 4 }) {
       Row() {
         Text(this.label)
           .fontSize(14)
@@ -1809,7 +1813,7 @@ struct ReaderMenuSlider {
         })
     }
     .width('100%')
-    .padding({ left: 16, right: 16, top: 8, bottom: 10 })
+    .padding({ left: 16, right: 16, top: 6, bottom: 8 })
   }
 }
 
@@ -1977,6 +1981,7 @@ struct ReaderMenuToggle {
         .selectedColor('#2F6F8F')
     }
     .width('100%')
+    .height(44)
     .padding({ left: 16, right: 16, top: 6, bottom: 6 })
     .alignItems(VerticalAlign.Center)
   }
