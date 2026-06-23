@@ -109,6 +109,13 @@ export struct ReaderContinuousImageItem {
     return Math.max(120, this.displayImageHeight * this.imageModel.currentScale);
   }
 
+  private imageObjectFit(): ImageFit {
+    if (this.sourceImageWidth <= 0 || this.sourceImageHeight <= 0) {
+      return ImageFit.Contain;
+    }
+    return ImageFit.Fill;
+  }
+
   private itemHeight(): number {
     return this.displayHeight();
   }
@@ -174,7 +181,7 @@ export struct ReaderContinuousImageItem {
         Image(this.imageUrl())
           .width(this.displayWidth())
           .height(this.displayHeight())
-          .objectFit(ImageFit.Fill)
+          .objectFit(this.imageObjectFit())
           .draggable(false)
           .backgroundColor(readerBackgroundColor())
           .opacity(this.failedImageUrl === this.imageUrl() ? 0 : 1)
@@ -182,6 +189,7 @@ export struct ReaderContinuousImageItem {
             if (event !== undefined && event.width > 0 && event.height > 0 && this.sourceImageWidth <= 0) {
               this.sourceImageWidth = event.width;
               this.sourceImageHeight = event.height;
+              this.updateDisplayImageSize();
               this.reportImageSize();
             }
             this.completedImageUrl = this.imageUrl();

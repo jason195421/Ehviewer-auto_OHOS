@@ -147,11 +147,25 @@ export struct ReaderImageViewport {
   }
 
   private imageFit(): ImageFit {
+    if (!this.hasSourceImageSize()) {
+      return ImageFit.Contain;
+    }
     const normalized = normalizePageScalingOption(this.fitMode);
     if (normalized === 'Actual size' || normalized === 'Fixed scale') {
       return ImageFit.None;
     }
     return ImageFit.Contain;
+  }
+
+  private imageObjectFit(): ImageFit {
+    if (!this.hasSourceImageSize()) {
+      return ImageFit.Contain;
+    }
+    return ImageFit.Fill;
+  }
+
+  private hasSourceImageSize(): boolean {
+    return this.sourceImageWidth > 0 && this.sourceImageHeight > 0;
   }
 
   private async loadCachedSourceImageSize(requestId: number, imageUrl: string): Promise<void> {
@@ -195,8 +209,8 @@ export struct ReaderImageViewport {
     if (componentWidth <= 0 || componentHeight <= 0) {
       return;
     }
-    const sourceWidth = this.sourceImageWidth > 0 ? this.sourceImageWidth : componentWidth;
-    const sourceHeight = this.sourceImageHeight > 0 ? this.sourceImageHeight : componentHeight;
+    const sourceWidth = this.hasSourceImageSize() ? this.sourceImageWidth : componentWidth;
+    const sourceHeight = this.hasSourceImageSize() ? this.sourceImageHeight : componentHeight;
     let displayWidth = componentWidth;
     let displayHeight = componentHeight;
     const normalized = normalizePageScalingOption(this.fitMode);
@@ -322,7 +336,7 @@ export struct ReaderImageViewport {
         Image(this.imageUrl())
           .width(this.imageDisplayWidth())
           .height(this.imageDisplayHeight())
-          .objectFit(ImageFit.Fill)
+          .objectFit(this.imageObjectFit())
           .draggable(false)
           .backgroundColor(readerBackgroundColor())
           .opacity(this.failedImageUrl === this.imageUrl() ? 0 : 1)
@@ -454,4 +468,3 @@ export struct ReaderImageViewport {
     .draggable(false)
   }
 }
-
