@@ -184,6 +184,25 @@ class ReaderPreviewModel {
     this.commit();
   }
 
+  edgeSwipeDirection(offsetX: number, velocityX: number = 0): number {
+    const maxX = this.maxOffsetX();
+    if (maxX <= 0) {
+      return 0;
+    }
+    const direction = Math.abs(offsetX) >= 8 ? offsetX : velocityX;
+    const strongDrag = Math.abs(offsetX) >= 14 || Math.abs(velocityX) >= 120;
+    if (!strongDrag) {
+      return 0;
+    }
+    if (direction < 0 && this.currentOffsetX <= -maxX + 0.5) {
+      return -1;
+    }
+    if (direction > 0 && this.currentOffsetX >= maxX - 0.5) {
+      return 1;
+    }
+    return 0;
+  }
+
   toggleDoubleTap(centerX: number, centerY: number): void {
     if (Math.abs(this.currentScale - READER_BASE_SCALE) > 0.01) {
       this.reset();
@@ -274,16 +293,20 @@ class ReaderPreviewModel {
     return this.maxOffsetX() > 0 || this.maxOffsetY() > 0;
   }
 
+  canHandleLocalPan(): boolean {
+    return this.canPanHorizontally();
+  }
+
   private canPanHorizontally(): boolean {
     return this.maxOffsetX() > 0;
   }
 
   shouldLetSwiperHandlePan(offsetX: number, velocityX: number): boolean {
     const maxX = this.maxOffsetX();
-    if (maxX <= 0) {
-      return false;
-    }
     const direction = Math.abs(offsetX) >= 1 ? offsetX : velocityX;
+    if (maxX <= 0) {
+      return Math.abs(direction) > 0.5;
+    }
     if (direction < -0.5 && this.currentOffsetX <= -maxX + 0.5) {
       return true;
     }
@@ -622,40 +645,12 @@ export struct ReaderScene {
     const oldReversed = this.swiperReversed;
     this.swiperVertical = dir === 'Top to bottom';
     this.swiperReversed = dir === 'Right to left';
-    if (this.swiperVertical) {
-      this.applyContinuousModeConstraints();
-    }
     if (oldReversed !== this.swiperReversed) {
       this.readerPageIndexesCount = -1;
       this.syncReaderPageIndexSource();
       try {
         this.swiperController.changeIndex(this.visualIndexForPageIndex(this.currentIndex), false);
       } catch (e) {}
-    }
-  }
-
-  private applyContinuousModeConstraints(): void {
-    let changed = false;
-    if (readerScreenRotationSetting() !== 'Default') {
-      ehSettingsStore.setValue('screen_rotation', 'Default');
-      changed = true;
-    }
-    if (normalizePageScalingOption(ehSettingsStore.getValue('page_scaling', 'Fit screen')) !== 'Fixed scale') {
-      ehSettingsStore.setValue('page_scaling', 'Fixed scale');
-      changed = true;
-    }
-    if (this.fitMode !== 'Fixed scale') {
-      this.fitMode = 'Fixed scale';
-    }
-    if (Math.abs(this.fixedScale - READER_BASE_SCALE) > 0.01) {
-      this.fixedScale = READER_BASE_SCALE;
-      this.zoomPercent = 100;
-    }
-    if (changed) {
-      const context = getAbilityContext();
-      if (context !== undefined) {
-        ehSettingsStore.save(context).catch(() => {});
-      }
     }
   }
 
@@ -804,18 +799,12 @@ export struct ReaderScene {
     this.menuAutoTransferTime = normalizeAutoTransferTimeOption(ehSettingsStore.getValue('start_transfer_time', '5s'));
     this.menuCustomBrightness = ehSettingsStore.getValue('custom_screen_lightness', 'Off') === 'On';
     this.menuBrightnessLevel = normalizeBrightnessLevelOption(ehSettingsStore.getValue('screen_lightness', '50%'));
-    if (this.menuReadingDirection === 'Top to bottom') {
-      this.applyContinuousMenuConstraints();
-    }
     this.menuVisible = true;
     this.clearAutoTransferTimer();
     this.autoTransferPlaying = false;
   }
 
   private applyMenuSettings(): void {
-    if (this.menuReadingDirection === 'Top to bottom') {
-      this.applyContinuousMenuConstraints();
-    }
     ehSettingsStore.setValue('screen_rotation', this.menuScreenRotation);
     ehSettingsStore.setValue('reading_direction', this.menuReadingDirection);
     ehSettingsStore.setValue('page_scaling', this.menuPageScaling);
@@ -830,10 +819,7 @@ export struct ReaderScene {
     ehSettingsStore.setValue('custom_screen_lightness', this.menuCustomBrightness ? 'On' : 'Off');
     ehSettingsStore.setValue('screen_lightness', normalizeBrightnessLevelOption(this.menuBrightnessLevel));
     const nextFitMode = normalizePageScalingOption(this.menuPageScaling);
-    if (this.menuReadingDirection === 'Top to bottom') {
-      this.fixedScale = READER_BASE_SCALE;
-      this.zoomPercent = 100;
-    } else if (nextFitMode === 'Fixed scale') {
+    if (nextFitMode === 'Fixed scale') {
       this.fixedScale = Math.max(READER_MIN_SCALE, Math.min(READER_MAX_SCALE, this.zoomPercent / 100));
       this.zoomPercent = Math.round(this.fixedScale * 100);
     } else {
@@ -860,6 +846,8 @@ export struct ReaderScene {
   private applyContinuousMenuConstraints(): void {
     this.menuScreenRotation = 'Default';
     this.menuPageScaling = 'Fixed scale';
+    this.zoomPercent = 100;
+    this.fixedScale = READER_BASE_SCALE;
   }
 
   private readerMenuScreenRotationOptions(): string[] {
@@ -877,8 +865,9 @@ export struct ReaderScene {
   }
 
   private onMenuReadingDirectionChange(value: string): void {
+    const previous = this.menuReadingDirection;
     this.menuReadingDirection = normalizeReadingDirectionOption(value);
-    if (this.menuReadingDirection === 'Top to bottom') {
+    if (previous !== 'Top to bottom' && this.menuReadingDirection === 'Top to bottom') {
       this.applyContinuousMenuConstraints();
     }
   }
@@ -1374,6 +1363,7 @@ export struct ReaderScene {
                 page: this.pageForIndex(index),
                 statusText: index === this.pageIndex ? this.statusText : uiText('Image page is loading'),
                 preferOriginal: this.preferOriginal,
+                fitMode: this.fitMode,
                 zoomScale: this.fixedScale,
                 isActive: index === this.currentIndex,
                 onTap: () => {
@@ -1389,6 +1379,12 @@ export struct ReaderScene {
                 onImageSizeChange: (width: number, height: number) => {
                   if (index === this.currentIndex) {
                     this.onActiveImageSizeChange(width, height);
+                  }
+                },
+                onZoomChange: (percent: number) => {
+                  if (index === this.currentIndex) {
+                    this.zoomPercent = percent;
+                    this.fixedScale = Math.max(READER_MIN_SCALE, Math.min(READER_MAX_SCALE, percent / 100));
                   }
                 }
               })
@@ -1450,6 +1446,11 @@ export struct ReaderScene {
               onImageSizeChange: (width: number, height: number) => {
                 if (index === this.currentIndex) {
                   this.onActiveImageSizeChange(width, height);
+                }
+              },
+              onEdgeSwipe: (direction: number) => {
+                if (index === this.currentIndex) {
+                  this.jumpByVisualDirection(direction);
                 }
               }
             })
@@ -1839,6 +1840,15 @@ export struct ReaderScene {
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
   }
 
+  private jumpByVisualDirection(direction: number): void {
+    if (direction === 0 || this.totalPages <= 0) {
+      return;
+    }
+    const visualIndex = this.visualIndexForPageIndex(this.currentIndex);
+    const targetVisualIndex = visualIndex + (direction < 0 ? 1 : -1);
+    this.jumpTo(this.pageIndexForVisualIndex(targetVisualIndex));
+  }
+
 }
 
 @Component
@@ -2226,6 +2236,7 @@ export struct ReaderImageViewport {
   onSwipeLockChange: (locked: boolean) => void = (_locked: boolean) => {};
   onZoomChange: (percent: number) => void = (_percent: number) => {};
   onImageSizeChange: (width: number, height: number) => void = (_width: number, _height: number) => {};
+  onEdgeSwipe: (direction: number) => void = (_direction: number) => {};
 
   @State imageModel: ReaderPreviewModel = new ReaderPreviewModel();
   @State completedImageUrl: string = '';
@@ -2635,7 +2646,7 @@ export struct ReaderImageViewport {
                 this.onImageLongPress();
               }
             }),
-          PanGesture({ fingers: 1, distance: this.imageModel.disableSwipe ? 3 : 50 })
+          PanGesture({ fingers: 1, distance: 3 })
             .onActionStart(() => {
               this.imageModel.panStart();
               this.reportState();
@@ -2645,8 +2656,12 @@ export struct ReaderImageViewport {
               this.reportState();
             })
             .onActionEnd((event: GestureEvent) => {
+              const edgeDirection = this.imageModel.edgeSwipeDirection(event.offsetX, event.velocityX);
               this.imageModel.panEnd(event.velocityX, event.velocityY);
               this.reportState();
+              if (edgeDirection !== 0) {
+                this.onEdgeSwipe(edgeDirection);
+              }
             })
             .onActionCancel(() => {
               this.imageModel.panEnd();
@@ -2690,22 +2705,28 @@ export struct ReaderContinuousImageItem {
   @Prop @Watch('onImageSourceChange') page: GalleryPage = createEmptyPage();
   @Prop statusText: string = '';
   @Prop @Watch('onImageSourceChange') preferOriginal: boolean = false;
+  @Prop @Watch('onFitModeChange') fitMode: string = 'Fixed scale';
   @Prop zoomScale: number = READER_BASE_SCALE;
   @Prop isActive: boolean = false;
   onTap: () => void = () => {};
   onRetry: () => void = () => {};
   onImageLongPress: () => void = () => {};
   onImageSizeChange: (width: number, height: number) => void = (_width: number, _height: number) => {};
+  onZoomChange: (percent: number) => void = (_percent: number) => {};
 
+  @State imageModel: ReaderPreviewModel = new ReaderPreviewModel();
   @State completedImageUrl: string = '';
   @State failedImageUrl: string = '';
   @State sourceImageWidth: number = 0;
   @State sourceImageHeight: number = 0;
   @State componentWidth: number = 1;
+  @State displayImageWidth: number = 1;
+  @State displayImageHeight: number = 120;
   private sourceSizeRequestId: number = 0;
 
   aboutToAppear(): void {
     this.onImageSourceChange();
+    this.onFitModeChange();
   }
 
   private imageUrl(): string {
@@ -2739,6 +2760,7 @@ export struct ReaderContinuousImageItem {
     if (size.width > 0 && size.height > 0) {
       this.sourceImageWidth = size.width;
       this.sourceImageHeight = size.height;
+      this.updateDisplayImageSize();
       this.reportImageSize();
     }
   }
@@ -2790,18 +2812,49 @@ export struct ReaderContinuousImageItem {
     }
   }
 
-  private displayScale(): number {
-    return Math.max(READER_MIN_SCALE, Math.min(READER_MAX_SCALE, this.zoomScale));
+  private onFitModeChange(): void {
+    this.updateDisplayImageSize();
+    this.syncFixedScale();
+    this.reportState();
+  }
+
+  private syncFixedScale(): void {
+    if (normalizePageScalingOption(this.fitMode) === 'Fixed scale') {
+      this.imageModel.setScale(this.zoomScale);
+    } else {
+      this.imageModel.reset();
+    }
   }
 
   private displayWidth(): number {
-    return Math.max(1, this.componentWidth * this.displayScale());
+    return this.displayImageWidth;
   }
 
   private displayHeight(): number {
-    const width = this.sourceImageWidth > 0 ? this.sourceImageWidth : this.componentWidth;
-    const height = this.sourceImageHeight > 0 ? this.sourceImageHeight : this.componentWidth * 1.35;
-    return Math.max(120, this.displayWidth() * height / width);
+    return this.displayImageHeight;
+  }
+
+  private itemHeight(): number {
+    return Math.max(120, this.displayImageHeight * this.imageModel.currentScale);
+  }
+
+  private updateDisplayImageSize(): void {
+    if (this.componentWidth <= 0) {
+      return;
+    }
+    const sourceWidth = this.sourceImageWidth > 0 ? this.sourceImageWidth : this.componentWidth;
+    const sourceHeight = this.sourceImageHeight > 0 ? this.sourceImageHeight : this.componentWidth * 1.35;
+    const normalized = normalizePageScalingOption(this.fitMode);
+    let width = this.componentWidth;
+    if (normalized === 'Actual size') {
+      width = this.sourceImageWidth > 0 ? this.getUIContext().px2vp(this.sourceImageWidth) : sourceWidth;
+    } else if (normalized === 'Fixed scale') {
+      width = this.componentWidth;
+    }
+    this.displayImageWidth = Math.max(1, width);
+    this.displayImageHeight = Math.max(120, this.displayImageWidth * sourceHeight / sourceWidth);
+    this.imageModel.setComponentSize(this.componentWidth, this.displayImageHeight);
+    this.imageModel.setImageSize(this.displayImageWidth, this.displayImageHeight);
   }
 
   private isFailed(): boolean {
@@ -2820,6 +2873,27 @@ export struct ReaderContinuousImageItem {
       return;
     }
     this.onImageSizeChange(this.sourceImageWidth, this.sourceImageHeight);
+  }
+
+  private reportState(): void {
+    if (!this.isActive) {
+      return;
+    }
+    this.onZoomChange(this.imageModel.zoomPercent());
+  }
+
+  private tapCenterX(event: GestureEvent): number {
+    if (event.fingerList.length > 0) {
+      return event.fingerList[0].localX;
+    }
+    return this.componentWidth / 2;
+  }
+
+  private tapCenterY(event: GestureEvent): number {
+    if (event.fingerList.length > 0) {
+      return event.fingerList[0].localY;
+    }
+    return this.displayHeight() / 2;
   }
 
   build() {
@@ -2844,6 +2918,9 @@ export struct ReaderContinuousImageItem {
           .onError(() => {
             this.failedImageUrl = this.imageUrl();
           })
+          .scale({ x: this.imageModel.currentScale, y: this.imageModel.currentScale, centerX: '50%', centerY: '50%' })
+          .translate({ x: this.imageModel.currentOffsetX, y: this.imageModel.currentOffsetY })
+          .animation({ duration: READER_INERTIA_DURATION, curve: Curve.EaseOut })
       }
       if (this.imageUrl().length === 0 || this.isImageLoading()) {
         LoadingProgress()
@@ -2860,29 +2937,78 @@ export struct ReaderContinuousImageItem {
       }
     }
     .width('100%')
-    .height(this.displayHeight())
+    .height(this.itemHeight())
     .backgroundColor('#050608')
     .clip(true)
     .onAreaChange((_oldValue: Area, newValue: Area) => {
       const width = Number.parseFloat(newValue.width.toString());
       if (width > 0 && !Number.isNaN(width)) {
         this.componentWidth = width;
+        this.updateDisplayImageSize();
       }
     })
-    .onClick(() => {
-      if (this.isFailed()) {
-        this.failedImageUrl = '';
-        this.completedImageUrl = '';
-        this.onRetry();
-        return;
+    .gesture(
+      GestureGroup(GestureMode.Exclusive,
+        TapGesture({ count: 1 })
+          .onAction(() => {
+            if (this.isFailed()) {
+              this.failedImageUrl = '';
+              this.completedImageUrl = '';
+              this.onRetry();
+              return;
+            }
+            this.onTap();
+          }),
+        GestureGroup(GestureMode.Parallel,
+          LongPressGesture({ repeat: false })
+            .onAction(() => {
+              if (!this.isFailed()) {
+                this.onImageLongPress();
+              }
+            }),
+          PinchGesture({ fingers: 2, distance: 1 })
+            .onActionStart((event: GestureEvent) => {
+              this.imageModel.pinchStart(event.pinchCenterX, event.pinchCenterY);
+              this.reportState();
+            })
+            .onActionUpdate((event: GestureEvent) => {
+              this.imageModel.pinchUpdate(event.scale);
+              this.reportState();
+            })
+            .onActionEnd(() => {
+              this.imageModel.pinchEnd();
+              this.reportState();
+            })
+            .onActionCancel(() => {
+              this.imageModel.pinchEnd();
+              this.reportState();
+            }),
+          PanGesture({ fingers: 1, distance: 3 })
+            .onActionStart(() => {
+              this.imageModel.panStart();
+              this.reportState();
+            })
+            .onActionUpdate((event: GestureEvent) => {
+              this.imageModel.panUpdate(event.offsetX, event.offsetY);
+              this.reportState();
+            })
+            .onActionEnd((event: GestureEvent) => {
+              this.imageModel.panEnd(event.velocityX, event.velocityY);
+              this.reportState();
+            })
+            .onActionCancel(() => {
+              this.imageModel.panEnd();
+              this.reportState();
+            })
+        )
+      )
+    )
+    .onGestureJudgeBegin((gestureInfo: GestureInfo, _event: BaseGestureEvent) => {
+      if (gestureInfo.type === GestureControl.GestureType.PAN_GESTURE && !this.imageModel.canHandleLocalPan()) {
+        return GestureJudgeResult.REJECT;
       }
-      this.onTap();
+      return GestureJudgeResult.CONTINUE;
     })
-    .gesture(LongPressGesture({ repeat: false }).onAction(() => {
-      if (!this.isFailed()) {
-        this.onImageLongPress();
-      }
-    }))
   }
 }
 @Component
