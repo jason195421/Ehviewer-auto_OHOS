@@ -33,6 +33,7 @@ import {
   normalizeAutoTransferTimeOption,
   normalizeBrightnessLevelOption,
   normalizeUltraDarkLightnessOption,
+  BOTTOM_AVOID_HEIGHT_KEY,
   STATUS_BAR_HEIGHT_KEY,
   uiText
 } from '../shared/EhShared';
@@ -89,6 +90,7 @@ export struct ReaderScene {
   onRefreshPage: (index: number) => void = () => {};
   restoreAppChromeOnExit: boolean = true;
   @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeightPx: number = 0;
+  @StorageProp(BOTTOM_AVOID_HEIGHT_KEY) bottomAvoidHeight: number = 0;
 
   @State fitMode: string = 'Fit screen';
   @State startPosition: string = 'Top right';
@@ -278,6 +280,10 @@ export struct ReaderScene {
 
   private readerStatusOverlayTop(): number {
     return Math.max(12, this.statusBarHeightVp() + 8);
+  }
+
+  private readerBottomInset(): number {
+    return Math.max(0, this.bottomAvoidHeight);
   }
 
   private scheduleReaderChromeMode(delay: number): void {
@@ -1203,6 +1209,7 @@ export struct ReaderScene {
           sliderTrackWidth: this.sliderTrackWidth,
           sliderLiveIndex: this.sliderLiveIndex,
           totalPages: this.totalPages,
+          bottomInset: this.readerBottomInset(),
           autoTransferPlaying: this.autoTransferPlaying,
           autoTransferEnabled: this.autoTransferDelayMs() > 0 && this.canGoNext(),
           onDismiss: () => {
@@ -1211,8 +1218,12 @@ export struct ReaderScene {
           onSliderChange: (value: number, mode: SliderChangeMode) => {
             this.clearSliderTimer();
             this.sliderLiveIndex = this.clampReaderPageIndex(value);
-            this.sliderDragging = mode !== SliderChangeMode.End && mode !== SliderChangeMode.Click;
-            if (mode === SliderChangeMode.End || mode === SliderChangeMode.Click) {
+            this.sliderDragging = mode === SliderChangeMode.Begin || mode === SliderChangeMode.Moving;
+            if (mode === SliderChangeMode.End) {
+              this.stopAutoTransferPlayback();
+              this.jumpTo(value);
+              this.scheduleSliderHide();
+            } else if (mode === SliderChangeMode.Click) {
               this.stopAutoTransferPlayback();
               this.jumpTo(value);
               this.scheduleSliderHide();

@@ -31,7 +31,7 @@ export struct ReaderInfoOverlay {
   right: number = 12;
 
   build() {
-    Row() {
+    Stack({ alignContent: Alignment.TopEnd }) {
       Row({ space: 8 }) {
         if (this.showProgress) {
           Text(this.progressText)
@@ -56,11 +56,10 @@ export struct ReaderInfoOverlay {
       .padding({ left: 10, right: 10, top: 5, bottom: 5 })
       .backgroundColor(themeScrimColor())
       .borderRadius(10)
+      .margin({ top: this.top, right: this.right })
     }
     .width('100%')
-    .justifyContent(FlexAlign.End)
-    .padding({ left: this.right, right: this.right })
-    .position({ x: 0, y: this.top })
+    .height('100%')
     .hitTestBehavior(HitTestMode.Transparent)
   }
 }
@@ -74,6 +73,7 @@ export struct ReaderSliderPanel {
   sliderTrackWidth: number = 1;
   sliderLiveIndex: number = 0;
   totalPages: number = 0;
+  bottomInset: number = 0;
   autoTransferPlaying: boolean = false;
   autoTransferEnabled: boolean = false;
   onDismiss: () => void = () => {};
@@ -87,8 +87,16 @@ export struct ReaderSliderPanel {
     return Math.max(0, Math.min(maxLeft, this.sliderBubbleX - bubbleSize / 2));
   }
 
+  private panelHeight(): number {
+    return 50 + Math.max(0, this.bottomInset);
+  }
+
+  private bubbleLift(): number {
+    return this.panelHeight() + 48;
+  }
+
   build() {
-    Stack() {
+    Stack({ alignContent: Alignment.BottomStart }) {
       Stack() {}
         .width('100%')
         .height('100%')
@@ -116,12 +124,11 @@ export struct ReaderSliderPanel {
           .layoutWeight(1)
           .height(42)
           Blank()
-            .width(42)
+            .width(36)
         }
         .width('100%')
         .padding({ left: 12, right: 12 })
-        .position({ x: 0, y: '100%' })
-        .translate({ y: -96 })
+        .margin({ bottom: this.bubbleLift() })
         .zIndex(2)
         .hitTestBehavior(HitTestMode.Transparent)
       }
@@ -132,8 +139,8 @@ export struct ReaderSliderPanel {
             .fontSize(12)
             .fontColor('#E5E7EB')
             .width(58)
-            .height(32)
-            .lineHeight(32)
+            .height(36)
+            .lineHeight(36)
             .textAlign(TextAlign.Center)
           Stack({ alignContent: Alignment.Center }) {
             Slider({
@@ -149,7 +156,7 @@ export struct ReaderSliderPanel {
               })
           }
           .layoutWeight(1)
-          .height(32)
+          .height(36)
           .onAreaChange((_oldArea: Area, newArea: Area) => {
             const width = newArea.width as number;
             if (width > 0 && !Number.isNaN(width)) {
@@ -162,7 +169,7 @@ export struct ReaderSliderPanel {
               .fontColor([Color.White])
           }
           .width(36)
-          .height(32)
+          .height(36)
           .enabled(this.autoTransferEnabled)
           .backgroundColor(this.autoTransferEnabled ? '#334155' : '#1F2937')
           .onClick(() => {
@@ -173,10 +180,8 @@ export struct ReaderSliderPanel {
         .alignItems(VerticalAlign.Center)
       }
       .width('100%')
-      .padding({ left: 12, right: 12, top: 8, bottom: 10 })
+      .padding({ left: 12, right: 12, top: 7, bottom: 7 + Math.max(0, this.bottomInset) })
       .backgroundColor('#CC111827')
-      .position({ x: 0, y: '100%' })
-      .translate({ y: '-100%' })
       .zIndex(1)
     }
     .width('100%')
