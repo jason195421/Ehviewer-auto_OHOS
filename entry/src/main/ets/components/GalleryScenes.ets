@@ -226,7 +226,7 @@ export struct GalleryListScene {
   localPageSize: number = 25;
   localProvider: (keyword: string, pageIndex: number, pageSize: number) => Promise<GalleryListLoadResult> =
     (_keyword: string, _pageIndex: number, _pageSize: number): Promise<GalleryListLoadResult> => {
-      return Promise.resolve({
+      const result: GalleryListLoadResult = {
         ok: true,
         url: '',
         statusCode: 200,
@@ -236,7 +236,8 @@ export struct GalleryListScene {
         nextUrl: '',
         resultCount: '',
         galleries: []
-      });
+      };
+      return Promise.resolve(result);
     };
   onMenu: () => void = () => {
   };

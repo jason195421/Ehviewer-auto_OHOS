@@ -199,22 +199,25 @@ export class EhHistoryStore {
 
   private async saveNow(context: common.UIAbilityContext): Promise<void> {
     try {
-      const itemsJson = JSON.stringify(this.serializeStoredItems());
-      const readPositionsJson = JSON.stringify(this.readPositions);
-      this.saveFile(context, itemsJson, readPositionsJson);
+      this.saveFile(context, this.serializeStoredItems(), this.serializeReadPositions());
     } catch (error) {
       throw new Error(String(error));
     }
   }
 
   private async restoreFromLegacyPreferences(context: common.UIAbilityContext): Promise<void> {
-    const prefs = await preferences.getPreferences(context, { name: PREFERENCES_NAME });
-    const raw = await prefs.get(VALUES_KEY, '');
-    const rawBackup = await prefs.get(VALUES_BACKUP_KEY, '');
-    const rawPositions = await prefs.get(READ_POSITIONS_KEY, '');
-    const rawPositionsBackup = await prefs.get(READ_POSITIONS_BACKUP_KEY, '');
-    this.items = this.parseStoredItems(raw, rawBackup);
-    this.readPositions = this.parseReadPositions(rawPositions, rawPositionsBackup);
+    try {
+      const prefs = await preferences.getPreferences(context, { name: PREFERENCES_NAME });
+      const raw = await prefs.get(VALUES_KEY, '');
+      const rawBackup = await prefs.get(VALUES_BACKUP_KEY, '');
+      const rawPositions = await prefs.get(READ_POSITIONS_KEY, '');
+      const rawPositionsBackup = await prefs.get(READ_POSITIONS_BACKUP_KEY, '');
+      this.items = this.parseStoredItems(raw, rawBackup);
+      this.readPositions = this.parseReadPositions(rawPositions, rawPositionsBackup);
+    } catch (error) {
+      this.items = [];
+      this.readPositions = [];
+    }
   }
 
   private readFile(path: string): HistoryFileState {
@@ -230,11 +233,11 @@ export class EhHistoryStore {
     }
   }
 
-  private saveFile(context: common.UIAbilityContext, itemsJson: string, readPositionsJson: string): void {
+  private saveFile(context: common.UIAbilityContext, items: StoredGalleryInfo[], readPositions: StoredReadPosition[]): void {
     const payload = JSON.stringify({
       version: 1,
-      items: JSON.parse(itemsJson) as StoredGalleryInfo[],
-      readPositions: JSON.parse(readPositionsJson) as StoredReadPosition[],
+      items: items,
+      readPositions: readPositions,
       updatedAt: Date.now()
     });
     writeTextFileQuietly(context.filesDir + '/' + FILE_NAME, payload);
@@ -248,6 +251,18 @@ export class EhHistoryStore {
       stored.push(galleryInfoToStored(this.items[i]));
     }
     return stored;
+  }
+
+  private serializeReadPositions(): StoredReadPosition[] {
+    const positions: StoredReadPosition[] = [];
+    for (let i = 0; i < this.readPositions.length; i++) {
+      positions.push({
+        gid: this.readPositions[i].gid,
+        pageIndex: this.readPositions[i].pageIndex,
+        updatedAt: this.readPositions[i].updatedAt
+      });
+    }
+    return positions;
   }
 
   private parseStoredItems(raw: preferences.ValueType, backup: preferences.ValueType): GalleryInfo[] {
