@@ -439,6 +439,7 @@ export struct ReaderScene {
   private readerPageIndexesSource: ArrayDataSource<number> = new ArrayDataSource<number>([]);
   private readerPageIndexesCount: number = -1;
   private readerPageIndexesReversed: boolean = false;
+  private continuousScroller: Scroller = new Scroller();
   private activeImageWidth: number = 0;
   private activeImageHeight: number = 0;
 
@@ -621,12 +622,40 @@ export struct ReaderScene {
     const oldReversed = this.swiperReversed;
     this.swiperVertical = dir === 'Top to bottom';
     this.swiperReversed = dir === 'Right to left';
+    if (this.swiperVertical) {
+      this.applyContinuousModeConstraints();
+    }
     if (oldReversed !== this.swiperReversed) {
       this.readerPageIndexesCount = -1;
       this.syncReaderPageIndexSource();
       try {
         this.swiperController.changeIndex(this.visualIndexForPageIndex(this.currentIndex), false);
       } catch (e) {}
+    }
+  }
+
+  private applyContinuousModeConstraints(): void {
+    let changed = false;
+    if (readerScreenRotationSetting() !== 'Default') {
+      ehSettingsStore.setValue('screen_rotation', 'Default');
+      changed = true;
+    }
+    if (normalizePageScalingOption(ehSettingsStore.getValue('page_scaling', 'Fit screen')) !== 'Fixed scale') {
+      ehSettingsStore.setValue('page_scaling', 'Fixed scale');
+      changed = true;
+    }
+    if (this.fitMode !== 'Fixed scale') {
+      this.fitMode = 'Fixed scale';
+    }
+    if (Math.abs(this.fixedScale - READER_BASE_SCALE) > 0.01) {
+      this.fixedScale = READER_BASE_SCALE;
+      this.zoomPercent = 100;
+    }
+    if (changed) {
+      const context = getAbilityContext();
+      if (context !== undefined) {
+        ehSettingsStore.save(context).catch(() => {});
+      }
     }
   }
 
@@ -717,6 +746,10 @@ export struct ReaderScene {
     return normalizePageScalingOption(this.fitMode) === 'Fixed scale';
   }
 
+  private isContinuousVerticalMode(): boolean {
+    return this.swiperVertical;
+  }
+
   private issueViewportCommand(command: string): void {
     this.viewportCommand = command;
     this.viewportCommandVersion++;
@@ -771,12 +804,18 @@ export struct ReaderScene {
     this.menuAutoTransferTime = normalizeAutoTransferTimeOption(ehSettingsStore.getValue('start_transfer_time', '5s'));
     this.menuCustomBrightness = ehSettingsStore.getValue('custom_screen_lightness', 'Off') === 'On';
     this.menuBrightnessLevel = normalizeBrightnessLevelOption(ehSettingsStore.getValue('screen_lightness', '50%'));
+    if (this.menuReadingDirection === 'Top to bottom') {
+      this.applyContinuousMenuConstraints();
+    }
     this.menuVisible = true;
     this.clearAutoTransferTimer();
     this.autoTransferPlaying = false;
   }
 
   private applyMenuSettings(): void {
+    if (this.menuReadingDirection === 'Top to bottom') {
+      this.applyContinuousMenuConstraints();
+    }
     ehSettingsStore.setValue('screen_rotation', this.menuScreenRotation);
     ehSettingsStore.setValue('reading_direction', this.menuReadingDirection);
     ehSettingsStore.setValue('page_scaling', this.menuPageScaling);
@@ -791,7 +830,10 @@ export struct ReaderScene {
     ehSettingsStore.setValue('custom_screen_lightness', this.menuCustomBrightness ? 'On' : 'Off');
     ehSettingsStore.setValue('screen_lightness', normalizeBrightnessLevelOption(this.menuBrightnessLevel));
     const nextFitMode = normalizePageScalingOption(this.menuPageScaling);
-    if (nextFitMode === 'Fixed scale') {
+    if (this.menuReadingDirection === 'Top to bottom') {
+      this.fixedScale = READER_BASE_SCALE;
+      this.zoomPercent = 100;
+    } else if (nextFitMode === 'Fixed scale') {
       this.fixedScale = Math.max(READER_MIN_SCALE, Math.min(READER_MAX_SCALE, this.zoomPercent / 100));
       this.zoomPercent = Math.round(this.fixedScale * 100);
     } else {
@@ -812,6 +854,32 @@ export struct ReaderScene {
     this.updateVolumePageBinding();
     if (this.autoTransferPlaying) {
       this.scheduleAutoTransfer();
+    }
+  }
+
+  private applyContinuousMenuConstraints(): void {
+    this.menuScreenRotation = 'Default';
+    this.menuPageScaling = 'Fixed scale';
+  }
+
+  private readerMenuScreenRotationOptions(): string[] {
+    if (this.menuReadingDirection === 'Top to bottom') {
+      return ['Default', 'Portrait', 'Landscape', 'Auto rotate'];
+    }
+    return ['Default', 'Portrait', 'Landscape', 'Auto rotate', 'Match image'];
+  }
+
+  private readerMenuPageScalingOptions(): string[] {
+    if (this.menuReadingDirection === 'Top to bottom') {
+      return ['Actual size', 'Fit width', 'Fixed scale'];
+    }
+    return ['Actual size', 'Fit width', 'Fit height', 'Fit screen', 'Fixed scale'];
+  }
+
+  private onMenuReadingDirectionChange(value: string): void {
+    this.menuReadingDirection = normalizeReadingDirectionOption(value);
+    if (this.menuReadingDirection === 'Top to bottom') {
+      this.applyContinuousMenuConstraints();
     }
   }
 
@@ -1268,6 +1336,16 @@ export struct ReaderScene {
     this.onJump(index);
   }
 
+  private onContinuousScrollIndex(index: number): void {
+    const pageIndex = this.pageIndexForVisualIndex(index);
+    if (pageIndex === this.currentIndex) {
+      return;
+    }
+    this.currentIndex = pageIndex;
+    this.sliderLiveIndex = pageIndex;
+    this.onJump(pageIndex);
+  }
+
   private resetActiveImageSize(): void {
     this.activeImageWidth = 0;
     this.activeImageHeight = 0;
@@ -1288,74 +1366,116 @@ export struct ReaderScene {
 
   build() {
     Stack({ alignContent: Alignment.Center }) {
-      Swiper(this.swiperController) {
-        LazyForEach(this.readerPageIndexSource(), (index: number) => {
-          ReaderImageViewport({
-            page: this.pageForIndex(index),
-            statusText: index === this.pageIndex ? this.statusText : uiText('Image page is loading'),
-            preferOriginal: this.preferOriginal,
-            fitMode: this.fitMode,
-            fixedScale: this.fixedScale,
-            startPosition: this.startPosition,
-            isActive: index === this.currentIndex,
-            command: this.viewportCommand,
-            commandVersion: this.viewportCommandVersion,
-            onTap: (x: number, y: number, w: number, h: number) => {
-              if (index === this.currentIndex) {
-                this.onTap(x, y, w, h);
-              }
-            },
-            onRetry: () => {
-              if (index === this.currentIndex) {
-                this.onRetry();
-              }
-            },
-            onImageLongPress: () => {
-              if (index === this.currentIndex) {
-                this.showImageActions();
-              }
-            },
-            onSwipeLockChange: (locked: boolean) => {
-              if (index === this.currentIndex) {
-                this.isDisableSwipe = locked;
-              }
-            },
-            onZoomChange: (percent: number) => {
-              if (index === this.currentIndex) {
-                this.zoomPercent = percent;
-                if (this.isFixedScaleMode()) {
-                  this.fixedScale = Math.max(READER_MIN_SCALE, Math.min(READER_MAX_SCALE, percent / 100));
+      if (this.isContinuousVerticalMode()) {
+        List({ space: 0, scroller: this.continuousScroller }) {
+          LazyForEach(this.readerPageIndexSource(), (index: number) => {
+            ListItem() {
+              ReaderContinuousImageItem({
+                page: this.pageForIndex(index),
+                statusText: index === this.pageIndex ? this.statusText : uiText('Image page is loading'),
+                preferOriginal: this.preferOriginal,
+                zoomScale: this.fixedScale,
+                isActive: index === this.currentIndex,
+                onTap: () => {
+                  this.showMenu();
+                },
+                onRetry: () => {
+                  this.onJump(index);
+                },
+                onImageLongPress: () => {
+                  this.currentIndex = index;
+                  this.showImageActions();
+                },
+                onImageSizeChange: (width: number, height: number) => {
+                  if (index === this.currentIndex) {
+                    this.onActiveImageSizeChange(width, height);
+                  }
+                }
+              })
+                .width('100%')
+            }
+            .reuseId('reader-continuous-page')
+          }, (index: number) => index.toString())
+        }
+        .width('100%')
+        .height('100%')
+        .backgroundColor('#050608')
+        .scrollBar(BarState.Off)
+        .cachedCount(this.readerRenderCacheCount() + 2)
+        .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
+        .onScrollIndex((first: number) => {
+          this.onContinuousScrollIndex(first);
+        })
+      } else {
+        Swiper(this.swiperController) {
+          LazyForEach(this.readerPageIndexSource(), (index: number) => {
+            ReaderImageViewport({
+              page: this.pageForIndex(index),
+              statusText: index === this.pageIndex ? this.statusText : uiText('Image page is loading'),
+              preferOriginal: this.preferOriginal,
+              fitMode: this.fitMode,
+              fixedScale: this.fixedScale,
+              startPosition: this.startPosition,
+              isActive: index === this.currentIndex,
+              command: this.viewportCommand,
+              commandVersion: this.viewportCommandVersion,
+              onTap: (x: number, y: number, w: number, h: number) => {
+                if (index === this.currentIndex) {
+                  this.onTap(x, y, w, h);
+                }
+              },
+              onRetry: () => {
+                if (index === this.currentIndex) {
+                  this.onRetry();
+                }
+              },
+              onImageLongPress: () => {
+                if (index === this.currentIndex) {
+                  this.showImageActions();
+                }
+              },
+              onSwipeLockChange: (locked: boolean) => {
+                if (index === this.currentIndex) {
+                  this.isDisableSwipe = locked;
+                }
+              },
+              onZoomChange: (percent: number) => {
+                if (index === this.currentIndex) {
+                  this.zoomPercent = percent;
+                  if (this.isFixedScaleMode()) {
+                    this.fixedScale = Math.max(READER_MIN_SCALE, Math.min(READER_MAX_SCALE, percent / 100));
+                  }
+                }
+              },
+              onImageSizeChange: (width: number, height: number) => {
+                if (index === this.currentIndex) {
+                  this.onActiveImageSizeChange(width, height);
                 }
               }
-            },
-            onImageSizeChange: (width: number, height: number) => {
-              if (index === this.currentIndex) {
-                this.onActiveImageSizeChange(width, height);
-              }
-            }
-          })
-            .width('100%')
-            .height('100%')
-        }, (index: number) => index.toString())
+            })
+              .width('100%')
+              .height('100%')
+          }, (index: number) => index.toString())
+        }
+        .index(this.visualIndexForPageIndex(this.currentIndex))
+        .cachedCount(this.readerRenderCacheCount())
+        .indicator(false)
+        .loop(false)
+        .autoPlay(false)
+        .vertical(false)
+        .displayCount(1)
+        .itemSpace(0)
+        .duration(180)
+        .curve(Curve.EaseOut)
+        .effectMode(EdgeEffect.None)
+        .disableSwipe(this.isDisableSwipe)
+        .onChange((index: number) => {
+          this.onSwiperChange(index);
+        })
+        .width('100%')
+        .height('100%')
+        .backgroundColor('#050608')
       }
-      .index(this.visualIndexForPageIndex(this.currentIndex))
-      .cachedCount(this.readerRenderCacheCount())
-      .indicator(false)
-      .loop(false)
-      .autoPlay(false)
-      .vertical(this.swiperVertical)
-      .displayCount(1)
-      .itemSpace(0)
-      .duration(180)
-      .curve(Curve.EaseOut)
-      .effectMode(EdgeEffect.None)
-      .disableSwipe(this.isDisableSwipe)
-      .onChange((index: number) => {
-        this.onSwiperChange(index);
-      })
-      .width('100%')
-      .height('100%')
-      .backgroundColor('#050608')
 
       if (this.menuUltraDarkMode) {
         Stack() {}
@@ -1559,7 +1679,7 @@ export struct ReaderScene {
 
               ReaderMenuSelect({
                 label: uiText('Screen rotation'),
-                options: ['Default', 'Portrait', 'Landscape', 'Auto rotate', 'Match image'],
+                options: this.readerMenuScreenRotationOptions(),
                 value: this.menuScreenRotation,
                 onChange: (v: string) => { this.menuScreenRotation = v; }
               })
@@ -1569,13 +1689,13 @@ export struct ReaderScene {
                 label: uiText('Reading direction'),
                 options: ['Left to right', 'Right to left', 'Top to bottom'],
                 value: this.menuReadingDirection,
-                onChange: (v: string) => { this.menuReadingDirection = v; }
+                onChange: (v: string) => { this.onMenuReadingDirectionChange(v); }
               })
               ReaderMenuDivider()
 
               ReaderMenuSelect({
                 label: uiText('Page scaling'),
-                options: ['Actual size', 'Fit width', 'Fit height', 'Fit screen', 'Fixed scale'],
+                options: this.readerMenuPageScalingOptions(),
                 value: this.menuPageScaling,
                 onChange: (v: string) => { this.menuPageScaling = v; }
               })
@@ -2562,6 +2682,207 @@ export struct ReaderImageViewport {
       return GestureJudgeResult.CONTINUE;
     })
     .draggable(false)
+  }
+}
+
+@Component
+export struct ReaderContinuousImageItem {
+  @Prop @Watch('onImageSourceChange') page: GalleryPage = createEmptyPage();
+  @Prop statusText: string = '';
+  @Prop @Watch('onImageSourceChange') preferOriginal: boolean = false;
+  @Prop zoomScale: number = READER_BASE_SCALE;
+  @Prop isActive: boolean = false;
+  onTap: () => void = () => {};
+  onRetry: () => void = () => {};
+  onImageLongPress: () => void = () => {};
+  onImageSizeChange: (width: number, height: number) => void = (_width: number, _height: number) => {};
+
+  @State completedImageUrl: string = '';
+  @State failedImageUrl: string = '';
+  @State sourceImageWidth: number = 0;
+  @State sourceImageHeight: number = 0;
+  @State componentWidth: number = 1;
+  private sourceSizeRequestId: number = 0;
+
+  aboutToAppear(): void {
+    this.onImageSourceChange();
+  }
+
+  private imageUrl(): string {
+    return readerDisplayImageUrl(this.page, this.preferOriginal);
+  }
+
+  private onImageSourceChange(): void {
+    const url = this.imageUrl();
+    const requestId = this.sourceSizeRequestId + 1;
+    this.sourceSizeRequestId = requestId;
+    if (this.completedImageUrl !== url) {
+      this.completedImageUrl = '';
+    }
+    if (this.failedImageUrl !== url) {
+      this.failedImageUrl = '';
+    }
+    this.sourceImageWidth = 0;
+    this.sourceImageHeight = 0;
+    this.loadCachedSourceImageSize(requestId, url).catch(() => {});
+  }
+
+  private async loadCachedSourceImageSize(requestId: number, imageUrl: string): Promise<void> {
+    const path = this.localSourceImagePath();
+    if (path.length === 0) {
+      return;
+    }
+    const size = await this.readSourceImageSize(path);
+    if (requestId !== this.sourceSizeRequestId || imageUrl !== this.imageUrl()) {
+      return;
+    }
+    if (size.width > 0 && size.height > 0) {
+      this.sourceImageWidth = size.width;
+      this.sourceImageHeight = size.height;
+      this.reportImageSize();
+    }
+  }
+
+  private localSourceImagePath(): string {
+    const page = this.page;
+    if (this.preferOriginal && page.cachedOriginImagePath !== undefined && page.cachedOriginImagePath.length > 0) {
+      return stripFileScheme(page.cachedOriginImagePath);
+    }
+    if (!this.preferOriginal && page.cachedImagePath !== undefined && page.cachedImagePath.length > 0) {
+      return stripFileScheme(page.cachedImagePath);
+    }
+    if (page.cachedImagePath !== undefined && page.cachedImagePath.length > 0) {
+      return stripFileScheme(page.cachedImagePath);
+    }
+    if (page.cachedOriginImagePath !== undefined && page.cachedOriginImagePath.length > 0) {
+      return stripFileScheme(page.cachedOriginImagePath);
+    }
+    const displayUrl = this.imageUrl();
+    if (displayUrl.indexOf('file://') === 0) {
+      return stripFileScheme(displayUrl);
+    }
+    const context = getAbilityContext();
+    if (context === undefined) {
+      return '';
+    }
+    const sourceUrl = this.preferOriginal && page.originImageUrl.length > 0 ? page.originImageUrl : page.imageUrl;
+    return readerImageCache.getCachedPath(context, sourceUrl);
+  }
+
+  private async readSourceImageSize(path: string): Promise<ReaderSourceImageSize> {
+    let imageSource: image.ImageSource | undefined = undefined;
+    try {
+      imageSource = image.createImageSource(path);
+      const imageInfo: image.ImageInfo = imageSource.getImageInfoSync();
+      return {
+        width: imageInfo.size.width,
+        height: imageInfo.size.height
+      };
+    } catch (error) {
+      return { width: 0, height: 0 };
+    } finally {
+      if (imageSource !== undefined) {
+        try {
+          await imageSource.release();
+        } catch (error) {
+        }
+      }
+    }
+  }
+
+  private displayScale(): number {
+    return Math.max(READER_MIN_SCALE, Math.min(READER_MAX_SCALE, this.zoomScale));
+  }
+
+  private displayWidth(): number {
+    return Math.max(1, this.componentWidth * this.displayScale());
+  }
+
+  private displayHeight(): number {
+    const width = this.sourceImageWidth > 0 ? this.sourceImageWidth : this.componentWidth;
+    const height = this.sourceImageHeight > 0 ? this.sourceImageHeight : this.componentWidth * 1.35;
+    return Math.max(120, this.displayWidth() * height / width);
+  }
+
+  private isFailed(): boolean {
+    const url = this.imageUrl();
+    return this.statusText.indexOf('failed') >= 0 || this.statusText.indexOf('Failed') >= 0 ||
+      (url.length > 0 && this.failedImageUrl === url);
+  }
+
+  private isImageLoading(): boolean {
+    const url = this.imageUrl();
+    return url.length > 0 && this.completedImageUrl !== url && this.failedImageUrl !== url;
+  }
+
+  private reportImageSize(): void {
+    if (!this.isActive || this.sourceImageWidth <= 0 || this.sourceImageHeight <= 0) {
+      return;
+    }
+    this.onImageSizeChange(this.sourceImageWidth, this.sourceImageHeight);
+  }
+
+  build() {
+    Stack({ alignContent: Alignment.Center }) {
+      if (this.imageUrl().length > 0) {
+        Image(this.imageUrl())
+          .width(this.displayWidth())
+          .height(this.displayHeight())
+          .objectFit(ImageFit.Fill)
+          .draggable(false)
+          .backgroundColor('#050608')
+          .opacity(this.failedImageUrl === this.imageUrl() ? 0 : 1)
+          .onComplete((event?: ReaderImageCompleteEvent) => {
+            if (event !== undefined && event.width > 0 && event.height > 0 && this.sourceImageWidth <= 0) {
+              this.sourceImageWidth = event.width;
+              this.sourceImageHeight = event.height;
+              this.reportImageSize();
+            }
+            this.completedImageUrl = this.imageUrl();
+            this.failedImageUrl = '';
+          })
+          .onError(() => {
+            this.failedImageUrl = this.imageUrl();
+          })
+      }
+      if (this.imageUrl().length === 0 || this.isImageLoading()) {
+        LoadingProgress()
+          .width(36)
+          .height(36)
+          .color(themeOnPrimarySecondaryText())
+          .padding(8)
+          .backgroundColor(themeScrimColor())
+          .borderRadius(18)
+      } else if (this.isFailed()) {
+        SymbolGlyph($r('sys.symbol.exclamationmark_triangle'))
+          .fontSize(32)
+          .fontColor(['#98A2B3'])
+      }
+    }
+    .width('100%')
+    .height(this.displayHeight())
+    .backgroundColor('#050608')
+    .clip(true)
+    .onAreaChange((_oldValue: Area, newValue: Area) => {
+      const width = Number.parseFloat(newValue.width.toString());
+      if (width > 0 && !Number.isNaN(width)) {
+        this.componentWidth = width;
+      }
+    })
+    .onClick(() => {
+      if (this.isFailed()) {
+        this.failedImageUrl = '';
+        this.completedImageUrl = '';
+        this.onRetry();
+        return;
+      }
+      this.onTap();
+    })
+    .gesture(LongPressGesture({ repeat: false }).onAction(() => {
+      if (!this.isFailed()) {
+        this.onImageLongPress();
+      }
+    }))
   }
 }
 @Component

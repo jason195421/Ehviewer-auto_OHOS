@@ -1644,10 +1644,16 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
   }
 
   if (panel === SettingsPanel.Read) {
+    const readingDirection = normalizeReadingDirectionOption(settingEntryValue(entries, 'reading_direction', 'Right to left'));
+    const continuousMode = readingDirection === 'Top to bottom';
     return [
-      optionSettingsRow('screen_rotation', 'Screen rotation', 'Reader orientation policy', entries, ['Default', 'Portrait', 'Landscape', 'Auto rotate', 'Match image']),
+      optionSettingsRow('screen_rotation', 'Screen rotation', 'Reader orientation policy', entries,
+        continuousMode ? ['Default', 'Portrait', 'Landscape', 'Auto rotate'] :
+          ['Default', 'Portrait', 'Landscape', 'Auto rotate', 'Match image']),
       optionSettingsRow('reading_direction', 'Reading direction', 'Left-to-right, right-to-left or vertical reader movement', entries, ['Left to right', 'Right to left', 'Top to bottom']),
-      optionSettingsRow('page_scaling', 'Page scaling', 'Fit width, fit height or original page scaling', entries, ['Actual size', 'Fit width', 'Fit height', 'Fit screen', 'Fixed scale']),
+      optionSettingsRow('page_scaling', 'Page scaling', 'Fit width, fit height or original page scaling', entries,
+        continuousMode ? ['Actual size', 'Fit width', 'Fixed scale'] :
+          ['Actual size', 'Fit width', 'Fit height', 'Fit screen', 'Fixed scale']),
       optionSettingsRow('start_position', 'Start position', 'Where a gallery starts when opened', entries, ['Top left', 'Top right', 'Bottom left', 'Bottom right', 'Center']),
       optionSettingsRow('start_transfer_time', 'Auto transfer time', 'Automatic next-page delay from original seekbar preference', entries, readerAutoTransferTimeOptions()),
       optionSettingsRow('reader_standalone', 'Standalone reader', 'Open reader in a standalone ability', entries, ON_OFF_OPTIONS),

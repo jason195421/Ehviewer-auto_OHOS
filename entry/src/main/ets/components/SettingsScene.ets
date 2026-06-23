@@ -200,11 +200,16 @@ export struct SettingsScene {
       this.statusText = 'Invalid proxy port: ' + value;
       return;
     }
-    ehSettingsStore.setValue(key, value);
+    const normalizedValue = this.normalizedSettingValue(key, value);
+    ehSettingsStore.setValue(key, normalizedValue);
+    if (key === 'reading_direction' && normalizedValue === 'Top to bottom') {
+      ehSettingsStore.setValue('screen_rotation', 'Default');
+      ehSettingsStore.setValue('page_scaling', 'Fixed scale');
+    }
     this.settingEntries = ehSettingsStore.getEntries();
     this.themeName = settingEntryValue(this.settingEntries, 'theme', 'Light');
     if (key === this.optionKey) {
-      this.optionValue = value;
+      this.optionValue = normalizedValue;
     }
     if (key === 'app_language') {
       notifyLanguageChanged();
@@ -221,16 +226,30 @@ export struct SettingsScene {
     }
     const context = getAbilityContext();
     if (context === undefined) {
-      this.statusText = isNetworkSettingKey(key) ? 'Saved network setting in memory: ' + key + ' = ' + value +
-        '. Refresh Homepage or run Network diagnostics.' : 'Saved in memory: ' + key + ' = ' + value;
+      this.statusText = isNetworkSettingKey(key) ? 'Saved network setting in memory: ' + key + ' = ' + normalizedValue +
+        '. Refresh Homepage or run Network diagnostics.' : 'Saved in memory: ' + key + ' = ' + normalizedValue;
       return;
     }
     ehSettingsStore.save(context).then(() => {
-      this.statusText = isNetworkSettingKey(key) ? 'Saved network setting: ' + key + ' = ' + value +
-        '. Refresh Homepage or run Network diagnostics.' : 'Saved: ' + key + ' = ' + value;
+      this.statusText = isNetworkSettingKey(key) ? 'Saved network setting: ' + key + ' = ' + normalizedValue +
+        '. Refresh Homepage or run Network diagnostics.' : 'Saved: ' + key + ' = ' + normalizedValue;
     }).catch((error: Error) => {
       this.statusText = 'Save failed: ' + error.message;
     });
+  }
+
+  private normalizedSettingValue(key: string, value: string): string {
+    if (key === 'screen_rotation' &&
+      settingEntryValue(this.settingEntries, 'reading_direction', 'Right to left') === 'Top to bottom' &&
+      value === 'Match image') {
+      return 'Default';
+    }
+    if (key === 'page_scaling' &&
+      settingEntryValue(this.settingEntries, 'reading_direction', 'Right to left') === 'Top to bottom' &&
+      (value === 'Fit height' || value === 'Fit screen')) {
+      return 'Fixed scale';
+    }
+    return value;
   }
 
   private requestDownloadLocationChange(value: string): void {
