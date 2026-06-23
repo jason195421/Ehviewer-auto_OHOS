@@ -1,6 +1,8 @@
-﻿import { GalleryTagGroup } from '../../model/GalleryModels';
-import { uiText } from '../../shared/EhShared';
+import { GalleryTagGroup } from '../../model/GalleryModels';
+import { ehTagTranslationStore } from '../../services/EhTagTranslationStore';
+import { shouldUseChineseUi, uiText } from '../../shared/EhShared';
 import { themePrimaryText, themeSecondaryText, themeSurface, themeSurfaceVariant } from '../../shared/EhTheme';
+
 @Component
 export struct DetailTags {
   @Prop tags: GalleryTagGroup[] = [];
@@ -25,15 +27,19 @@ export struct DetailTags {
           .fontColor(themeSecondaryText())
           .margin({ top: 8 })
       } else {
-        ForEach(this.tags, (group: GalleryTagGroup) => {
-          TagGroupRow({
-            namespace: group.namespace,
-            tags: group.tags,
-            onTagSearch: (namespace: string, tag: string) => {
-              this.onTagSearch(namespace, tag);
-            }
-          })
-        }, (group: GalleryTagGroup) => group.namespace)
+        Column({ space: 8 }) {
+          ForEach(this.tags, (group: GalleryTagGroup) => {
+            TagGroupRow({
+              namespace: group.namespace,
+              tags: group.tags,
+              onTagSearch: (namespace: string, tag: string) => {
+                this.onTagSearch(namespace, tag);
+              }
+            })
+          }, (group: GalleryTagGroup) => group.namespace)
+        }
+        .width('100%')
+        .margin({ top: 8 })
       }
     }
     .alignItems(HorizontalAlign.Start)
@@ -49,6 +55,14 @@ export struct TagGroupRow {
   tags: string[] = [];
   onTagSearch: (namespace: string, tag: string) => void = (_namespace: string, _tag: string) => {};
 
+  private tagLabel(tag: string): string {
+    if (!shouldUseChineseUi()) {
+      return tag;
+    }
+    const translated = ehTagTranslationStore.translate(this.namespace, tag);
+    return translated.length > 0 ? translated : tag;
+  }
+
   build() {
     Row() {
       Text(this.namespace)
@@ -57,7 +71,7 @@ export struct TagGroupRow {
         .width(86)
       Flex({ wrap: FlexWrap.Wrap }) {
         ForEach(this.tags, (tag: string) => {
-          Button(tag, { type: ButtonType.Normal, stateEffect: true })
+          Button(this.tagLabel(tag), { type: ButtonType.Normal, stateEffect: true })
             .height(26)
             .fontSize(12)
             .fontColor(themePrimaryText())
@@ -70,11 +84,9 @@ export struct TagGroupRow {
             })
         }, (tag: string) => this.namespace + ':' + tag)
       }
-        .clip(true)
-        .layoutWeight(1)
+      .clip(true)
+      .layoutWeight(1)
     }
     .width('100%')
-    .margin({ top: 8 })
   }
 }
-

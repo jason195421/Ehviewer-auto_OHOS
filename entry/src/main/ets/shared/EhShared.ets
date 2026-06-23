@@ -48,6 +48,7 @@ export interface EhBackupBundle {
 }
 
 export const LANGUAGE_REVISION_KEY: string = 'ehviewer_language_revision';
+export const HISTORY_READ_REVISION_KEY: string = 'ehviewer_history_read_revision';
 
 export interface DrawerItem {
   route: GalleryRoute;
@@ -119,6 +120,11 @@ export function notifyLanguageChanged(): void {
 
 export function notifyThemeChanged(): void {
   notifyLanguageChanged();
+}
+
+export function notifyHistoryReadChanged(): void {
+  const current = AppStorage.get<number>(HISTORY_READ_REVISION_KEY);
+  AppStorage.setOrCreate<number>(HISTORY_READ_REVISION_KEY, current === undefined ? 1 : current + 1);
 }
 
 export function shouldUseChineseUi(): boolean {
@@ -866,6 +872,17 @@ export function createDetailFromGallery(gallery: GalleryInfo): GalleryDetail {
   detail.thumbHeight = gallery.thumbHeight;
   detail.favoriteSlot = gallery.favoriteSlot;
   detail.favoriteName = gallery.favoriteName;
+  detail.simpleLanguage = gallery.simpleLanguage;
+  detail.simpleTags = cloneStringArray(gallery.simpleTags);
+  detail.tagList = cloneStringArray(gallery.tagList);
+  detail.detailLanguage = gallery.detailLanguage;
+  detail.detailTags = gallery.detailTags === undefined ? undefined : cloneGalleryTagGroups(gallery.detailTags);
+  if (gallery.detailLanguage !== undefined && gallery.detailLanguage.length > 0) {
+    detail.language = gallery.detailLanguage;
+  }
+  if (gallery.detailTags !== undefined && gallery.detailTags.length > 0) {
+    detail.tags = cloneGalleryTagGroups(gallery.detailTags);
+  }
   return detail;
 }
 
@@ -974,7 +991,87 @@ function cloneRequiredStringArray(values: string[]): string[] {
   return result;
 }
 
+function cloneOptionalGalleryTagGroups(groups: GalleryTagGroup[] | undefined): GalleryTagGroup[] | undefined {
+  if (groups === undefined) {
+    return undefined;
+  }
+  const result: GalleryTagGroup[] = [];
+  for (let i = 0; i < groups.length; i++) {
+    result.push({
+      namespace: groups[i].namespace,
+      tags: cloneRequiredStringArray(groups[i].tags)
+    });
+  }
+  return result;
+}
+
+function findLanguageInTagGroups(groups: GalleryTagGroup[] | undefined): string {
+  if (groups === undefined) {
+    return '';
+  }
+  for (let i = 0; i < groups.length; i++) {
+    if (groups[i].namespace.toLowerCase() === 'language' && groups[i].tags.length > 0) {
+      return groups[i].tags[0];
+    }
+  }
+  return '';
+}
+
+function findLanguageInTags(tags: string[] | undefined): string {
+  if (tags === undefined) {
+    return '';
+  }
+  for (let i = 0; i < tags.length; i++) {
+    const tag = tags[i];
+    const lower = tag.toLowerCase();
+    if (lower.indexOf('language:') === 0 && tag.length > 9) {
+      return tag.substring(9);
+    }
+  }
+  return '';
+}
+
+export function gallerySimpleLanguage(gallery: GalleryInfo): string {
+  if (gallery.simpleLanguage !== undefined && gallery.simpleLanguage.length > 0) {
+    return gallery.simpleLanguage;
+  }
+  if (gallery.detailLanguage !== undefined && gallery.detailLanguage.length > 0) {
+    return gallery.detailLanguage;
+  }
+  const groupLanguage = findLanguageInTagGroups(gallery.detailTags);
+  if (groupLanguage.length > 0) {
+    return groupLanguage;
+  }
+  const listLanguage = findLanguageInTags(gallery.tagList);
+  if (listLanguage.length > 0) {
+    return listLanguage;
+  }
+  return findLanguageInTags(gallery.simpleTags);
+}
+
+function galleryDetailLanguage(gallery: GalleryInfo): string | undefined {
+  const detail = gallery as GalleryDetail;
+  if (detail.language !== undefined && detail.language.length > 0) {
+    return detail.language;
+  }
+  if (gallery.detailLanguage !== undefined && gallery.detailLanguage.length > 0) {
+    return gallery.detailLanguage;
+  }
+  const language = gallerySimpleLanguage(gallery);
+  return language.length > 0 ? language : undefined;
+}
+
+function galleryDetailTags(gallery: GalleryInfo): GalleryTagGroup[] | undefined {
+  const detail = gallery as GalleryDetail;
+  if (detail.tags !== undefined && detail.tags.length > 0) {
+    return cloneOptionalGalleryTagGroups(detail.tags);
+  }
+  return cloneOptionalGalleryTagGroups(gallery.detailTags);
+}
+
 export function cloneGalleryInfo(gallery: GalleryInfo): GalleryInfo {
+  const language = gallery.simpleLanguage !== undefined && gallery.simpleLanguage.length > 0 ?
+    gallery.simpleLanguage : gallerySimpleLanguage(gallery);
   return {
     gid: gallery.gid,
     token: gallery.token,
@@ -986,14 +1083,16 @@ export function cloneGalleryInfo(gallery: GalleryInfo): GalleryInfo {
     uploader: gallery.uploader,
     rating: gallery.rating,
     rated: gallery.rated,
-    simpleLanguage: gallery.simpleLanguage,
+    simpleLanguage: language.length > 0 ? language : undefined,
     simpleTags: cloneStringArray(gallery.simpleTags),
     pages: gallery.pages,
     thumbWidth: gallery.thumbWidth,
     thumbHeight: gallery.thumbHeight,
     favoriteSlot: gallery.favoriteSlot,
     favoriteName: gallery.favoriteName,
-    tagList: cloneStringArray(gallery.tagList)
+    tagList: cloneStringArray(gallery.tagList),
+    detailTags: galleryDetailTags(gallery),
+    detailLanguage: galleryDetailLanguage(gallery)
   };
 }
 
@@ -1081,6 +1180,8 @@ export function cloneGalleryDetail(detail: GalleryDetail): GalleryDetail {
     favoriteSlot: base.favoriteSlot,
     favoriteName: base.favoriteName,
     tagList: base.tagList,
+    detailTags: cloneGalleryTagGroups(detail.tags),
+    detailLanguage: detail.language,
     apiUid: detail.apiUid,
     apiKey: detail.apiKey,
     tags: cloneGalleryTagGroups(detail.tags),
@@ -1187,10 +1288,12 @@ export function saveGalleryReadPosition(gid: number, pageIndex: number): void {
   const context = getAbilityContext();
   if (context === undefined) {
     ehHistoryStore.setReadPage(gid, pageIndex);
+    notifyHistoryReadChanged();
     return;
   }
   ehHistoryStore.ensureLoaded(context).then(() => {
     ehHistoryStore.setReadPage(gid, pageIndex);
+    notifyHistoryReadChanged();
     ehHistoryStore.save(context).catch(() => {});
   }).catch(() => {});
 }

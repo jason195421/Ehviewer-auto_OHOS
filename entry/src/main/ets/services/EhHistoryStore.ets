@@ -1,7 +1,7 @@
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import { fileIo as fs } from '@kit.CoreFileKit';
-import { GalleryCategory, GalleryInfo } from '../model/GalleryModels';
+import { GalleryCategory, GalleryDetail, GalleryInfo, GalleryTagGroup } from '../model/GalleryModels';
 import { EhUrl } from './EhUrl';
 
 const PREFERENCES_NAME: string = 'ehviewer_history';
@@ -33,6 +33,13 @@ interface StoredGalleryInfo {
   favoriteSlot?: number;
   favoriteName?: string;
   tagList?: string[];
+  detailTags?: StoredGalleryTagGroup[];
+  detailLanguage?: string;
+}
+
+interface StoredGalleryTagGroup {
+  namespace?: string;
+  tags?: string[];
 }
 
 interface StoredReadPosition {
@@ -355,7 +362,9 @@ function storedToGalleryInfo(item: StoredGalleryInfo): GalleryInfo {
     thumbHeight: typeof item.thumbHeight === 'number' ? item.thumbHeight : 0,
     favoriteSlot: typeof item.favoriteSlot === 'number' ? item.favoriteSlot : -2,
     favoriteName: item.favoriteName,
-    tagList: item.tagList
+    tagList: item.tagList,
+    detailTags: storedToGalleryTagGroups(item.detailTags),
+    detailLanguage: item.detailLanguage
   };
 }
 
@@ -381,6 +390,8 @@ function parseStoredGalleryUrl(url: string | undefined): StoredGalleryUrlParts {
 }
 
 function galleryInfoToStored(item: GalleryInfo): StoredGalleryInfo {
+  const tags = galleryDetailTags(item);
+  const language = galleryDetailLanguage(item);
   return {
     galleryUrl: EhUrl.getGalleryDetailUrl(item.gid, item.token),
     gid: item.gid,
@@ -400,7 +411,9 @@ function galleryInfoToStored(item: GalleryInfo): StoredGalleryInfo {
     thumbHeight: item.thumbHeight,
     favoriteSlot: item.favoriteSlot,
     favoriteName: item.favoriteName,
-    tagList: item.tagList
+    tagList: item.tagList,
+    detailTags: galleryTagGroupsToStored(tags),
+    detailLanguage: language
   };
 }
 
@@ -421,6 +434,8 @@ function cloneGalleryInfos(items: GalleryInfo[]): GalleryInfo[] {
 }
 
 function cloneGalleryInfo(item: GalleryInfo): GalleryInfo {
+  const tags = galleryDetailTags(item);
+  const language = galleryDetailLanguage(item);
   return {
     gid: item.gid,
     token: item.token,
@@ -439,8 +454,78 @@ function cloneGalleryInfo(item: GalleryInfo): GalleryInfo {
     thumbHeight: item.thumbHeight,
     favoriteSlot: item.favoriteSlot,
     favoriteName: item.favoriteName,
-    tagList: item.tagList
+    tagList: item.tagList,
+    detailTags: cloneGalleryTagGroups(tags),
+    detailLanguage: language
   };
+}
+
+function galleryDetailTags(item: GalleryInfo): GalleryTagGroup[] | undefined {
+  const detail = item as GalleryDetail;
+  if (detail.tags !== undefined && detail.tags.length > 0) {
+    return detail.tags;
+  }
+  return item.detailTags;
+}
+
+function galleryDetailLanguage(item: GalleryInfo): string | undefined {
+  const detail = item as GalleryDetail;
+  if (detail.language !== undefined && detail.language.length > 0) {
+    return detail.language;
+  }
+  return item.detailLanguage;
+}
+
+function storedToGalleryTagGroups(groups: StoredGalleryTagGroup[] | undefined): GalleryTagGroup[] | undefined {
+  if (groups === undefined || !Array.isArray(groups)) {
+    return undefined;
+  }
+  const next: GalleryTagGroup[] = [];
+  for (let i = 0; i < groups.length; i++) {
+    const group = groups[i];
+    const namespace: string = typeof group.namespace === 'string' ? group.namespace : '';
+    const tags: string[] = Array.isArray(group.tags) ? group.tags as string[] : [];
+    if (namespace.length > 0 && tags.length > 0) {
+      next.push({ namespace: namespace, tags: cloneStringArray(tags) });
+    }
+  }
+  return next.length > 0 ? next : undefined;
+}
+
+function galleryTagGroupsToStored(groups: GalleryTagGroup[] | undefined): StoredGalleryTagGroup[] | undefined {
+  if (groups === undefined) {
+    return undefined;
+  }
+  const next: StoredGalleryTagGroup[] = [];
+  for (let i = 0; i < groups.length; i++) {
+    next.push({
+      namespace: groups[i].namespace,
+      tags: cloneStringArray(groups[i].tags)
+    });
+  }
+  return next;
+}
+
+function cloneGalleryTagGroups(groups: GalleryTagGroup[] | undefined): GalleryTagGroup[] | undefined {
+  if (groups === undefined) {
+    return undefined;
+  }
+  const next: GalleryTagGroup[] = [];
+  for (let i = 0; i < groups.length; i++) {
+    next.push({
+      namespace: groups[i].namespace,
+      tags: cloneStringArray(groups[i].tags)
+    });
+  }
+  return next;
+}
+
+function cloneStringArray(values: string[]): string[] {
+  const next: string[] = [];
+  for (let i = 0; i < values.length; i++) {
+    next.push(values[i]);
+  }
+  return next;
 }
 
 function writeTextFileQuietly(path: string, value: string): void {

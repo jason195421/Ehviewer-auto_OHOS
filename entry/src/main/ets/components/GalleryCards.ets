@@ -5,10 +5,12 @@ import {
   categoryColor,
   categoryName,
   createEmptyGallery,
+  gallerySimpleLanguage,
   galleryDisplayTitle,
   galleryListMode,
   galleryThumbHeight,
   galleryThumbWidth,
+  HISTORY_READ_REVISION_KEY,
   readerLocalImageSource,
   showGalleryPages,
   uiText
@@ -29,6 +31,7 @@ import {
 export struct GalleryListRow {
   @Prop gallery: GalleryInfo = createEmptyGallery();
   @Prop selected: boolean = false;
+  @StorageProp(HISTORY_READ_REVISION_KEY) historyReadRevision: number = 0;
 
   private cardHeight(): number {
     return galleryThumbHeight();
@@ -80,6 +83,9 @@ export struct GalleryListRow {
   }
 
   private readPageText(): string {
+    if (this.historyReadRevision < 0) {
+      return '';
+    }
     if (this.gallery.pages <= 0) {
       return '';
     }
@@ -93,10 +99,8 @@ export struct GalleryListRow {
   }
 
   private languageText(): string {
-    if (this.gallery.simpleLanguage !== undefined && this.gallery.simpleLanguage.length > 0) {
-      return this.gallery.simpleLanguage;
-    }
-    return '-';
+    const language = gallerySimpleLanguage(this.gallery);
+    return language.length > 0 ? language : '-';
   }
 
   private tagColor(index: number): string {
@@ -367,8 +371,12 @@ export struct GalleryThumb {
 export struct GalleryThumbCard {
   @Prop gallery: GalleryInfo = createEmptyGallery();
   @Prop selected: boolean = false;
+  @StorageProp(HISTORY_READ_REVISION_KEY) historyReadRevision: number = 0;
 
   private readPageText(): string {
+    if (this.historyReadRevision < 0) {
+      return '';
+    }
     if (this.gallery.pages <= 0) {
       return '';
     }

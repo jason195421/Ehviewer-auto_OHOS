@@ -1,6 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
-import { GalleryCategory, GalleryInfo } from '../model/GalleryModels';
+import { GalleryCategory, GalleryDetail, GalleryInfo, GalleryTagGroup } from '../model/GalleryModels';
 
 const PREFERENCES_NAME: string = 'ehviewer_downloads';
 const VALUES_KEY: string = 'items';
@@ -56,6 +56,8 @@ interface StoredDownloadInfo {
   favoriteSlot?: number;
   favoriteName?: string;
   tagList?: string[];
+  detailTags?: StoredGalleryTagGroup[];
+  detailLanguage?: string;
   state?: string;
   legacy?: number;
   time?: number;
@@ -67,6 +69,11 @@ interface StoredDownloadInfo {
   downloaded?: number;
   total?: number;
   fileSize?: number;
+}
+
+interface StoredGalleryTagGroup {
+  namespace?: string;
+  tags?: string[];
 }
 
 interface StoredDownloadLabel {
@@ -380,6 +387,8 @@ export class EhDownloadStore {
 }
 
 function galleryToDownloadInfo(gallery: GalleryInfo, label: string): DownloadInfo {
+  const tags = galleryDetailTags(gallery);
+  const language = galleryDetailLanguage(gallery);
   return {
     gid: gallery.gid,
     token: gallery.token,
@@ -399,6 +408,8 @@ function galleryToDownloadInfo(gallery: GalleryInfo, label: string): DownloadInf
     favoriteSlot: gallery.favoriteSlot,
     favoriteName: gallery.favoriteName,
     tagList: gallery.tagList,
+    detailTags: cloneGalleryTagGroups(tags),
+    detailLanguage: language,
     state: DownloadState.None,
     legacy: 0,
     time: Date.now(),
@@ -433,6 +444,8 @@ function storedToDownloadInfo(item: StoredDownloadInfo): DownloadInfo {
     favoriteSlot: typeof item.favoriteSlot === 'number' ? item.favoriteSlot : -2,
     favoriteName: item.favoriteName,
     tagList: item.tagList,
+    detailTags: storedToGalleryTagGroups(item.detailTags),
+    detailLanguage: item.detailLanguage,
     state: normalizeDownloadState(item.state),
     legacy: typeof item.legacy === 'number' ? item.legacy : 0,
     time: typeof item.time === 'number' ? item.time : Date.now(),
@@ -479,6 +492,8 @@ function cloneDownloadInfos(items: DownloadInfo[]): DownloadInfo[] {
 }
 
 function cloneDownloadInfo(item: DownloadInfo): DownloadInfo {
+  const tags = galleryDetailTags(item);
+  const language = galleryDetailLanguage(item);
   return {
     gid: item.gid,
     token: item.token,
@@ -498,6 +513,8 @@ function cloneDownloadInfo(item: DownloadInfo): DownloadInfo {
     favoriteSlot: item.favoriteSlot,
     favoriteName: item.favoriteName,
     tagList: item.tagList,
+    detailTags: cloneGalleryTagGroups(tags),
+    detailLanguage: language,
     state: item.state,
     legacy: item.legacy,
     time: item.time,
@@ -510,6 +527,60 @@ function cloneDownloadInfo(item: DownloadInfo): DownloadInfo {
     total: item.total,
     fileSize: item.fileSize
   };
+}
+
+function galleryDetailTags(item: GalleryInfo): GalleryTagGroup[] | undefined {
+  const detail = item as GalleryDetail;
+  if (detail.tags !== undefined && detail.tags.length > 0) {
+    return detail.tags;
+  }
+  return item.detailTags;
+}
+
+function galleryDetailLanguage(item: GalleryInfo): string | undefined {
+  const detail = item as GalleryDetail;
+  if (detail.language !== undefined && detail.language.length > 0) {
+    return detail.language;
+  }
+  return item.detailLanguage;
+}
+
+function storedToGalleryTagGroups(groups: StoredGalleryTagGroup[] | undefined): GalleryTagGroup[] | undefined {
+  if (groups === undefined || !Array.isArray(groups)) {
+    return undefined;
+  }
+  const next: GalleryTagGroup[] = [];
+  for (let i = 0; i < groups.length; i++) {
+    const group = groups[i];
+    const namespace: string = typeof group.namespace === 'string' ? group.namespace : '';
+    const tags: string[] = Array.isArray(group.tags) ? group.tags as string[] : [];
+    if (namespace.length > 0 && tags.length > 0) {
+      next.push({ namespace: namespace, tags: cloneStringArray(tags) });
+    }
+  }
+  return next.length > 0 ? next : undefined;
+}
+
+function cloneGalleryTagGroups(groups: GalleryTagGroup[] | undefined): GalleryTagGroup[] | undefined {
+  if (groups === undefined) {
+    return undefined;
+  }
+  const next: GalleryTagGroup[] = [];
+  for (let i = 0; i < groups.length; i++) {
+    next.push({
+      namespace: groups[i].namespace,
+      tags: cloneStringArray(groups[i].tags)
+    });
+  }
+  return next;
+}
+
+function cloneStringArray(values: string[]): string[] {
+  const next: string[] = [];
+  for (let i = 0; i < values.length; i++) {
+    next.push(values[i]);
+  }
+  return next;
 }
 
 function cloneDownloadLabels(labels: DownloadLabel[]): DownloadLabel[] {

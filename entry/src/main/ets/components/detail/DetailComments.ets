@@ -77,15 +77,6 @@ export struct DetailComments {
           .borderRadius(6)
         }, (comment: GalleryComment) => comment.id)
 
-        if (this.comments.length > 2) {
-          Text(uiText('View all') + ' ' + this.comments.length.toString() + ' ' + uiText('comments') + ' ->')
-            .fontSize(13)
-            .fontColor(themePrimaryColor())
-            .margin({ top: 6 })
-            .onClick(() => {
-              this.onComments();
-            })
-        }
       }
     }
     .alignItems(HorizontalAlign.Start)

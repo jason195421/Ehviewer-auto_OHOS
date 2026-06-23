@@ -13,6 +13,7 @@ const TAG_TRANSLATION_RAWFILE: string = 'ehtag_translations.tsv';
 class EhTagTranslationStore {
   private loaded: boolean = false;
   private entries: EhTagSuggestion[] = [];
+  private translations: Map<string, string> = new Map<string, string>();
 
   suggest(keyword: string, limit: number = 0, namespaces: string[] = []): EhTagSuggestion[] {
     const normalized = keyword.trim().toLowerCase();
@@ -40,6 +41,13 @@ class EhTagTranslationStore {
     return result;
   }
 
+  translate(namespace: string, tag: string): string {
+    this.ensureLoaded();
+    const key = normalizeFullTag(namespace, tag);
+    const translated = this.translations.get(key);
+    return translated === undefined ? '' : translated;
+  }
+
   private ensureLoaded(): void {
     if (this.loaded) {
       return;
@@ -53,8 +61,10 @@ class EhTagTranslationStore {
       const data = context.resourceManager.getRawFileContentSync(TAG_TRANSLATION_RAWFILE);
       const decoder = util.TextDecoder.create('utf-8', { ignoreBOM: true });
       this.entries = this.parse(decoder.decodeToString(data, { stream: false }));
+      this.rebuildTranslationMap();
     } catch (error) {
       this.entries = [];
+      this.translations = new Map<string, string>();
     }
   }
 
@@ -79,6 +89,15 @@ class EhTagTranslationStore {
     }
     return next;
   }
+
+  private rebuildTranslationMap(): void {
+    const next: Map<string, string> = new Map<string, string>();
+    for (let i = 0; i < this.entries.length; i++) {
+      const entry = this.entries[i];
+      next.set(entry.tag.toLowerCase(), entry.translated);
+    }
+    this.translations = next;
+  }
 }
 
 export const ehTagTranslationStore = new EhTagTranslationStore();
@@ -92,4 +111,13 @@ function normalizeNamespaces(namespaces: string[]): string[] {
     }
   }
   return next;
+}
+
+function normalizeFullTag(namespace: string, tag: string): string {
+  const normalizedNamespace = namespace.trim().toLowerCase();
+  const normalizedTag = tag.trim().toLowerCase();
+  if (normalizedTag.indexOf(':') >= 0) {
+    return normalizedTag;
+  }
+  return normalizedNamespace.length === 0 ? normalizedTag : normalizedNamespace + ':' + normalizedTag;
 }

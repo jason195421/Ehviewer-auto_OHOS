@@ -17,6 +17,8 @@ export interface GalleryInfo {
   favoriteSlot: number;
   favoriteName?: string;
   tagList?: string[];
+  detailTags?: GalleryTagGroup[];
+  detailLanguage?: string;
 }
 
 export interface GalleryDetail extends GalleryInfo {

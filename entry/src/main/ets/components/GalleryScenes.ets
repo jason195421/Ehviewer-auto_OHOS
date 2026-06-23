@@ -1477,7 +1477,7 @@ export struct GalleryListScene {
             }
           })
 
-          if (this.showDetail) {
+          if (this.showDetail && !this.showReader) {
             GalleryDetailOverlayScene({
               renderVersion: this.renderVersion,
               showComments: this.showComments,
