@@ -1487,17 +1487,6 @@ function immersiveChromeOffsetFromHeight(height: number, expandedHeight: number)
   return Math.max(-expandedHeight, Math.min(0, height - expandedHeight));
 }
 
-function immersiveChromeOpacityFromHeight(height: number, expandedHeight: number): number {
-  if (expandedHeight <= 0) {
-    return 1;
-  }
-  return Math.max(0, Math.min(1, height / expandedHeight));
-}
-
-function immersiveChromeOpacityFromOffset(offsetY: number, expandedHeight: number): number {
-  return immersiveChromeOpacityFromHeight(immersiveChromeHeightFromOffset(offsetY, expandedHeight), expandedHeight);
-}
-
 function nextImmersiveChromeHeight(currentHeight: number, scrollOffset: number, contentOffset: number,
   expandedHeight: number): number {
   if (contentOffset <= 4) {
