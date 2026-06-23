@@ -18,7 +18,7 @@ import {
   themeTransparentColor
 } from '../shared/EhTheme';
 import { ArrayDataSource } from '../shared/ListDataSource';
-import { STATUS_BAR_HEIGHT_KEY, uiText, setActiveBackHandler, createEmptyDetail, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, readerPageReferer, cacheReaderImageForPage, readerPreloadCount, topListChipColor } from '../shared/EhShared';
+import { STATUS_BAR_HEIGHT_KEY, setActiveBackHandler, createEmptyDetail, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, readerPageReferer, cacheReaderImageForPage, readerPreloadCount, topListChipColor } from '../shared/EhShared';
 import { GalleryDetailOverlayScene, GalleryListScene, GalleryListStateView, ReaderPageState, ReaderScene } from './GalleryScenes';
 import { FloatingToolbarHost } from './NavigationComponents';
 

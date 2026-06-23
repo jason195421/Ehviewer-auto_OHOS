@@ -100,7 +100,7 @@ export struct ReaderContinuousImageItem {
     }
   }
 
-  private onZoomScaleChange(): void {
+  onZoomScaleChange(): void {
     if (!this.isPinching && normalizePageScalingOption(this.fitMode) === 'Fixed scale') {
       this.imageModel.setScale(this.zoomScale);
     }
@@ -164,20 +164,6 @@ export struct ReaderContinuousImageItem {
 
   private reportState(): void {
     this.onZoomChange(this.imageModel.zoomPercent());
-  }
-
-  private tapCenterX(event: GestureEvent): number {
-    if (event.fingerList.length > 0) {
-      return event.fingerList[0].localX;
-    }
-    return this.componentWidth / 2;
-  }
-
-  private tapCenterY(event: GestureEvent): number {
-    if (event.fingerList.length > 0) {
-      return event.fingerList[0].localY;
-    }
-    return this.displayHeight() / 2;
   }
 
   build() {

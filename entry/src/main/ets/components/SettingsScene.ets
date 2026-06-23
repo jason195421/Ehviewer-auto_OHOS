@@ -41,6 +41,7 @@ import {
   themePrimaryColor,
   themePrimaryText,
   themeSecondaryText,
+  themeScrimColor,
   themeSurface,
   themeSurfaceVariant,
   themeTertiaryText
@@ -1118,7 +1119,7 @@ struct DownloadMigrationConfirmOverlay {
       Column()
         .width('100%')
         .height('100%')
-        .backgroundColor('#99000000')
+        .backgroundColor(themeScrimColor())
         .onClick(this.onCancel)
 
       Column() {

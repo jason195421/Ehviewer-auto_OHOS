@@ -277,7 +277,7 @@ export struct ReaderScene {
   }
 
   private readerStatusOverlayTop(): number {
-    return this.readingFullscreenEnabled() ? 12 : this.statusBarHeightVp() + 8;
+    return Math.max(12, this.statusBarHeightVp() + 8);
   }
 
   private scheduleReaderChromeMode(delay: number): void {
@@ -825,10 +825,20 @@ export struct ReaderScene {
     }
     try {
       const helper = photoAccessHelper.getPhotoAccessHelper(context);
-      const uri = await helper.createAsset(photoAccessHelper.PhotoType.IMAGE, albumImageFileType(sourcePath));
+      const config: photoAccessHelper.PhotoCreationConfig = {
+        title: readerImageFileName(index, sourcePath, this.currentImageShareTarget()),
+        fileNameExtension: albumImageFileType(sourcePath),
+        photoType: photoAccessHelper.PhotoType.IMAGE,
+        subtype: photoAccessHelper.PhotoSubtype.DEFAULT
+      };
+      const uris = await helper.showAssetsCreationDialog([fileUri.getUriFromPath(sourcePath)], [config]);
+      if (uris.length === 0) {
+        return;
+      }
+      const uri = uris[0];
       if (copyFileContent(sourcePath, uri)) {
         this.getUIContext().getPromptAction().showToast({
-          message: uiText('Saved to album') + ': ' + readerImageFileName(index, sourcePath, this.currentImageShareTarget())
+          message: uiText('Saved to album') + ': ' + config.title
         });
       }
     } catch (error) {
@@ -957,7 +967,7 @@ export struct ReaderScene {
 
   private sliderBubbleX(): number {
     const total = this.totalPages <= 0 ? 1 : this.totalPages;
-    const usableWidth = Math.max(1, this.sliderTrackWidth - 44);
+    const usableWidth = Math.max(1, this.sliderTrackWidth);
     if (total <= 1) {
       return 0;
     }
@@ -1190,6 +1200,7 @@ export struct ReaderScene {
           sliderDragging: this.sliderDragging,
           sliderPageText: this.sliderPageText(),
           sliderBubbleX: this.sliderBubbleX(),
+          sliderTrackWidth: this.sliderTrackWidth,
           sliderLiveIndex: this.sliderLiveIndex,
           totalPages: this.totalPages,
           autoTransferPlaying: this.autoTransferPlaying,

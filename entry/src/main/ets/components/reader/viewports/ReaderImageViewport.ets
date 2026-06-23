@@ -143,22 +143,11 @@ export struct ReaderImageViewport {
     return true;
   }
 
-  private onFixedScaleChange(): void {
+  onFixedScaleChange(): void {
     if (normalizePageScalingOption(this.fitMode) === 'Fixed scale') {
       this.imageModel.setScale(this.fixedScale);
       this.reportState();
     }
-  }
-
-  private imageFit(): ImageFit {
-    if (!this.hasSourceImageSize()) {
-      return ImageFit.Contain;
-    }
-    const normalized = normalizePageScalingOption(this.fitMode);
-    if (normalized === 'Actual size' || normalized === 'Fixed scale') {
-      return ImageFit.None;
-    }
-    return ImageFit.Contain;
   }
 
   private imageObjectFit(): ImageFit {

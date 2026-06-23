@@ -28,6 +28,7 @@ export struct ReaderInfoOverlay {
   progressText: string = '';
   batteryText: string = '';
   top: number = 0;
+  right: number = 12;
 
   build() {
     Row() {
@@ -58,8 +59,9 @@ export struct ReaderInfoOverlay {
     }
     .width('100%')
     .justifyContent(FlexAlign.End)
-    .padding({ left: 12, right: 12 })
+    .padding({ left: this.right, right: this.right })
     .position({ x: 0, y: this.top })
+    .hitTestBehavior(HitTestMode.Transparent)
   }
 }
 
@@ -69,6 +71,7 @@ export struct ReaderSliderPanel {
   sliderDragging: boolean = false;
   sliderPageText: string = '';
   sliderBubbleX: number = 0;
+  sliderTrackWidth: number = 1;
   sliderLiveIndex: number = 0;
   totalPages: number = 0;
   autoTransferPlaying: boolean = false;
@@ -77,6 +80,12 @@ export struct ReaderSliderPanel {
   onSliderChange: (value: number, mode: SliderChangeMode) => void = (_value: number, _mode: SliderChangeMode) => {};
   onTrackWidthChange: (width: number) => void = (_width: number) => {};
   onToggleAutoTransfer: () => void = () => {};
+
+  private sliderBubbleLeft(): number {
+    const bubbleSize = 42;
+    const maxLeft = Math.max(0, this.sliderTrackWidth - bubbleSize);
+    return Math.max(0, Math.min(maxLeft, this.sliderBubbleX - bubbleSize / 2));
+  }
 
   build() {
     Stack() {
@@ -88,25 +97,45 @@ export struct ReaderSliderPanel {
         })
         .zIndex(0)
 
+      if (this.sliderDragging) {
+        Row() {
+          Blank()
+            .width(58)
+          Stack() {
+            Text(this.sliderPageText)
+              .fontSize(12)
+              .fontColor(themeOnPrimaryText())
+              .lineHeight(42)
+              .textAlign(TextAlign.Center)
+              .width(42)
+              .height(42)
+              .backgroundColor(themeScrimColor())
+              .borderRadius(21)
+              .position({ x: this.sliderBubbleLeft(), y: 0 })
+          }
+          .layoutWeight(1)
+          .height(42)
+          Blank()
+            .width(42)
+        }
+        .width('100%')
+        .padding({ left: 12, right: 12 })
+        .position({ x: 0, y: '100%' })
+        .translate({ y: -96 })
+        .zIndex(2)
+        .hitTestBehavior(HitTestMode.Transparent)
+      }
+
       Column() {
         Row() {
           Text(this.progressText)
             .fontSize(12)
             .fontColor('#E5E7EB')
             .width(58)
+            .height(32)
+            .lineHeight(32)
             .textAlign(TextAlign.Center)
-          Stack({ alignContent: Alignment.BottomStart }) {
-            if (this.sliderDragging) {
-              Text(this.sliderPageText)
-                .fontSize(12)
-                .fontColor(themeOnPrimaryText())
-                .lineHeight(18)
-                .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                .backgroundColor(themeScrimColor())
-                .borderRadius(8)
-                .position({ x: this.sliderBubbleX, y: -24 })
-                .zIndex(2)
-            }
+          Stack({ alignContent: Alignment.Center }) {
             Slider({
               value: this.sliderLiveIndex,
               min: 0,
@@ -120,7 +149,7 @@ export struct ReaderSliderPanel {
               })
           }
           .layoutWeight(1)
-          .height(64)
+          .height(32)
           .onAreaChange((_oldArea: Area, newArea: Area) => {
             const width = newArea.width as number;
             if (width > 0 && !Number.isNaN(width)) {
@@ -132,8 +161,8 @@ export struct ReaderSliderPanel {
               .fontSize(18)
               .fontColor([Color.White])
           }
-          .width(42)
-          .height(36)
+          .width(36)
+          .height(32)
           .enabled(this.autoTransferEnabled)
           .backgroundColor(this.autoTransferEnabled ? '#334155' : '#1F2937')
           .onClick(() => {
@@ -144,7 +173,7 @@ export struct ReaderSliderPanel {
         .alignItems(VerticalAlign.Center)
       }
       .width('100%')
-      .padding({ left: 12, right: 12, top: 14, bottom: 18 })
+      .padding({ left: 12, right: 12, top: 8, bottom: 10 })
       .backgroundColor('#CC111827')
       .position({ x: 0, y: '100%' })
       .translate({ y: '-100%' })
