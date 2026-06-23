@@ -1162,22 +1162,25 @@ export struct DownloadScene {
   }
 
   private async preloadLocalReaderPagesAsync(index: number): Promise<void> {
-    const count = readerPreloadCount();
+    const count = Math.max(2, readerPreloadCount());
     if (count <= 0) {
       return;
     }
     for (let offset = 1; offset <= count; offset++) {
-      const nextIndex = index + offset;
-      if (nextIndex < 0 || nextIndex >= this.localReaderPages.length) {
-        return;
-      }
-      if (this.pageHasLocalImage(this.localReaderPages[nextIndex].page) ||
-        this.isLocalReaderPageLoading(nextIndex)) {
-        continue;
-      }
-      try {
-        await this.loadAndSaveLocalReaderPage(nextIndex, false, false);
-      } catch (error) {
+      const targets: number[] = [index - offset, index + offset];
+      for (let i = 0; i < targets.length; i++) {
+        const nextIndex = targets[i];
+        if (nextIndex < 0 || nextIndex >= this.localReaderPages.length) {
+          continue;
+        }
+        if (this.pageHasLocalImage(this.localReaderPages[nextIndex].page) ||
+          this.isLocalReaderPageLoading(nextIndex)) {
+          continue;
+        }
+        try {
+          await this.loadAndSaveLocalReaderPage(nextIndex, false, false);
+        } catch (error) {
+        }
       }
     }
   }

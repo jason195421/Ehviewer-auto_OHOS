@@ -301,6 +301,10 @@ class ReaderPreviewModel {
     return this.maxOffsetX() > 0;
   }
 
+  private canPanVertically(): boolean {
+    return this.maxOffsetY() > 0;
+  }
+
   private isHorizontalGestureIntent(offsetX: number, velocityX: number = 0, offsetY: number = 0, velocityY: number = 0): boolean {
     const x = Math.abs(offsetX) >= 1 ? Math.abs(offsetX) : Math.abs(velocityX);
     const y = Math.abs(offsetY) >= 1 ? Math.abs(offsetY) : Math.abs(velocityY);
@@ -308,7 +312,7 @@ class ReaderPreviewModel {
   }
 
   shouldLetSwiperHandlePan(offsetX: number, velocityX: number, offsetY: number = 0, velocityY: number = 0): boolean {
-    if (!this.isHorizontalGestureIntent(offsetX, velocityX, offsetY, velocityY)) {
+    if (this.canPanVertically() && !this.isHorizontalGestureIntent(offsetX, velocityX, offsetY, velocityY)) {
       return false;
     }
     const maxX = this.maxOffsetX();
@@ -722,6 +726,31 @@ export struct ReaderScene {
 
   private readerRenderCacheCount(): number {
     return READER_OFFSCREEN_RENDER_COUNT;
+  }
+
+  private readerPreRenderIndexes(): number[] {
+    const total = this.totalPages <= 0 ? 1 : this.totalPages;
+    const center = Math.max(0, Math.min(total - 1, this.currentIndex));
+    const indexes: number[] = [];
+    for (let offset = 1; offset <= READER_OFFSCREEN_RENDER_COUNT; offset++) {
+      const previous = center - offset;
+      const next = center + offset;
+      if (previous >= 0) {
+        indexes.push(previous);
+      }
+      if (next < total) {
+        indexes.push(next);
+      }
+    }
+    return indexes;
+  }
+
+  private offscreenTranslateX(index: number): number {
+    return index < this.currentIndex ? -100000 : 100000;
+  }
+
+  private offscreenTranslateY(index: number): number {
+    return index < this.currentIndex ? -100000 : 100000;
   }
 
   private syncReaderPageIndexSource(): void {
@@ -1473,6 +1502,8 @@ export struct ReaderScene {
         .vertical(false)
         .displayCount(1)
         .itemSpace(0)
+        .prevMargin(0)
+        .nextMargin(0)
         .duration(180)
         .curve(Curve.EaseOut)
         .effectMode(EdgeEffect.None)
@@ -1484,6 +1515,8 @@ export struct ReaderScene {
         .height('100%')
         .backgroundColor('#050608')
       }
+
+      this.PreRenderAdjacentPages()
 
       if (this.menuUltraDarkMode) {
         Stack() {}
@@ -1564,7 +1597,6 @@ export struct ReaderScene {
                 step: 1
               })
                 .width('100%')
-                .margin({ top: 30 })
                 .enabled(this.totalPages > 1)
                 .onChange((value: number, mode: SliderChangeMode) => {
                   this.clearSliderTimer();
@@ -1856,6 +1888,56 @@ export struct ReaderScene {
     this.jumpTo(this.pageIndexForVisualIndex(targetVisualIndex));
   }
 
+  @Builder
+  private PreRenderAdjacentPages() {
+    ForEach(this.readerPreRenderIndexes(), (index: number) => {
+      if (this.isContinuousVerticalMode()) {
+        ReaderContinuousImageItem({
+          page: this.pageForIndex(index),
+          statusText: uiText('Image page is loading'),
+          preferOriginal: this.preferOriginal,
+          fitMode: this.fitMode,
+          zoomScale: this.fixedScale,
+          isActive: false,
+          onTap: () => {},
+          onRetry: () => {
+            this.onRefreshPage(index);
+          },
+          onImageLongPress: () => {},
+          onImageSizeChange: () => {},
+          onZoomChange: () => {}
+        })
+          .width('100%')
+          .translate({ y: this.offscreenTranslateY(index) })
+          .hitTestBehavior(HitTestMode.Transparent)
+      } else {
+        ReaderImageViewport({
+          page: this.pageForIndex(index),
+          statusText: uiText('Image page is loading'),
+          preferOriginal: this.preferOriginal,
+          fitMode: this.fitMode,
+          fixedScale: this.fixedScale,
+          startPosition: this.startPosition,
+          isActive: false,
+          command: '',
+          commandVersion: 0,
+          onTap: () => {},
+          onRetry: () => {
+            this.onRefreshPage(index);
+          },
+          onImageLongPress: () => {},
+          onSwipeLockChange: () => {},
+          onZoomChange: () => {},
+          onImageSizeChange: () => {},
+          onEdgeSwipe: () => {}
+        })
+          .width('100%')
+          .height('100%')
+          .translate({ x: this.offscreenTranslateX(index) })
+          .hitTestBehavior(HitTestMode.Transparent)
+      }
+    }, (index: number) => 'reader-prerender-' + index.toString())
+  }
 }
 
 @Component
@@ -2232,7 +2314,7 @@ export struct ReaderImageViewport {
   @Prop statusText: string = '';
   @Prop @Watch('onImageSourceChange') preferOriginal: boolean = false;
   @Prop @Watch('onFitModeChange') fitMode: string = 'Fit screen';
-  @Prop fixedScale: number = READER_BASE_SCALE;
+  @Prop @Watch('onFixedScaleChange') fixedScale: number = READER_BASE_SCALE;
   @Prop startPosition: string = 'Top right';
   @Prop @Watch('onActiveChange') isActive: boolean = false;
   @Prop command: string = '';
@@ -2347,6 +2429,13 @@ export struct ReaderImageViewport {
     }
     this.imageModel.setScale(this.fixedScale);
     return true;
+  }
+
+  private onFixedScaleChange(): void {
+    if (normalizePageScalingOption(this.fitMode) === 'Fixed scale') {
+      this.imageModel.setScale(this.fixedScale);
+      this.reportState();
+    }
   }
 
   private imageFit(): ImageFit {
@@ -2484,6 +2573,16 @@ export struct ReaderImageViewport {
 
   private startAlignment(): Alignment {
     const normalized = normalizeStartPositionOption(this.startPosition);
+    const imageFitsVertically = this.displayImageHeight * this.imageModel.currentScale <= this.imageModel.componentHeight + 0.5;
+    if (imageFitsVertically) {
+      if (normalized === 'Top left' || normalized === 'Bottom left') {
+        return Alignment.Start;
+      }
+      if (normalized === 'Top right' || normalized === 'Bottom right') {
+        return Alignment.End;
+      }
+      return Alignment.Center;
+    }
     if (normalized === 'Top left') {
       return Alignment.TopStart;
     }
@@ -2558,7 +2657,7 @@ export struct ReaderImageViewport {
         Image(this.imageUrl())
           .width(this.imageDisplayWidth())
           .height(this.imageDisplayHeight())
-          .objectFit(this.imageFit())
+          .objectFit(ImageFit.Fill)
           .draggable(false)
           .backgroundColor('#050608')
           .opacity(this.failedImageUrl === this.imageUrl() ? 0 : 1)
@@ -2577,7 +2676,6 @@ export struct ReaderImageViewport {
           })
           .scale({ x: this.imageModel.currentScale, y: this.imageModel.currentScale, centerX: '50%', centerY: '50%' })
           .translate({ x: this.imageModel.currentOffsetX, y: this.imageModel.currentOffsetY })
-          .animation({ duration: READER_INERTIA_DURATION, curve: Curve.EaseOut })
         if (this.isImageLoading()) {
           LoadingProgress()
             .width(44)
@@ -2740,6 +2838,7 @@ export struct ReaderContinuousImageItem {
   @State displayImageWidth: number = 1;
   @State displayImageHeight: number = 120;
   private isPinching: boolean = false;
+  private pinchStartScale: number = READER_BASE_SCALE;
   private sourceSizeRequestId: number = 0;
 
   aboutToAppear(): void {
@@ -2851,15 +2950,15 @@ export struct ReaderContinuousImageItem {
   }
 
   private displayWidth(): number {
-    return this.displayImageWidth;
+    return Math.max(1, this.displayImageWidth * this.imageModel.currentScale);
   }
 
   private displayHeight(): number {
-    return this.displayImageHeight;
+    return Math.max(120, this.displayImageHeight * this.imageModel.currentScale);
   }
 
   private itemHeight(): number {
-    return Math.max(120, this.displayImageHeight * this.imageModel.currentScale);
+    return this.displayHeight();
   }
 
   private updateDisplayImageSize(): void {
@@ -2939,7 +3038,6 @@ export struct ReaderContinuousImageItem {
           .onError(() => {
             this.failedImageUrl = this.imageUrl();
           })
-          .scale({ x: this.imageModel.currentScale, y: this.imageModel.currentScale, centerX: '50%', centerY: '50%' })
           .translate({ x: this.imageModel.currentOffsetX, y: this.imageModel.currentOffsetY })
       }
       if (this.imageUrl().length === 0 || this.isImageLoading()) {
@@ -2989,11 +3087,14 @@ export struct ReaderContinuousImageItem {
           PinchGesture({ fingers: 2, distance: 1 })
             .onActionStart((event: GestureEvent) => {
               this.isPinching = true;
+              this.pinchStartScale = this.imageModel.currentScale;
               this.imageModel.pinchStart(event.pinchCenterX, event.pinchCenterY);
-              this.reportState();
             })
             .onActionUpdate((event: GestureEvent) => {
-              this.imageModel.pinchUpdate(event.scale);
+              if (event.scale <= 0 || Number.isNaN(event.scale)) {
+                return;
+              }
+              this.imageModel.setScale(this.pinchStartScale * event.scale);
               this.reportState();
             })
             .onActionEnd(() => {

@@ -940,36 +940,42 @@ export struct GalleryListScene {
   }
 
   private async preloadReaderPages(index: number): Promise<void> {
-    const count = readerPreloadCount();
+    const count = Math.max(2, readerPreloadCount());
     if (count <= 0) {
       return;
     }
 
     for (let offset = 1; offset <= count; offset++) {
-      const nextIndex = index + offset;
-      if (nextIndex < 0 || nextIndex >= this.readerTotalPages()) {
-        return;
-      }
-
-      const preview = await this.ensureReaderPreview(nextIndex, true);
-      if (preview === null) {
-        continue;
-      }
-      if (preview.pageUrl.length === 0 || galleryPageCache.has(preview.pageUrl)) {
-        continue;
-      }
-
-      try {
-        const result = await this.client.loadGalleryPage(preview.pageUrl, this.activeSite,
-          readerPageReferer(this.detailRequestUrl, this.detail.previewSet, nextIndex, this.activeSite));
-        if (result.ok && result.page !== null) {
-          const cacheUrl = result.page.pageUrl.length > 0 ? result.page.pageUrl : preview.pageUrl;
-          galleryPageCache.put(cacheUrl, result.page);
-          galleryPageCache.put(preview.pageUrl, result.page);
-          this.setReaderPage(nextIndex, result.page);
-          this.cacheReaderImage(nextIndex, result.page);
+      const targets: number[] = [index - offset, index + offset];
+      for (let i = 0; i < targets.length; i++) {
+        const nextIndex = targets[i];
+        if (nextIndex < 0 || nextIndex >= this.readerTotalPages()) {
+          continue;
         }
-      } catch (error) {
+
+        const preview = await this.ensureReaderPreview(nextIndex, true);
+        if (preview === null || preview.pageUrl.length === 0) {
+          continue;
+        }
+        const cached = galleryPageCache.get(preview.pageUrl);
+        if (cached !== null) {
+          this.setReaderPage(nextIndex, cached);
+          this.cacheReaderImage(nextIndex, cached);
+          continue;
+        }
+
+        try {
+          const result = await this.client.loadGalleryPage(preview.pageUrl, this.activeSite,
+            readerPageReferer(this.detailRequestUrl, this.detail.previewSet, nextIndex, this.activeSite));
+          if (result.ok && result.page !== null) {
+            const cacheUrl = result.page.pageUrl.length > 0 ? result.page.pageUrl : preview.pageUrl;
+            galleryPageCache.put(cacheUrl, result.page);
+            galleryPageCache.put(preview.pageUrl, result.page);
+            this.setReaderPage(nextIndex, result.page);
+            this.cacheReaderImage(nextIndex, result.page);
+          }
+        } catch (error) {
+        }
       }
     }
   }
