@@ -141,8 +141,9 @@ export class ListUrlBuilder {
     if (this.category !== GalleryCategory.None) {
       params.push({ key: 'f_cats', value: ((~this.category) & ALL_CATEGORY).toString() });
     }
-    if (this.keyword.trim().length > 0) {
-      params.push({ key: 'f_search', value: this.keyword });
+    const hasKeyword = this.keyword.trim().length > 0;
+    if (hasKeyword || this.advanceSearch !== -1) {
+      params.push({ key: 'f_search', value: hasKeyword ? this.keyword : '' });
     }
     if (this.pageIndex !== 0) {
       params.push({ key: 'page', value: this.pageIndex.toString() });

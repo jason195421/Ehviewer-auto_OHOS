@@ -336,7 +336,7 @@ export struct GalleryListScene {
     this.resultCount = cache.resultCount;
     this.galleries = cloneGalleryInfos(cache.galleries);
     this.hasFirstRefresh = cache.hasFirstRefresh;
-    this.filterActive = cache.filterActive;
+    this.filterActive = this.isSearchResultScene ? false : cache.filterActive;
     this.accountFilterEnabled = cache.accountFilterEnabled !== false;
     this.searchMode = cache.searchMode;
     this.searchCategory = cache.searchCategory;
@@ -396,7 +396,7 @@ export struct GalleryListScene {
       this.minRating = this.initialMinRating;
       this.pageFrom = this.initialPageFrom;
       this.pageTo = this.initialPageTo;
-      this.filterActive = this.searchResultDraft.filterActive;
+      this.filterActive = this.isSearchResultScene ? false : this.searchResultDraft.filterActive;
       this.searchSubmitted = !this.isSearchResultScene || this.initialSearchSubmitted;
     }
     const context = getAbilityContext();
@@ -696,7 +696,7 @@ export struct GalleryListScene {
   }
 
   private searchModeForRoute(routeMode: ListMode, keyword: string): ListMode {
-    if (this.filterActive && keyword.trim().length > 0) {
+    if (!this.isSearchResultScene && this.filterActive && keyword.trim().length > 0) {
       return ListMode.Filter;
     }
     if (this.sourceRoute === GalleryRoute.Home) {
@@ -748,7 +748,7 @@ export struct GalleryListScene {
       minRating: this.minRating,
       pageFrom: -1,
       pageTo: -1,
-      filterActive: this.filterActive,
+      filterActive: false,
       submitted: false
     };
     this.showSearchResultScene = true;
@@ -787,10 +787,6 @@ export struct GalleryListScene {
   }
 
   private toggleFilter(): void {
-    if (this.isSearchResultScene) {
-      this.toggleSearchFilter();
-      return;
-    }
     this.accountFilterEnabled = !this.accountFilterEnabled;
     this.fabExpanded = false;
     ehSettingsStore.setValue('use_account_default_filter', this.accountFilterEnabled ? 'On' : 'Off');
@@ -802,15 +798,6 @@ export struct GalleryListScene {
         this.saveListCache();
       });
     }
-    this.saveListCache();
-    this.loadListPage(0, this.galleries.length > 0);
-  }
-
-  private toggleSearchFilter(): void {
-    this.filterActive = !this.filterActive;
-    this.fabExpanded = false;
-    this.statusText = this.filterActive ? 'Search filter enabled' : 'Search filter disabled';
-    this.searchSubmitted = true;
     this.saveListCache();
     this.loadListPage(0, this.galleries.length > 0);
   }
@@ -2028,7 +2015,8 @@ export struct GalleryListContent {
         }
         .width(40)
         .height(40)
-        .backgroundColor(this.filterActive ? themeOnPrimaryActionStrongBackground() : themeOnPrimaryActionBackground())
+        .backgroundColor(
+          this.accountFilterEnabled ? themeOnPrimaryActionStrongBackground() : themeOnPrimaryActionBackground())
         .flexShrink(0)
         .onClick(() => {
           this.onFilter();
@@ -2288,7 +2276,7 @@ export struct GalleryListContent {
         QuickActionColumn({
           expanded: this.actionsExpanded,
           filterActive: this.filterActive,
-          accountFilterEnabled: this.isSearchResultScene ? this.filterActive : this.accountFilterEnabled,
+          accountFilterEnabled: this.accountFilterEnabled,
           canJump: this.canJump,
           canRandom: this.canRandom,
           onToggle: this.onToggleActions,
