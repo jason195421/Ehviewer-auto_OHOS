@@ -328,6 +328,9 @@ export struct GalleryListScene {
   }
 
   private restoreListCache(): boolean {
+    if (this.isSearchResultScene) {
+      return false;
+    }
     const cache = galleryListSceneCache.get(this.cacheKey());
     if (cache === undefined) {
       return false;
@@ -418,8 +421,12 @@ export struct GalleryListScene {
         this.statusText = 'Cookie load failed, using current session: ' + error.message;
       }).finally(() => {
         const previousAccountFilterEnabled = this.accountFilterEnabled;
-        this.syncAccountFilterSetting();
-        if (previousAccountFilterEnabled !== this.accountFilterEnabled && !this.useLocalProvider) {
+        if (this.isSearchResultScene) {
+          this.accountFilterEnabled = false;
+        } else {
+          this.syncAccountFilterSetting();
+        }
+        if (!this.isSearchResultScene && previousAccountFilterEnabled !== this.accountFilterEnabled && !this.useLocalProvider) {
           this.hasFirstRefresh = false;
         }
         if (!this.isSearchResultScene || this.searchSubmitted) {
