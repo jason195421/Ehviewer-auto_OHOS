@@ -28,94 +28,102 @@ export struct ReaderInfoOverlay {
   progressText: string = '';
   batteryText: string = '';
   top: number = 0;
-  left: number = 0;
   right: number = 12;
 
   build() {
-    Row({ space: 8 }) {
+    Row({ space: 6 }) {
       if (this.showClock) {
-        ReaderInfoPillText({ text: readerClockText() })
+        Text(readerClockText())
+          .fontSize(14)
+          .fontColor(themeOnPrimaryText())
+          .lineHeight(16)
+          .maxLines(1)
       }
       if (this.showProgress) {
-        ReaderInfoPillText({ text: this.progressText })
+        Text(this.progressText)
+          .fontSize(14)
+          .fontColor(themeOnPrimaryText())
+          .lineHeight(16)
+          .maxLines(1)
       }
       if (this.showBattery) {
-        ReaderInfoPillText({ text: this.batteryText })
+        Text(this.batteryText)
+          .fontSize(14)
+          .fontColor(themeOnPrimaryText())
+          .lineHeight(16)
+          .maxLines(1)
       }
     }
-    .width('100%')
-    .alignItems(VerticalAlign.Center)
-    .justifyContent(FlexAlign.End)
-    .padding({ right: Math.max(12, this.right) })
-    .position({ x: 0, y: this.top })
-    .hitTestBehavior(HitTestMode.None)
-  }
-}
-
-@Component
-struct ReaderInfoPillText {
-  text: string = '';
-
-  build() {
-    Text(this.text)
-      .fontSize(12)
-      .fontColor(themeOnPrimaryText())
-      .lineHeight(16)
-      .maxLines(1)
-      .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-      .backgroundColor(themeScrimColor())
-      .borderRadius(10)
+    .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+    .backgroundColor(themeScrimColor())
+    .borderRadius(10)
+    .hitTestBehavior(HitTestMode.Transparent)
   }
 }
 
 @Component
 struct ReaderSliderBubble {
-  text: string = '';
+  @Prop @Watch('onTextChange') text: string = '';
+  @State displayText: string = '';
+
+  aboutToAppear(): void {
+    this.displayText = this.text;
+  }
+
+  onTextChange(): void {
+    this.displayText = this.text;
+  }
 
   build() {
-    Text(this.text)
-      .fontSize(12)
+    Text(this.displayText)
+      .fontSize(14)
       .fontWeight(FontWeight.Medium)
-      .fontColor(themeOnPrimaryText())
-      .lineHeight(42)
+      .fontColor('#FFFFFF')
+      .lineHeight(40)
       .textAlign(TextAlign.Center)
-      .width(42)
-      .height(42)
-      .backgroundColor(themeScrimColor())
-      .borderRadius(21)
+      .textVerticalAlign(TextVerticalAlign.CENTER)
+      .width(40)
+      .height(40)
+      .backgroundColor('#1F2937')
+      .borderRadius(20)
+      .borderWidth(1)
+      .borderColor('#3F4756')
+      .shadow({ radius: 8, color: 'rgba(0,0,0,0.45)', offsetX: 0, offsetY: 2 })
   }
 }
 
 @Component
 struct ReaderSliderPageText {
-  text: string = '';
+  @Prop text: string = '';
 
   build() {
-    Text(this.text)
-      .fontSize(12)
-      .fontColor('#E5E7EB')
-      .width(50)
-      .height(32)
-      .lineHeight(32)
-      .textAlign(TextAlign.Center)
-      .maxLines(1)
+    Column() {
+      Text(this.text)
+        .fontSize(14)
+        .fontColor('#E5E7EB')
+        .maxLines(1)
+    }
+    .width(54)
+    .height(50)
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
   }
 }
 
 @Component
 struct ReaderAutoTransferButton {
-  autoTransferPlaying: boolean = false;
-  autoTransferEnabled: boolean = false;
+  @Prop autoTransferPlaying: boolean = false;
+  @Prop autoTransferEnabled: boolean = false;
   onToggleAutoTransfer: () => void = () => {};
 
   build() {
     Button({ type: ButtonType.Circle, stateEffect: true }) {
       SymbolGlyph(this.autoTransferPlaying ? $r('sys.symbol.pause_fill') : $r('sys.symbol.play_fill'))
-        .fontSize(17)
+        .fontSize(24)
         .fontColor([Color.White])
     }
-    .width(32)
-    .height(32)
+    .width(50)
+    .height(50)
     .enabled(this.autoTransferEnabled)
     .backgroundColor(this.autoTransferEnabled ? '#334155' : '#1F2937')
     .onClick(() => {
@@ -126,8 +134,8 @@ struct ReaderAutoTransferButton {
 
 @Component
 struct ReaderSliderTrack {
-  sliderLiveIndex: number = 0;
-  totalPages: number = 0;
+  @Prop sliderLiveIndex: number = 0;
+  @Prop totalPages: number = 0;
   onSliderChange: (value: number, mode: SliderChangeMode) => void = (_value: number, _mode: SliderChangeMode) => {};
   onTrackWidthChange: (width: number) => void = (_width: number) => {};
 
@@ -140,14 +148,14 @@ struct ReaderSliderTrack {
         step: 1
       })
         .width('100%')
-        .height(32)
+        .height(36)
         .enabled(this.totalPages > 1)
         .onChange((value: number, mode: SliderChangeMode) => {
           this.onSliderChange(value, mode);
         })
     }
     .layoutWeight(1)
-    .height(32)
+    .height(50)
     .onAreaChange((_oldArea: Area, newArea: Area) => {
       const width = newArea.width as number;
       if (width > 0 && !Number.isNaN(width)) {
@@ -159,11 +167,11 @@ struct ReaderSliderTrack {
 
 @Component
 struct ReaderSliderBar {
-  progressText: string = '';
-  sliderLiveIndex: number = 0;
-  totalPages: number = 0;
-  autoTransferPlaying: boolean = false;
-  autoTransferEnabled: boolean = false;
+  @Prop progressText: string = '';
+  @Prop sliderLiveIndex: number = 0;
+  @Prop totalPages: number = 0;
+  @Prop autoTransferPlaying: boolean = false;
+  @Prop autoTransferEnabled: boolean = false;
   onSliderChange: (value: number, mode: SliderChangeMode) => void = (_value: number, _mode: SliderChangeMode) => {};
   onTrackWidthChange: (width: number) => void = (_width: number) => {};
   onToggleAutoTransfer: () => void = () => {};
@@ -186,40 +194,42 @@ struct ReaderSliderBar {
       })
     }
     .width('100%')
-    .height(32)
+    .height(50)
     .alignItems(VerticalAlign.Center)
   }
 }
 
 @Component
 export struct ReaderSliderPanel {
-  progressText: string = '';
-  sliderDragging: boolean = false;
-  sliderPageText: string = '';
-  sliderBubbleX: number = 0;
-  sliderTrackWidth: number = 1;
-  sliderLiveIndex: number = 0;
-  totalPages: number = 0;
-  bottomInset: number = 0;
-  autoTransferPlaying: boolean = false;
-  autoTransferEnabled: boolean = false;
+  @Prop progressText: string = '';
+  @Prop sliderDragging: boolean = false;
+  @Prop sliderPageText: string = '';
+  @Prop sliderBubbleX: number = 0;
+  @Prop sliderTrackWidth: number = 1;
+  @Prop sliderLiveIndex: number = 0;
+  @Prop totalPages: number = 0;
+  @Prop bottomInset: number = 0;
+  @Prop autoTransferPlaying: boolean = false;
+  @Prop autoTransferEnabled: boolean = false;
   onDismiss: () => void = () => {};
   onSliderChange: (value: number, mode: SliderChangeMode) => void = (_value: number, _mode: SliderChangeMode) => {};
   onTrackWidthChange: (width: number) => void = (_width: number) => {};
   onToggleAutoTransfer: () => void = () => {};
 
   private sliderBubbleLeft(): number {
-    const bubbleSize = 42;
+    const bubbleSize = 40;
     const maxLeft = Math.max(0, this.sliderTrackWidth - bubbleSize);
     return Math.max(0, Math.min(maxLeft, this.sliderBubbleX - bubbleSize / 2));
   }
 
   private panelHeight(): number {
-    return 40 + Math.max(0, this.bottomInset);
+    // Slider bar (32) + generous top/bottom padding (10 each) + bottom safe-area inset.
+    return 62 + Math.max(0, this.bottomInset);
   }
 
   private bubbleBottomMargin(): number {
-    return this.panelHeight() + 6;
+    // Bubble sits just above the panel's top edge, completely clear of the panel background.
+    return this.panelHeight() + 4;
   }
 
   build() {
@@ -230,26 +240,28 @@ export struct ReaderSliderPanel {
         .onClick(() => {
           this.onDismiss();
         })
+        .hitTestBehavior(HitTestMode.Transparent)
         .zIndex(0)
 
       if (this.sliderDragging) {
         Row() {
           Blank()
-            .width(50)
+            .width(54)
           Stack() {
             ReaderSliderBubble({ text: this.sliderPageText })
               .position({ x: this.sliderBubbleLeft(), y: 0 })
           }
           .layoutWeight(1)
-          .height(42)
+          .height(40)
           Blank()
-            .width(32)
+            .width(50)
         }
         .width('100%')
+        .height(40)
         .padding({ left: 10, right: 10 })
-        .margin({ bottom: this.bubbleBottomMargin() })
+        .offset({ y: -this.bubbleBottomMargin() })
         .zIndex(2)
-        .hitTestBehavior(HitTestMode.Transparent)
+        .hitTestBehavior(HitTestMode.None)
       }
 
       Column() {
@@ -266,7 +278,7 @@ export struct ReaderSliderPanel {
       }
       .width('100%')
       .height(this.panelHeight())
-      .padding({ left: 10, right: 10, top: 4, bottom: 4 + Math.max(0, this.bottomInset) })
+      .padding({ left: 10, right: 10, top: 10, bottom: 20 + Math.max(0, this.bottomInset) })
       .backgroundColor('#CC111827')
       .zIndex(1)
     }
