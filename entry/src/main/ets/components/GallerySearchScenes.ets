@@ -879,7 +879,9 @@ export struct QuickActionColumn {
         isEnabled: true,
         primary: true,
         active: this.activeActionIndex === this.primaryIndex(),
-        directTap: false
+        onTapAction: () => {
+          this.toggleExpanded();
+        }
       })
     }
     .alignItems(HorizontalAlign.End)

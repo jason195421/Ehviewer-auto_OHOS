@@ -1728,7 +1728,7 @@ export struct DownloadScene {
         .justifyContent(FlexAlign.End)
         .alignItems(HorizontalAlign.End)
         .padding({ right: 16, bottom: 24 })
-        .hitTestBehavior(HitTestMode.None)
+        .hitTestBehavior(HitTestMode.Transparent)
       }
       .width('100%')
       .height('100%')
@@ -1961,7 +1961,9 @@ struct DownloadToolColumn {
         isEnabled: true,
         primary: true,
         active: this.activeActionIndex === this.primaryIndex(),
-        directTap: false
+        onTapAction: () => {
+          this.toggleExpanded();
+        }
       })
     }
     .alignItems(HorizontalAlign.End)

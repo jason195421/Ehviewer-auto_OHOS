@@ -2244,7 +2244,7 @@ export struct GalleryListContent {
       .justifyContent(FlexAlign.End)
       .alignItems(HorizontalAlign.End)
       .padding({ right: 16, bottom: 24 })
-      .hitTestBehavior(HitTestMode.None)
+      .hitTestBehavior(HitTestMode.Transparent)
 
       if (this.advancedPanelVisible) {
         Column()
@@ -2381,7 +2381,7 @@ export struct GalleryListContent {
           })
         }
       }
-      .hitTestBehavior(HitTestMode.None)
+      .hitTestBehavior(HitTestMode.Transparent)
     }
     .width('100%')
     .height('100%')
