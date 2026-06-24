@@ -508,6 +508,7 @@ export function zhText(text: string): string {
     case 'Save to...': return '保存到…';
     case 'Saved to album': return '已保存到相册';
     case 'Save failed': return '保存失败';
+    case 'Export': return '导出';
     case 'Rate': return '评分';
     case 'Cancel': return '取消';
     case 'Submit': return '提交';

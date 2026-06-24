@@ -1763,62 +1763,68 @@ struct DownloadToolColumn {
   onDelete: () => void = () => {};
   onExportZip: () => void = () => {};
 
+  private toggleExpanded(): void {
+    this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
+      this.onToggle();
+    });
+  }
+
   build() {
     Column() {
       if (this.expanded) {
         Column({ space: 8 }) {
           if (this.hasSelection) {
             ActionBubble({
-              label: '',
+              label: uiText('Export'),
               symbolIcon: $r('sys.symbol.share'),
               isEnabled: true,
               onTapAction: this.onExportZip
             })
             ActionBubble({
-              label: '',
+              label: uiText('Delete'),
               symbolIcon: $r('sys.symbol.trash'),
               isEnabled: true,
               onTapAction: this.onDelete
             })
           }
           ActionBubble({
-            label: '',
+            label: uiText('Status'),
             symbolIcon: $r('sys.symbol.magnifyingglass'),
             isEnabled: true,
             onTapAction: this.onStatus
           })
           ActionBubble({
-            label: '',
+            label: uiText('Label'),
             symbolIcon: $r('sys.symbol.list_number'),
             isEnabled: true,
             onTapAction: this.onCategory
           })
           ActionBubble({
-            label: '',
+            label: uiText('Sort'),
             symbolIcon: $r('sys.symbol.chevron_forward'),
             isEnabled: true,
             onTapAction: this.onSort
           })
           ActionBubble({
-            label: '',
+            label: uiText('Start all'),
             symbolIcon: $r('sys.symbol.play_fill'),
             isEnabled: true,
             onTapAction: this.onStart
           })
           ActionBubble({
-            label: '',
+            label: uiText('Stop all'),
             symbolIcon: $r('sys.symbol.pause_fill'),
             isEnabled: this.canOperate,
             onTapAction: this.onStop
           })
           ActionBubble({
-            label: '',
+            label: uiText('Scan'),
             symbolIcon: $r('sys.symbol.play_arrow_triangle_2_circlepath'),
             isEnabled: true,
             onTapAction: this.onRestore
           })
           ActionBubble({
-            label: '',
+            label: uiText('Clear done'),
             symbolIcon: $r('sys.symbol.checkmark_circle'),
             isEnabled: this.canOperate,
             onTapAction: this.onClearDone
@@ -1826,17 +1832,23 @@ struct DownloadToolColumn {
         }
         .alignItems(HorizontalAlign.End)
         .margin({ bottom: 10 })
+        .transition(TransitionEffect.OPACITY
+          .combine(TransitionEffect.translate({ y: 12 }))
+          .animation({ duration: 180, curve: Curve.EaseOut }))
       }
 
       ActionBubble({
-        label: '',
+        label: uiText('Actions'),
         symbolIcon: this.expanded ? $r('sys.symbol.xmark') : $r('sys.symbol.more'),
         isEnabled: true,
         primary: true,
-        onTapAction: this.onToggle
+        onTapAction: () => {
+          this.toggleExpanded();
+        }
       })
     }
     .alignItems(HorizontalAlign.End)
+    .hitTestBehavior(HitTestMode.Block)
   }
 }
 

@@ -3,7 +3,7 @@ import { DEFAULT_ADVANCE_SEARCH, ListMode } from '../services/EhUrl';
 import { ehTagTranslationStore } from '../services/EhTagTranslationStore';
 import { mainContentWidthFallbackVp, rememberMainContentWidthVp } from '../services/EhWindowImmersive';
 import { LANGUAGE_REVISION_KEY, categoryColor, uiText } from '../shared/EhShared';
-import { themeControlMutedBackground, themeControlNeutralBackground, themeInactiveActionText, themeOnPrimaryText, themePrimaryColor, themePrimaryText, themeSecondaryText, themeSelectedBackgroundLight, themeShadowColor, themeSurface, themeSurfaceVariant } from '../shared/EhTheme';
+import { themeControlMutedBackground, themeControlNeutralBackground, themeInactiveActionText, themeOnPrimaryText, themePrimaryColor, themePrimaryText, themeSecondaryText, themeShadowColor, themeSurface, themeSurfaceVariant } from '../shared/EhTheme';
 import {
   selectArrowModifier,
   themedSelectButtonBackground,
@@ -736,6 +736,12 @@ export struct QuickActionColumn {
   onRefresh: () => void = () => {};
   onRandom: () => void = () => {};
 
+  private toggleExpanded(): void {
+    this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
+      this.onToggle();
+    });
+  }
+
   build() {
     Column() {
       if (this.expanded) {
@@ -775,19 +781,23 @@ export struct QuickActionColumn {
         }
         .alignItems(HorizontalAlign.End)
         .margin({ bottom: 10 })
+        .transition(TransitionEffect.OPACITY
+          .combine(TransitionEffect.translate({ y: 12 }))
+          .animation({ duration: 180, curve: Curve.EaseOut }))
       }
 
       ActionBubble({
-        label: '',
+        label: uiText('Actions'),
         symbolIcon: this.expanded ? $r('sys.symbol.xmark') : $r('sys.symbol.more'),
         isEnabled: true,
         primary: true,
         onTapAction: () => {
-          this.onToggle();
+          this.toggleExpanded();
         }
       })
     }
     .alignItems(HorizontalAlign.End)
+    .hitTestBehavior(HitTestMode.Block)
   }
 }
 
@@ -796,11 +806,50 @@ export struct ActionBubble {
   @Prop label: string = '';
   @Prop symbolIcon: Resource = $r('sys.symbol.plus');
   @Prop isEnabled: boolean = true;
+  @State labelVisible: boolean = false;
+  @State suppressTapAfterLongPress: boolean = false;
   primary: boolean = false;
   onTapAction: () => void = () => {};
 
+  private showLabel(): void {
+    if (this.label.length === 0 || this.labelVisible) {
+      return;
+    }
+    this.suppressTapAfterLongPress = true;
+    this.getUIContext().animateTo({ duration: 140, curve: Curve.EaseOut }, () => {
+      this.labelVisible = true;
+    });
+  }
+
+  private hideLabel(): void {
+    setTimeout(() => {
+      this.suppressTapAfterLongPress = false;
+    }, 180);
+    if (!this.labelVisible) {
+      return;
+    }
+    this.getUIContext().animateTo({ duration: 120, curve: Curve.EaseIn }, () => {
+      this.labelVisible = false;
+    });
+  }
+
   build() {
-    Column({ space: 4 }) {
+    Row({ space: 8 }) {
+      if (this.labelVisible && this.label.length > 0) {
+        Text(this.label)
+          .fontSize(12)
+          .fontColor(themePrimaryText())
+          .textAlign(TextAlign.End)
+          .backgroundColor(themeSurface())
+          .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+          .borderRadius(14)
+          .shadow({ radius: 8, color: themeShadowColor(), offsetX: 0, offsetY: 2 })
+          .maxLines(1)
+          .transition(TransitionEffect.OPACITY
+            .combine(TransitionEffect.translate({ x: 8 }))
+            .animation({ duration: 140, curve: Curve.EaseOut }))
+      }
+
       Button({ type: ButtonType.Circle, stateEffect: true }) {
         SymbolGlyph(this.symbolIcon)
           .fontSize(this.primary ? 26 : 20)
@@ -813,21 +862,28 @@ export struct ActionBubble {
         themeControlMutedBackground())
       .shadow({ radius: this.primary ? 14 : 8, color: themeShadowColor(), offsetX: 0, offsetY: 3 })
       .onClick(() => {
+        if (this.suppressTapAfterLongPress) {
+          return;
+        }
         this.onTapAction();
       })
-
-      if (!this.primary && this.label.length > 0) {
-        Text(this.label)
-          .fontSize(10)
-          .fontColor(themePrimaryColor())
-          .textAlign(TextAlign.Center)
-          .backgroundColor(themeSelectedBackgroundLight())
-          .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-          .borderRadius(8)
-          .maxLines(1)
-      }
+      .gesture(LongPressGesture({ repeat: false })
+        .onAction(() => {
+          this.showLabel();
+        })
+        .onActionEnd(() => {
+          this.hideLabel();
+        })
+        .onActionCancel(() => {
+          this.hideLabel();
+        }))
     }
-    .alignItems(HorizontalAlign.Center)
+    .alignItems(VerticalAlign.Center)
+    .justifyContent(FlexAlign.End)
+    .hitTestBehavior(HitTestMode.Block)
+    .transition(TransitionEffect.OPACITY
+      .combine(TransitionEffect.translate({ y: 12 }))
+      .animation({ duration: 160, curve: Curve.EaseOut }))
   }
 }
 
