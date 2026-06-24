@@ -3,6 +3,7 @@ import { connection } from '@kit.NetworkKit';
 import { ehSettingsStore } from './EhSettingsStore';
 
 const DOH_URL: string = 'https://77.88.8.1/dns-query';
+const DEFAULT_SNI_HOST: string = 'cloudflare.com';
 const BUILT_IN_RULES: HostRule[] = [
   { host: 'e-hentai.org', ips: ['104.20.18.168', '104.20.19.168', '172.66.132.196', '172.66.140.62', '172.67.2.238'] },
   { host: 'repo.e-hentai.org', ips: ['104.20.18.168', '104.20.19.168', '172.67.2.238'] },
@@ -24,11 +25,15 @@ interface HostRule {
   ips: string[];
 }
 
-export function applyEhNetworkOptions(options: http.HttpRequestOptions): void {
+export function applyEhNetworkOptions(options: http.HttpRequestOptions, url: string = ''): void {
   options.usingCache = false;
   options.usingProxy = proxyOption();
   if (ehSettingsStore.getValue('dns_over_https', 'Off') === 'On') {
     options.dnsOverHttps = DOH_URL;
+  }
+  const sniHost = domainFrontingSniHost(url);
+  if (sniHost.length > 0) {
+    options.sniHostName = sniHost;
   }
 }
 
@@ -75,6 +80,33 @@ function proxyOption(): boolean | http.HttpProxy {
     }
   }
   return proxyType === 'System';
+}
+
+function domainFrontingSniHost(url: string): string {
+  if (ehSettingsStore.getValue('domain_fronting', 'On') !== 'On' || !isHttpsUrl(url)) {
+    return '';
+  }
+  const configured = normalizeSniHost(ehSettingsStore.getValue('domain_fronting_sni', DEFAULT_SNI_HOST));
+  if (configured.length > 0) {
+    return configured;
+  }
+  return DEFAULT_SNI_HOST;
+}
+
+function normalizeSniHost(value: string): string {
+  const host = value.trim().toLowerCase();
+  if (host.length === 0 || host.length > 255) {
+    return '';
+  }
+  if (host.indexOf('://') >= 0 || host.indexOf('/') >= 0 || host.indexOf(':') >= 0 ||
+      host.indexOf(' ') >= 0 || host.indexOf('\t') >= 0) {
+    return '';
+  }
+  return host;
+}
+
+function isHttpsUrl(url: string): boolean {
+  return /^https:\/\//i.test(url);
 }
 
 function waitHostRuleTask(task: Promise<void>, timeoutMs: number): Promise<void> {

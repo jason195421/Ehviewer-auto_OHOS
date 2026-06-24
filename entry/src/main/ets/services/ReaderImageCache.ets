@@ -36,6 +36,7 @@ export interface ImageDownloadProgress {
 export type ImageDownloadProgressCallback = (progress: ImageDownloadProgress) => void;
 
 interface ImageRequestHeader {
+  'Host'?: string;
   'User-Agent': string;
   'Accept': string;
   'Accept-Language': string;
@@ -150,7 +151,7 @@ export class ReaderImageCache {
     }
     const request = http.createHttp();
     try {
-      const header = buildImageRequestHeader(referer, ehCookieStore.getCookieHeader());
+      const header = buildImageRequestHeader(imageUrl, referer, ehCookieStore.getCookieHeader());
       const timeout = imageRequestTimeoutMs();
       await ensureEhHostRules();
       const options: http.HttpRequestOptions = {
@@ -160,7 +161,7 @@ export class ReaderImageCache {
         connectTimeout: timeout,
         readTimeout: timeout
       };
-      applyEhNetworkOptions(options);
+      applyEhNetworkOptions(options, imageUrl);
       const response = await request.request(imageUrl, options);
 
       const statusCode = Number(response.responseCode);
@@ -192,7 +193,7 @@ export class ReaderImageCache {
     try {
       const file = fs.openSync(path, fs.OpenMode.CREATE | fs.OpenMode.TRUNC | fs.OpenMode.READ_WRITE);
       fd = file.fd;
-      const header = buildImageRequestHeader(referer, ehCookieStore.getCookieHeader());
+      const header = buildImageRequestHeader(imageUrl, referer, ehCookieStore.getCookieHeader());
       const timeout = imageRequestTimeoutMs();
       await ensureEhHostRules();
       const options: http.HttpRequestOptions = {
@@ -202,7 +203,7 @@ export class ReaderImageCache {
         connectTimeout: timeout,
         readTimeout: timeout
       };
-      applyEhNetworkOptions(options);
+      applyEhNetworkOptions(options, imageUrl);
       request.on('dataReceive', (data: ArrayBuffer) => {
         if (data.byteLength > 0 && fd >= 0) {
           fs.writeSync(fd, data);
@@ -254,8 +255,9 @@ export class ReaderImageCache {
   }
 }
 
-function buildImageRequestHeader(referer: string, cookieHeader: string): ImageRequestHeader {
+function buildImageRequestHeader(imageUrl: string, referer: string, cookieHeader: string): ImageRequestHeader {
   const header: ImageRequestHeader = {
+    'Host': requestHost(imageUrl),
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36 EhViewerHarmony/0.1',
     'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
     'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
@@ -266,6 +268,11 @@ function buildImageRequestHeader(referer: string, cookieHeader: string): ImageRe
     header.Cookie = cookieHeader;
   }
   return header;
+}
+
+function requestHost(url: string): string {
+  const match = /^https?:\/\/([^\/?#]+)/i.exec(url);
+  return match === null ? '' : match[1];
 }
 
 function imageRequestTimeoutMs(): number {

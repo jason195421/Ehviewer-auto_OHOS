@@ -21,6 +21,11 @@ interface SettingEntry {
 export default class EntryAbility extends UIAbility {
   private windowStage: window.WindowStage | undefined = undefined;
   private authPending: boolean = false;
+  // Largest bottom avoid (nav bar / gesture indicator) height observed this session, in px.
+  // The reader hides system bars (setWindowSystemBarEnable([])), which makes the live avoid
+  // area report 0 — but the gesture indicator zone physically persists. We keep the max-seen
+  // value so the reader can still inset its bottom bar clear of that zone.
+  private maxBottomAvoidPx: number = 0;
 
   onWindowStageCreate(stage: window.WindowStage): void {
     this.windowStage = stage;
@@ -60,16 +65,16 @@ export default class EntryAbility extends UIAbility {
 
   private updateWindowAvoidAreas(win: window.Window): void {
     this.updateSystemAvoidArea(win);
-    this.updateNavigationAvoidArea(win);
+    this.updateBottomAvoidArea(win);
   }
 
   private updateChangedAvoidArea(win: window.Window, data: window.AvoidAreaOptions): void {
     if (data.type === window.AvoidAreaType.TYPE_SYSTEM) {
       this.setTopAvoidArea(win, data.area);
-      return;
     }
-    if (data.type === window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR) {
-      this.setBottomAvoidArea(win, data.area);
+    if (data.type === window.AvoidAreaType.TYPE_SYSTEM ||
+        data.type === window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR) {
+      this.updateBottomAvoidArea(win);
     }
   }
 
@@ -83,10 +88,23 @@ export default class EntryAbility extends UIAbility {
     }
   }
 
-  private updateNavigationAvoidArea(win: window.Window): void {
+  // Bottom avoid = max(TYPE_SYSTEM.bottom, TYPE_NAVIGATION_INDICATOR.bottom), kept as a
+  // session sticky-max so it survives the reader hiding the system bars (which reports 0).
+  private updateBottomAvoidArea(win: window.Window): void {
+    let bottomPx = 0;
     try {
-      const area = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR);
-      this.setBottomAvoidArea(win, area);
+      bottomPx = Math.max(bottomPx,
+        win.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM).bottomRect.height);
+    } catch (error) {}
+    try {
+      bottomPx = Math.max(bottomPx,
+        win.getWindowAvoidArea(window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR).bottomRect.height);
+    } catch (error) {}
+    if (bottomPx > this.maxBottomAvoidPx) {
+      this.maxBottomAvoidPx = bottomPx;
+    }
+    try {
+      AppStorage.set<number>(BOTTOM_AVOID_HEIGHT_KEY, win.getUIContext().px2vp(this.maxBottomAvoidPx));
     } catch (error) {
       AppStorage.set<number>(BOTTOM_AVOID_HEIGHT_KEY, 0);
     }
@@ -98,14 +116,6 @@ export default class EntryAbility extends UIAbility {
       AppStorage.set<number>(TOP_AVOID_HEIGHT_KEY, win.getUIContext().px2vp(area.topRect.height));
     } catch (error) {
       AppStorage.set<number>(TOP_AVOID_HEIGHT_KEY, 0);
-    }
-  }
-
-  private setBottomAvoidArea(win: window.Window, area: window.AvoidArea): void {
-    try {
-      AppStorage.set<number>(BOTTOM_AVOID_HEIGHT_KEY, win.getUIContext().px2vp(area.bottomRect.height));
-    } catch (error) {
-      AppStorage.set<number>(BOTTOM_AVOID_HEIGHT_KEY, 0);
     }
   }
 

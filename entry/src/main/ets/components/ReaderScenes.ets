@@ -978,11 +978,13 @@ export struct ReaderScene {
 
   private sliderBubbleX(): number {
     const total = this.totalPages <= 0 ? 1 : this.totalPages;
-    const usableWidth = Math.max(1, this.sliderTrackWidth);
+    // ArkUI Slider default blockSize=16vp, so thumb travels [8, trackWidth-8].
+    const blockRadius = 8;
+    const usableWidth = Math.max(1, this.sliderTrackWidth - 2 * blockRadius);
     if (total <= 1) {
-      return 0;
+      return blockRadius;
     }
-    return Math.max(0, Math.min(usableWidth, usableWidth * this.sliderLiveIndex / (total - 1)));
+    return blockRadius + Math.max(0, Math.min(usableWidth, usableWidth * this.sliderLiveIndex / (total - 1)));
   }
 
   private sliderPageText(): string {
@@ -1193,7 +1195,7 @@ export struct ReaderScene {
           .zIndex(2)
       }
 
-      if (!this.menuVisible && !this.sliderVisible) {
+      if (!this.menuVisible) {
         ReaderInfoOverlay({
           showProgress: this.overlayShowProgress,
           showClock: this.overlayShowClock,
@@ -1203,6 +1205,7 @@ export struct ReaderScene {
           top: this.readerStatusOverlayTop(),
           right: this.readerStatusOverlayRight()
         })
+          .position({ x: 40, y: 40 })
           .zIndex(4)
       }
       if (this.sliderVisible) {

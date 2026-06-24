@@ -189,7 +189,7 @@ export class EhHttpClient {
         connectTimeout: TEXT_CONNECT_TIMEOUT_MS,
         readTimeout: TEXT_READ_TIMEOUT_MS
       };
-      applyEhNetworkOptions(options);
+      applyEhNetworkOptions(options, url);
       const response = await requestWithDeadline(request, url, options, TEXT_DEADLINE_TIMEOUT_MS);
 
       ehCookieStore.absorbSetCookieHeader(response.cookies);
@@ -288,7 +288,7 @@ export class EhHttpClient {
         connectTimeout: TEXT_CONNECT_TIMEOUT_MS,
         readTimeout: TEXT_READ_TIMEOUT_MS
       };
-      applyEhNetworkOptions(options);
+      applyEhNetworkOptions(options, url);
       const response = await requestWithDeadline(request, url, options, TEXT_DEADLINE_TIMEOUT_MS);
 
       ehCookieStore.absorbSetCookieHeader(response.cookies);
@@ -331,7 +331,7 @@ export class EhHttpClient {
         connectTimeout: API_TIMEOUT_MS,
         readTimeout: API_TIMEOUT_MS
       };
-      applyEhNetworkOptions(options);
+      applyEhNetworkOptions(options, url);
       const response = await requestWithDeadline(request, url, options, API_DEADLINE_TIMEOUT_MS);
 
       ehCookieStore.absorbSetCookieHeader(response.cookies);
