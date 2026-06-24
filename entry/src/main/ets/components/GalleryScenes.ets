@@ -1478,24 +1478,28 @@ export struct GalleryListScene {
             onSearchCategoryChange: (category: number) => {
               this.searchCategory = category;
               if (this.isSearchResultScene) {
+                this.searchFilterEnabled = true;
                 this.searchSubmitted = false;
               }
             },
             onAdvancedEnabledChange: (enabled: boolean) => {
               this.advancedSearchEnabled = enabled;
               if (this.isSearchResultScene) {
+                this.searchFilterEnabled = true;
                 this.searchSubmitted = false;
               }
             },
             onAdvanceSearchChange: (flags: number) => {
               this.advanceSearch = flags;
               if (this.isSearchResultScene) {
+                this.searchFilterEnabled = true;
                 this.searchSubmitted = false;
               }
             },
             onMinRatingChange: (rating: number) => {
               this.minRating = rating;
               if (this.isSearchResultScene) {
+                this.searchFilterEnabled = true;
                 this.searchSubmitted = false;
               }
             },

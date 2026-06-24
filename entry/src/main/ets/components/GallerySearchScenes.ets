@@ -429,7 +429,7 @@ export struct SearchAdvancedPanel {
 
   aboutToAppear(): void {
     this.modeDraft = this.searchModeValue;
-    this.categoryDraft = this.searchCategory === GalleryCategory.None ? rememberedSearchCategory : this.searchCategory;
+    this.categoryDraft = this.searchCategory;
     this.advancedEnabledDraft = this.advancedSearchEnabled;
     this.advanceSearchDraft = this.advanceSearch;
     this.minRatingDraft = this.minRating;
