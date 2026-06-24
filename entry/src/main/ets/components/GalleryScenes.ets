@@ -518,7 +518,7 @@ export struct GalleryListScene {
 
     request.then((result: GalleryListLoadResult) => {
       this.requestUrl = result.url;
-      this.galleries = applyGalleryFilters(cloneGalleryInfos(result.galleries));
+      this.galleries = this.visibleRemoteGalleries(result.galleries);
       this.statusText = result.ok ? result.message : galleryListFailureMessage(result, this.activeSite);
       this.totalPages = result.pages;
       this.nextUrl = result.nextUrl;
@@ -559,7 +559,7 @@ export struct GalleryListScene {
 
     this.localProvider(this.keyword.trim(), pageIndex, this.localPageSize).then((result: GalleryListLoadResult) => {
       this.requestUrl = result.url;
-      this.galleries = applyGalleryFilters(cloneGalleryInfos(result.galleries));
+      this.galleries = this.visibleRemoteGalleries(result.galleries);
       this.statusText = result.ok ? result.message : result.message;
       this.totalPages = result.pages;
       this.nextUrl = result.nextUrl;
@@ -606,7 +606,7 @@ export struct GalleryListScene {
 
     request.then((result: GalleryListLoadResult) => {
       this.requestUrl = result.url;
-      const newGalleries = applyGalleryFilters(cloneGalleryInfos(result.galleries));
+      const newGalleries = this.visibleRemoteGalleries(result.galleries);
       if (newGalleries.length === 0) {
         // Empty page = reached the end even if we don't know total
         this.statusText = uiText('All pages loaded');
@@ -642,7 +642,7 @@ export struct GalleryListScene {
     this.isLoadingMore = true;
     this.localProvider(this.keyword.trim(), nextPage, this.localPageSize).then((result: GalleryListLoadResult) => {
       this.requestUrl = result.url;
-      const newGalleries = applyGalleryFilters(cloneGalleryInfos(result.galleries));
+      const newGalleries = this.visibleRemoteGalleries(result.galleries);
       if (newGalleries.length === 0) {
         this.statusText = uiText('All pages loaded');
         this.isLoadingMore = false;
@@ -675,6 +675,11 @@ export struct GalleryListScene {
       this.activeSite = primarySite;
       return result;
     });
+  }
+
+  private visibleRemoteGalleries(galleries: GalleryInfo[]): GalleryInfo[] {
+    const cloned = cloneGalleryInfos(galleries);
+    return this.isSearchResultScene ? cloned : applyGalleryFilters(cloned);
   }
 
   private loadRoutePage(pageIndex: number, site: GallerySite): Promise<GalleryListLoadResult> {
