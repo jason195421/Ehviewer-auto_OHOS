@@ -138,6 +138,7 @@ interface GalleryListSceneCache {
   minRating: number;
   pageFrom: number;
   pageTo: number;
+  searchFilterEnabled: boolean;
   searchSubmitted: boolean;
   listScrollOffset: number;
 }
@@ -152,6 +153,7 @@ interface SearchResultDraft {
   pageFrom: number;
   pageTo: number;
   filterActive: boolean;
+  searchFilterEnabled: boolean;
   submitted: boolean;
 }
 
@@ -169,6 +171,7 @@ function createEmptySearchResultDraft(): SearchResultDraft {
     pageFrom: -1,
     pageTo: -1,
     filterActive: false,
+    searchFilterEnabled: true,
     submitted: false
   };
 }
@@ -269,6 +272,7 @@ export struct GalleryListScene {
   @State fabExpanded: boolean = false;
   @State filterActive: boolean = false;
   @State accountFilterEnabled: boolean = true;
+  @State searchFilterEnabled: boolean = true;
   @State showSearchResultScene: boolean = false;
   @State searchResultDraft: SearchResultDraft = createEmptySearchResultDraft();
   @State searchMode: ListMode = ListMode.Normal;
@@ -313,7 +317,8 @@ export struct GalleryListScene {
       return this.sourceRoute.toString() + '|search-result|' + this.keyword + '|' + this.searchMode.toString() + '|' +
         this.searchCategory.toString() + '|' + (this.advancedSearchEnabled ? '1' : '0') + '|' +
         this.advanceSearch.toString() + '|' + this.minRating.toString() + '|' +
-        (this.accountFilterEnabled ? 'account-filter-on' : 'account-filter-off');
+        (this.accountFilterEnabled ? 'account-filter-on' : 'account-filter-off') + '|' +
+        (this.searchFilterEnabled ? 'search-filter-on' : 'search-filter-off');
     }
     return this.sourceRoute.toString() + '|' + mode + '|' + this.follow + '|' + this.initialKeyword + '|' +
       this.initialSearchMode.toString() + '|' + this.initialSearchCategory.toString() + '|' +
@@ -339,6 +344,7 @@ export struct GalleryListScene {
     this.hasFirstRefresh = cache.hasFirstRefresh;
     this.filterActive = this.isSearchResultScene ? false : cache.filterActive;
     this.accountFilterEnabled = cache.accountFilterEnabled !== false;
+    this.searchFilterEnabled = cache.searchFilterEnabled !== false;
     this.searchMode = cache.searchMode;
     this.searchCategory = cache.searchCategory;
     this.advancedSearchEnabled = cache.advancedSearchEnabled;
@@ -365,6 +371,7 @@ export struct GalleryListScene {
       hasFirstRefresh: this.hasFirstRefresh,
       filterActive: this.filterActive,
       accountFilterEnabled: this.accountFilterEnabled,
+      searchFilterEnabled: this.searchFilterEnabled,
       searchMode: this.searchMode,
       searchCategory: this.searchCategory,
       advancedSearchEnabled: this.advancedSearchEnabled,
@@ -398,6 +405,7 @@ export struct GalleryListScene {
       this.pageFrom = this.initialPageFrom;
       this.pageTo = this.initialPageTo;
       this.filterActive = this.isSearchResultScene ? false : this.searchResultDraft.filterActive;
+      this.searchFilterEnabled = this.isSearchResultScene ? this.searchResultDraft.searchFilterEnabled : true;
       this.searchSubmitted = !this.isSearchResultScene || this.initialSearchSubmitted;
     }
     const context = getAbilityContext();
@@ -682,7 +690,7 @@ export struct GalleryListScene {
     builder.mode = this.searchModeForRoute(routeMode, builder.keyword);
     builder.follow = this.follow;
     builder.category = this.requestCategoryForMode(builder.mode);
-    if (this.advancedSearchEnabled && this.searchSupportsAdvanced(builder.mode)) {
+    if (this.shouldApplySearchFilters() && this.advancedSearchEnabled && this.searchSupportsAdvanced(builder.mode)) {
       builder.advanceSearch = this.advanceSearch;
       builder.minRating = this.minRating;
       builder.pageFrom = this.pageFrom;
@@ -713,8 +721,12 @@ export struct GalleryListScene {
     return routeMode;
   }
 
+  private shouldApplySearchFilters(): boolean {
+    return !this.isSearchResultScene || this.searchFilterEnabled;
+  }
+
   private requestCategoryForMode(mode: ListMode): number {
-    if (this.searchCategory !== GalleryCategory.None) {
+    if (this.shouldApplySearchFilters() && this.searchCategory !== GalleryCategory.None) {
       return this.searchCategory;
     }
     if (this.searchSupportsAdvanced(mode) && (this.isSearchResultScene || !this.accountFilterEnabled)) {
@@ -760,6 +772,7 @@ export struct GalleryListScene {
       pageFrom: -1,
       pageTo: -1,
       filterActive: false,
+      searchFilterEnabled: true,
       submitted: false
     };
     this.showSearchResultScene = true;
@@ -791,6 +804,7 @@ export struct GalleryListScene {
       pageFrom: -1,
       pageTo: -1,
       filterActive: false,
+      searchFilterEnabled: true,
       submitted: true
     };
     this.showSearchResultScene = true;
@@ -798,6 +812,10 @@ export struct GalleryListScene {
   }
 
   private toggleFilter(): void {
+    if (this.isSearchResultScene) {
+      this.toggleSearchFilterEnabled();
+      return;
+    }
     this.accountFilterEnabled = !this.accountFilterEnabled;
     this.fabExpanded = false;
     ehSettingsStore.setValue('use_account_default_filter', this.accountFilterEnabled ? 'On' : 'Off');
@@ -810,7 +828,16 @@ export struct GalleryListScene {
       });
     }
     this.saveListCache();
-    this.loadListPage(0, this.galleries.length > 0);
+    this.loadListPage(0, false);
+  }
+
+  private toggleSearchFilterEnabled(): void {
+    this.searchFilterEnabled = !this.searchFilterEnabled;
+    this.fabExpanded = false;
+    this.statusText = this.searchFilterEnabled ? 'Search filters enabled' : 'Search filters disabled';
+    this.searchSubmitted = true;
+    this.saveListCache();
+    this.loadListPage(0, false);
   }
 
   private jumpGalleryPage(): void {
@@ -1413,6 +1440,7 @@ export struct GalleryListScene {
             actionsExpanded: this.fabExpanded,
             filterActive: this.filterActive,
             accountFilterEnabled: this.accountFilterEnabled,
+            searchFilterEnabled: this.searchFilterEnabled,
             showSearchButton: (routeUsesKeyword(this.sourceRoute) || this.useLocalProvider) && !this.isSearchResultScene,
             showBackButton: this.isSearchResultScene,
             isSearchResultScene: this.isSearchResultScene,
@@ -1639,6 +1667,7 @@ export struct GalleryListContent {
   @Prop actionsExpanded: boolean = false;
   @Prop filterActive: boolean = false;
   @Prop accountFilterEnabled: boolean = true;
+  @Prop searchFilterEnabled: boolean = true;
   @Prop showSearchButton: boolean = false;
   @Prop showBackButton: boolean = false;
   @Prop isSearchResultScene: boolean = false;
@@ -2027,7 +2056,7 @@ export struct GalleryListContent {
         .width(40)
         .height(40)
         .backgroundColor(
-          this.accountFilterEnabled ? themeOnPrimaryActionStrongBackground() : themeOnPrimaryActionBackground())
+          this.searchFilterEnabled ? themeOnPrimaryActionStrongBackground() : themeOnPrimaryActionBackground())
         .flexShrink(0)
         .onClick(() => {
           this.onFilter();
@@ -2287,7 +2316,7 @@ export struct GalleryListContent {
         QuickActionColumn({
           expanded: this.actionsExpanded,
           filterActive: this.filterActive,
-          accountFilterEnabled: this.accountFilterEnabled,
+          accountFilterEnabled: this.isSearchResultScene ? this.searchFilterEnabled : this.accountFilterEnabled,
           canJump: this.canJump,
           canRandom: this.canRandom,
           onToggle: this.onToggleActions,
