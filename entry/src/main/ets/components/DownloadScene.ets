@@ -1885,7 +1885,7 @@ struct DownloadToolColumn {
           if (this.hasSelection) {
             ActionBubble({
               label: uiText('Export'),
-              symbolIcon: $r('sys.symbol.share'),
+              symbolIcon: $r('sys.symbol.archivebox'),
               isEnabled: true,
               active: this.activeActionIndex === 0,
               directTap: false

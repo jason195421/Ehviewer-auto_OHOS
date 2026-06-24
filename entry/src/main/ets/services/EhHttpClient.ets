@@ -158,7 +158,7 @@ export class EhHttpClient {
       }
     }
 
-    const promise = this.getTextNetwork(url, referer, cookieHeader, cacheTtlMs, includeUConfig)
+    const promise = this.getTextNetwork(url, referer, cookieHeader, cacheTtlMs)
       .then((response: EhHttpResponse) => {
         if (cacheTtlMs > 0 && response.statusCode >= 200 && response.statusCode < 300) {
           this.putCachedResponse(cacheKey, response, cacheTtlMs);
@@ -178,22 +178,19 @@ export class EhHttpClient {
   }
 
   private async getTextNetwork(url: string, referer: string, cookieHeader: string,
-    cacheTtlMs: number, includeUConfig: boolean): Promise<EhHttpResponse> {
+    cacheTtlMs: number): Promise<EhHttpResponse> {
     return requestTextWithRetry((): Promise<EhHttpResponse> => {
-      return this.getTextOnce(url, referer, cookieHeader, cacheTtlMs, includeUConfig);
+      return this.getTextOnce(url, referer, cookieHeader, cacheTtlMs);
     }, 3);
   }
 
   private async getTextOnce(url: string, referer: string, cookieHeader: string,
-    cacheTtlMs: number, includeUConfig: boolean): Promise<EhHttpResponse> {
+    cacheTtlMs: number): Promise<EhHttpResponse> {
     const request = http.createHttp();
     await acquireTextSlot();
     try {
       const header = buildRequestHeader(url, referer, cookieHeader, cacheTtlMs);
       await ensureEhHostRules();
-      if (!includeUConfig) {
-        clearUConfigWebCookieForRequest(url);
-      }
       const options: http.HttpRequestOptions = {
         method: http.RequestMethod.GET,
         header: header,
@@ -947,29 +944,6 @@ function syncSetCookiesToWebView(url: string, setCookieHeader: string): void {
   }
 
   if (synced) {
-    try {
-      webview.WebCookieManager.saveCookieSync();
-    } catch (error) {
-    }
-  }
-}
-
-function clearUConfigWebCookieForRequest(url: string): void {
-  const expiredCookie = 'uconfig=; Max-Age=0; path=/';
-  const targets: string[] = [
-    url,
-    EhUrl.HOST_E,
-    EhUrl.HOST_EX
-  ];
-  let changed = false;
-  for (let i = 0; i < targets.length; i++) {
-    try {
-      webview.WebCookieManager.configCookieSync(targets[i], expiredCookie);
-      changed = true;
-    } catch (error) {
-    }
-  }
-  if (changed) {
     try {
       webview.WebCookieManager.saveCookieSync();
     } catch (error) {

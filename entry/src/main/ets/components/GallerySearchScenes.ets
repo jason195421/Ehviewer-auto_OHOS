@@ -1,5 +1,6 @@
 import { ALL_CATEGORY, GalleryCategory } from '../model/GalleryModels';
 import { DEFAULT_ADVANCE_SEARCH, ListMode } from '../services/EhUrl';
+import { ehSearchHistoryStore } from '../services/EhSearchHistoryStore';
 import { ehTagTranslationStore } from '../services/EhTagTranslationStore';
 import { mainContentWidthFallbackVp, rememberMainContentWidthVp } from '../services/EhWindowImmersive';
 import { LANGUAGE_REVISION_KEY, categoryColor, uiText } from '../shared/EhShared';
@@ -40,7 +41,6 @@ interface TagNamespaceOption {
   value: string;
 }
 
-const searchHistoryKeywords: string[] = [];
 const SEARCH_SUGGESTION_RENDER_BATCH: number = 80;
 const ACTION_BUBBLE_SIZE: number = 44;
 const ACTION_BUBBLE_GAP: number = 8;
@@ -91,19 +91,7 @@ export function applyTagSuggestionToKeyword(keyword: string, tag: string): strin
 }
 
 export function recordSearchHistory(keyword: string): void {
-  const trimmed = keyword.trim();
-  if (trimmed.length === 0) {
-    return;
-  }
-  for (let i = searchHistoryKeywords.length - 1; i >= 0; i--) {
-    if (searchHistoryKeywords[i] === trimmed) {
-      searchHistoryKeywords.splice(i, 1);
-    }
-  }
-  searchHistoryKeywords.unshift(trimmed);
-  if (searchHistoryKeywords.length > 128) {
-    searchHistoryKeywords.splice(128);
-  }
+  ehSearchHistoryStore.record(keyword);
 }
 
 function parseGalleryUrl(text: string): GalleryUrlMatch | null {
@@ -127,9 +115,10 @@ export function buildSearchSuggestions(keyword: string, limit: number = 0,
   const text = keyword.trim();
   const next: SearchSuggestionItem[] = [];
   if (text.length === 0) {
+    const historyKeywords = ehSearchHistoryStore.getKeywords();
     const unlimited = limit <= 0;
-    for (let i = 0; i < searchHistoryKeywords.length && (unlimited || next.length < limit); i++) {
-      const history = searchHistoryKeywords[i];
+    for (let i = 0; i < historyKeywords.length && (unlimited || next.length < limit); i++) {
+      const history = historyKeywords[i];
       next.push({
         kind: 'history',
         title: history,

@@ -134,7 +134,7 @@ export class EhDownloadFileStore {
       throw new Error('No downloads selected');
     }
 
-    const root = this.downloadRoot(context);
+    const root = this.zipExportRoot(context);
     ensureDirectory(root);
     const stagingRoot = context.cacheDir + '/download_zip_export_' + Date.now().toString();
     removeDirectoryTree(stagingRoot);
@@ -344,6 +344,14 @@ export class EhDownloadFileStore {
 
   private downloadRoot(context: common.UIAbilityContext): string {
     return this.rootForLocation(context, ehSettingsStore.getValue('download_location', DOWNLOAD_LOCATION_APP_FILES));
+  }
+
+  private zipExportRoot(context: common.UIAbilityContext): string {
+    try {
+      return this.publicDownloadRoot(context);
+    } catch (error) {
+      throw new Error('Zip export needs Downloads access. Set Settings > EH > Download location to Downloads first.');
+    }
   }
 
   private findGalleryDirectoryByGid(context: common.UIAbilityContext, gid: number): string {

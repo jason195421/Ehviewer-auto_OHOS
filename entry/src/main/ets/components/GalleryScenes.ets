@@ -421,11 +421,7 @@ export struct GalleryListScene {
         this.statusText = 'Cookie load failed, using current session: ' + error.message;
       }).finally(() => {
         const previousAccountFilterEnabled = this.accountFilterEnabled;
-        if (this.isSearchResultScene) {
-          this.accountFilterEnabled = false;
-        } else {
-          this.syncAccountFilterSetting();
-        }
+        this.syncAccountFilterSetting();
         if (!this.isSearchResultScene && previousAccountFilterEnabled !== this.accountFilterEnabled && !this.useLocalProvider) {
           this.hasFirstRefresh = false;
         }
@@ -703,7 +699,11 @@ export struct GalleryListScene {
       builder.pageFrom = this.pageFrom;
       builder.pageTo = this.pageTo;
     }
-    if (!this.includeAccountUConfig() && this.searchSupportsAdvanced(builder.mode)) {
+    if (this.isSearchResultScene && !this.searchFilterEnabled && this.searchSupportsAdvanced(builder.mode)) {
+      builder.category = ALL_CATEGORY;
+      builder.advanceSearch = ACCOUNT_DEFAULT_FILTER_DISABLE_FLAGS;
+    }
+    if (!this.isSearchResultScene && !this.includeAccountUConfig() && this.searchSupportsAdvanced(builder.mode)) {
       builder.advanceSearch =
         (builder.advanceSearch === -1 ? 0 : builder.advanceSearch) | ACCOUNT_DEFAULT_FILTER_DISABLE_FLAGS;
     }
@@ -712,7 +712,7 @@ export struct GalleryListScene {
   }
 
   private includeAccountUConfig(): boolean {
-    return !this.isSearchResultScene && this.accountFilterEnabled;
+    return this.isSearchResultScene || this.accountFilterEnabled;
   }
 
   private searchModeForRoute(routeMode: ListMode, keyword: string): ListMode {
@@ -740,7 +740,10 @@ export struct GalleryListScene {
     if (this.shouldApplySearchFilters() && this.searchCategory !== GalleryCategory.None) {
       return this.searchCategory;
     }
-    if (this.searchSupportsAdvanced(mode) && (this.isSearchResultScene || !this.accountFilterEnabled)) {
+    if (this.isSearchResultScene && this.shouldApplySearchFilters() && this.searchSupportsAdvanced(mode)) {
+      return ALL_CATEGORY;
+    }
+    if (!this.isSearchResultScene && this.searchSupportsAdvanced(mode) && !this.accountFilterEnabled) {
       return ALL_CATEGORY;
     }
     return GalleryCategory.None;
