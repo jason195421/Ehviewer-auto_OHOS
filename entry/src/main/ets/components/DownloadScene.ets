@@ -71,6 +71,10 @@ function normalizeSceneScrollOffset(offset: number): number {
 
 const DOWNLOAD_PAGE_PROGRESS_SCALE: number = 1000;
 const DOWNLOAD_PROGRESS_UPDATE_INTERVAL_MS: number = 250;
+const ACTION_BUBBLE_SIZE: number = 44;
+const ACTION_BUBBLE_GAP: number = 8;
+const ACTION_BUBBLE_PRIMARY_SIZE: number = 54;
+const ACTION_BUBBLE_PRIMARY_GAP: number = 10;
 
 function mergeDownloadDetailTitles(detail: GalleryDetail, item: DownloadInfo): GalleryDetail {
   const next = cloneGalleryDetail(detail);
@@ -1752,6 +1756,7 @@ struct DownloadToolColumn {
   @Prop expanded: boolean = false;
   @Prop hasSelection: boolean = false;
   @Prop canOperate: boolean = false;
+  @State activeActionIndex: number = -1;
   onToggle: () => void = () => {};
   onStatus: () => void = () => {};
   onCategory: () => void = () => {};
@@ -1769,6 +1774,110 @@ struct DownloadToolColumn {
     });
   }
 
+  private actionCount(): number {
+    if (!this.expanded) {
+      return 0;
+    }
+    return this.hasSelection ? 9 : 7;
+  }
+
+  private primaryIndex(): number {
+    return this.actionCount();
+  }
+
+  private expandedActionsHeight(): number {
+    const count = this.actionCount();
+    if (count <= 0) {
+      return 0;
+    }
+    return count * ACTION_BUBBLE_SIZE + (count - 1) * ACTION_BUBBLE_GAP;
+  }
+
+  private hitActionIndex(y: number): number {
+    const count = this.actionCount();
+    if (count > 0) {
+      const actionsHeight = this.expandedActionsHeight();
+      if (y >= 0 && y <= actionsHeight) {
+        const row = Math.floor(y / (ACTION_BUBBLE_SIZE + ACTION_BUBBLE_GAP));
+        const rowTop = row * (ACTION_BUBBLE_SIZE + ACTION_BUBBLE_GAP);
+        if (row >= 0 && row < count && y >= rowTop && y <= rowTop + ACTION_BUBBLE_SIZE) {
+          return row;
+        }
+      }
+      const primaryTop = actionsHeight + ACTION_BUBBLE_PRIMARY_GAP;
+      if (y >= primaryTop && y <= primaryTop + ACTION_BUBBLE_PRIMARY_SIZE) {
+        return this.primaryIndex();
+      }
+      return -1;
+    }
+    if (y >= 0 && y <= ACTION_BUBBLE_PRIMARY_SIZE) {
+      return this.primaryIndex();
+    }
+    return -1;
+  }
+
+  private touchY(event: TouchEvent): number {
+    if (event.touches.length > 0) {
+      return event.touches[0].y;
+    }
+    return -1;
+  }
+
+  private updateActiveAction(event: TouchEvent): void {
+    const index = this.hitActionIndex(this.touchY(event));
+    if (index !== this.activeActionIndex) {
+      this.getUIContext().animateTo({ duration: 120, curve: Curve.EaseOut }, () => {
+        this.activeActionIndex = index;
+      });
+    }
+  }
+
+  private triggerAction(index: number): void {
+    if (index < 0) {
+      return;
+    }
+    if (index === this.primaryIndex()) {
+      this.toggleExpanded();
+      return;
+    }
+    const baseIndex = this.hasSelection ? index - 2 : index;
+    if (this.hasSelection && index === 0) {
+      this.onExportZip();
+    } else if (this.hasSelection && index === 1) {
+      this.onDelete();
+    } else if (baseIndex === 0) {
+      this.onStatus();
+    } else if (baseIndex === 1) {
+      this.onCategory();
+    } else if (baseIndex === 2) {
+      this.onSort();
+    } else if (baseIndex === 3) {
+      this.onStart();
+    } else if (baseIndex === 4 && this.canOperate) {
+      this.onStop();
+    } else if (baseIndex === 5) {
+      this.onRestore();
+    } else if (baseIndex === 6 && this.canOperate) {
+      this.onClearDone();
+    }
+  }
+
+  private handleToolbarTouch(event: TouchEvent): void {
+    if (event.type === TouchType.Down || event.type === TouchType.Move) {
+      this.updateActiveAction(event);
+    } else if (event.type === TouchType.Up) {
+      const index = this.hitActionIndex(this.touchY(event));
+      this.activeActionIndex = -1;
+      this.triggerAction(index);
+    } else if (event.type === TouchType.Cancel) {
+      this.activeActionIndex = -1;
+    }
+  }
+
+  private baseActionIndex(index: number): number {
+    return this.hasSelection ? index + 2 : index;
+  }
+
   build() {
     Column() {
       if (this.expanded) {
@@ -1778,56 +1887,65 @@ struct DownloadToolColumn {
               label: uiText('Export'),
               symbolIcon: $r('sys.symbol.share'),
               isEnabled: true,
-              onTapAction: this.onExportZip
+              active: this.activeActionIndex === 0,
+              directTap: false
             })
             ActionBubble({
               label: uiText('Delete'),
               symbolIcon: $r('sys.symbol.trash'),
               isEnabled: true,
-              onTapAction: this.onDelete
+              active: this.activeActionIndex === 1,
+              directTap: false
             })
           }
           ActionBubble({
             label: uiText('Status'),
             symbolIcon: $r('sys.symbol.magnifyingglass'),
             isEnabled: true,
-            onTapAction: this.onStatus
+            active: this.activeActionIndex === this.baseActionIndex(0),
+            directTap: false
           })
           ActionBubble({
             label: uiText('Label'),
             symbolIcon: $r('sys.symbol.list_number'),
             isEnabled: true,
-            onTapAction: this.onCategory
+            active: this.activeActionIndex === this.baseActionIndex(1),
+            directTap: false
           })
           ActionBubble({
             label: uiText('Sort'),
             symbolIcon: $r('sys.symbol.chevron_forward'),
             isEnabled: true,
-            onTapAction: this.onSort
+            active: this.activeActionIndex === this.baseActionIndex(2),
+            directTap: false
           })
           ActionBubble({
             label: uiText('Start all'),
             symbolIcon: $r('sys.symbol.play_fill'),
             isEnabled: true,
-            onTapAction: this.onStart
+            active: this.activeActionIndex === this.baseActionIndex(3),
+            directTap: false
           })
           ActionBubble({
             label: uiText('Stop all'),
             symbolIcon: $r('sys.symbol.pause_fill'),
             isEnabled: this.canOperate,
-            onTapAction: this.onStop
+            active: this.activeActionIndex === this.baseActionIndex(4),
+            directTap: false
           })
           ActionBubble({
             label: uiText('Scan'),
             symbolIcon: $r('sys.symbol.play_arrow_triangle_2_circlepath'),
             isEnabled: true,
-            onTapAction: this.onRestore
+            active: this.activeActionIndex === this.baseActionIndex(5),
+            directTap: false
           })
           ActionBubble({
             label: uiText('Clear done'),
             symbolIcon: $r('sys.symbol.checkmark_circle'),
             isEnabled: this.canOperate,
-            onTapAction: this.onClearDone
+            active: this.activeActionIndex === this.baseActionIndex(6),
+            directTap: false
           })
         }
         .alignItems(HorizontalAlign.End)
@@ -1842,13 +1960,15 @@ struct DownloadToolColumn {
         symbolIcon: this.expanded ? $r('sys.symbol.xmark') : $r('sys.symbol.more'),
         isEnabled: true,
         primary: true,
-        onTapAction: () => {
-          this.toggleExpanded();
-        }
+        active: this.activeActionIndex === this.primaryIndex(),
+        directTap: false
       })
     }
     .alignItems(HorizontalAlign.End)
     .hitTestBehavior(HitTestMode.BLOCK_HIERARCHY)
+    .onTouch((event: TouchEvent) => {
+      this.handleToolbarTouch(event);
+    })
   }
 }
 

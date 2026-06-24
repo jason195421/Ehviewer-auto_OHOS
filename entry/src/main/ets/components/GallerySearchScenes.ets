@@ -42,6 +42,10 @@ interface TagNamespaceOption {
 
 const searchHistoryKeywords: string[] = [];
 const SEARCH_SUGGESTION_RENDER_BATCH: number = 80;
+const ACTION_BUBBLE_SIZE: number = 44;
+const ACTION_BUBBLE_GAP: number = 8;
+const ACTION_BUBBLE_PRIMARY_SIZE: number = 54;
+const ACTION_BUBBLE_PRIMARY_GAP: number = 10;
 let rememberedSearchCategory: number = GalleryCategory.None;
 const TAG_NAMESPACE_OPTIONS: TagNamespaceOption[] = [
   { label: 'Artist', value: 'artist' },
@@ -735,11 +739,98 @@ export struct QuickActionColumn {
   onJump: () => void = () => {};
   onRefresh: () => void = () => {};
   onRandom: () => void = () => {};
+  @State activeActionIndex: number = -1;
 
   private toggleExpanded(): void {
     this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseOut }, () => {
       this.onToggle();
     });
+  }
+
+  private actionCount(): number {
+    return this.expanded ? 4 : 0;
+  }
+
+  private primaryIndex(): number {
+    return this.actionCount();
+  }
+
+  private expandedActionsHeight(): number {
+    const count = this.actionCount();
+    if (count <= 0) {
+      return 0;
+    }
+    return count * ACTION_BUBBLE_SIZE + (count - 1) * ACTION_BUBBLE_GAP;
+  }
+
+  private hitActionIndex(y: number): number {
+    const count = this.actionCount();
+    if (count > 0) {
+      const actionsHeight = this.expandedActionsHeight();
+      if (y >= 0 && y <= actionsHeight) {
+        const row = Math.floor(y / (ACTION_BUBBLE_SIZE + ACTION_BUBBLE_GAP));
+        const rowTop = row * (ACTION_BUBBLE_SIZE + ACTION_BUBBLE_GAP);
+        if (row >= 0 && row < count && y >= rowTop && y <= rowTop + ACTION_BUBBLE_SIZE) {
+          return row;
+        }
+      }
+      const primaryTop = actionsHeight + ACTION_BUBBLE_PRIMARY_GAP;
+      if (y >= primaryTop && y <= primaryTop + ACTION_BUBBLE_PRIMARY_SIZE) {
+        return this.primaryIndex();
+      }
+      return -1;
+    }
+    if (y >= 0 && y <= ACTION_BUBBLE_PRIMARY_SIZE) {
+      return this.primaryIndex();
+    }
+    return -1;
+  }
+
+  private touchY(event: TouchEvent): number {
+    if (event.touches.length > 0) {
+      return event.touches[0].y;
+    }
+    return -1;
+  }
+
+  private updateActiveAction(event: TouchEvent): void {
+    const index = this.hitActionIndex(this.touchY(event));
+    if (index !== this.activeActionIndex) {
+      this.getUIContext().animateTo({ duration: 120, curve: Curve.EaseOut }, () => {
+        this.activeActionIndex = index;
+      });
+    }
+  }
+
+  private triggerAction(index: number): void {
+    if (index < 0) {
+      return;
+    }
+    if (index === this.primaryIndex()) {
+      this.toggleExpanded();
+      return;
+    }
+    if (index === 0) {
+      this.onFilter();
+    } else if (index === 1 && this.canJump) {
+      this.onJump();
+    } else if (index === 2) {
+      this.onRefresh();
+    } else if (index === 3 && this.canRandom) {
+      this.onRandom();
+    }
+  }
+
+  private handleToolbarTouch(event: TouchEvent): void {
+    if (event.type === TouchType.Down || event.type === TouchType.Move) {
+      this.updateActiveAction(event);
+    } else if (event.type === TouchType.Up) {
+      const index = this.hitActionIndex(this.touchY(event));
+      this.activeActionIndex = -1;
+      this.triggerAction(index);
+    } else if (event.type === TouchType.Cancel) {
+      this.activeActionIndex = -1;
+    }
   }
 
   build() {
@@ -750,33 +841,29 @@ export struct QuickActionColumn {
             label: this.filterActive ? uiText('Filter On') : uiText('Filter'),
             symbolIcon: $r('sys.symbol.magnifyingglass'),
             isEnabled: true,
-            onTapAction: () => {
-              this.onFilter();
-            }
+            active: this.activeActionIndex === 0,
+            directTap: false
           })
           ActionBubble({
             label: uiText('Jump'),
             symbolIcon: $r('sys.symbol.chevron_forward'),
             isEnabled: this.canJump,
-            onTapAction: () => {
-              this.onJump();
-            }
+            active: this.activeActionIndex === 1,
+            directTap: false
           })
           ActionBubble({
             label: uiText('Refresh'),
             symbolIcon: $r('sys.symbol.play_arrow_triangle_2_circlepath'),
             isEnabled: true,
-            onTapAction: () => {
-              this.onRefresh();
-            }
+            active: this.activeActionIndex === 2,
+            directTap: false
           })
           ActionBubble({
             label: uiText('Random'),
             symbolIcon: $r('sys.symbol.play_fill'),
             isEnabled: this.canRandom,
-            onTapAction: () => {
-              this.onRandom();
-            }
+            active: this.activeActionIndex === 3,
+            directTap: false
           })
         }
         .alignItems(HorizontalAlign.End)
@@ -791,13 +878,15 @@ export struct QuickActionColumn {
         symbolIcon: this.expanded ? $r('sys.symbol.xmark') : $r('sys.symbol.more'),
         isEnabled: true,
         primary: true,
-        onTapAction: () => {
-          this.toggleExpanded();
-        }
+        active: this.activeActionIndex === this.primaryIndex(),
+        directTap: false
       })
     }
     .alignItems(HorizontalAlign.End)
     .hitTestBehavior(HitTestMode.BLOCK_HIERARCHY)
+    .onTouch((event: TouchEvent) => {
+      this.handleToolbarTouch(event);
+    })
   }
 }
 
@@ -806,36 +895,14 @@ export struct ActionBubble {
   @Prop label: string = '';
   @Prop symbolIcon: Resource = $r('sys.symbol.plus');
   @Prop isEnabled: boolean = true;
-  @State labelVisible: boolean = false;
-  @State suppressTapAfterLongPress: boolean = false;
+  @Prop active: boolean = false;
   primary: boolean = false;
+  directTap: boolean = true;
   onTapAction: () => void = () => {};
-
-  private showLabel(): void {
-    if (this.label.length === 0 || this.labelVisible) {
-      return;
-    }
-    this.suppressTapAfterLongPress = true;
-    this.getUIContext().animateTo({ duration: 140, curve: Curve.EaseOut }, () => {
-      this.labelVisible = true;
-    });
-  }
-
-  private hideLabel(): void {
-    setTimeout(() => {
-      this.suppressTapAfterLongPress = false;
-    }, 180);
-    if (!this.labelVisible) {
-      return;
-    }
-    this.getUIContext().animateTo({ duration: 120, curve: Curve.EaseIn }, () => {
-      this.labelVisible = false;
-    });
-  }
 
   build() {
     Row({ space: 8 }) {
-      if (this.labelVisible && this.label.length > 0) {
+      if (this.active && this.label.length > 0) {
         Text(this.label)
           .fontSize(12)
           .fontColor(themePrimaryText())
@@ -862,21 +929,10 @@ export struct ActionBubble {
         themeControlMutedBackground())
       .shadow({ radius: this.primary ? 14 : 8, color: themeShadowColor(), offsetX: 0, offsetY: 3 })
       .onClick(() => {
-        if (this.suppressTapAfterLongPress) {
-          return;
+        if (this.directTap) {
+          this.onTapAction();
         }
-        this.onTapAction();
       })
-      .gesture(LongPressGesture({ repeat: false })
-        .onAction(() => {
-          this.showLabel();
-        })
-        .onActionEnd(() => {
-          this.hideLabel();
-        })
-        .onActionCancel(() => {
-          this.hideLabel();
-        }))
     }
     .alignItems(VerticalAlign.Center)
     .justifyContent(FlexAlign.End)
