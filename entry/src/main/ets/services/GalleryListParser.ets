@@ -127,8 +127,8 @@ function splitGalleryRows(body: string, displayMode: GalleryListDisplayMode): st
 function splitTableRows(body: string, displayMode: GalleryListDisplayMode): string[] {
   const rows: string[] = [];
   const tableStart = findItgTableStart(body, displayMode);
-  const tableEnd = tableStart < 0 ? -1 : body.indexOf('</table>', tableStart);
-  const source = tableStart >= 0 && tableEnd > tableStart ? body.substring(tableStart, tableEnd + 8) : body;
+  const tableBlock = tableStart < 0 ? '' : findFirstTagBlock(body.substring(tableStart), 'table');
+  const source = tableBlock.length > 0 ? tableBlock : body;
   let index = 0;
   while (index < source.length) {
     const start = source.substring(index).search(/<tr\b/i);
