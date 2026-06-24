@@ -702,6 +702,7 @@ export struct GalleryListScene {
     if (this.isSearchResultScene && !this.searchFilterEnabled && this.searchSupportsAdvanced(builder.mode)) {
       builder.category = ALL_CATEGORY;
       builder.advanceSearch = ACCOUNT_DEFAULT_FILTER_DISABLE_FLAGS;
+      builder.includeAdvSearchParam = false;
     }
     if (!this.isSearchResultScene && !this.includeAccountUConfig() && this.searchSupportsAdvanced(builder.mode)) {
       builder.advanceSearch =
@@ -739,9 +740,6 @@ export struct GalleryListScene {
   private requestCategoryForMode(mode: ListMode): number {
     if (this.shouldApplySearchFilters() && this.searchCategory !== GalleryCategory.None) {
       return this.searchCategory;
-    }
-    if (this.isSearchResultScene && this.shouldApplySearchFilters() && this.searchSupportsAdvanced(mode)) {
-      return ALL_CATEGORY;
     }
     if (!this.isSearchResultScene && this.searchSupportsAdvanced(mode) && !this.accountFilterEnabled) {
       return ALL_CATEGORY;

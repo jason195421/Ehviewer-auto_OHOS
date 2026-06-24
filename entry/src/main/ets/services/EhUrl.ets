@@ -96,6 +96,7 @@ export class ListUrlBuilder {
   keyword: string = '';
   follow: string = '';
   advanceSearch: number = -1;
+  includeAdvSearchParam: boolean = true;
   minRating: number = -1;
   pageFrom: number = -1;
   pageTo: number = -1;
@@ -108,6 +109,7 @@ export class ListUrlBuilder {
     this.keyword = '';
     this.follow = '';
     this.advanceSearch = -1;
+    this.includeAdvSearchParam = true;
     this.minRating = -1;
     this.pageFrom = -1;
     this.pageTo = -1;
@@ -165,7 +167,9 @@ export class ListUrlBuilder {
     if (this.advanceSearch === -1) {
       return;
     }
-    params.push({ key: 'advsearch', value: '1' });
+    if (this.includeAdvSearchParam) {
+      params.push({ key: 'advsearch', value: '1' });
+    }
     appendFlagParam(params, this.advanceSearch, 0x1, 'f_sname');
     appendFlagParam(params, this.advanceSearch, 0x2, 'f_stags');
     appendFlagParam(params, this.advanceSearch, 0x4, 'f_sdesc');
