@@ -150,6 +150,7 @@ interface SearchResultDraft {
   minRating: number;
   pageFrom: number;
   pageTo: number;
+  filterActive: boolean;
   submitted: boolean;
 }
 
@@ -166,6 +167,7 @@ function createEmptySearchResultDraft(): SearchResultDraft {
     minRating: -1,
     pageFrom: -1,
     pageTo: -1,
+    filterActive: false,
     submitted: false
   };
 }
@@ -394,6 +396,7 @@ export struct GalleryListScene {
       this.minRating = this.initialMinRating;
       this.pageFrom = this.initialPageFrom;
       this.pageTo = this.initialPageTo;
+      this.filterActive = this.searchResultDraft.filterActive;
       this.searchSubmitted = !this.isSearchResultScene || this.initialSearchSubmitted;
     }
     const context = getAbilityContext();
@@ -585,7 +588,8 @@ export struct GalleryListScene {
     this.isLoadingMore = true;
 
     const request =
-      this.nextUrl.length > 0 ? this.client.loadGalleryListUrl(this.absoluteListUrl(this.nextUrl), this.activeSite) :
+      this.nextUrl.length > 0 ?
+        this.client.loadGalleryListUrl(this.absoluteListUrl(this.nextUrl), this.activeSite, this.accountFilterEnabled) :
         this.loadRoutePageWithFallback(nextPage);
 
     request.then((result: GalleryListLoadResult) => {
@@ -688,7 +692,7 @@ export struct GalleryListScene {
         (builder.advanceSearch === -1 ? 0 : builder.advanceSearch) | ACCOUNT_DEFAULT_FILTER_DISABLE_FLAGS;
     }
     this.requestUrl = builder.build(site);
-    return this.client.loadGalleryList(builder, site);
+    return this.client.loadGalleryList(builder, site, this.accountFilterEnabled);
   }
 
   private searchModeForRoute(routeMode: ListMode, keyword: string): ListMode {
@@ -744,6 +748,7 @@ export struct GalleryListScene {
       minRating: this.minRating,
       pageFrom: -1,
       pageTo: -1,
+      filterActive: this.filterActive,
       submitted: false
     };
     this.showSearchResultScene = true;
@@ -774,6 +779,7 @@ export struct GalleryListScene {
       minRating: -1,
       pageFrom: -1,
       pageTo: -1,
+      filterActive: false,
       submitted: true
     };
     this.showSearchResultScene = true;
@@ -781,6 +787,10 @@ export struct GalleryListScene {
   }
 
   private toggleFilter(): void {
+    if (this.isSearchResultScene) {
+      this.toggleSearchFilter();
+      return;
+    }
     this.accountFilterEnabled = !this.accountFilterEnabled;
     this.fabExpanded = false;
     ehSettingsStore.setValue('use_account_default_filter', this.accountFilterEnabled ? 'On' : 'Off');
@@ -792,6 +802,15 @@ export struct GalleryListScene {
         this.saveListCache();
       });
     }
+    this.saveListCache();
+    this.loadListPage(0, this.galleries.length > 0);
+  }
+
+  private toggleSearchFilter(): void {
+    this.filterActive = !this.filterActive;
+    this.fabExpanded = false;
+    this.statusText = this.filterActive ? 'Search filter enabled' : 'Search filter disabled';
+    this.searchSubmitted = true;
     this.saveListCache();
     this.loadListPage(0, this.galleries.length > 0);
   }
@@ -2003,6 +2022,19 @@ export struct GalleryListContent {
           })
 
         Button({ type: ButtonType.Circle, stateEffect: true }) {
+          SymbolGlyph($r('sys.symbol.funnel'))
+            .fontSize(22)
+            .fontColor([themeOnPrimaryText()])
+        }
+        .width(40)
+        .height(40)
+        .backgroundColor(this.filterActive ? themeOnPrimaryActionStrongBackground() : themeOnPrimaryActionBackground())
+        .flexShrink(0)
+        .onClick(() => {
+          this.onFilter();
+        })
+
+        Button({ type: ButtonType.Circle, stateEffect: true }) {
           SymbolGlyph($r('sys.symbol.plus'))
             .fontSize(22)
             .fontColor([themeOnPrimaryText()])
@@ -2256,7 +2288,7 @@ export struct GalleryListContent {
         QuickActionColumn({
           expanded: this.actionsExpanded,
           filterActive: this.filterActive,
-          accountFilterEnabled: this.accountFilterEnabled,
+          accountFilterEnabled: this.isSearchResultScene ? this.filterActive : this.accountFilterEnabled,
           canJump: this.canJump,
           canRandom: this.canRandom,
           onToggle: this.onToggleActions,

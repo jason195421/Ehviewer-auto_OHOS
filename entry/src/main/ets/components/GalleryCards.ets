@@ -253,9 +253,9 @@ export struct GalleryListRow {
 
 @Component
 export struct GalleryTagChip {
-  text: string = '';
-  backgroundColorValue: string = '#D8EEF7';
-  color: string = '#205E78';
+  @Prop text: string = '';
+  @Prop backgroundColorValue: string = '#D8EEF7';
+  @Prop color: string = '#205E78';
 
   build() {
     Text(this.text)
@@ -452,7 +452,7 @@ export struct GalleryThumbCard {
 
 @Component
 export struct CategoryBadge {
-  category: number = GalleryCategory.Unknown;
+  @Prop category: number = GalleryCategory.Unknown;
 
   build() {
     Text(categoryName(this.category))

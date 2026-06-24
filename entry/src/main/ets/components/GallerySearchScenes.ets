@@ -791,6 +791,9 @@ export struct QuickActionColumn {
     if (event.touches.length > 0) {
       return event.touches[0].y;
     }
+    if (event.changedTouches.length > 0) {
+      return event.changedTouches[0].y;
+    }
     return -1;
   }
 
@@ -827,8 +830,9 @@ export struct QuickActionColumn {
       this.updateActiveAction(event);
     } else if (event.type === TouchType.Up) {
       const index = this.hitActionIndex(this.touchY(event));
+      const fallbackIndex = index >= 0 ? index : this.activeActionIndex;
       this.activeActionIndex = -1;
-      this.triggerAction(index);
+      this.triggerAction(fallbackIndex);
     } else if (event.type === TouchType.Cancel) {
       this.activeActionIndex = -1;
     }

@@ -6,11 +6,17 @@ const COOKIE_KEY: string = 'cookie_header';
 const KEY_IPB_MEMBER_ID: string = 'ipb_member_id';
 const KEY_IPB_PASS_HASH: string = 'ipb_pass_hash';
 const KEY_CONTENT_WARNING: string = 'nw';
+const KEY_UCONFIG: string = 'uconfig';
 const CONTENT_WARNING_NOT_SHOW: string = '1';
 
 export interface CookieEntry {
   name: string;
   value: string;
+}
+
+export interface CookieHeaderOptions {
+  includeContentWarning?: boolean;
+  includeUConfig?: boolean;
 }
 
 export class EhCookieStore {
@@ -41,14 +47,20 @@ export class EhCookieStore {
   }
 
   getCookieHeader(): string {
-    return this.buildCookieHeader(true);
+    return this.buildCookieHeader({ includeContentWarning: true, includeUConfig: true });
+  }
+
+  getCookieHeaderWithOptions(options: CookieHeaderOptions): string {
+    return this.buildCookieHeader(options);
   }
 
   getEditableCookieHeader(): string {
-    return this.buildCookieHeader(false);
+    return this.buildCookieHeader({ includeContentWarning: false, includeUConfig: true });
   }
 
-  private buildCookieHeader(includeContentWarning: boolean): string {
+  private buildCookieHeader(options: CookieHeaderOptions): string {
+    const includeContentWarning = options.includeContentWarning !== false;
+    const includeUConfig = options.includeUConfig !== false;
     const pairs: string[] = [];
     let hasContentWarning = false;
     for (let i = 0; i < this.cookies.length; i++) {
@@ -56,6 +68,9 @@ export class EhCookieStore {
         hasContentWarning = true;
       }
       if (!includeContentWarning && this.cookies[i].name === KEY_CONTENT_WARNING) {
+        continue;
+      }
+      if (!includeUConfig && this.cookies[i].name === KEY_UCONFIG) {
         continue;
       }
       pairs.push(this.cookies[i].name + '=' + this.cookies[i].value);

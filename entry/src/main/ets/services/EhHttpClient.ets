@@ -19,6 +19,10 @@ export interface EhHttpResponse {
   cookies: string;
 }
 
+export interface EhTextRequestOptions {
+  includeUConfig?: boolean;
+}
+
 interface CachedHttpResponse {
   key: string;
   response: EhHttpResponse;
@@ -135,8 +139,11 @@ export interface NetworkDiagnosticResult {
 }
 
 export class EhHttpClient {
-  async getText(url: string, referer: string = EhUrl.getReferer(), cacheTtlMs: number = 45000): Promise<EhHttpResponse> {
-    const cookieHeader = ehCookieStore.getCookieHeader();
+  async getText(url: string, referer: string = EhUrl.getReferer(), cacheTtlMs: number = 45000,
+    options?: EhTextRequestOptions): Promise<EhHttpResponse> {
+    const cookieHeader = options?.includeUConfig === false ?
+      ehCookieStore.getCookieHeaderWithOptions({ includeContentWarning: true, includeUConfig: false }) :
+      ehCookieStore.getCookieHeader();
     const cacheKey = buildCacheKey('GET', url, referer, cookieHeader);
     if (cacheTtlMs > 0) {
       const cached = this.getCachedResponse(cacheKey);
@@ -515,9 +522,10 @@ export class EhHttpClient {
     }
   }
 
-  async loadGalleryList(builder: ListUrlBuilder, site: GallerySite = GallerySite.E): Promise<GalleryListLoadResult> {
+  async loadGalleryList(builder: ListUrlBuilder, site: GallerySite = GallerySite.E,
+    includeUConfig: boolean = true): Promise<GalleryListLoadResult> {
     const url = builder.build(site);
-    return this.loadGalleryListUrl(url, site);
+    return this.loadGalleryListUrl(url, site, includeUConfig);
   }
 
   async loadFavoritesList(builder: FavListUrlBuilder, site: GallerySite = GallerySite.E): Promise<GalleryListLoadResult> {
@@ -525,9 +533,11 @@ export class EhHttpClient {
     return this.loadGalleryListUrl(url, site);
   }
 
-  async loadGalleryListUrl(url: string, site: GallerySite = GallerySite.E): Promise<GalleryListLoadResult> {
+  async loadGalleryListUrl(url: string, site: GallerySite = GallerySite.E,
+    includeUConfig: boolean = true): Promise<GalleryListLoadResult> {
     try {
-      const response = await this.getText(url, EhUrl.getReferer(site), 60000);
+      const response = await this.getText(url, EhUrl.getReferer(site), includeUConfig ? 60000 : 0,
+        { includeUConfig: includeUConfig });
       if (response.statusCode < 200 || response.statusCode >= 300) {
         return {
           ok: false,
