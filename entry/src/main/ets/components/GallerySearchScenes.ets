@@ -977,8 +977,8 @@ export struct SearchFlagChip {
 
 @Component
 export struct SearchCategoryChip {
-  label: string = '';
-  category: number = GalleryCategory.Unknown;
+  @Prop label: string = '';
+  @Prop category: number = GalleryCategory.Unknown;
   @Prop selected: boolean = false;
   onToggle: (category: number) => void = (_category: number) => {};
 

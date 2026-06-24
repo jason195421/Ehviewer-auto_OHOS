@@ -1,5 +1,6 @@
 ﻿import { pasteboard } from '@kit.BasicServicesKit';
 import {
+  ALL_CATEGORY,
   GalleryCategory,
   GalleryDetail,
   GalleryInfo,
@@ -680,7 +681,7 @@ export struct GalleryListScene {
     const routeMode = this.useForcedMode ? this.forcedMode : listModeForRoute(this.sourceRoute);
     builder.mode = this.searchModeForRoute(routeMode, builder.keyword);
     builder.follow = this.follow;
-    builder.category = this.searchCategory;
+    builder.category = this.requestCategoryForMode(builder.mode);
     if (this.advancedSearchEnabled && this.searchSupportsAdvanced(builder.mode)) {
       builder.advanceSearch = this.advanceSearch;
       builder.minRating = this.minRating;
@@ -710,6 +711,16 @@ export struct GalleryListScene {
       return this.searchMode;
     }
     return routeMode;
+  }
+
+  private requestCategoryForMode(mode: ListMode): number {
+    if (this.searchCategory !== GalleryCategory.None) {
+      return this.searchCategory;
+    }
+    if (this.searchSupportsAdvanced(mode) && (this.isSearchResultScene || !this.accountFilterEnabled)) {
+      return ALL_CATEGORY;
+    }
+    return GalleryCategory.None;
   }
 
   private searchSupportsAdvanced(mode: ListMode): boolean {
