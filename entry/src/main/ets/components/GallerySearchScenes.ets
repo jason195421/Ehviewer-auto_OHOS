@@ -879,9 +879,7 @@ export struct QuickActionColumn {
         isEnabled: true,
         primary: true,
         active: this.activeActionIndex === this.primaryIndex(),
-        onTapAction: () => {
-          this.toggleExpanded();
-        }
+        directTap: false
       })
     }
     .alignItems(HorizontalAlign.End)
@@ -942,7 +940,7 @@ export struct ActionBubble {
     }
     .alignItems(VerticalAlign.Center)
     .justifyContent(FlexAlign.End)
-    .hitTestBehavior(HitTestMode.BLOCK_HIERARCHY)
+    .hitTestBehavior(HitTestMode.Transparent)
     .transition(TransitionEffect.OPACITY
       .combine(TransitionEffect.translate({ y: 12 }))
       .animation({ duration: 160, curve: Curve.EaseOut }))

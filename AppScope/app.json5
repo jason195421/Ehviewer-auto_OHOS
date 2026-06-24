@@ -2,8 +2,8 @@
   "app": {
     "bundleName": "yt.ehviewer.huawei",
     "vendor": "xiaojieonly",
-    "versionCode": 433,
-    "versionName": "0.3.33",
+    "versionCode": 434,
+    "versionName": "0.3.34",
     "icon": "$media:app_icon",
     "label": "$string:app_name"
   }

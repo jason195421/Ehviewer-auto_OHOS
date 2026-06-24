@@ -1961,9 +1961,7 @@ struct DownloadToolColumn {
         isEnabled: true,
         primary: true,
         active: this.activeActionIndex === this.primaryIndex(),
-        onTapAction: () => {
-          this.toggleExpanded();
-        }
+        directTap: false
       })
     }
     .alignItems(HorizontalAlign.End)
