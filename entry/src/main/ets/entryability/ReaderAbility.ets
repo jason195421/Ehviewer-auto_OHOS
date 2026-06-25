@@ -6,6 +6,7 @@ import {
   rememberReaderWindow,
   restoreAppWindowState
 } from '../services/EhWindowImmersive';
+import { ehAppLog } from '../services/EhAppLog';
 
 export const READER_ABILITY_CONTEXT_KEY: string = 'readerAbilityContext';
 
@@ -24,6 +25,7 @@ export default class ReaderAbility extends UIAbility {
     stage.loadContent('pages/Reader', (error) => {
       if (error.code) {
         console.error(`Failed to load reader page. code=${error.code}, message=${error.message}`);
+        ehAppLog.error(this.context, 'ReaderAbility', 'Failed to load reader page: ' + error.message);
         return;
       }
       const win = this.ensureReaderWindow(stage);

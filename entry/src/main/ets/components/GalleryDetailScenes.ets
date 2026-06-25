@@ -1,9 +1,9 @@
 ﻿import { GalleryDetail, GalleryPreview } from '../model/GalleryModels';
-import { STATUS_BAR_HEIGHT_KEY, createEmptyDetail, galleryDisplayTitle, uiStatusText } from '../shared/EhShared';
-import { themeScrimColor, themeSuccessBackground, themeSuccessText } from '../shared/EhTheme';
+import { STATUS_BAR_HEIGHT_KEY, createEmptyDetail, galleryDisplayTitle } from '../shared/EhShared';
+import { themePageBackground, themeScrimColor } from '../shared/EhTheme';
 import { EhSubNavBar } from './NavigationComponents';
 import { CommentsScene } from './ReaderScenes';
-import { DetailHeader, DetailLoadStatus } from './detail/DetailHeader';
+import { DetailHeader } from './detail/DetailHeader';
 import { DetailInfoBlock } from './detail/DetailInfo';
 import { DetailActions, RatingPanel } from './detail/DetailActions';
 import { DetailTags } from './detail/DetailTags';
@@ -122,15 +122,6 @@ export struct GalleryDetailScene {
           onBack: this.onBack
         })
 
-        if (this.statusText.length > 0) {
-          Text(uiStatusText(this.statusText))
-            .fontSize(12)
-            .fontColor(themeSuccessText())
-            .width('100%')
-            .padding({ left: 14, right: 14, top: 6, bottom: 6 })
-            .backgroundColor(themeSuccessBackground())
-        }
-
         List({ space: 0, scroller: this.detailScroller }) {
           ListItem() {
             DetailHeader({
@@ -141,16 +132,6 @@ export struct GalleryDetailScene {
             })
           }
           .reuseId('detail-header')
-          if (this.statusText.length > 0 && (!this.isDetailLoaded || this.statusText.indexOf('failed') >= 0 ||
-            this.statusText.indexOf('Failed') >= 0)) {
-            ListItem() {
-              DetailLoadStatus({
-                statusText: this.statusText,
-                isError: this.statusText.indexOf('failed') >= 0 || this.statusText.indexOf('Failed') >= 0
-              })
-            }
-            .reuseId('detail-status')
-          }
           ListItem() {
             DetailInfoBlock({ detail: this.detail, requestUrl: this.requestUrl, isDetailLoaded: this.isDetailLoaded })
           }
@@ -199,6 +180,7 @@ export struct GalleryDetailScene {
         .width('100%')
         .height('100%')
         .layoutWeight(1)
+        .backgroundColor(themePageBackground())
         .cachedCount(3)
         .onAppear(() => {
           if (this.initialDetailScrollOffset > 0) {
@@ -214,6 +196,7 @@ export struct GalleryDetailScene {
       }
       .width('100%')
       .height('100%')
+      .backgroundColor(themePageBackground())
 
       if (this.showRatingDialog) {
         Column() {
@@ -241,6 +224,7 @@ export struct GalleryDetailScene {
     }
     .width('100%')
     .height('100%')
+    .backgroundColor(themePageBackground())
   }
 }
 

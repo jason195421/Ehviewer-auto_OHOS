@@ -754,10 +754,15 @@ export function zhText(text: string): string {
     case 'Explanation dialog from the original privacy settings': return '原隐私设置中的说明对话框';
     case 'Save parse error body': return '保存解析错误正文';
     case 'Persist parser failures for debugging': return '保存解析失败内容用于调试';
-    case 'Save crash log': return '保存崩溃日志';
+    case 'Save crash log': return '保存日志';
     case 'Persist crash logs locally': return '在本地保存崩溃日志';
+    case 'Persist app errors and debug messages locally': return '在本地保存应用错误和调试信息';
     case 'Dump logcat': return '导出 logcat';
     case 'Android logcat equivalent needs Harmony logging export': return 'Android logcat 等价功能需要 Harmony 日志导出';
+    case 'Export log': return '导出日志';
+    case 'Save the local app log to a text file': return '将本地应用日志保存为文本文件';
+    case 'Clear saved log': return '清空已保存日志';
+    case 'Delete the local app log file': return '删除本地应用日志文件';
     case 'Clear download path cache': return '清除下载路径缓存';
     case 'Refresh cached file path and size lookups': return '刷新缓存的文件路径和大小查询';
     case 'Clear memory cache': return '清除内存缓存';
@@ -1342,6 +1347,14 @@ export function readerStartIndex(detail: GalleryDetail): number {
   return 0;
 }
 
+export async function readerStartIndexAsync(detail: GalleryDetail): Promise<number> {
+  const context = getAbilityContext();
+  if (context !== undefined) {
+    await ehHistoryStore.ensureLoaded(context).catch(() => {});
+  }
+  return readerStartIndex(detail);
+}
+
 export function downloadButtonText(gid: number): string {
   return ehDownloadStore.contains(gid) ? 'Queued' : 'Download';
 }
@@ -1837,8 +1850,9 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
   if (panel === SettingsPanel.Advanced) {
     const rows: SettingsRowItem[] = [
       optionSettingsRow('save_parse_error_body', 'Save parse error body', 'Persist parser failures for debugging', entries, ON_OFF_OPTIONS),
-      optionSettingsRow('save_crash_log', 'Save crash log', 'Persist crash logs locally', entries, ON_OFF_OPTIONS),
-      staticSettingsRow('dump_logcat', 'Dump logcat', 'Android logcat equivalent needs Harmony logging export', 'Info', 'action'),
+      optionSettingsRow('save_crash_log', 'Save crash log', 'Persist app errors and debug messages locally', entries, ON_OFF_OPTIONS),
+      staticSettingsRow('dump_logcat', 'Export log', 'Save the local app log to a text file', 'Export', 'action'),
+      staticSettingsRow('clear_app_log', 'Clear saved log', 'Delete the local app log file', 'Clear', 'action'),
       staticSettingsRow('clear_download_path_cache', 'Clear download path cache', 'Refresh cached file path and size lookups', 'Run', 'action'),
       staticSettingsRow('clear_memory_cache', 'Clear memory cache', 'Drop reader image and page caches', 'Run', 'action'),
       optionSettingsRow('read_cache_size', 'Read cache size', 'Reader cache budget', entries, ['40 MB', '80 MB', '160 MB', '320 MB', '640 MB']),

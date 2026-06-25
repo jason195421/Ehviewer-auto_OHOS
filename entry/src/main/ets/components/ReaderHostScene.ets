@@ -15,6 +15,7 @@ import {
   readerPageReferer,
   readerPreloadCount,
   readerStartIndex,
+  readerStartIndexAsync,
   saveGalleryReadPosition,
   setReaderActiveBackHandler
 } from '../shared/EhShared';
@@ -68,7 +69,8 @@ export struct ReaderHostScene {
     this.detailRequestUrl = session.detailRequestUrl;
     this.listRequestUrl = session.listRequestUrl;
     this.site = session.site;
-    this.pageIndex = session.pageIndex >= 0 ? session.pageIndex : readerStartIndex(this.detail);
+    const usesSavedPosition = session.pageIndex < 0;
+    this.pageIndex = usesSavedPosition ? readerStartIndex(this.detail) : session.pageIndex;
     this.seedReaderPreviewCache(this.detail.previewSet);
     this.page = this.isPageForIndex(session.page, this.pageIndex) ? cloneGalleryPage(session.page) : createEmptyPage();
     if (this.page.imageUrl.length > 0 || this.page.pageUrl.length > 0 ||
@@ -76,6 +78,19 @@ export struct ReaderHostScene {
       this.setReaderPage(this.pageIndex, this.page);
     }
     this.renderVersion++;
+    if (usesSavedPosition) {
+      readerStartIndexAsync(this.detail).then((index: number) => {
+        if (index !== this.pageIndex) {
+          this.pageIndex = index;
+          this.page = createEmptyPage();
+          this.renderVersion++;
+        }
+        this.loadReaderPageByIndex(index);
+      }).catch(() => {
+        this.loadReaderPageByIndex(this.pageIndex);
+      });
+      return;
+    }
     if (this.page.imageUrl.length === 0 &&
       (this.page.cachedImagePath === undefined || this.page.cachedImagePath.length === 0)) {
       this.loadReaderPageByIndex(this.pageIndex);

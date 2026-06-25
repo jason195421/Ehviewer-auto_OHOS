@@ -22,6 +22,7 @@ import { CacheClearResult, readerImageCache } from '../services/ReaderImageCache
 import { FilterRule, FILTER_MODE_TITLE, ehFilterStore } from '../services/EhFilterStore';
 import { applyAppChromeImmersiveMode } from '../services/EhWindowImmersive';
 import { applyWindowPrivacyMode } from '../services/EhWindowPrivacy';
+import { ehAppLog } from '../services/EhAppLog';
 import {
   EH_APP_VERSION_CODE,
   EH_APP_VERSION_NAME,
@@ -488,6 +489,10 @@ export struct SettingsScene {
       this.clearMemoryCache();
       return true;
     }
+    if (key === 'clear_app_log') {
+      this.clearAppLog();
+      return true;
+    }
     if (key === 'about_analytics') {
       this.statusText = 'Analytics is only recorded when enabled. The HarmonyOS port currently keeps this as a local preference.';
       return true;
@@ -530,7 +535,7 @@ export struct SettingsScene {
       return true;
     }
     if (key === 'dump_logcat') {
-      this.statusText = 'Android logcat export has no direct HarmonyOS equivalent yet. Crash/log persistence settings are available above.';
+      this.exportAppLog();
       return true;
     }
     if (key === 'u_config') {
@@ -679,6 +684,55 @@ export struct SettingsScene {
     }).catch((error: Error) => {
       this.statusText = 'Export load failed: ' + error.message;
     });
+  }
+
+  private exportAppLog(): void {
+    const context = getAbilityContext();
+    if (context === undefined) {
+      this.statusText = 'Export log needs an ability context';
+      return;
+    }
+    const now = new Date();
+    const stamp = now.getFullYear().toString() +
+      padTwo(now.getMonth() + 1) + padTwo(now.getDate()) + '_' +
+      padTwo(now.getHours()) + padTwo(now.getMinutes()) + padTwo(now.getSeconds());
+    const fileName = 'ehviewer_log_' + stamp + '.txt';
+    const content = ehAppLog.read(context);
+    if (content.length === 0) {
+      this.statusText = 'No saved log yet';
+      return;
+    }
+
+    const saveOptions = new picker.DocumentSaveOptions();
+    saveOptions.newFileNames = [fileName];
+    saveOptions.fileSuffixChoices = ['Text file|.txt'];
+    const documentPicker = new picker.DocumentViewPicker(context);
+    documentPicker.save(saveOptions).then((uris: string[]) => {
+      if (uris.length === 0) {
+        this.statusText = 'Log export cancelled';
+        return;
+      }
+      try {
+        const file = fs.openSync(uris[0], fs.OpenMode.READ_WRITE | fs.OpenMode.TRUNC);
+        fs.writeSync(file.fd, content);
+        fs.closeSync(file.fd);
+        this.statusText = 'Log exported: ' + uris[0];
+      } catch (error) {
+        this.statusText = 'Log export failed: ' + String(error);
+      }
+    }).catch((error: Error) => {
+      this.statusText = 'Log picker failed: ' + error.message;
+    });
+  }
+
+  private clearAppLog(): void {
+    const context = getAbilityContext();
+    if (context === undefined) {
+      this.statusText = 'Clear log needs an ability context';
+      return;
+    }
+    ehAppLog.clear(context);
+    this.statusText = 'Saved log cleared';
   }
 
   private importData(): void {

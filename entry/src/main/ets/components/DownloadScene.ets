@@ -11,6 +11,7 @@ import { galleryPageCache } from '../services/GalleryPageCache';
 import { mergeGalleryPreviewSets } from '../services/GalleryPreviewLoader';
 import { ImageDownloadProgress, readerImageCache } from '../services/ReaderImageCache';
 import { createReaderSessionState, readerSessionStore } from '../services/ReaderSessionStore';
+import { ehAppLog } from '../services/EhAppLog';
 import {
   applyAppChromeImmersiveMode,
   enterEmbeddedReaderFullscreen,
@@ -45,6 +46,7 @@ import {
   nextDownloadStatusFilter,
   readerPageReferer,
   readerPreloadCount,
+  readerStartIndexAsync,
   saveGalleryReadPosition,
   uiText,
   uiValue
@@ -727,6 +729,7 @@ export struct DownloadScene {
       .then((result) => {
         if (!result.ok || result.detail === null) {
           this.detailStatus = 'Detail load failed: ' + result.message;
+          ehAppLog.warn(getAbilityContext(), 'DownloadDetail', this.detailStatus);
           this.detailRenderVersion++;
           return;
         }
@@ -739,6 +742,7 @@ export struct DownloadScene {
         this.detailRenderVersion++;
       }).catch((error: Error) => {
         this.detailStatus = 'Detail load failed: ' + error.message;
+        ehAppLog.error(getAbilityContext(), 'DownloadDetail', this.detailStatus);
         this.detailRenderVersion++;
       });
   }
@@ -790,7 +794,15 @@ export struct DownloadScene {
 
   private readDetail(): void {
     if (this.detailItem !== null) {
-      this.openDownloadedItem(this.detailItem);
+      readerStartIndexAsync(this.detail).then((index: number) => {
+        if (this.detailItem !== null) {
+          this.openDownloadedItemAt(this.detailItem, index);
+        }
+      }).catch(() => {
+        if (this.detailItem !== null) {
+          this.openDownloadedItem(this.detailItem);
+        }
+      });
     }
   }
 
@@ -902,6 +914,7 @@ export struct DownloadScene {
       ehDownloadStore.setState(item.gid, DownloadState.Failed);
       ehDownloadStore.setTransfer(item.gid, 0, 0);
       this.statusText = 'Download failed: ' + String(error);
+      ehAppLog.error(getAbilityContext(), 'Download', this.statusText);
       this.persistDownloads();
     }
   }

@@ -16,6 +16,7 @@ import {
 } from '../shared/EhShared';
 import { EhUrl } from './EhUrl';
 import { mergeGalleryPreviewSets } from './GalleryPreviewLoader';
+import { ehAppLog } from './EhAppLog';
 
 const DOWNLOAD_PAGE_PROGRESS_SCALE: number = 1000;
 const DOWNLOAD_PROGRESS_UPDATE_INTERVAL_MS: number = 250;
@@ -224,6 +225,7 @@ export class EhDownloadManager {
       ehDownloadStore.setState(item.gid, DownloadState.Failed);
       ehDownloadStore.setTransfer(item.gid, 0, 0);
       this.publishStatus('Download failed: ' + String(error));
+      ehAppLog.error(context, 'DownloadManager', 'Download failed: ' + String(error));
       this.saveDownloads(context);
     }
   }

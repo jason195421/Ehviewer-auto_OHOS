@@ -25,6 +25,7 @@ import { DetailPreviewPager, mergeGalleryPreviewSets, seedPreviewMap } from '../
 import { createReaderSessionState, readerSessionStore } from '../services/ReaderSessionStore';
 import { ehSettingsStore } from '../services/EhSettingsStore';
 import { ehDownloadManager } from '../services/EhDownloadManager';
+import { ehAppLog } from '../services/EhAppLog';
 import {
   applyAppChromeImmersiveMode,
   enterEmbeddedReaderFullscreen,
@@ -84,6 +85,7 @@ import {
   saveGalleryToHistory,
   saveGalleryReadPosition,
   readerStartIndex,
+  readerStartIndexAsync,
   downloadButtonText,
   toggleGalleryDownload,
   listModeForRoute,
@@ -914,6 +916,7 @@ export struct GalleryListScene {
         this.detailRequestUrl = result.url;
         if (!result.ok || result.detail === null) {
           this.detailStatus = 'Detail load failed: ' + result.message;
+          ehAppLog.warn(getAbilityContext(), 'GalleryDetail', this.detailStatus);
           this.renderVersion++;
           return;
         }
@@ -931,6 +934,7 @@ export struct GalleryListScene {
       })
       .catch((error: Error) => {
         this.detailStatus = 'Detail load failed: ' + error.message;
+        ehAppLog.error(getAbilityContext(), 'GalleryDetail', this.detailStatus);
         this.renderVersion++;
       });
   }
@@ -1164,7 +1168,11 @@ export struct GalleryListScene {
       this.detailStatus = 'Read is waiting for preview pages';
       return;
     }
-    this.loadReaderPageByIndex(readerStartIndex(this.detail));
+    readerStartIndexAsync(this.detail).then((index: number) => {
+      this.loadReaderPageByIndex(index);
+    }).catch(() => {
+      this.loadReaderPageByIndex(readerStartIndex(this.detail));
+    });
   }
 
   private persistReaderSession(): void {

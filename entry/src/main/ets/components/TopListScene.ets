@@ -7,6 +7,7 @@ import { galleryPageCache } from '../services/GalleryPageCache';
 import { DetailPreviewPager, mergeGalleryPreviewSets, seedPreviewMap } from '../services/GalleryPreviewLoader';
 import { createReaderSessionState, readerSessionStore } from '../services/ReaderSessionStore';
 import { ehDownloadManager } from '../services/EhDownloadManager';
+import { ehAppLog } from '../services/EhAppLog';
 import { applyAppChromeImmersiveMode, enterEmbeddedReaderFullscreen, leaveEmbeddedReaderFullscreen } from '../services/EhWindowImmersive';
 import { LANGUAGE_REVISION_KEY, nextFloatingToolbarOffset } from '../shared/EhShared';
 import {
@@ -19,7 +20,7 @@ import {
   themeTransparentColor
 } from '../shared/EhTheme';
 import { ArrayDataSource } from '../shared/ListDataSource';
-import { STATUS_BAR_HEIGHT_KEY, setActiveBackHandler, createEmptyDetail, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, downloadButtonText, toggleGalleryDownload, readerPageReferer, cacheReaderImageForPage, readerPreloadCount, topListChipColor } from '../shared/EhShared';
+import { STATUS_BAR_HEIGHT_KEY, setActiveBackHandler, createEmptyDetail, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, readerStartIndexAsync, downloadButtonText, toggleGalleryDownload, readerPageReferer, cacheReaderImageForPage, readerPreloadCount, topListChipColor } from '../shared/EhShared';
 import { GalleryDetailOverlayScene, GalleryListScene, GalleryListStateView, ReaderPageState, ReaderScene } from './GalleryScenes';
 import { FloatingToolbarHost } from './NavigationComponents';
 
@@ -215,6 +216,7 @@ export struct TopListScene {
       this.detailRequestUrl = result.url;
       if (!result.ok || result.detail === null) {
         this.detailStatus = 'Detail load failed: ' + result.message;
+        ehAppLog.warn(getAbilityContext(), 'TopListDetail', this.detailStatus);
         this.renderVersion++;
         return;
       }
@@ -230,6 +232,7 @@ export struct TopListScene {
       this.prewarmReader();
     }).catch((error: Error) => {
       this.detailStatus = 'Detail load failed: ' + error.message;
+      ehAppLog.error(getAbilityContext(), 'TopListDetail', this.detailStatus);
       this.renderVersion++;
     });
   }
@@ -447,7 +450,11 @@ export struct TopListScene {
       this.detailStatus = 'Read is waiting for preview pages';
       return;
     }
-    this.loadReaderPageByIndex(readerStartIndex(this.detail));
+    readerStartIndexAsync(this.detail).then((index: number) => {
+      this.loadReaderPageByIndex(index);
+    }).catch(() => {
+      this.loadReaderPageByIndex(readerStartIndex(this.detail));
+    });
   }
 
   private persistReaderSession(site: GallerySite): void {

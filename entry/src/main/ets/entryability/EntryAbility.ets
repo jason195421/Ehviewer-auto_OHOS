@@ -5,6 +5,7 @@ import { userAuth } from '@kit.UserAuthenticationKit';
 import { MAIN_WINDOW_KEY, prepareAppChromeBeforeContent, rememberMainWindow } from '../services/EhWindowImmersive';
 import { applyWindowPrivacyMode, WINDOW_PRIVACY_STATUS_KEY } from '../services/EhWindowPrivacy';
 import { ehSettingsStore } from '../services/EhSettingsStore';
+import { ehAppLog } from '../services/EhAppLog';
 
 const SETTINGS_PREF_NAME: string = 'ehviewer_settings';
 const SETTINGS_VALUES_KEY: string = 'values';
@@ -59,6 +60,7 @@ export default class EntryAbility extends UIAbility {
     stage.loadContent('pages/Index', (error) => {
       if (error.code) {
         console.error(`Failed to load the main page. code=${error.code}, message=${error.message}`);
+        ehAppLog.error(this.context, 'EntryAbility', 'Failed to load main page: ' + error.message);
       }
     });
   }
