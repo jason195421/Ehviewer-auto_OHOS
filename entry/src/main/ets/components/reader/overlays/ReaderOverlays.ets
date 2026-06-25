@@ -22,14 +22,14 @@ import {
 
 @Component
 export struct ReaderInfoOverlay {
-  showProgress: boolean = true;
-  showClock: boolean = true;
-  showBattery: boolean = true;
-  progressText: string = '';
-  clockText: string = '';
-  batteryText: string = '';
-  top: number = 0;
-  right: number = 12;
+  @Prop showProgress: boolean = true;
+  @Prop showClock: boolean = true;
+  @Prop showBattery: boolean = true;
+  @Prop progressText: string = '';
+  @Prop clockText: string = '';
+  @Prop batteryText: string = '';
+  @Prop top: number = 0;
+  @Prop right: number = 12;
 
   build() {
     Row({ space: 6 }) {
@@ -592,8 +592,8 @@ export struct ReaderSettingsMenuOverlay {
         .width('100%')
         .layoutWeight(1)
       }
-      .width('92%')
-      .constraintSize({ maxWidth: 520, maxHeight: '76%' })
+      .width('70%')
+      .constraintSize({ maxWidth: 400, maxHeight: '70%' })
       .backgroundColor('#EE111827')
       .borderRadius(12)
       .clip(true)
