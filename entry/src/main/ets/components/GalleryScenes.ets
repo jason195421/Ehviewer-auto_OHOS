@@ -755,6 +755,9 @@ export struct GalleryListScene {
   }
 
   private requestCategoryForMode(mode: ListMode): number {
+    if (this.isSearchResultScene && !this.searchFilterEnabled && this.searchSupportsAdvanced(mode)) {
+      return ALL_CATEGORY;
+    }
     if (this.isSearchResultScene && this.searchAdvancedPanelOpened && this.searchSupportsAdvanced(mode)) {
       return this.searchCategory === GalleryCategory.None ? ALL_CATEGORY : this.searchCategory;
     }
