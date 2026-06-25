@@ -720,7 +720,6 @@ export struct GalleryListScene {
     if (this.isSearchResultScene && !this.searchFilterEnabled && this.searchSupportsAdvanced(builder.mode)) {
       const baseFlags = builder.advanceSearch === -1 ? 0 : builder.advanceSearch;
       builder.advanceSearch = baseFlags | ACCOUNT_DEFAULT_FILTER_DISABLE_FLAGS;
-      builder.includeAdvSearchParam = false;
     }
     if (!this.isSearchResultScene && !this.includeAccountUConfig() && this.searchSupportsAdvanced(builder.mode)) {
       builder.advanceSearch =
@@ -731,7 +730,7 @@ export struct GalleryListScene {
   }
 
   private includeAccountUConfig(): boolean {
-    return this.isSearchResultScene || this.accountFilterEnabled;
+    return !this.isSearchResultScene && this.accountFilterEnabled;
   }
 
   private searchModeForRoute(routeMode: ListMode, keyword: string): ListMode {
