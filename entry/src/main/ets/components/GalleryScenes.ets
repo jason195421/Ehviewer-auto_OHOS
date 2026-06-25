@@ -730,7 +730,7 @@ export struct GalleryListScene {
   }
 
   private includeAccountUConfig(): boolean {
-    return !this.isSearchResultScene && this.accountFilterEnabled;
+    return this.isSearchResultScene || this.accountFilterEnabled;
   }
 
   private searchModeForRoute(routeMode: ListMode, keyword: string): ListMode {
