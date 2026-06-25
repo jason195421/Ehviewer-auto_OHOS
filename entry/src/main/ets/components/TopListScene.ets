@@ -20,7 +20,7 @@ import {
   themeTransparentColor
 } from '../shared/EhTheme';
 import { ArrayDataSource } from '../shared/ListDataSource';
-import { STATUS_BAR_HEIGHT_KEY, setActiveBackHandler, createEmptyDetail, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, readerStartIndexAsync, downloadButtonText, toggleGalleryDownload, readerPageReferer, cacheReaderImageForPage, readerPreloadCount, topListChipColor } from '../shared/EhShared';
+import { STATUS_BAR_HEIGHT_KEY, setActiveBackHandler, createEmptyDetail, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, readerStartIndexAsync, downloadButtonText, toggleGalleryDownload, readerPageReferer, cacheReaderImageForPage, readerPreloadCount, topListChipColor, currentGallerySite } from '../shared/EhShared';
 import { GalleryDetailOverlayScene, GalleryListScene, GalleryListStateView, ReaderPageState, ReaderScene } from './GalleryScenes';
 import { FloatingToolbarHost } from './NavigationComponents';
 
@@ -62,6 +62,7 @@ export struct TopListScene {
   @State showDetail: boolean = false;
   @State showReader: boolean = false;
   @State showComments: boolean = false;
+  @State restoreDetailWithFade: boolean = false;
   @State detail: GalleryDetail = createEmptyDetail();
   @State detailStatus: string = 'Tap a ranking item to load detail';
   @State detailRequestUrl: string = '';
@@ -131,6 +132,10 @@ export struct TopListScene {
     return trimmedNamespace + ':' + tagQuery;
   }
 
+  private gallerySite(): GallerySite {
+    return currentGallerySite();
+  }
+
   private loadTopList(): void {
     this.statusText = 'Loading top lists...';
     this.renderVersion++;
@@ -196,6 +201,7 @@ export struct TopListScene {
       return;
     }
 
+    this.restoreDetailWithFade = false;
     this.showDetail = true;
     this.detailPreviewPager.start();
     const loadingDetail = createEmptyDetail();
@@ -212,7 +218,8 @@ export struct TopListScene {
     this.favoriteBusy = false;
     this.renderVersion++;
 
-    this.client.loadGalleryDetail(gid, item.token, 0, GallerySite.E, this.requestUrl).then((result: GalleryDetailLoadResult) => {
+    const site = this.gallerySite();
+    this.client.loadGalleryDetail(gid, item.token, 0, site, this.requestUrl).then((result: GalleryDetailLoadResult) => {
       this.detailRequestUrl = result.url;
       if (!result.ok || result.detail === null) {
         this.detailStatus = 'Detail load failed: ' + result.message;
@@ -238,6 +245,7 @@ export struct TopListScene {
   }
 
   private closeDetail(): void {
+    this.restoreDetailWithFade = false;
     this.showDetail = false;
     this.showReader = false;
     this.showComments = false;
@@ -269,6 +277,7 @@ export struct TopListScene {
   }
 
   private closeReader(): void {
+    this.restoreDetailWithFade = this.showDetail;
     this.showReader = false;
     this.readerStatus = 'Reader is ready';
     this.readerPage = createEmptyPage();
@@ -277,6 +286,15 @@ export struct TopListScene {
     leaveEmbeddedReaderFullscreen();
     this.restoreBackHandler();
     this.renderVersion++;
+    this.clearRestoreDetailFadeLater();
+  }
+
+  private clearRestoreDetailFadeLater(): void {
+    setTimeout(() => {
+      if (!this.showReader) {
+        this.restoreDetailWithFade = false;
+      }
+    }, 260);
   }
 
   private restoreBackHandler(): void {
@@ -298,7 +316,8 @@ export struct TopListScene {
     this.readerPage = createReaderLoadingPage(preview.pageUrl);
     this.setReaderPage(preview.index, this.readerPage);
     this.renderVersion++;
-    this.openReaderAbility(GallerySite.E);
+    const site = this.gallerySite();
+    this.openReaderAbility(site);
 
     const cached = galleryPageCache.get(preview.pageUrl);
     if (cached !== null) {
@@ -308,12 +327,12 @@ export struct TopListScene {
       this.renderVersion++;
       this.cacheReaderImage(preview.index, cached);
       this.preloadReaderPages(preview.index);
-      this.persistReaderSession(GallerySite.E);
+      this.persistReaderSession(site);
       return;
     }
 
-    this.client.loadGalleryPage(preview.pageUrl, GallerySite.E,
-      readerPageReferer(this.detailRequestUrl, this.detail.previewSet, preview.index, GallerySite.E)).then((result: GalleryPageLoadResult) => {
+    this.client.loadGalleryPage(preview.pageUrl, site,
+      readerPageReferer(this.detailRequestUrl, this.detail.previewSet, preview.index, site)).then((result: GalleryPageLoadResult) => {
       if (!result.ok || result.page === null) {
         this.readerStatus = 'Page load failed: ' + result.message;
         return;
@@ -332,11 +351,11 @@ export struct TopListScene {
       this.renderVersion++;
       this.cacheReaderImage(preview.index, result.page);
       this.preloadReaderPages(preview.index);
-      this.persistReaderSession(GallerySite.E);
+      this.persistReaderSession(site);
     }).catch((error: Error) => {
       this.readerStatus = 'Page load failed: ' + error.message;
       this.renderVersion++;
-      this.persistReaderSession(GallerySite.E);
+      this.persistReaderSession(site);
     });
   }
 
@@ -378,8 +397,9 @@ export struct TopListScene {
         }
 
         try {
-          const result = await this.client.loadGalleryPage(preview.pageUrl, GallerySite.E,
-            readerPageReferer(this.detailRequestUrl, this.detail.previewSet, nextIndex, GallerySite.E));
+          const site = this.gallerySite();
+          const result = await this.client.loadGalleryPage(preview.pageUrl, site,
+            readerPageReferer(this.detailRequestUrl, this.detail.previewSet, nextIndex, site));
           if (result.ok && result.page !== null) {
             const cacheUrl = result.page.pageUrl.length > 0 ? result.page.pageUrl : preview.pageUrl;
             galleryPageCache.put(cacheUrl, result.page);
@@ -407,8 +427,9 @@ export struct TopListScene {
     }
 
     try {
-      const result = await this.client.loadGalleryPage(preview.pageUrl, GallerySite.E,
-        readerPageReferer(this.detailRequestUrl, this.detail.previewSet, 0, GallerySite.E));
+      const site = this.gallerySite();
+      const result = await this.client.loadGalleryPage(preview.pageUrl, site,
+        readerPageReferer(this.detailRequestUrl, this.detail.previewSet, 0, site));
       if (result.ok && result.page !== null) {
         const cacheUrl = result.page.pageUrl.length > 0 ? result.page.pageUrl : preview.pageUrl;
         galleryPageCache.put(cacheUrl, result.page);
@@ -437,7 +458,7 @@ export struct TopListScene {
     this.readerPage = createReaderLoadingPage('');
     this.setReaderPage(index, this.readerPage);
     this.renderVersion++;
-    this.openReaderAbility(GallerySite.E);
+    this.openReaderAbility(this.gallerySite());
     this.ensureReaderPreview(index, false).then((resolved: GalleryPreview | null) => {
       if (resolved !== null && this.readerPreviewIndex === index) {
         this.loadReaderPage(resolved);
@@ -557,8 +578,9 @@ export struct TopListScene {
     if (pending !== undefined) {
       return pending;
     }
+    const site = this.gallerySite();
     const request = this.client.loadGalleryDetail(this.detail.gid, this.detail.token, previewPageIndex,
-      GallerySite.E, this.detailRequestUrl).then((result: GalleryDetailLoadResult) => {
+      site, this.detailRequestUrl).then((result: GalleryDetailLoadResult) => {
       this.readerPreviewPageRequests.delete(previewPageIndex);
       if (!result.ok || result.detail === null) {
         if (!silent) {
@@ -585,7 +607,7 @@ export struct TopListScene {
     const referer = this.detailRequestUrl.length > 0 ? this.detailRequestUrl : this.requestUrl;
     await this.detailPreviewPager.loadNext({
       client: this.client,
-      site: GallerySite.E,
+      site: this.gallerySite(),
       referer: referer,
       getDetail: () => this.detail,
       isVisible: () => this.showDetail,
@@ -631,7 +653,7 @@ export struct TopListScene {
     this.applyDetailFavoriteState(this.optimisticFavorite);
     this.renderVersion++;
     this.client.toggleFavorite(this.detail.gid, this.detail.token, wasFavorited,
-      GallerySite.E).then((result: ToggleFavoriteResult) => {
+      this.gallerySite()).then((result: ToggleFavoriteResult) => {
       this.detailStatus = result.message;
       if (result.ok) {
         this.optimisticFavorite = result.nowFavorited;
@@ -664,7 +686,7 @@ export struct TopListScene {
       this.renderVersion++;
       return;
     }
-    const url = EhUrl.getGalleryDetailUrl(this.detail.gid, this.detail.token, 0, false, GallerySite.E);
+    const url = EhUrl.getGalleryDetailUrl(this.detail.gid, this.detail.token, 0, false, this.gallerySite());
     this.copyDetailLink(url, 'Gallery URL');
   }
 
@@ -677,7 +699,7 @@ export struct TopListScene {
     this.detailStatus = 'Submitting rating...';
     this.renderVersion++;
     this.client.rateGallery(this.detail.gid, this.detail.token, this.detail.apiUid, this.detail.apiKey, rating,
-      GallerySite.E).then((result: RateGalleryResult) => {
+      this.gallerySite()).then((result: RateGalleryResult) => {
       this.detailStatus = result.message;
       if (result.ok) {
         const nextDetail = cloneGalleryDetail(this.detail);
@@ -786,8 +808,9 @@ export struct TopListScene {
           this.closeTagSearch();
         }
       })
-        .transition(TransitionEffect.move(TransitionEdge.END)
-          .animation({ duration: 300, curve: Curve.EaseOut }))
+        .transition(this.restoreDetailWithFade ?
+          TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }) :
+          TransitionEffect.move(TransitionEdge.END).animation({ duration: 300, curve: Curve.EaseOut }))
     } else if (this.showReader) {
       ReaderScene({
         renderVersion: this.renderVersion,

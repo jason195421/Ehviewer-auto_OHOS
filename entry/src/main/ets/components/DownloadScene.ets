@@ -136,6 +136,7 @@ export struct DownloadScene {
   @State detailRenderVersion: number = 0;
   @State showReader: boolean = false;
   @State showComments: boolean = false;
+  @State restoreDetailWithFade: boolean = false;
   @State localReaderDetail: GalleryDetail = createEmptyDetail();
   @State localReaderPage: GalleryPage = createEmptyPage();
   @State localReaderPages: ReaderPageState[] = [];
@@ -719,6 +720,7 @@ export struct DownloadScene {
 
   private openDetail(item: DownloadInfo): void {
     this.detailItem = item;
+    this.restoreDetailWithFade = false;
     this.showDetail = true;
     this.detail = createDetailFromGallery(item);
     this.detailStatus = 'Loading gallery detail...';
@@ -748,6 +750,7 @@ export struct DownloadScene {
   }
 
   private closeDetail(): void {
+    this.restoreDetailWithFade = false;
     this.showDetail = false;
     this.showComments = false;
     this.detailStatus = '';
@@ -1208,10 +1211,20 @@ export struct DownloadScene {
   }
 
   private closeLocalReader(): void {
+    this.restoreDetailWithFade = this.showDetail;
     this.showReader = false;
     this.localReaderStatus = 'Page loaded from downloads';
     leaveEmbeddedReaderFullscreen();
     this.restoreBackHandler();
+    this.clearRestoreDetailFadeLater();
+  }
+
+  private clearRestoreDetailFadeLater(): void {
+    setTimeout(() => {
+      if (!this.showReader) {
+        this.restoreDetailWithFade = false;
+      }
+    }, 260);
   }
 
   private restoreBackHandler(): void {
@@ -1581,8 +1594,9 @@ export struct DownloadScene {
           this.closeTagSearch();
         }
       })
-        .transition(TransitionEffect.move(TransitionEdge.END)
-          .animation({ duration: 300, curve: Curve.EaseOut }))
+        .transition(this.restoreDetailWithFade ?
+          TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }) :
+          TransitionEffect.move(TransitionEdge.END).animation({ duration: 300, curve: Curve.EaseOut }))
     } else if (this.showReader) {
       ReaderScene({
         renderVersion: this.localReaderRenderVersion,

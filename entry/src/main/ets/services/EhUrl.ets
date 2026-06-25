@@ -126,7 +126,7 @@ export class ListUrlBuilder {
       case ListMode.Filter:
         return buildUrl(EhUrl.getHost(site), this.buildFilterParams());
       case ListMode.WhatsHot:
-        return EhUrl.getPopularUrl(site);
+        return buildUrl(EhUrl.getPopularUrl(site), this.buildPopularParams());
       case ListMode.ImageSearch:
         return EhUrl.getImageSearchUrl(site);
       case ListMode.Subscription:
@@ -161,6 +161,18 @@ export class ListUrlBuilder {
       params.push({ key: 'page', value: this.pageIndex.toString() });
     }
     params.push({ key: 'f_search', value: this.keyword });
+    return params;
+  }
+
+  private buildPopularParams(): QueryParam[] {
+    const params: QueryParam[] = [];
+    if (this.category !== GalleryCategory.None) {
+      params.push({ key: 'f_cats', value: ((~this.category) & ALL_CATEGORY).toString() });
+    }
+    if (this.pageIndex !== 0) {
+      params.push({ key: 'page', value: this.pageIndex.toString() });
+    }
+    this.appendAdvanceParams(params);
     return params;
   }
 

@@ -294,6 +294,7 @@ export struct GalleryListScene {
   @State showDetail: boolean = false;
   @State showReader: boolean = false;
   @State showComments: boolean = false;
+  @State restoreDetailWithFade: boolean = false;
   @State detail: GalleryDetail = createEmptyDetail();
   @State detailStatus: string = 'Tap a gallery row to load detail';
   @State detailRequestUrl: string = '';
@@ -768,7 +769,8 @@ export struct GalleryListScene {
   }
 
   private searchSupportsAdvanced(mode: ListMode): boolean {
-    return mode === ListMode.Normal || mode === ListMode.Subscription || mode === ListMode.Tag;
+    return mode === ListMode.Normal || mode === ListMode.Subscription || mode === ListMode.Tag ||
+      mode === ListMode.WhatsHot;
   }
 
   private applySearch(): void {
@@ -898,6 +900,7 @@ export struct GalleryListScene {
   }
 
   private loadDetail(gallery: GalleryInfo): void {
+    this.restoreDetailWithFade = false;
     this.showDetail = true;
     this.detailPreviewPager.start();
     this.detail = createDetailFromGallery(gallery);
@@ -939,6 +942,7 @@ export struct GalleryListScene {
   }
 
   private closeDetail(): void {
+    this.restoreDetailWithFade = false;
     this.showDetail = false;
     this.showReader = false;
     this.showComments = false;
@@ -970,6 +974,7 @@ export struct GalleryListScene {
   }
 
   private closeReader(): void {
+    this.restoreDetailWithFade = this.showDetail;
     this.showReader = false;
     this.readerStatus = 'Reader is ready';
     this.readerPage = createEmptyPage();
@@ -978,6 +983,15 @@ export struct GalleryListScene {
     leaveEmbeddedReaderFullscreen();
     this.restoreBackHandler();
     this.renderVersion++;
+    this.clearRestoreDetailFadeLater();
+  }
+
+  private clearRestoreDetailFadeLater(): void {
+    setTimeout(() => {
+      if (!this.showReader) {
+        this.restoreDetailWithFade = false;
+      }
+    }, 260);
   }
 
   private restoreBackHandler(): void {
@@ -1479,6 +1493,37 @@ export struct GalleryListScene {
           .transition(TransitionEffect.asymmetric(
             TransitionEffect.move(TransitionEdge.END).animation({ duration: 260, curve: Curve.EaseOut }),
             TransitionEffect.move(TransitionEdge.END).animation({ duration: 220, curve: Curve.EaseIn })))
+      } else if (this.showReader) {
+        ReaderScene({
+          renderVersion: this.renderVersion,
+          page: this.readerPage,
+          readerPages: this.readerPages,
+          statusText: this.readerStatus,
+          pageIndex: this.readerPreviewIndex,
+          totalPages: this.readerTotalPages(),
+          onBack: () => {
+            this.closeReader();
+          },
+          onPrev: () => {
+            this.loadReaderPageByIndex(this.readerPreviewIndex - 1);
+          },
+          onNext: () => {
+            this.loadReaderPageByIndex(this.readerPreviewIndex + 1);
+          },
+          onJump: (index: number) => {
+            this.loadReaderPageByIndex(index);
+          },
+          onRetry: () => {
+            this.loadReaderPageByIndex(this.readerPreviewIndex);
+          },
+          onRefreshPage: (index: number) => {
+            this.loadReaderPageByIndex(index);
+          }
+        })
+          .width('100%')
+          .height('100%')
+          .transition(TransitionEffect.move(TransitionEdge.BOTTOM)
+            .animation({ duration: 300, curve: Curve.EaseOut }))
       } else {
         Stack({ alignContent: Alignment.TopStart }) {
           GalleryListContent({
@@ -1613,7 +1658,7 @@ export struct GalleryListScene {
             }
           })
 
-          if (this.showDetail && !this.showReader) {
+          if (this.showDetail) {
             GalleryDetailOverlayScene({
               renderVersion: this.renderVersion,
               showComments: this.showComments,
@@ -1669,41 +1714,9 @@ export struct GalleryListScene {
             })
               .width('100%')
               .height('100%')
-              .transition(TransitionEffect.move(TransitionEdge.END)
-                .animation({ duration: 300, curve: Curve.EaseOut }))
-          }
-
-          if (this.showReader) {
-            ReaderScene({
-              renderVersion: this.renderVersion,
-              page: this.readerPage,
-              readerPages: this.readerPages,
-              statusText: this.readerStatus,
-              pageIndex: this.readerPreviewIndex,
-              totalPages: this.readerTotalPages(),
-              onBack: () => {
-                this.closeReader();
-              },
-              onPrev: () => {
-                this.loadReaderPageByIndex(this.readerPreviewIndex - 1);
-              },
-              onNext: () => {
-                this.loadReaderPageByIndex(this.readerPreviewIndex + 1);
-              },
-              onJump: (index: number) => {
-                this.loadReaderPageByIndex(index);
-              },
-              onRetry: () => {
-                this.loadReaderPageByIndex(this.readerPreviewIndex);
-              },
-              onRefreshPage: (index: number) => {
-                this.loadReaderPageByIndex(index);
-              }
-            })
-              .width('100%')
-              .height('100%')
-              .transition(TransitionEffect.move(TransitionEdge.BOTTOM)
-                .animation({ duration: 300, curve: Curve.EaseOut }))
+              .transition(this.restoreDetailWithFade ?
+                TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }) :
+                TransitionEffect.move(TransitionEdge.END).animation({ duration: 300, curve: Curve.EaseOut }))
           }
         }
         .width('100%')
