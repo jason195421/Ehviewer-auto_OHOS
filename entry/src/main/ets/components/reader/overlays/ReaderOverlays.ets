@@ -356,10 +356,12 @@ export struct ReaderSettingsMenuOverlay {
   @Prop menuShowBattery: boolean = true;
   @Prop menuReadingFullscreen: boolean = true;
   @Prop menuVolumePage: boolean = false;
-  @Prop menuCustomBrightness: boolean = false;
+  @Prop @Watch('onMenuCustomBrightnessChange') menuCustomBrightness: boolean = false;
   @Prop menuBrightnessLevel: string = '50%';
-  @Prop menuUltraDarkMode: boolean = false;
+  @Prop @Watch('onMenuUltraDarkModeChange') menuUltraDarkMode: boolean = false;
   @Prop menuUltraDarkBrightness: string = '50%';
+  @State customBrightnessVisible: boolean = false;
+  @State ultraDarkVisible: boolean = false;
   @Prop screenRotationOptions: string[] = [];
   @Prop pageScalingOptions: string[] = [];
   onDismiss: () => void = () => {};
@@ -379,6 +381,19 @@ export struct ReaderSettingsMenuOverlay {
   onBrightnessLevelChange: (value: string) => void = (_value: string) => {};
   onUltraDarkModeChange: (value: boolean) => void = (_value: boolean) => {};
   onUltraDarkBrightnessChange: (value: string) => void = (_value: string) => {};
+
+  aboutToAppear(): void {
+    this.customBrightnessVisible = this.menuCustomBrightness;
+    this.ultraDarkVisible = this.menuUltraDarkMode;
+  }
+
+  onMenuCustomBrightnessChange(): void {
+    this.customBrightnessVisible = this.menuCustomBrightness;
+  }
+
+  onMenuUltraDarkModeChange(): void {
+    this.ultraDarkVisible = this.menuUltraDarkMode;
+  }
 
   build() {
     Stack({ alignContent: Alignment.Center }) {
@@ -519,11 +534,14 @@ export struct ReaderSettingsMenuOverlay {
 
             ReaderMenuToggle({
               label: uiText('Custom brightness'),
-              value: this.menuCustomBrightness,
-              onChange: this.onCustomBrightnessChange
+              value: this.customBrightnessVisible,
+              onChange: (value: boolean) => {
+                this.customBrightnessVisible = value;
+                this.onCustomBrightnessChange(value);
+              }
             })
 
-            if (this.menuCustomBrightness) {
+            if (this.customBrightnessVisible) {
               ReaderMenuDivider()
               ReaderMenuSlider({
                 label: uiText('Screen lightness'),
@@ -543,11 +561,14 @@ export struct ReaderSettingsMenuOverlay {
 
             ReaderMenuToggle({
               label: uiText('Ultra dark mode'),
-              value: this.menuUltraDarkMode,
-              onChange: this.onUltraDarkModeChange
+              value: this.ultraDarkVisible,
+              onChange: (value: boolean) => {
+                this.ultraDarkVisible = value;
+                this.onUltraDarkModeChange(value);
+              }
             })
 
-            if (this.menuUltraDarkMode) {
+            if (this.ultraDarkVisible) {
               ReaderMenuDivider()
               ReaderMenuSlider({
                 label: uiText('Ultra dark brightness'),
