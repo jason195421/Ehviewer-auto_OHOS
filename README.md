@@ -9,6 +9,7 @@
 ## 下载
 
 请在 [GitHub Releases](https://github.com/suibianqwe/Ehviewer_OHOS/releases) 中下载最新的 `.hap` 安装包。
+推荐使用 [小白调试助手](https://github.com/likuai2010/auto-installer) 安装。
 
 当前版本：`0.3.58`
 
