@@ -802,6 +802,9 @@ export function zhText(text: string): string {
     case 'Check for updates': return '检查更新';
     case 'Check the latest GitHub release': return '检查 GitHub 最新发布版本';
     case 'New version available': return '发现新版本';
+    case 'New version found': return '发现新版本';
+    case 'No updates available': return '当前已是最新版本';
+    case 'Checking for updates...': return '正在检查更新...';
     case 'Current version': return '当前版本';
     case 'No release notes': return '暂无更新内容';
     case 'Update': return '更新';

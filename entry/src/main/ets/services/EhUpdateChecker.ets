@@ -19,6 +19,7 @@ export interface ReleaseInfo {
   name: string;
   body: string;
   htmlUrl: string;
+  hapDownloadUrl: string;
 }
 
 export interface UpdateCheckResult {
@@ -29,11 +30,17 @@ export interface UpdateCheckResult {
   message: string;
 }
 
+interface GitHubReleaseAssetJson {
+  name?: string;
+  browser_download_url?: string;
+}
+
 interface GitHubReleaseJson {
   tag_name?: string;
   name?: string;
   body?: string;
   html_url?: string;
+  assets?: GitHubReleaseAssetJson[];
   draft?: boolean;
   prerelease?: boolean;
 }
@@ -141,15 +148,32 @@ function parseGitHubRelease(body: string): ReleaseInfo | null {
     }
     const htmlUrl = typeof parsed.html_url === 'string' && parsed.html_url.length > 0 ?
       parsed.html_url : EH_REPOSITORY_URL + '/releases/tag/' + tagName;
+    const hapDownloadUrl = findHapDownloadUrl(parsed.assets, htmlUrl);
     return {
       tagName: tagName,
       name: typeof parsed.name === 'string' && parsed.name.length > 0 ? parsed.name : tagName,
       body: typeof parsed.body === 'string' ? parsed.body.trim() : '',
-      htmlUrl: htmlUrl
+      htmlUrl: htmlUrl,
+      hapDownloadUrl: hapDownloadUrl
     };
   } catch (error) {
     return null;
   }
+}
+
+function findHapDownloadUrl(assets: GitHubReleaseAssetJson[] | undefined, fallbackUrl: string): string {
+  if (assets === undefined || !Array.isArray(assets)) {
+    return fallbackUrl;
+  }
+  for (let i = 0; i < assets.length; i++) {
+    const asset = assets[i];
+    const name = typeof asset.name === 'string' ? asset.name.toLowerCase() : '';
+    const downloadUrl = typeof asset.browser_download_url === 'string' ? asset.browser_download_url : '';
+    if (name.endsWith('.hap') && downloadUrl.length > 0) {
+      return downloadUrl;
+    }
+  }
+  return fallbackUrl;
 }
 
 function isVersionNewer(latestTag: string, currentTag: string): boolean {

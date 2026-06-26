@@ -241,7 +241,7 @@ struct Index {
             const release = this.updateRelease;
             this.updateDialogVisible = false;
             if (release !== null) {
-              this.openExternalUrl(release.htmlUrl);
+              this.openExternalUrl(release.hapDownloadUrl);
             }
           }
         })

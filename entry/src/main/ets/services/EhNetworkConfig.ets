@@ -49,14 +49,14 @@ export function createEhRequestPlan(url: string): EhRequestPlan {
       url: url,
       host: hostHeader,
       fronted: false,
-      sniHost: ''
+      sniHost: host
     };
   }
   return {
     url: replaceUrlHost(url, eFrontingIp),
     host: hostHeader,
     fronted: true,
-    sniHost: ''
+    sniHost: host
   };
 }
 
@@ -125,7 +125,10 @@ function eFrontingIpForUrl(url: string, host: string): string {
   }
   const normalizedHost = host.toLowerCase();
   if (ehSettingsStore.getValue('built_in_hosts', 'Off') === 'On') {
-    return firstIpv4ForHost(normalizedHost, BUILT_IN_RULES);
+    const ip = firstIpv4ForHost(normalizedHost, BUILT_IN_RULES);
+    if (ip.length > 0) {
+      return ip;
+    }
   }
   return '';
 }

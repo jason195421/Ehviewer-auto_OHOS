@@ -692,15 +692,16 @@ export struct SettingsScene {
   }
 
   private checkForUpdatesManually(): void {
-    this.statusText = 'Checking for updates...';
+    this.statusText = uiText('Checking for updates...');
     ehUpdateChecker.checkLatestRelease().then((result: UpdateCheckResult) => {
       if (result.hasUpdate && result.latest !== null) {
         this.updateCurrentVersion = result.current.versionName;
         this.updateRelease = result.latest;
         this.updateDialogVisible = true;
-        this.statusText = 'New version found: ' + result.latest.tagName;
+        this.statusText = uiText('New version found') + ': ' + result.latest.tagName;
       } else {
         this.statusText = result.message;
+        this.getUIContext().getPromptAction().showToast({ message: result.message });
       }
     }).catch((error: Error) => {
       this.statusText = '检查更新失败: ' + error.message;
@@ -1192,7 +1193,7 @@ export struct SettingsScene {
             const release = this.updateRelease;
             this.updateDialogVisible = false;
             if (release !== null) {
-              this.openExternalUrl(release.htmlUrl, 'latest release');
+              this.openExternalUrl(release.hapDownloadUrl, 'latest HAP');
             }
           }
         })
