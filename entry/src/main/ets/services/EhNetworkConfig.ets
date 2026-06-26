@@ -28,23 +28,35 @@ export interface EhRequestPlan {
   url: string;
   host: string;
   fronted: boolean;
+  sniHost: string;
 }
 
 export function createEhRequestPlan(url: string): EhRequestPlan {
   const host = requestHost(url);
   const hostHeader = requestHostHeader(url);
-  const frontingIp = frontingIpForUrl(url, host);
-  if (frontingIp.length === 0) {
+  const exFrontingIp = exFrontingIpForUrl(url, host);
+  if (exFrontingIp.length > 0) {
+    return {
+      url: replaceUrlHost(url, exFrontingIp),
+      host: hostHeader,
+      fronted: true,
+      sniHost: ''
+    };
+  }
+  const eFrontingIp = eFrontingIpForUrl(url, host);
+  if (eFrontingIp.length === 0) {
     return {
       url: url,
       host: hostHeader,
-      fronted: false
+      fronted: false,
+      sniHost: ''
     };
   }
   return {
-    url: replaceUrlHost(url, frontingIp),
+    url: url,
     host: hostHeader,
-    fronted: true
+    fronted: true,
+    sniHost: eFrontingIp
   };
 }
 
@@ -56,6 +68,9 @@ export function applyEhNetworkOptions(options: http.HttpRequestOptions, plan: Eh
   }
   if (plan.fronted) {
     options.remoteValidation = 'skip';
+  }
+  if (plan.sniHost.length > 0) {
+    options.sniHostName = plan.sniHost;
   }
 }
 
@@ -104,7 +119,18 @@ function proxyOption(): boolean | http.HttpProxy {
   return proxyType === 'System';
 }
 
-function frontingIpForUrl(url: string, host: string): string {
+function eFrontingIpForUrl(url: string, host: string): string {
+  if (ehSettingsStore.getValue('domain_fronting', 'On') !== 'On' || !isHttpsUrl(url) || host.length === 0) {
+    return '';
+  }
+  const normalizedHost = host.toLowerCase();
+  if (ehSettingsStore.getValue('built_in_hosts', 'Off') === 'On') {
+    return firstIpv4ForHost(normalizedHost, BUILT_IN_RULES);
+  }
+  return '';
+}
+
+function exFrontingIpForUrl(url: string, host: string): string {
   if (ehSettingsStore.getValue('domain_fronting', 'On') !== 'On' || !isHttpsUrl(url) || host.length === 0) {
     return '';
   }
