@@ -237,6 +237,7 @@ export struct EhNavBar {
   @Prop subtitle: string = '';
   @Prop searchMode: boolean = false;
   @Prop keyword: string = '';
+  @Prop searchPlaceholder: string = '';
   @Prop filterActive: boolean = false;
   @Prop showClear: boolean = false;
   @Prop canClear: boolean = false;
@@ -301,7 +302,8 @@ export struct EhNavBar {
           Stack({ alignContent: Alignment.BottomStart }) {
             TextInput({
               text: this.keyword,
-              placeholder: this.title.length === 0 ? uiText('Search galleries') : uiText(this.title)
+              placeholder: this.searchPlaceholder.length > 0 ? uiText(this.searchPlaceholder) :
+                (this.title.length === 0 ? uiText('Search galleries') : uiText(this.title))
             })
               .height(38)
               .width('100%')
@@ -586,12 +588,14 @@ export struct FloatingToolbarHost {
   @Prop kind: string = 'title';
   @Prop title: string = '';
   @Prop keyword: string = '';
+  @Prop searchPlaceholder: string = '';
   @Prop filterActive: boolean = false;
   @Prop requestUrl: string = '';
   @Prop showClear: boolean = false;
   @Prop canClear: boolean = false;
   @Prop showSearchButton: boolean = false;
   @Prop showRefreshButton: boolean = true;
+  @Prop showBackButton: boolean = false;
   @Prop searchShowsAdvancedButton: boolean = false;
   @Prop toolbarOffsetY: number = 0;
   @Prop toolbarHeight: number = 62;
@@ -625,11 +629,13 @@ export struct FloatingToolbarHost {
           title: this.title,
           searchMode: this.kind === 'search',
           keyword: this.keyword,
+          searchPlaceholder: this.searchPlaceholder,
           filterActive: this.filterActive,
           showClear: this.showClear,
           canClear: this.canClear,
           showSearchButton: this.showSearchButton,
           showRefreshButton: this.showRefreshButton,
+          showBackButton: this.showBackButton,
           searchShowsAdvancedButton: this.searchShowsAdvancedButton,
           onKeywordChange: this.onKeywordChange,
           onSearchFocus: this.onSearchFocus,

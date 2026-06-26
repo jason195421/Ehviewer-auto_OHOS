@@ -1632,6 +1632,7 @@ export struct GalleryListScene {
             searchFilterEnabled: this.searchFilterEnabled,
             showSearchButton: (routeUsesKeyword(this.sourceRoute) || this.useLocalProvider) && !this.isSearchResultScene,
             showBackButton: this.isSearchResultScene,
+            searchPlaceholder: this.useLocalProvider ? 'Search history' : 'Search galleries',
             isSearchResultScene: this.isSearchResultScene,
             useLocalSearchBar: this.useLocalProvider && this.localSearchBarVisible,
             searchSubmitted: this.searchSubmitted,
@@ -1728,7 +1729,9 @@ export struct GalleryListScene {
               }
             },
             onSearch: () => {
-              if (this.isSearchResultScene || this.useLocalProvider) {
+              if (this.useLocalProvider && !this.localSearchBarVisible) {
+                this.openLocalSearchBar();
+              } else if (this.isSearchResultScene || this.useLocalProvider) {
                 this.applySearch();
               } else {
                 this.openSearchScene();
@@ -1860,6 +1863,7 @@ export struct GalleryListContent {
   @Prop searchFilterEnabled: boolean = true;
   @Prop showSearchButton: boolean = false;
   @Prop showBackButton: boolean = false;
+  @Prop searchPlaceholder: string = 'Search galleries';
   @Prop isSearchResultScene: boolean = false;
   @Prop useLocalSearchBar: boolean = false;
   @Prop searchSubmitted: boolean = true;
@@ -2269,7 +2273,7 @@ export struct GalleryListContent {
           this.onBack();
         })
 
-        TextInput({ text: this.keyword, placeholder: uiText('Search galleries') })
+        TextInput({ text: this.keyword, placeholder: uiText(this.searchPlaceholder) })
           .height(38)
           .layoutWeight(1)
           .backgroundColor(themeFieldBackground())

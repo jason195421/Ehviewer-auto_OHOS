@@ -1885,14 +1885,22 @@ export struct DownloadScene {
         kind: this.searchBarVisible ? 'search' : 'title',
         title: 'Downloads',
         keyword: this.query,
+        searchPlaceholder: 'Search downloads',
         filterActive: this.advancedPanelVisible || this.advancedSearchEnabled ||
           this.searchCategory !== GalleryCategory.None || this.minRating > 0,
         showSearchButton: !this.searchBarVisible,
+        showBackButton: this.searchBarVisible,
         showRefreshButton: false,
         searchShowsAdvancedButton: true,
         toolbarOffsetY: this.toolbarOffsetY,
         toolbarHeight: 56,
-            onMenu: this.onMenu,
+            onMenu: () => {
+              if (this.searchBarVisible) {
+                this.closeDownloadSearchBar();
+              } else {
+                this.onMenu();
+              }
+            },
             onKeywordChange: (value: string) => {
               this.updateDownloadKeyword(value);
             },
