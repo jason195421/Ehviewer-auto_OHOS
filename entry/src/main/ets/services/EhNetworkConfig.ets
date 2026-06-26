@@ -109,12 +109,6 @@ function frontingIpForUrl(url: string, host: string): string {
     return '';
   }
   const normalizedHost = host.toLowerCase();
-  if (ehSettingsStore.getValue('built_in_hosts', 'Off') === 'On') {
-    const ip = firstIpv4ForHost(normalizedHost, BUILT_IN_RULES);
-    if (ip.length > 0) {
-      return ip;
-    }
-  }
   if (ehSettingsStore.getValue('built_ex_hosts', 'Off') === 'On') {
     const ip = firstIpv4ForHost(normalizedHost, BUILT_EX_RULES);
     if (ip.length > 0) {
