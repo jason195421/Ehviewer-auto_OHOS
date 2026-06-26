@@ -6,12 +6,15 @@
 
 这是 [Ehviewer_CN_SXJ](https://github.com/xiaojieonly/Ehviewer_CN_SXJ) 的 HarmonyOS 移植版本，目标是在鸿蒙设备上使用接近原应用的浏览、搜索、阅读、下载和设置体验。目前版本仍在快速迭代中（烧token如流水），请各位多多反馈意见和建议，多提bug，我会尽快完善（token没烧完的话）。
 
-## 下载
+## 下载及安装
 
 请在 [GitHub Releases](https://github.com/suibianqwe/Ehviewer_OHOS/releases) 中下载最新的 `.hap` 安装包。
 推荐使用 [小白调试助手](https://github.com/likuai2010/auto-installer) 安装。
 
 当前版本：`0.3.60`
+目标API：`6.1.1(24)`
+兼容API：`6.1.0.31(23)`
+**因为绕过sni功能仅能在API23实现，因此暂不支持更低API版本**（由于技术原因，仅支持里站直连）
 
 ## 功能
 
