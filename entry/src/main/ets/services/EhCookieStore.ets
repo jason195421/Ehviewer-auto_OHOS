@@ -47,10 +47,16 @@ export class EhCookieStore {
   }
 
   getCookieHeader(): string {
+    if (!this.hasCookies()) {
+      return this.buildGuestCookieHeader();
+    }
     return this.buildCookieHeader({ includeContentWarning: true, includeUConfig: true });
   }
 
   getCookieHeaderWithOptions(options: CookieHeaderOptions): string {
+    if (!this.hasCookies()) {
+      return this.buildGuestCookieHeader();
+    }
     return this.buildCookieHeader(options);
   }
 
@@ -79,6 +85,10 @@ export class EhCookieStore {
       pairs.push(KEY_CONTENT_WARNING + '=' + CONTENT_WARNING_NOT_SHOW);
     }
     return pairs.join('; ');
+  }
+
+  private buildGuestCookieHeader(): string {
+    return KEY_CONTENT_WARNING + '=' + CONTENT_WARNING_NOT_SHOW;
   }
 
   hasCookies(): boolean {

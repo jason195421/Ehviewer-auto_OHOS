@@ -4,7 +4,7 @@ import { EhHttpClient, SignInResult } from '../services/EhHttpClient';
 import { EhUrl } from '../services/EhUrl';
 import { applyAppChromeImmersiveMode } from '../services/EhWindowImmersive';
 import { LANGUAGE_REVISION_KEY } from '../shared/EhShared';
-import { themeOnPrimaryText, themePrimaryColor, themePrimaryText, themeSecondaryText, themeSuccessText, themeSurface, themeTransparentColor } from '../shared/EhTheme';
+import { themeOnPrimaryText, themePageBackground, themePrimaryColor, themePrimaryText, themeSecondaryText, themeSuccessText, themeSurface, themeTransparentColor } from '../shared/EhTheme';
 import { SessionMode, uiText, uiStatusText, getAbilityContext } from '../shared/EhShared';
 
 @Component
@@ -257,6 +257,7 @@ export struct SessionScene {
     }
     .width('100%')
     .height('100%')
+    .backgroundColor(themePageBackground())
   }
 
   @Builder
@@ -345,10 +346,13 @@ export struct SessionScene {
         .width('100%')
         .height('100%')
         .padding(20)
+        .backgroundColor(themePageBackground())
       }
       .width('100%')
       .height('100%')
+      .backgroundColor(themePageBackground())
     }
+    .backgroundColor(themePageBackground())
   }
 
   @Builder
@@ -461,6 +465,7 @@ export struct SessionScene {
     }
     .width('100%')
     .height('100%')
+    .backgroundColor(themePageBackground())
   }
 
   @Builder
@@ -502,6 +507,7 @@ export struct SessionScene {
     }
     .width('100%')
     .height('100%')
+    .backgroundColor(themePageBackground())
   }
 }
 
