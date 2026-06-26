@@ -439,11 +439,17 @@ export struct GalleryListScene {
         if (!this.isSearchResultScene && previousAccountFilterEnabled !== this.accountFilterEnabled && !this.useLocalProvider) {
           this.hasFirstRefresh = false;
         }
+        if (this.isSearchResultScene && this.initialSearchSubmitted && !this.hasFirstRefresh) {
+          this.searchSubmitted = true;
+        }
         if (!this.isSearchResultScene || this.searchSubmitted) {
           this.firstRefresh();
         }
       });
     } else {
+      if (this.isSearchResultScene && this.initialSearchSubmitted && !this.hasFirstRefresh) {
+        this.searchSubmitted = true;
+      }
       if (!this.isSearchResultScene || this.searchSubmitted) {
         this.firstRefresh();
       }
@@ -872,11 +878,12 @@ export struct GalleryListScene {
     if (trimmedNamespace.length === 0 || trimmedTag.length === 0) {
       return;
     }
-    const tagQuery = trimmedTag.indexOf(' ') >= 0 ? '"' + trimmedTag.replace(/"/g, '\\"') + '"' : trimmedTag;
     this.showComments = false;
     this.showReader = false;
+    this.showDetail = false;
+    this.showSearchResultScene = false;
     this.searchResultDraft = {
-      keyword: trimmedNamespace + ':' + tagQuery,
+      keyword: trimmedNamespace + ':' + trimmedTag,
       mode: ListMode.Tag,
       category: GalleryCategory.None,
       advancedEnabled: false,
@@ -889,8 +896,10 @@ export struct GalleryListScene {
       searchAdvancedPanelOpened: false,
       submitted: true
     };
-    this.showSearchResultScene = true;
     this.fabExpanded = false;
+    setTimeout(() => {
+      this.showSearchResultScene = true;
+    }, 0);
   }
 
   private toggleFilter(): void {

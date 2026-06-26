@@ -11,6 +11,7 @@ import { KeyEvent } from '@ohos.multimodalInput.keyEvent';
 import { GalleryPage } from '../model/GalleryModels';
 import {
   applyReaderWindowState,
+  applyReaderBrightnessFromSettings,
   getMainWindow,
   getReaderWindow,
   rememberMainWindow,
@@ -648,17 +649,7 @@ export struct ReaderScene {
     if (win === undefined) {
       return;
     }
-    if (ehSettingsStore.getValue('ultra_dark_mode', 'Off') === 'On') {
-      win.setWindowBrightness(0).catch(() => {});
-      return;
-    }
-    if (ehSettingsStore.getValue('custom_screen_lightness', 'Off') !== 'On') {
-      win.setWindowBrightness(-1).catch(() => {});
-      return;
-    }
-    const pct = Number.parseFloat(ehSettingsStore.getValue('screen_lightness', '50%')) / 100;
-    const brightness = Number.isNaN(pct) ? 0.5 : Math.max(0, Math.min(1, pct));
-    win.setWindowBrightness(brightness).catch(() => {});
+    await applyReaderBrightnessFromSettings(win);
   }
 
   private async resetReaderBrightness(): Promise<void> {

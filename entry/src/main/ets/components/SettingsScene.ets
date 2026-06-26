@@ -1090,6 +1090,7 @@ export struct SettingsScene {
           Web({ src: this.webViewUrl, controller: this.webViewController })
             .javaScriptAccess(true)
             .domStorageAccess(true)
+            .backgroundColor(Color.Transparent)
             .onPageEnd((event: OnPageEndEvent) => {
               this.captureAccountWebCookies(event.url);
             })
@@ -1098,6 +1099,7 @@ export struct SettingsScene {
         }
         .width('100%')
         .height('100%')
+        .backgroundColor(themePageBackground())
         .transition(TransitionEffect.move(TransitionEdge.END)
           .animation({ duration: 300, curve: Curve.EaseOut }))
       } else if (this.panel === SettingsPanel.Session) {

@@ -185,6 +185,20 @@ export async function applyReaderWindowStateFromSettings(target: window.Window):
   await applyReaderWindowState(target, keepScreenOn, orientation, fullscreen);
 }
 
+export async function applyReaderBrightnessFromSettings(target: window.Window): Promise<void> {
+  if (ehSettingsStore.getValue('ultra_dark_mode', 'Off') === 'On') {
+    await setWindowBrightnessQuietly(target, 0, 'set reader ultra dark brightness');
+    return;
+  }
+  if (ehSettingsStore.getValue('custom_screen_lightness', 'Off') !== 'On') {
+    await setWindowBrightnessQuietly(target, -1, 'restore reader brightness');
+    return;
+  }
+  const pct = Number.parseFloat(ehSettingsStore.getValue('screen_lightness', '50%')) / 100;
+  const brightness = Number.isNaN(pct) ? 0.5 : Math.max(0, Math.min(1, pct));
+  await setWindowBrightnessQuietly(target, brightness, 'set reader brightness');
+}
+
 export function rememberWindowPreferredOrientation(target: window.Window): void {
   try {
     const windowId = target.getWindowProperties().id;
@@ -287,6 +301,15 @@ async function setWindowKeepScreenOnQuietly(target: window.Window, keepScreenOn:
   operation: string): Promise<void> {
   try {
     await target.setWindowKeepScreenOn(keepScreenOn);
+  } catch (error) {
+    logWindowError(operation, error);
+  }
+}
+
+async function setWindowBrightnessQuietly(target: window.Window, brightness: number,
+  operation: string): Promise<void> {
+  try {
+    await target.setWindowBrightness(brightness);
   } catch (error) {
     logWindowError(operation, error);
   }

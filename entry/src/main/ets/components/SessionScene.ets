@@ -523,6 +523,7 @@ export struct SessionScene {
       Web({ src: this.webUrl, controller: this.webController })
         .javaScriptAccess(true)
         .domStorageAccess(true)
+        .backgroundColor(Color.Transparent)
         .onPageEnd((event: OnPageEndEvent) => {
           this.checkWebCookie(event.url);
         })
