@@ -10,7 +10,7 @@ import { GalleryPageApiParseResult, parseGalleryPageApi } from './GalleryPageApi
 import { GalleryPageParseResult, parseGalleryPage } from './GalleryPageParser';
 import { GalleryPageUrlInfo, parseGalleryPageUrl } from './GalleryPageUrlParser';
 import { ehSpiderInfoStore } from './EhSpiderInfoStore';
-import { applyEhNetworkOptions, ensureEhHostRules } from './EhNetworkConfig';
+import { applyEhNetworkOptions, createEhRequestPlan, EhRequestPlan, ensureEhHostRules } from './EhNetworkConfig';
 import { TopListParseResult, parseTopList } from './TopListParser';
 
 export interface EhHttpResponse {
@@ -190,7 +190,8 @@ export class EhHttpClient {
     const request = http.createHttp();
     await acquireTextSlot();
     try {
-      const header = buildRequestHeader(url, referer, cookieHeader, cacheTtlMs);
+      const plan = createEhRequestPlan(url);
+      const header = buildRequestHeader(plan, referer, cookieHeader, cacheTtlMs);
       await ensureEhHostRules();
       const options: http.HttpRequestOptions = {
         method: http.RequestMethod.GET,
@@ -199,8 +200,8 @@ export class EhHttpClient {
         connectTimeout: TEXT_CONNECT_TIMEOUT_MS,
         readTimeout: TEXT_READ_TIMEOUT_MS
       };
-      applyEhNetworkOptions(options, url);
-      const response = await requestWithDeadline(request, url, options, TEXT_DEADLINE_TIMEOUT_MS);
+      applyEhNetworkOptions(options, plan);
+      const response = await requestWithDeadline(request, plan.url, options, TEXT_DEADLINE_TIMEOUT_MS);
 
       ehCookieStore.absorbSetCookieHeader(response.cookies);
       syncSetCookiesToWebView(url, response.cookies);
@@ -288,7 +289,8 @@ export class EhHttpClient {
     const request = http.createHttp();
     await acquireTextSlot();
     try {
-      const header = buildPostRequestHeader(referer, origin, cookieHeader);
+      const plan = createEhRequestPlan(url);
+      const header = buildPostRequestHeader(plan, referer, origin, cookieHeader);
       await ensureEhHostRules();
       const options: http.HttpRequestOptions = {
         method: http.RequestMethod.POST,
@@ -298,8 +300,8 @@ export class EhHttpClient {
         connectTimeout: TEXT_CONNECT_TIMEOUT_MS,
         readTimeout: TEXT_READ_TIMEOUT_MS
       };
-      applyEhNetworkOptions(options, url);
-      const response = await requestWithDeadline(request, url, options, TEXT_DEADLINE_TIMEOUT_MS);
+      applyEhNetworkOptions(options, plan);
+      const response = await requestWithDeadline(request, plan.url, options, TEXT_DEADLINE_TIMEOUT_MS);
 
       ehCookieStore.absorbSetCookieHeader(response.cookies);
       syncSetCookiesToWebView(url, response.cookies);
@@ -331,7 +333,8 @@ export class EhHttpClient {
     await acquireTextSlot();
     try {
       const cookieHeader = ehCookieStore.getCookieHeaderForUrl(url);
-      const header = buildJsonRequestHeader(referer, origin, cookieHeader);
+      const plan = createEhRequestPlan(url);
+      const header = buildJsonRequestHeader(plan, referer, origin, cookieHeader);
       await ensureEhHostRules();
       const options: http.HttpRequestOptions = {
         method: http.RequestMethod.POST,
@@ -341,8 +344,8 @@ export class EhHttpClient {
         connectTimeout: API_TIMEOUT_MS,
         readTimeout: API_TIMEOUT_MS
       };
-      applyEhNetworkOptions(options, url);
-      const response = await requestWithDeadline(request, url, options, API_DEADLINE_TIMEOUT_MS);
+      applyEhNetworkOptions(options, plan);
+      const response = await requestWithDeadline(request, plan.url, options, API_DEADLINE_TIMEOUT_MS);
 
       ehCookieStore.absorbSetCookieHeader(response.cookies);
       syncSetCookiesToWebView(url, response.cookies);
@@ -1043,10 +1046,10 @@ function networkErrorMessage(error: Object): string {
   return message.length > 0 ? message : 'Network request failed';
 }
 
-function buildRequestHeader(url: string, referer: string, cookieHeader: string, cacheTtlMs: number): RequestHeader {
+function buildRequestHeader(plan: EhRequestPlan, referer: string, cookieHeader: string, cacheTtlMs: number): RequestHeader {
   const maxAge = Math.max(0, Math.floor(cacheTtlMs / 1000));
   const header: RequestHeader = {
-    'Host': requestHost(url),
+    'Host': plan.host,
     'User-Agent': CHROME_USER_AGENT,
     'Accept': CHROME_ACCEPT,
     'Accept-Language': CHROME_ACCEPT_LANGUAGE,
@@ -1060,8 +1063,10 @@ function buildRequestHeader(url: string, referer: string, cookieHeader: string, 
   return header;
 }
 
-function buildPostRequestHeader(referer: string, origin: string, cookieHeader: string): RequestHeader {
+function buildPostRequestHeader(plan: EhRequestPlan, referer: string, origin: string,
+  cookieHeader: string): RequestHeader {
   const header: RequestHeader = {
+    'Host': plan.host,
     'User-Agent': CHROME_USER_AGENT,
     'Accept': CHROME_ACCEPT,
     'Accept-Language': CHROME_ACCEPT_LANGUAGE,
@@ -1078,8 +1083,10 @@ function buildPostRequestHeader(referer: string, origin: string, cookieHeader: s
   return header;
 }
 
-function buildJsonRequestHeader(referer: string, origin: string, cookieHeader: string): RequestHeader {
+function buildJsonRequestHeader(plan: EhRequestPlan, referer: string, origin: string,
+  cookieHeader: string): RequestHeader {
   const header: RequestHeader = {
+    'Host': plan.host,
     'User-Agent': CHROME_USER_AGENT,
     'Accept': 'application/json,text/plain,*/*;q=0.8',
     'Accept-Language': CHROME_ACCEPT_LANGUAGE,
@@ -1102,11 +1109,6 @@ function buildFormBody(fields: FormField[]): string {
     parts.push(encodeURIComponent(fields[i].key) + '=' + encodeURIComponent(fields[i].value));
   }
   return parts.join('&');
-}
-
-function requestHost(url: string): string {
-  const match = /^https?:\/\/([^\/?#]+)/i.exec(url);
-  return match === null ? '' : match[1];
 }
 
 function buildCacheKey(method: string, url: string, referer: string, cookieHeader: string): string {
