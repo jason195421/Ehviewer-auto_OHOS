@@ -17,6 +17,7 @@ import { ehHistoryStore } from '../services/EhHistoryStore';
 import { ehSettingsStore, SettingEntry, defaultSettingEntries } from '../services/EhSettingsStore';
 import { EhHttpClient, NetworkDiagnosticResult } from '../services/EhHttpClient';
 import { EhUrl } from '../services/EhUrl';
+import { ehUpdateChecker, ReleaseInfo, UpdateCheckResult } from '../services/EhUpdateChecker';
 import { galleryPageCache } from '../services/GalleryPageCache';
 import { CacheClearResult, readerImageCache } from '../services/ReaderImageCache';
 import { FilterRule, FILTER_MODE_TITLE, ehFilterStore } from '../services/EhFilterStore';
@@ -64,6 +65,7 @@ import { EhBackupBundle, SettingsHeaderItem, SettingsRowItem, SettingsPanel, SET
 import { FilterPanel, MigrationScene } from './DownloadMigrationScenes';
 import { AppSubToolbar, AppToolbar } from './NavigationComponents';
 import { collectWebCookies, hasLoginCookie, SessionScene, syncCookieHeaderToWebView } from './SessionScene';
+import { UpdatePromptOverlay } from './UpdatePromptOverlay';
 
 const DOWNLOAD_PAGE_PROGRESS_SCALE: number = 1000;
 
@@ -90,6 +92,9 @@ export struct SettingsScene {
   @State filterNewText: string = '';
   @State filterNewMode: number = FILTER_MODE_TITLE;
   @State settingsRenderRevision: number = 0;
+  @State updateDialogVisible: boolean = false;
+  @State updateCurrentVersion: string = '';
+  @State updateRelease: ReleaseInfo | null = null;
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
   private webViewController: webview.WebviewController = new webview.WebviewController();
   private client: EhHttpClient = new EhHttpClient();
@@ -527,7 +532,7 @@ export struct SettingsScene {
       return true;
     }
     if (key === 'check_for_updates') {
-      this.openExternalUrl(EH_RELEASE_URL, 'release page');
+      this.checkForUpdatesManually();
       return true;
     }
     if (key === 'donate') {
@@ -683,6 +688,22 @@ export struct SettingsScene {
       });
     }).catch((error: Error) => {
       this.statusText = 'Export load failed: ' + error.message;
+    });
+  }
+
+  private checkForUpdatesManually(): void {
+    this.statusText = 'Checking for updates...';
+    ehUpdateChecker.checkLatestRelease().then((result: UpdateCheckResult) => {
+      if (result.hasUpdate && result.latest !== null) {
+        this.updateCurrentVersion = result.current.versionName;
+        this.updateRelease = result.latest;
+        this.updateDialogVisible = true;
+        this.statusText = 'New version found: ' + result.latest.tagName;
+      } else {
+        this.statusText = result.message;
+      }
+    }).catch((error: Error) => {
+      this.statusText = '检查更新失败: ' + error.message;
     });
   }
 
@@ -1157,6 +1178,25 @@ export struct SettingsScene {
           }
         })
           .zIndex(20)
+          .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseOut }))
+      }
+
+      if (this.updateDialogVisible && this.updateRelease !== null) {
+        UpdatePromptOverlay({
+          release: this.updateRelease,
+          currentVersion: this.updateCurrentVersion,
+          onCancel: () => {
+            this.updateDialogVisible = false;
+          },
+          onUpdate: () => {
+            const release = this.updateRelease;
+            this.updateDialogVisible = false;
+            if (release !== null) {
+              this.openExternalUrl(release.htmlUrl, 'latest release');
+            }
+          }
+        })
+          .zIndex(30)
           .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseOut }))
       }
     }

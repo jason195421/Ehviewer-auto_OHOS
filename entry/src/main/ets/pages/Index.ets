@@ -5,7 +5,9 @@ import { ehDownloadStore } from '../services/EhDownloadStore';
 import { ehSearchHistoryStore } from '../services/EhSearchHistoryStore';
 import { ehSettingsStore } from '../services/EhSettingsStore';
 import { ehSpiderInfoStore } from '../services/EhSpiderInfoStore';
+import { ehUpdateChecker, ReleaseInfo, UpdateCheckResult } from '../services/EhUpdateChecker';
 import { EhDrawer } from '../components/NavigationComponents';
+import { UpdatePromptOverlay } from '../components/UpdatePromptOverlay';
 import { applyAppChromeImmersiveMode, isEmbeddedReaderActive } from '../services/EhWindowImmersive';
 import { FavoriteGalleryScene, HomeGalleryScene, HotGalleryScene, SubscriptionGalleryScene } from '../components/GalleryScenes';
 import { HistoryScene, TopListScene } from '../components/HistoryTopScenes';
@@ -32,11 +34,29 @@ struct Index {
   @State drawerOverlayOpacity: number = 0;
   @State settingsReady: boolean = false;
   @State routeStack: GalleryRoute[] = [];
+  @State updateDialogVisible: boolean = false;
+  @State updateCurrentVersion: string = '';
+  @State updateRelease: ReleaseInfo | null = null;
   @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeight: number = 0;
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
 
   private statusBarVp(): number {
     return this.getUIContext().px2vp(this.statusBarHeight);
+  }
+
+  private openExternalUrl(url: string): void {
+    const context = getAbilityContext();
+    if (context === undefined) {
+      return;
+    }
+    context.startAbility({
+      action: 'ohos.want.action.viewData',
+      entities: ['entity.system.browsable'],
+      uri: url,
+      parameters: {
+        'ohos.ability.params.showDefaultPicker': true
+      }
+    }).catch(() => {});
   }
 
   private canOpenDrawerBySwipe(): boolean {
@@ -87,10 +107,25 @@ struct Index {
     ehSettingsStore.load(context).then(() => {
       this.settingsReady = true;
       this.loadSessionRoute(context);
+      this.checkForUpdatesOnStartup();
     }).catch(() => {
       this.settingsReady = true;
       this.loadSessionRoute(context);
+      this.checkForUpdatesOnStartup();
     });
+  }
+
+  private checkForUpdatesOnStartup(): void {
+    if (ehSettingsStore.getValue('close_auto_updates', 'Off') === 'On') {
+      return;
+    }
+    ehUpdateChecker.checkLatestRelease().then((result: UpdateCheckResult) => {
+      if (result.hasUpdate && result.latest !== null) {
+        this.updateCurrentVersion = result.current.versionName;
+        this.updateRelease = result.latest;
+        this.updateDialogVisible = true;
+      }
+    }).catch(() => {});
   }
 
   private loadSessionRoute(ctx: common.UIAbilityContext): void {
@@ -193,6 +228,25 @@ struct Index {
           .translate({ x: this.drawerOffsetX })
           .zIndex(9)
           .shadow({ radius: 32, color: themeShadowColor(), offsetX: 8, offsetY: 0 })
+      }
+
+      if (this.updateDialogVisible && this.updateRelease !== null) {
+        UpdatePromptOverlay({
+          release: this.updateRelease,
+          currentVersion: this.updateCurrentVersion,
+          onCancel: () => {
+            this.updateDialogVisible = false;
+          },
+          onUpdate: () => {
+            const release = this.updateRelease;
+            this.updateDialogVisible = false;
+            if (release !== null) {
+              this.openExternalUrl(release.htmlUrl);
+            }
+          }
+        })
+          .zIndex(30)
+          .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseOut }))
       }
     }
     .width('100%')

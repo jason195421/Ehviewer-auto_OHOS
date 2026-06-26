@@ -800,7 +800,11 @@ export function zhText(text: string): string {
     case 'Branch and describe from the build workspace': return '构建工作区分支和 describe 信息';
     case 'Branch and release from the build workspace': return '构建工作区分支和发布版本';
     case 'Check for updates': return '检查更新';
-    case 'Original AppUpdater entry': return '原 AppUpdater 入口';
+    case 'Check the latest GitHub release': return '检查 GitHub 最新发布版本';
+    case 'New version available': return '发现新版本';
+    case 'Current version': return '当前版本';
+    case 'No release notes': return '暂无更新内容';
+    case 'Update': return '更新';
     case 'Close automatic updates': return '关闭自动更新';
     case 'Disable startup update check': return '禁用启动时更新检查';
     case 'Donate': return '捐赠';
@@ -1885,7 +1889,7 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
       staticSettingsRow('version', 'Version', 'HarmonyOS port workspace version', EH_APP_VERSION_NAME, 'version'),
       staticSettingsRow('git_commit', 'Release', 'Branch and release from the build workspace',
         EH_GIT_BRANCH + ' / ' + EH_RELEASE_TAG, 'version'),
-      staticSettingsRow('check_for_updates', 'Check for updates', 'Original AppUpdater entry', 'Open', 'action'),
+      staticSettingsRow('check_for_updates', 'Check for updates', 'Check the latest GitHub release', 'Run', 'action'),
       optionSettingsRow('close_auto_updates', 'Close automatic updates', 'Disable startup update check', entries, ON_OFF_OPTIONS),
       staticSettingsRow('donate', 'Donate', 'Original donation entry', 'Not migrated', 'url')
     ];
