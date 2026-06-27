@@ -71,9 +71,10 @@ export class ReaderImageCache {
     if (onProgress !== undefined) {
       listeners.push(onProgress);
     }
-    const progressCallback: ImageDownloadProgressCallback = (progress: ImageDownloadProgress): void => {
-      publishPendingProgress(imageUrl, progress);
-    };
+    const progressCallback: ImageDownloadProgressCallback | undefined = onProgress !== undefined ?
+      (progress: ImageDownloadProgress): void => {
+        publishPendingProgress(imageUrl, progress);
+      } : undefined;
     const promise = this.download(context, imageUrl, referer, path, priority, progressCallback);
     putPending(imageUrl, promise, listeners);
     try {
