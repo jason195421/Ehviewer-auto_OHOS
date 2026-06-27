@@ -59,6 +59,14 @@ export class EhAppLog {
     return context.filesDir + '/' + LOG_FILE_NAME;
   }
 
+  size(context: common.UIAbilityContext): number {
+    try {
+      return fs.statSync(this.logPath(context)).size;
+    } catch (error) {
+      return 0;
+    }
+  }
+
   private trimIfNeeded(path: string): void {
     try {
       const stat = fs.statSync(path);

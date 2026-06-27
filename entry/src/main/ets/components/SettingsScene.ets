@@ -70,6 +70,7 @@ import { UpdatePromptOverlay } from './UpdatePromptOverlay';
 
 const DOWNLOAD_PAGE_PROGRESS_SCALE: number = 1000;
 const DIAGNOSTIC_LOG_TAG: string = 'SettingsScene';
+const LOG_EXPORT_CHUNK_BYTES: number = 64 * 1024;
 
 @Component
 export struct SettingsScene {
@@ -748,13 +749,13 @@ export struct SettingsScene {
       padTwo(now.getMonth() + 1) + padTwo(now.getDate()) + '_' +
       padTwo(now.getHours()) + padTwo(now.getMinutes()) + padTwo(now.getSeconds());
     const fileName = 'ehviewer_log_' + stamp + '.txt';
-    const content = ehAppLog.read(context);
-    if (content.length === 0) {
+    if (ehAppLog.size(context) <= 0) {
       this.showFloatingStatus('No saved log yet');
       return;
     }
-    this.writeTextToDownloads(context, fileName, content).then((path: string) => {
-      this.showFloatingStatus('Log exported: ' + path);
+    this.copyFileToDownloads(context, fileName, ehAppLog.logPath(context)).then((path: string) => {
+      this.statusText = 'Log exported: ' + path;
+      this.showToast('Log exported');
     }).catch((error: Error) => {
       this.showFloatingStatus('Log export failed: ' + error.message);
       ehAppLog.error(context, DIAGNOSTIC_LOG_TAG, 'Log export failed: ' + error.message);
@@ -768,25 +769,31 @@ export struct SettingsScene {
     }
     const root = ehDownloadFileStore.publicDownloadRoot(context);
     const path = uniqueDiagnosticLogPath(root, fileName);
-    let fd = -1;
-    try {
-      const file = fs.openSync(path, fs.OpenMode.CREATE | fs.OpenMode.TRUNC | fs.OpenMode.READ_WRITE);
-      fd = file.fd;
-      fs.writeSync(fd, content);
-      return path;
-    } finally {
-      if (fd >= 0) {
-        try {
-          fs.closeSync(fd);
-        } catch (error) {
-        }
-      }
+    await writeTextFileChunked(path, content);
+    return path;
+  }
+
+  private async copyFileToDownloads(context: common.UIAbilityContext, fileName: string, sourcePath: string): Promise<string> {
+    const ready = await this.ensureDownloadLocationAccess(context, DOWNLOAD_LOCATION_DOWNLOADS);
+    if (!ready) {
+      throw new Error('Downloads access was not granted');
     }
+    const root = ehDownloadFileStore.publicDownloadRoot(context);
+    const path = uniqueDiagnosticLogPath(root, fileName);
+    await copyFileChunked(sourcePath, path);
+    return path;
   }
 
   private showFloatingStatus(message: string): void {
     this.statusText = message;
-    this.getUIContext().getPromptAction().showToast({ message: message });
+    this.showToast(message);
+  }
+
+  private showToast(message: string): void {
+    try {
+      this.getUIContext().getPromptAction().showToast({ message: message });
+    } catch (error) {
+    }
   }
 
   private clearAppLog(): void {
@@ -1020,7 +1027,8 @@ export struct SettingsScene {
       const content = this.createNetworkDiagnosticLog(results, summary);
       const fileName = 'ehviewer_network_' + diagnosticTimestamp(new Date()) + '.txt';
       this.writeTextToDownloads(context, fileName, content).then((path: string) => {
-        this.showFloatingStatus('Network diagnostics exported: ' + path);
+        this.statusText = 'Network diagnostics exported: ' + path;
+        this.showToast('Network diagnostics exported');
       }).catch((error: Error) => {
         this.showFloatingStatus('Network diagnostics export failed: ' + error.message);
         ehAppLog.error(context, DIAGNOSTIC_LOG_TAG, 'Network diagnostics export failed: ' + error.message);
@@ -1972,6 +1980,83 @@ function uniqueDiagnosticLogPath(root: string, fileName: string): string {
     index++;
   }
   return path;
+}
+
+async function writeTextFileChunked(path: string, content: string): Promise<void> {
+  let fd = -1;
+  try {
+    const file = fs.openSync(path, fs.OpenMode.CREATE | fs.OpenMode.TRUNC | fs.OpenMode.READ_WRITE);
+    fd = file.fd;
+    for (let start = 0; start < content.length; start += LOG_EXPORT_CHUNK_BYTES) {
+      fs.writeSync(fd, content.substring(start, Math.min(content.length, start + LOG_EXPORT_CHUNK_BYTES)));
+      await yieldToUi();
+    }
+  } catch (error) {
+    removeFileQuietly(path);
+    throw new Error(String(error));
+  } finally {
+    if (fd >= 0) {
+      try {
+        fs.closeSync(fd);
+      } catch (error) {
+      }
+    }
+  }
+}
+
+async function copyFileChunked(sourcePath: string, targetPath: string): Promise<void> {
+  let sourceFd = -1;
+  let targetFd = -1;
+  try {
+    const source = fs.openSync(sourcePath, fs.OpenMode.READ_ONLY);
+    sourceFd = source.fd;
+    const target = fs.openSync(targetPath, fs.OpenMode.CREATE | fs.OpenMode.TRUNC | fs.OpenMode.READ_WRITE);
+    targetFd = target.fd;
+    const stat = fs.statSync(sourceFd);
+    let offset = 0;
+    while (offset < stat.size) {
+      const size = Math.min(LOG_EXPORT_CHUNK_BYTES, stat.size - offset);
+      const buffer = new ArrayBuffer(size);
+      const readSize = fs.readSync(sourceFd, buffer, { offset: offset, length: size });
+      if (readSize <= 0) {
+        break;
+      }
+      fs.writeSync(targetFd, buffer.slice(0, readSize));
+      offset += readSize;
+      await yieldToUi();
+    }
+  } catch (error) {
+    removeFileQuietly(targetPath);
+    throw new Error(String(error));
+  } finally {
+    if (sourceFd >= 0) {
+      try {
+        fs.closeSync(sourceFd);
+      } catch (error) {
+      }
+    }
+    if (targetFd >= 0) {
+      try {
+        fs.closeSync(targetFd);
+      } catch (error) {
+      }
+    }
+  }
+}
+
+function removeFileQuietly(path: string): void {
+  try {
+    fs.unlinkSync(path);
+  } catch (error) {
+  }
+}
+
+function yieldToUi(): Promise<void> {
+  return new Promise<void>((resolve: (value: void | PromiseLike<void>) => void) => {
+    setTimeout(() => {
+      resolve();
+    }, 0);
+  });
 }
 
 function pathExists(path: string): boolean {
