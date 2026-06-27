@@ -1,3 +1,5 @@
+import { common } from '@kit.AbilityKit';
+import { fileUri, picker } from '@kit.CoreFileKit';
 import { GalleryCategory, GalleryDetail, GalleryPage, GalleryPreview, GalleryRoute } from '../model/GalleryModels';
 import { ehDownloadFileStore, RestoredDownloadGallery } from '../services/EhDownloadFileStore';
 import { ehDownloadManager } from '../services/EhDownloadManager';
@@ -72,6 +74,31 @@ function normalizeSceneScrollOffset(offset: number): number {
     return 0;
   }
   return offset;
+}
+
+async function pickDownloadsOutputPath(context: common.UIAbilityContext, fileName: string): Promise<string> {
+  const saveOptions = new picker.DocumentSaveOptions();
+  saveOptions.pickerMode = picker.DocumentPickerMode.DOWNLOAD;
+  const documentPicker = new picker.DocumentViewPicker(context);
+  const result = await documentPicker.save(saveOptions);
+  if (result.length === 0 || result[0].length === 0) {
+    return '';
+  }
+  return new fileUri.FileUri(result[0] + '/' + sanitizeExportFileName(fileName)).path;
+}
+
+function sanitizeExportFileName(fileName: string): string {
+  return fileName.replace(/[\\/:*?"<>|]/g, '_');
+}
+
+function downloadExportTimestamp(now: Date): string {
+  return now.getFullYear().toString() + padDownloadExportTwo(now.getMonth() + 1) + padDownloadExportTwo(now.getDate()) +
+    '_' + padDownloadExportTwo(now.getHours()) + padDownloadExportTwo(now.getMinutes()) +
+    padDownloadExportTwo(now.getSeconds());
+}
+
+function padDownloadExportTwo(value: number): string {
+  return value < 10 ? '0' + value.toString() : value.toString();
 }
 
 const DOWNLOAD_PAGE_PROGRESS_SCALE: number = 1000;
@@ -841,7 +868,16 @@ export struct DownloadScene {
       return;
     }
     this.statusText = 'Exporting ' + selected.length.toString() + ' selected downloads...';
-    ehDownloadFileStore.exportGalleriesZip(context, selected).then((result) => {
+    pickDownloadsOutputPath(context, 'EhViewer_downloads_' + downloadExportTimestamp(new Date()) + '.zip').then((path: string) => {
+      if (path.length === 0) {
+        this.statusText = 'Export cancelled';
+        return;
+      }
+      return ehDownloadFileStore.exportGalleriesZip(context, selected, path);
+    }).then((result) => {
+      if (result === undefined) {
+        return;
+      }
       this.clearDownloadSelection();
       this.statusText = 'Exported ' + result.folders.toString() + ' folders to ' + result.path + ' (' +
         downloadSizeText(result.bytes) + ')';

@@ -129,13 +129,18 @@ export class EhDownloadFileStore {
     return this.findGalleryDirectoryByGid(context, gallery.gid);
   }
 
-  async exportGalleriesZip(context: common.UIAbilityContext, galleries: GalleryInfo[]): Promise<DownloadZipExportResult> {
+  async exportGalleriesZip(context: common.UIAbilityContext, galleries: GalleryInfo[],
+    outputPath: string = ''): Promise<DownloadZipExportResult> {
     if (galleries.length <= 0) {
       throw new Error('No downloads selected');
     }
 
-    const root = this.zipExportRoot(context);
-    ensureDirectory(root);
+    const zipPath = outputPath.length > 0 ? outputPath :
+      uniqueZipPath(this.zipExportRoot(context), 'EhViewer_downloads_' + zipTimestamp() + '.zip');
+    const zipRoot = parentPath(zipPath);
+    if (zipRoot.length > 0) {
+      ensureDirectory(zipRoot);
+    }
     const stagingRoot = context.cacheDir + '/download_zip_export_' + Date.now().toString();
     removeDirectoryTree(stagingRoot);
     ensureDirectory(stagingRoot);
@@ -162,20 +167,20 @@ export class EhDownloadFileStore {
         throw new Error('Selected downloaded folders are missing');
       }
 
-      const outputPath = uniqueZipPath(root, 'EhViewer_downloads_' + zipTimestamp() + '.zip');
       const options: zlib.Options = {
         level: zlib.CompressLevel.COMPRESS_LEVEL_DEFAULT_COMPRESSION,
         memLevel: zlib.MemLevel.MEM_LEVEL_DEFAULT,
         strategy: zlib.CompressStrategy.COMPRESS_STRATEGY_DEFAULT_STRATEGY
       };
       try {
-        await zlib.compressFile(stagingRoot, outputPath, options);
+        removeFileQuietly(zipPath);
+        await zlib.compressFile(stagingRoot, zipPath, options);
       } catch (error) {
         throw new Error('Zip compression failed: ' + String(error));
       }
-      const bytes = this.statFileSize(outputPath);
+      const bytes = this.statFileSize(zipPath);
       return {
-        path: outputPath,
+        path: zipPath,
         folders: folders,
         files: files,
         bytes: bytes
@@ -661,6 +666,21 @@ function uniqueZipPath(parent: string, fileName: string): string {
     index++;
   }
   return candidate;
+}
+
+function parentPath(path: string): string {
+  const slash = path.lastIndexOf('/');
+  if (slash <= 0) {
+    return '';
+  }
+  return path.substring(0, slash);
+}
+
+function removeFileQuietly(path: string): void {
+  try {
+    fs.unlinkSync(path);
+  } catch (error) {
+  }
 }
 
 function zipTimestamp(): string {

@@ -763,23 +763,19 @@ export struct SettingsScene {
   }
 
   private async writeTextToDownloads(context: common.UIAbilityContext, fileName: string, content: string): Promise<string> {
-    const ready = await this.ensureDownloadLocationAccess(context, DOWNLOAD_LOCATION_DOWNLOADS);
-    if (!ready) {
-      throw new Error('Downloads access was not granted');
+    const path = await pickDownloadsOutputPath(context, fileName);
+    if (path.length === 0) {
+      throw new Error('Export cancelled');
     }
-    const root = ehDownloadFileStore.publicDownloadRoot(context);
-    const path = uniqueDiagnosticLogPath(root, fileName);
     await writeTextFileChunked(path, content);
     return path;
   }
 
   private async copyFileToDownloads(context: common.UIAbilityContext, fileName: string, sourcePath: string): Promise<string> {
-    const ready = await this.ensureDownloadLocationAccess(context, DOWNLOAD_LOCATION_DOWNLOADS);
-    if (!ready) {
-      throw new Error('Downloads access was not granted');
+    const path = await pickDownloadsOutputPath(context, fileName);
+    if (path.length === 0) {
+      throw new Error('Export cancelled');
     }
-    const root = ehDownloadFileStore.publicDownloadRoot(context);
-    const path = uniqueDiagnosticLogPath(root, fileName);
     await copyFileChunked(sourcePath, path);
     return path;
   }
@@ -1967,6 +1963,21 @@ function normalizeSettingsDownloadLocation(value: string): string {
 function diagnosticTimestamp(now: Date): string {
   return now.getFullYear().toString() + padTwo(now.getMonth() + 1) + padTwo(now.getDate()) + '_' +
     padTwo(now.getHours()) + padTwo(now.getMinutes()) + padTwo(now.getSeconds());
+}
+
+async function pickDownloadsOutputPath(context: common.UIAbilityContext, fileName: string): Promise<string> {
+  const saveOptions = new picker.DocumentSaveOptions();
+  saveOptions.pickerMode = picker.DocumentPickerMode.DOWNLOAD;
+  const documentPicker = new picker.DocumentViewPicker(context);
+  const result = await documentPicker.save(saveOptions);
+  if (result.length === 0 || result[0].length === 0) {
+    return '';
+  }
+  return new fileUri.FileUri(result[0] + '/' + sanitizeExportFileName(fileName)).path;
+}
+
+function sanitizeExportFileName(fileName: string): string {
+  return fileName.replace(/[\\/:*?"<>|]/g, '_');
 }
 
 function uniqueDiagnosticLogPath(root: string, fileName: string): string {
