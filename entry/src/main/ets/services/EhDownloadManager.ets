@@ -22,6 +22,7 @@ import { ehAppLog } from './EhAppLog';
 
 const DOWNLOAD_PAGE_PROGRESS_SCALE: number = 1000;
 const DOWNLOAD_PAGE_RETRY_LIMIT: number = 3;
+const DOWNLOAD_IMAGE_RETRY_LIMIT: number = 1;
 const DOWNLOAD_NOTIFICATION_ID: number = 8001;
 const DOWNLOAD_NOTIFICATION_TEMPLATE: string = 'downloadTemplate';
 
@@ -50,6 +51,14 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve: () => void) => {
     setTimeout(resolve, ms);
   });
+}
+
+function imageHostForLog(url: string): string {
+  const match = /^https?:\/\/([^\/?#]+)/i.exec(url);
+  if (match === null) {
+    return '';
+  }
+  return match[1];
 }
 
 function mergeDownloadDetailTitles(detail: GalleryDetail, item: DownloadInfo): GalleryDetail {
@@ -348,7 +357,8 @@ export class EhDownloadManager {
       galleryPageCache.put(cacheUrl, page);
       galleryPageCache.put(preview.pageUrl, page);
       ehAppLog.info(context, 'DownloadManager', (forceReloadPage ? 'Reloaded' : 'Loaded') + ' page gid=' +
-        item.gid.toString() + ', page=' + (pageIndex + 1).toString() + '/' + total.toString());
+        item.gid.toString() + ', page=' + (pageIndex + 1).toString() + '/' + total.toString() +
+        this.reloadedPageHostLog(previousPage, page));
     }
 
     const imageUrl = downloadImageUrlForPage(page);
@@ -366,7 +376,8 @@ export class EhDownloadManager {
       this.recordDownloadSpeed(item, state, total, deltaBytes);
     };
     const cachedPath = existingCachedPath.length > 0 ? existingCachedPath :
-      await readerImageCache.ensureCached(context, imageUrl, page.pageUrl, true, onProgress, cacheKey);
+      await readerImageCache.ensureCached(context, imageUrl, page.pageUrl, true, onProgress, cacheKey,
+        { retryLimit: DOWNLOAD_IMAGE_RETRY_LIMIT });
     const downloadedBytes = Math.max(readerImageCache.cachedSize(context, imageUrl, cacheKey), lastProgressBytes);
     if (downloadedBytes > lastProgressBytes) {
       this.recordDownloadSpeed(item, state, total, downloadedBytes - lastProgressBytes, true);
@@ -375,6 +386,16 @@ export class EhDownloadManager {
       page: page,
       cachedPath: cachedPath
     };
+  }
+
+  private reloadedPageHostLog(previousPage: GalleryPage | null, page: GalleryPage): string {
+    if (previousPage === null) {
+      return ', imageHost=' + imageHostForLog(downloadImageUrlForPage(page));
+    }
+    const previousHost = imageHostForLog(downloadImageUrlForPage(previousPage));
+    const nextHost = imageHostForLog(downloadImageUrlForPage(page));
+    const skipText = previousPage.skipHathKey.length > 0 ? ', nl=on' : ', nl=missing';
+    return skipText + ', imageHost=' + previousHost + ' -> ' + nextHost;
   }
 
   private recordDownloadSpeed(item: DownloadInfo, state: DownloadWorkerState, total: number, deltaBytes: number,

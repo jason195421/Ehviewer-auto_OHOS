@@ -25,6 +25,7 @@ const MAX_ACTIVE_IMAGE_DOWNLOADS: number = 6;
 const MAX_IMAGE_CACHE_BYTES: number = 320 * 1024 * 1024;
 const IMAGE_RETRY_DELAYS_MS: number[] = [300, 900, 1800, 3200];
 const IMAGE_CONNECT_TIMEOUT_MS: number = 4500;
+const DEFAULT_IMAGE_RETRY_LIMIT: number = 5;
 let activeImageDownloads: number = 0;
 
 interface CachedImageFile {
@@ -45,6 +46,10 @@ export interface ImageDownloadProgress {
 
 export type ImageDownloadProgressCallback = (progress: ImageDownloadProgress) => void;
 
+export interface ImageDownloadOptions {
+  retryLimit?: number;
+}
+
 interface ImageRequestHeader {
   'Host'?: string;
   'User-Agent': string;
@@ -57,7 +62,8 @@ interface ImageRequestHeader {
 
 export class ReaderImageCache {
   async ensureCached(context: common.UIAbilityContext, imageUrl: string, referer: string,
-    priority: boolean = false, onProgress?: ImageDownloadProgressCallback, cacheKey: string = ''): Promise<string> {
+    priority: boolean = false, onProgress?: ImageDownloadProgressCallback, cacheKey: string = '',
+    options?: ImageDownloadOptions): Promise<string> {
     if (imageUrl.length === 0) {
       return '';
     }
@@ -87,7 +93,7 @@ export class ReaderImageCache {
     const progressCallback: ImageDownloadProgressCallback = (progress: ImageDownloadProgress): void => {
       publishPendingProgress(pendingKey, progress);
     };
-    const promise = this.download(context, imageUrl, referer, path, priority, progressCallback);
+    const promise = this.download(context, imageUrl, referer, path, priority, progressCallback, options);
     putPending(pendingKey, promise, listeners);
     try {
       return await promise;
@@ -146,11 +152,11 @@ export class ReaderImageCache {
   }
 
   private async download(context: common.UIAbilityContext, imageUrl: string, referer: string, path: string,
-    priority: boolean, onProgress?: ImageDownloadProgressCallback): Promise<string> {
+    priority: boolean, onProgress?: ImageDownloadProgressCallback, options?: ImageDownloadOptions): Promise<string> {
     ensureDirectory(readerImageCacheDirectory(context));
     await acquireImageSlot(priority);
     try {
-      await this.downloadWithRetry(context, imageUrl, referer, path, onProgress);
+      await this.downloadWithRetry(context, imageUrl, referer, path, onProgress, options);
       pruneImageCache(readerImageCacheDirectory(context));
       return path;
     } finally {
@@ -159,9 +165,10 @@ export class ReaderImageCache {
   }
 
   private async downloadWithRetry(context: common.UIAbilityContext, imageUrl: string, referer: string, path: string,
-    onProgress?: ImageDownloadProgressCallback): Promise<void> {
+    onProgress?: ImageDownloadProgressCallback, options?: ImageDownloadOptions): Promise<void> {
     let lastError = '';
-    for (let attempt = 0; attempt < 5; attempt++) {
+    const retryLimit = normalizedRetryLimit(options);
+    for (let attempt = 0; attempt < retryLimit; attempt++) {
       try {
         await this.downloadOnce(imageUrl, referer, path, attempt, onProgress);
         return;
@@ -169,8 +176,8 @@ export class ReaderImageCache {
         removeFileQuietly(path);
         lastError = imageNetworkErrorMessage(error);
         ehAppLog.warn(context, 'ReaderImageCache', 'Image attempt failed attempt=' + (attempt + 1).toString() +
-          '/5, url=' + trimLogUrl(imageUrl) + ': ' + lastError);
-        if (attempt >= 4 || !isTransientImageError(lastError)) {
+          '/' + retryLimit.toString() + ', url=' + trimLogUrl(imageUrl) + ': ' + lastError);
+        if (attempt >= retryLimit - 1 || !isTransientImageError(lastError)) {
           throw new Error(lastError);
         }
         await sleepImageRetry(attempt);
@@ -467,6 +474,13 @@ function sleepImageRetry(attempt: number): Promise<void> {
       resolve();
     }, delay);
   });
+}
+
+function normalizedRetryLimit(options?: ImageDownloadOptions): number {
+  if (options === undefined || options.retryLimit === undefined) {
+    return DEFAULT_IMAGE_RETRY_LIMIT;
+  }
+  return Math.max(1, Math.min(DEFAULT_IMAGE_RETRY_LIMIT, Math.round(options.retryLimit)));
 }
 
 function isTransientImageError(message: string): boolean {
