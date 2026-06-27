@@ -286,16 +286,6 @@ export struct ReaderImageViewport {
 
   private startAlignment(): Alignment {
     const normalized = normalizeStartPositionOption(this.startPosition);
-    const imageFitsVertically = this.displayImageHeight * this.imageModel.currentScale <= this.imageModel.componentHeight + 0.5;
-    if (imageFitsVertically) {
-      if (normalized === 'Top left' || normalized === 'Bottom left') {
-        return Alignment.Start;
-      }
-      if (normalized === 'Top right' || normalized === 'Bottom right') {
-        return Alignment.End;
-      }
-      return Alignment.Center;
-    }
     if (normalized === 'Top left') {
       return Alignment.TopStart;
     }
@@ -365,31 +355,35 @@ export struct ReaderImageViewport {
   }
 
   build() {
-    Stack({ alignContent: this.startAlignment() }) {
+    Stack({ alignContent: Alignment.Center }) {
       if (this.imageUrl().length > 0) {
-        Image(this.imageUrl())
-          .width(this.imageDisplayWidth())
-          .height(this.imageDisplayHeight())
-          .objectFit(this.imageObjectFit())
-          .draggable(false)
-          .backgroundColor(readerBackgroundColor())
-          .opacity(this.failedImageUrl === this.imageUrl() ? 0 : 1)
-          .onComplete((event?: ReaderImageCompleteEvent) => {
-            if (event !== undefined && event.width > 0 && event.height > 0 && this.sourceImageWidth <= 0) {
-              this.sourceImageWidth = event.width;
-              this.sourceImageHeight = event.height;
-              cacheReaderSourceImageSize(this.imageUrl(), event.width, event.height);
-              this.updateDisplayImageSize();
-              this.reportImageSize();
-            }
-            this.completedImageUrl = this.imageUrl();
-            this.failedImageUrl = '';
-          })
-          .onError(() => {
-            this.failedImageUrl = this.imageUrl();
-          })
-          .scale({ x: this.imageModel.currentScale, y: this.imageModel.currentScale, centerX: '50%', centerY: '50%' })
-          .translate({ x: this.imageModel.currentOffsetX, y: this.imageModel.currentOffsetY })
+        Stack({ alignContent: this.startAlignment() }) {
+          Image(this.imageUrl())
+            .width(this.imageDisplayWidth())
+            .height(this.imageDisplayHeight())
+            .objectFit(this.imageObjectFit())
+            .draggable(false)
+            .backgroundColor(readerBackgroundColor())
+            .opacity(this.failedImageUrl === this.imageUrl() ? 0 : 1)
+            .onComplete((event?: ReaderImageCompleteEvent) => {
+              if (event !== undefined && event.width > 0 && event.height > 0 && this.sourceImageWidth <= 0) {
+                this.sourceImageWidth = event.width;
+                this.sourceImageHeight = event.height;
+                cacheReaderSourceImageSize(this.imageUrl(), event.width, event.height);
+                this.updateDisplayImageSize();
+                this.reportImageSize();
+              }
+              this.completedImageUrl = this.imageUrl();
+              this.failedImageUrl = '';
+            })
+            .onError(() => {
+              this.failedImageUrl = this.imageUrl();
+            })
+            .scale({ x: this.imageModel.currentScale, y: this.imageModel.currentScale, centerX: '50%', centerY: '50%' })
+            .translate({ x: this.imageModel.currentOffsetX, y: this.imageModel.currentOffsetY })
+        }
+        .width('100%')
+        .height('100%')
         if (this.isImageLoading()) {
           ReaderStatusView({ failed: false, compact: false, progress: this.downloadProgress })
             .zIndex(2)
