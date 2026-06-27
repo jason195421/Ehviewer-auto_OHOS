@@ -10,7 +10,13 @@ import { GalleryPageApiParseResult, parseGalleryPageApi } from './GalleryPageApi
 import { GalleryPageParseResult, parseGalleryPage } from './GalleryPageParser';
 import { GalleryPageUrlInfo, parseGalleryPageUrl } from './GalleryPageUrlParser';
 import { ehSpiderInfoStore } from './EhSpiderInfoStore';
-import { applyEhNetworkOptions, createEhRequestPlan, EhRequestPlan, ensureEhHostRules } from './EhNetworkConfig';
+import {
+  applyEhNetworkOptions,
+  createEhRequestPlan,
+  EhRequestPlan,
+  ensureEhHostRules,
+  recordEhRequestOutcome
+} from './EhNetworkConfig';
 import { TopListParseResult, parseTopList } from './TopListParser';
 
 export interface EhHttpResponse {
@@ -188,9 +194,12 @@ export class EhHttpClient {
   private async getTextOnce(url: string, referer: string, cookieHeader: string,
     cacheTtlMs: number): Promise<EhHttpResponse> {
     const request = http.createHttp();
+    let plan: EhRequestPlan | null = null;
+    const startedAt = Date.now();
+    let outcomeRecorded = false;
     await acquireTextSlot();
     try {
-      const plan = createEhRequestPlan(url);
+      plan = createEhRequestPlan(url);
       const header = buildRequestHeader(plan, referer, cookieHeader, cacheTtlMs);
       await ensureEhHostRules();
       const options: http.HttpRequestOptions = {
@@ -202,15 +211,21 @@ export class EhHttpClient {
       };
       applyEhNetworkOptions(options, plan);
       const response = await requestWithDeadline(request, plan.url, options, TEXT_DEADLINE_TIMEOUT_MS);
+      const statusCode = Number(response.responseCode);
+      recordEhRequestOutcome(plan, statusCode >= 200 && statusCode < 500, Date.now() - startedAt);
+      outcomeRecorded = true;
 
       ehCookieStore.absorbSetCookieHeader(response.cookies);
       syncSetCookiesToWebView(url, response.cookies);
       return {
-        statusCode: Number(response.responseCode),
+        statusCode: statusCode,
         body: response.result as string,
         cookies: response.cookies
       };
     } catch (error) {
+      if (plan !== null && !outcomeRecorded) {
+        recordEhRequestOutcome(plan, false, Date.now() - startedAt);
+      }
       throw new Error(networkErrorMessage(error));
     } finally {
       try {
@@ -287,9 +302,12 @@ export class EhHttpClient {
   private async postFormOnce(url: string, body: string, referer: string, origin: string,
     cookieHeader: string): Promise<EhHttpResponse> {
     const request = http.createHttp();
+    let plan: EhRequestPlan | null = null;
+    const startedAt = Date.now();
+    let outcomeRecorded = false;
     await acquireTextSlot();
     try {
-      const plan = createEhRequestPlan(url);
+      plan = createEhRequestPlan(url);
       const header = buildPostRequestHeader(plan, referer, origin, cookieHeader);
       await ensureEhHostRules();
       const options: http.HttpRequestOptions = {
@@ -302,15 +320,21 @@ export class EhHttpClient {
       };
       applyEhNetworkOptions(options, plan);
       const response = await requestWithDeadline(request, plan.url, options, TEXT_DEADLINE_TIMEOUT_MS);
+      const statusCode = Number(response.responseCode);
+      recordEhRequestOutcome(plan, statusCode >= 200 && statusCode < 500, Date.now() - startedAt);
+      outcomeRecorded = true;
 
       ehCookieStore.absorbSetCookieHeader(response.cookies);
       syncSetCookiesToWebView(url, response.cookies);
       return {
-        statusCode: Number(response.responseCode),
+        statusCode: statusCode,
         body: response.result as string,
         cookies: response.cookies
       };
     } catch (error) {
+      if (plan !== null && !outcomeRecorded) {
+        recordEhRequestOutcome(plan, false, Date.now() - startedAt);
+      }
       throw new Error(networkErrorMessage(error));
     } finally {
       try {
@@ -330,10 +354,13 @@ export class EhHttpClient {
   private async postJsonOnce(url: string, body: string, referer: string = '',
     origin: string = ''): Promise<EhHttpResponse> {
     const request = http.createHttp();
+    let plan: EhRequestPlan | null = null;
+    const startedAt = Date.now();
+    let outcomeRecorded = false;
     await acquireTextSlot();
     try {
       const cookieHeader = ehCookieStore.getCookieHeaderForUrl(url);
-      const plan = createEhRequestPlan(url);
+      plan = createEhRequestPlan(url);
       const header = buildJsonRequestHeader(plan, referer, origin, cookieHeader);
       await ensureEhHostRules();
       const options: http.HttpRequestOptions = {
@@ -346,15 +373,21 @@ export class EhHttpClient {
       };
       applyEhNetworkOptions(options, plan);
       const response = await requestWithDeadline(request, plan.url, options, API_DEADLINE_TIMEOUT_MS);
+      const statusCode = Number(response.responseCode);
+      recordEhRequestOutcome(plan, statusCode >= 200 && statusCode < 500, Date.now() - startedAt);
+      outcomeRecorded = true;
 
       ehCookieStore.absorbSetCookieHeader(response.cookies);
       syncSetCookiesToWebView(url, response.cookies);
       return {
-        statusCode: Number(response.responseCode),
+        statusCode: statusCode,
         body: response.result as string,
         cookies: response.cookies
       };
     } catch (error) {
+      if (plan !== null && !outcomeRecorded) {
+        recordEhRequestOutcome(plan, false, Date.now() - startedAt);
+      }
       throw new Error(networkErrorMessage(error));
     } finally {
       try {

@@ -2,7 +2,13 @@ import { common } from '@kit.AbilityKit';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import { http } from '@kit.NetworkKit';
 import { ehCookieStore } from './EhCookieStore';
-import { applyEhNetworkOptions, createEhRequestPlan, EhRequestPlan, ensureEhHostRules } from './EhNetworkConfig';
+import {
+  applyEhNetworkOptions,
+  createEhRequestPlan,
+  EhRequestPlan,
+  ensureEhHostRules,
+  recordEhRequestOutcome
+} from './EhNetworkConfig';
 import { ehSettingsStore } from './EhSettingsStore';
 
 interface PendingImageDownload {
@@ -164,8 +170,11 @@ export class ReaderImageCache {
   private async downloadOnce(imageUrl: string, referer: string, path: string,
     onProgress?: ImageDownloadProgressCallback): Promise<void> {
     const request = http.createHttp();
+    let plan: EhRequestPlan | null = null;
+    const startedAt = Date.now();
+    let outcomeRecorded = false;
     try {
-      const plan = createEhRequestPlan(imageUrl);
+      plan = createEhRequestPlan(imageUrl);
       const header = buildImageRequestHeader(plan, referer, ehCookieStore.getCookieHeaderForUrl(imageUrl));
       const timeout = imageRequestTimeoutMs();
       await ensureEhHostRules();
@@ -181,18 +190,27 @@ export class ReaderImageCache {
 
       const statusCode = Number(response.responseCode);
       if (statusCode < 200 || statusCode >= 300) {
+        recordEhRequestOutcome(plan, false, Date.now() - startedAt);
+        outcomeRecorded = true;
         throw new Error(imageStatusMessage(statusCode));
       }
 
       const data = response.result as ArrayBuffer;
       if (data.byteLength <= 0) {
+        recordEhRequestOutcome(plan, false, Date.now() - startedAt);
+        outcomeRecorded = true;
         throw new Error('Empty image response');
       }
       writeArrayBuffer(path, data);
+      recordEhRequestOutcome(plan, true, Date.now() - startedAt);
+      outcomeRecorded = true;
       if (onProgress !== undefined) {
         onProgress({ receivedBytes: data.byteLength, totalBytes: data.byteLength });
       }
     } catch (error) {
+      if (plan !== null && !outcomeRecorded) {
+        recordEhRequestOutcome(plan, false, Date.now() - startedAt);
+      }
       throw new Error(imageNetworkErrorMessage(error));
     } finally {
       try {

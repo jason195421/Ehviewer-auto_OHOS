@@ -16,7 +16,7 @@ import { DownloadInfo, DownloadLabel, DownloadState, ehDownloadStore } from '../
 import { ehHistoryStore } from '../services/EhHistoryStore';
 import { ehSettingsStore, SettingEntry, defaultSettingEntries } from '../services/EhSettingsStore';
 import { EhHttpClient, NetworkDiagnosticResult } from '../services/EhHttpClient';
-import { startEhFrontingBenchmark } from '../services/EhNetworkConfig';
+import { startEhDirectConnectionProbe, startEhFrontingBenchmark } from '../services/EhNetworkConfig';
 import { EhUrl } from '../services/EhUrl';
 import { ehUpdateChecker, ReleaseInfo, UpdateCheckResult } from '../services/EhUpdateChecker';
 import { galleryPageCache } from '../services/GalleryPageCache';
@@ -236,6 +236,9 @@ export struct SettingsScene {
       applyWindowPrivacyMode(value === 'On', (status: string) => {
         this.statusText = status;
       });
+    }
+    if (isNetworkSettingKey(key)) {
+      this.refreshNetworkRuntime();
     }
     const context = getAbilityContext();
     if (context === undefined) {
@@ -991,11 +994,22 @@ export struct SettingsScene {
 
   private runNetworkDiagnostics(): void {
     this.statusText = 'Running network diagnostics...';
-    startEhFrontingBenchmark(getAbilityContext());
+    this.refreshNetworkRuntime();
     this.client.runNetworkDiagnostics().then((results: NetworkDiagnosticResult[]) => {
       this.statusText = formatNetworkDiagnostics(results);
     }).catch((error: Error) => {
       this.statusText = 'Network diagnostics failed: ' + error.message;
+    });
+  }
+
+  private refreshNetworkRuntime(): void {
+    const context = getAbilityContext();
+    startEhDirectConnectionProbe(context).then((directAvailable: boolean) => {
+      if (!directAvailable) {
+        startEhFrontingBenchmark(context);
+      }
+    }).catch(() => {
+      startEhFrontingBenchmark(context);
     });
   }
 
@@ -1900,6 +1914,7 @@ function settingsRowRenderKey(row: SettingsRowItem): string {
 
 function isNetworkSettingKey(key: string): boolean {
   return key === 'proxy' || key === 'proxy_host' || key === 'proxy_port' || key === 'built_in_hosts' ||
-    key === 'built_ex_hosts' || key === 'dns_over_https' || key === 'domain_fronting';
+    key === 'built_ex_hosts' || key === 'dns_over_https' || key === 'domain_fronting' ||
+    key === 'auto_direct_connection' || key === 'gallery_site';
 }
 

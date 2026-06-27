@@ -652,6 +652,7 @@ export function zhText(text: string): string {
     case 'Built EX hosts': return '内置 EX hosts';
     case 'DNS over HTTPS': return 'DNS over HTTPS';
     case 'Domain fronting': return '域名前置';
+    case 'Direct connection check': return '直连检测';
     case 'Account, site, gallery list and comments': return '账号、站点、画廊列表和评论';
     case 'Reader direction, scaling and screen behavior': return '阅读方向、缩放和屏幕行为';
     case 'Location, threads, preload and cleanup': return '位置、线程、预加载和清理';
@@ -788,6 +789,7 @@ export function zhText(text: string): string {
     case 'Use DoH resolver': return '使用 DoH 解析器';
     case 'Original network compatibility switch': return '原应用网络兼容性开关';
     case 'Bypass SNI blocking using built-in host fronting': return '使用内置 hosts 绕过 SNI 封锁';
+    case 'Use direct connection when the selected site responds within 1s': return '所选站点 1 秒内可直连时不使用 hosts 和域名前置';
     case 'Export data': return '导出数据';
     case 'Export settings, database and app state': return '导出设置、数据库和应用状态';
     case 'Import data': return '导入数据';
@@ -1891,6 +1893,7 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
     rows.push(optionSettingsRow('built_ex_hosts', 'Built EX hosts', 'Force bundled ExHentai host overrides; leave Off unless your network needs them', entries, ON_OFF_OPTIONS));
     rows.push(optionSettingsRow('dns_over_https', 'DNS over HTTPS', 'Use DoH resolver', entries, ON_OFF_OPTIONS));
     rows.push(optionSettingsRow('domain_fronting', 'Domain fronting', 'Bypass SNI blocking using built-in host fronting', entries, ON_OFF_OPTIONS));
+    rows.push(optionSettingsRow('auto_direct_connection', 'Direct connection check', 'Use direct connection when the selected site responds within 1s', entries, ON_OFF_OPTIONS));
     rows.push(staticSettingsRow('export_data', 'Export data', 'Save settings, history, downloads and filter rules to a JSON file', 'Export', 'action'));
     rows.push(staticSettingsRow('import_data', 'Import data', 'Restore from a previously exported JSON backup', 'Import', 'action'));
     rows.push(staticSettingsRow('wifi_transfer', 'Wi-Fi server/client', 'Original Wi-Fi transfer tools', 'Not migrated', 'activity'));

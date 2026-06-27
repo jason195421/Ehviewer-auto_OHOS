@@ -12,7 +12,10 @@ const FRONTING_PROBE_READ_TIMEOUT_MS: number = 3000;
 const FRONTING_PROBE_DEADLINE_MS: number = 4500;
 const FRONTING_PROBE_CONCURRENCY: number = 4;
 const FRONTING_FAST_IP_LIMIT: number = 3;
-const FRONTING_PROBE_REFRESH_MS: number = 30 * 60 * 1000;
+const DIRECT_PROBE_TIMEOUT_MS: number = 1000;
+const IP_FAILURE_LATENCY_PENALTY_MS: number = 2500;
+const IP_SUCCESS_LATENCY_BONUS_MS: number = 120;
+const IP_QUALITY_SAVE_THROTTLE_MS: number = 30000;
 const FRONTING_PROBE_USER_AGENT: string =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36';
 const BUILT_IN_RULES: HostRule[] = [
@@ -35,9 +38,12 @@ const HOST_IP_QUALITIES: HostIpQuality[] = [];
 let frontingProbeKey: string = '';
 let frontingProbeGeneration: number = 0;
 let frontingProbePending: Promise<void> | null = null;
-let frontingProbeStartedAt: number = 0;
 let frontingIpCachePath: string = '';
 let frontingIpCacheLoadedKey: string = '';
+let directProbeKey: string = '';
+let directProbePending: Promise<boolean> | null = null;
+let directProbePassed: boolean = false;
+let lastIpQualitySaveAt: number = 0;
 
 interface HostRule {
   host: string;
@@ -55,6 +61,9 @@ interface HostIpQuality {
   ok: boolean;
   latencyMs: number;
   testedAt: number;
+  successCount?: number;
+  failureCount?: number;
+  lastResultAt?: number;
 }
 
 interface HostIpProbeTarget {
@@ -80,6 +89,14 @@ export function createEhRequestPlan(url: string): EhRequestPlan {
   ensureFrontingQualityCacheLoaded();
   const host = requestHost(url);
   const hostHeader = requestHostHeader(url);
+  if (shouldUseDirectConnection(host)) {
+    return {
+      url: url,
+      host: hostHeader,
+      fronted: false,
+      sniHost: host
+    };
+  }
   const exFrontingIp = exFrontingIpForUrl(url, host);
   if (exFrontingIp.length > 0) {
     return {
@@ -129,6 +146,73 @@ export function applyEhNetworkOptions(options: http.HttpRequestOptions, plan: Eh
   }
 }
 
+export function startEhDirectConnectionProbe(context?: common.UIAbilityContext): Promise<boolean> {
+  if (context !== undefined) {
+    frontingIpCachePath = context.filesDir + '/' + FRONTING_IP_CACHE_FILE_NAME;
+  }
+  const key = directProbeKeyValue();
+  if (key === 'Off') {
+    directProbeKey = key;
+    directProbePassed = false;
+    return Promise.resolve(false);
+  }
+  if (directProbePending !== null && directProbeKey === key) {
+    return directProbePending;
+  }
+  directProbeKey = key;
+  directProbePassed = false;
+  directProbePending = removeKnownHostRules().then(() => {
+    return probeDirectSelectedSite();
+  }).then((passed: boolean) => {
+    if (directProbeKey === key) {
+      directProbePassed = passed;
+    }
+    directProbePending = null;
+    return passed;
+  }).catch(() => {
+    if (directProbeKey === key) {
+      directProbePassed = false;
+    }
+    directProbePending = null;
+    return false;
+  });
+  return directProbePending;
+}
+
+export function recordEhRequestOutcome(plan: EhRequestPlan, ok: boolean, elapsedMs: number): void {
+  if (!plan.fronted) {
+    return;
+  }
+  const ip = requestHost(plan.url);
+  if (!isIpv4(ip)) {
+    return;
+  }
+  const host = plan.host.split(':')[0].toLowerCase();
+  if (host.length === 0 || !isKnownProbeTarget(host, ip)) {
+    return;
+  }
+  const current = qualityForHostIp(host, ip);
+  const now = Date.now();
+  const successCount = current.successCount === undefined ? 0 : current.successCount;
+  const failureCount = current.failureCount === undefined ? 0 : current.failureCount;
+  if (ok) {
+    current.ok = true;
+    current.successCount = successCount + 1;
+    current.failureCount = Math.max(0, failureCount - 1);
+    const measured = Math.max(1, elapsedMs);
+    current.latencyMs = Math.max(1, Math.round((current.latencyMs * 2 + measured) / 3) -
+      Math.min(IP_SUCCESS_LATENCY_BONUS_MS, current.successCount * 20));
+  } else {
+    current.failureCount = failureCount + 1;
+    current.latencyMs = Math.max(current.latencyMs, Math.max(1, elapsedMs)) +
+      IP_FAILURE_LATENCY_PENALTY_MS * Math.min(4, current.failureCount);
+    current.ok = current.successCount !== undefined && current.successCount > current.failureCount;
+  }
+  current.testedAt = now;
+  current.lastResultAt = now;
+  saveCachedIpQualitiesThrottled(frontingBenchmarkKey());
+}
+
 export function startEhFrontingBenchmark(context?: common.UIAbilityContext): void {
   if (context !== undefined) {
     frontingIpCachePath = context.filesDir + '/' + FRONTING_IP_CACHE_FILE_NAME;
@@ -138,26 +222,22 @@ export function startEhFrontingBenchmark(context?: common.UIAbilityContext): voi
     clearIpQualities();
     frontingProbeKey = key;
     frontingIpCacheLoadedKey = '';
-    frontingProbeStartedAt = 0;
     return;
   }
-  loadCachedIpQualities(key);
+  const hasCachedBenchmark = loadCachedIpQualities(key);
   if (key === frontingProbeKey && frontingProbePending !== null) {
     return;
   }
-  if (key === frontingProbeKey && frontingProbeStartedAt > 0 &&
-    Date.now() - frontingProbeStartedAt < FRONTING_PROBE_REFRESH_MS) {
+  if (hasCachedBenchmark || hasUsableIpQualities()) {
     return;
   }
   frontingProbeKey = key;
   frontingProbeGeneration++;
-  frontingProbeStartedAt = Date.now();
   const generation = frontingProbeGeneration;
   frontingProbePending = runEhFrontingBenchmark(generation).then((results: HostIpQuality[]) => {
     if (generation === frontingProbeGeneration) {
-      if (replaceIpQualities(results)) {
-        saveCachedIpQualities(key);
-      }
+      replaceIpQualities(results);
+      saveCachedIpQualities(key);
       frontingProbePending = null;
     }
   }).catch(() => {
@@ -168,6 +248,14 @@ export function startEhFrontingBenchmark(context?: common.UIAbilityContext): voi
 }
 
 export async function ensureEhHostRules(): Promise<void> {
+  if (directProbePassed && ehSettingsStore.getValue('auto_direct_connection', 'On') === 'On') {
+    const key = 'Direct';
+    if (appliedHostRulesKey !== key) {
+      await waitHostRuleTask(removeKnownHostRules(), 1200);
+      appliedHostRulesKey = key;
+    }
+    return;
+  }
   const key = ehSettingsStore.getValue('built_in_hosts', 'Off') + ':' +
     ehSettingsStore.getValue('built_ex_hosts', 'Off');
   if (key === 'Off:Off') {
@@ -213,7 +301,8 @@ function proxyOption(): boolean | http.HttpProxy {
 }
 
 function eFrontingIpForUrl(url: string, host: string): string {
-  if (ehSettingsStore.getValue('domain_fronting', 'On') !== 'On' || !isHttpsUrl(url) || host.length === 0) {
+  if (shouldUseDirectConnection(host) || ehSettingsStore.getValue('domain_fronting', 'On') !== 'On' ||
+    !isHttpsUrl(url) || host.length === 0) {
     return '';
   }
   const normalizedHost = host.toLowerCase();
@@ -227,7 +316,8 @@ function eFrontingIpForUrl(url: string, host: string): string {
 }
 
 function exFrontingIpForUrl(url: string, host: string): string {
-  if (ehSettingsStore.getValue('domain_fronting', 'On') !== 'On' || !isHttpsUrl(url) || host.length === 0) {
+  if (shouldUseDirectConnection(host) || ehSettingsStore.getValue('domain_fronting', 'On') !== 'On' ||
+    !isHttpsUrl(url) || host.length === 0) {
     return '';
   }
   const normalizedHost = host.toLowerCase();
@@ -303,8 +393,10 @@ function rankedIpv4ListForHost(host: string, rules: HostRule[]): string[] {
   }
 
   results.sort((left: HostIpQuality, right: HostIpQuality) => {
-    if (left.latencyMs !== right.latencyMs) {
-      return left.latencyMs - right.latencyMs;
+    const leftScore = ipQualityScore(left);
+    const rightScore = ipQualityScore(right);
+    if (leftScore !== rightScore) {
+      return leftScore - rightScore;
     }
     return left.ip.localeCompare(right.ip);
   });
@@ -480,6 +572,42 @@ function recordIpQuality(result: HostIpQuality): void {
   HOST_IP_QUALITIES.push(result);
 }
 
+function qualityForHostIp(host: string, ip: string): HostIpQuality {
+  for (let i = 0; i < HOST_IP_QUALITIES.length; i++) {
+    if (HOST_IP_QUALITIES[i].host === host && HOST_IP_QUALITIES[i].ip === ip) {
+      return HOST_IP_QUALITIES[i];
+    }
+  }
+  const quality: HostIpQuality = {
+    host: host,
+    ip: ip,
+    ok: true,
+    latencyMs: FRONTING_PROBE_DEADLINE_MS,
+    testedAt: Date.now(),
+    successCount: 0,
+    failureCount: 0,
+    lastResultAt: 0
+  };
+  HOST_IP_QUALITIES.push(quality);
+  return quality;
+}
+
+function hasUsableIpQualities(): boolean {
+  for (let i = 0; i < HOST_IP_QUALITIES.length; i++) {
+    if (HOST_IP_QUALITIES[i].ok && isKnownProbeTarget(HOST_IP_QUALITIES[i].host, HOST_IP_QUALITIES[i].ip)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function ipQualityScore(item: HostIpQuality): number {
+  const successCount = item.successCount === undefined ? 0 : item.successCount;
+  const failureCount = item.failureCount === undefined ? 0 : item.failureCount;
+  return item.latencyMs + failureCount * IP_FAILURE_LATENCY_PENALTY_MS -
+    Math.min(600, successCount * IP_SUCCESS_LATENCY_BONUS_MS);
+}
+
 function replaceIpQualities(results: HostIpQuality[]): boolean {
   const validResults: HostIpQuality[] = [];
   for (let i = 0; i < results.length; i++) {
@@ -504,19 +632,19 @@ function clearIpQualities(): void {
   }
 }
 
-function loadCachedIpQualities(key: string): void {
+function loadCachedIpQualities(key: string): boolean {
   if (frontingIpCacheLoadedKey === key) {
-    return;
+    return true;
   }
   clearIpQualities();
   frontingIpCacheLoadedKey = key;
   if (frontingIpCachePath.length === 0) {
-    return;
+    return false;
   }
   try {
     const parsed = JSON.parse(fs.readTextSync(frontingIpCachePath)) as FrontingIpQualityCache;
     if (parsed.key !== key || !Array.isArray(parsed.qualities)) {
-      return;
+      return false;
     }
     for (let i = 0; i < parsed.qualities.length; i++) {
       const item = parsed.qualities[i];
@@ -526,11 +654,16 @@ function loadCachedIpQualities(key: string): void {
           ip: item.ip,
           ok: item.ok,
           latencyMs: item.latencyMs,
-          testedAt: item.testedAt
+          testedAt: item.testedAt,
+          successCount: typeof item.successCount === 'number' ? item.successCount : 0,
+          failureCount: typeof item.failureCount === 'number' ? item.failureCount : 0,
+          lastResultAt: typeof item.lastResultAt === 'number' ? item.lastResultAt : item.testedAt
         });
       }
     }
+    return true;
   } catch (error) {
+    return false;
   }
 }
 
@@ -541,7 +674,7 @@ function saveCachedIpQualities(key: string): void {
   const qualities: HostIpQuality[] = [];
   for (let i = 0; i < HOST_IP_QUALITIES.length; i++) {
     const item = HOST_IP_QUALITIES[i];
-    if (item.ok && isKnownProbeTarget(item.host, item.ip)) {
+    if (isKnownProbeTarget(item.host, item.ip)) {
       qualities.push(item);
     }
   }
@@ -567,6 +700,18 @@ function saveCachedIpQualities(key: string): void {
   }
 }
 
+function saveCachedIpQualitiesThrottled(key: string): void {
+  if (key === 'Off') {
+    return;
+  }
+  const now = Date.now();
+  if (now - lastIpQualitySaveAt < IP_QUALITY_SAVE_THROTTLE_MS) {
+    return;
+  }
+  lastIpQualitySaveAt = now;
+  saveCachedIpQualities(key);
+}
+
 function isValidIpQuality(item: HostIpQuality): boolean {
   if (item === undefined || item === null) {
     return false;
@@ -577,8 +722,61 @@ function isValidIpQuality(item: HostIpQuality): boolean {
   if (typeof item.latencyMs !== 'number' || typeof item.testedAt !== 'number') {
     return false;
   }
-  return item.ok && item.host.length > 0 && isIpv4(item.ip) && item.latencyMs > 0 &&
+  return item.host.length > 0 && isIpv4(item.ip) && item.latencyMs > 0 &&
     isKnownProbeTarget(item.host, item.ip);
+}
+
+function shouldUseDirectConnection(host: string): boolean {
+  if (!directProbePassed || ehSettingsStore.getValue('auto_direct_connection', 'On') !== 'On') {
+    return false;
+  }
+  const selectedHost = selectedGalleryHost();
+  const normalizedHost = host.toLowerCase();
+  return normalizedHost === selectedHost || normalizedHost.endsWith('.' + selectedHost);
+}
+
+function directProbeKeyValue(): string {
+  if (ehSettingsStore.getValue('auto_direct_connection', 'On') !== 'On') {
+    return 'Off';
+  }
+  return ehSettingsStore.getValue('gallery_site', 'E-Hentai') + ':' + ehSettingsStore.getValue('proxy', 'System') + ':' +
+    ehSettingsStore.getValue('proxy_host', '') + ':' + ehSettingsStore.getValue('proxy_port', '');
+}
+
+function selectedGalleryHost(): string {
+  return ehSettingsStore.getValue('gallery_site', 'E-Hentai') === 'ExHentai' ? 'exhentai.org' : 'e-hentai.org';
+}
+
+async function probeDirectSelectedSite(): Promise<boolean> {
+  const request = http.createHttp();
+  try {
+    const host = selectedGalleryHost();
+    const options: http.HttpRequestOptions = {
+      method: http.RequestMethod.HEAD,
+      header: {
+        'User-Agent': FRONTING_PROBE_USER_AGENT,
+        'Accept': '*/*',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        'Cache-Control': 'no-cache',
+        'Connection': 'close'
+      },
+      expectDataType: http.HttpDataType.STRING,
+      usingCache: false,
+      usingProxy: proxyOption(),
+      connectTimeout: DIRECT_PROBE_TIMEOUT_MS,
+      readTimeout: DIRECT_PROBE_TIMEOUT_MS
+    };
+    const response = await requestWithProbeDeadline(request, 'https://' + host + '/', options, DIRECT_PROBE_TIMEOUT_MS);
+    const statusCode = Number(response.responseCode);
+    return statusCode > 0 && statusCode < 500;
+  } catch (error) {
+    return false;
+  } finally {
+    try {
+      request.destroy();
+    } catch (error) {
+    }
+  }
 }
 
 function isKnownProbeTarget(host: string, ip: string): boolean {
