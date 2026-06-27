@@ -765,8 +765,11 @@ function shouldUseDirectConnection(host: string): boolean {
   if (!directProbePassed || ehSettingsStore.getValue('auto_direct_connection', 'On') !== 'On') {
     return false;
   }
-  const selectedHost = selectedGalleryHost();
   const normalizedHost = host.toLowerCase();
+  if (normalizedHost === 'repo.e-hentai.org') {
+    return true;
+  }
+  const selectedHost = selectedGalleryHost();
   return normalizedHost === selectedHost || normalizedHost.endsWith('.' + selectedHost);
 }
 
