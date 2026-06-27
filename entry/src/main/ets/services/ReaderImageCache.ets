@@ -23,6 +23,7 @@ const WAITING_IMAGE_SLOTS: (() => void)[] = [];
 const MAX_ACTIVE_IMAGE_DOWNLOADS: number = 6;
 const MAX_IMAGE_CACHE_BYTES: number = 320 * 1024 * 1024;
 const IMAGE_RETRY_DELAYS_MS: number[] = [300, 900, 1800, 3200];
+const IMAGE_CONNECT_TIMEOUT_MS: number = 4500;
 let activeImageDownloads: number = 0;
 
 interface CachedImageFile {
@@ -153,7 +154,7 @@ export class ReaderImageCache {
     let lastError = '';
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
-        await this.downloadOnce(imageUrl, referer, path, onProgress);
+        await this.downloadOnce(imageUrl, referer, path, attempt, onProgress);
         return;
       } catch (error) {
         removeFileQuietly(path);
@@ -168,7 +169,7 @@ export class ReaderImageCache {
   }
 
   private async downloadOnce(imageUrl: string, referer: string, path: string,
-    onProgress?: ImageDownloadProgressCallback): Promise<void> {
+    attempt: number, onProgress?: ImageDownloadProgressCallback): Promise<void> {
     const request = http.createHttp();
     let plan: EhRequestPlan | null = null;
     const startedAt = Date.now();
@@ -182,11 +183,11 @@ export class ReaderImageCache {
         method: http.RequestMethod.GET,
         header: header,
         expectDataType: http.HttpDataType.ARRAY_BUFFER,
-        connectTimeout: timeout,
+        connectTimeout: plan.fronted ? IMAGE_CONNECT_TIMEOUT_MS : Math.min(timeout, 10000),
         readTimeout: timeout
       };
       applyEhNetworkOptions(options, plan);
-      const response = await request.request(plan.url, options);
+      const response = await requestWithImageDeadline(request, plan.url, options, imageRequestDeadlineMs(plan, attempt));
 
       const statusCode = Number(response.responseCode);
       if (statusCode < 200 || statusCode >= 300) {
@@ -252,6 +253,48 @@ function imageRequestTimeoutMs(): number {
     return 60000;
   }
   return 30000;
+}
+
+function imageRequestDeadlineMs(plan: EhRequestPlan, attempt: number): number {
+  const timeout = imageRequestTimeoutMs();
+  if (!plan.fronted || attempt >= 2) {
+    return timeout;
+  }
+  return Math.min(timeout, 15000);
+}
+
+function requestWithImageDeadline(request: http.HttpRequest, url: string, options: http.HttpRequestOptions,
+  timeoutMs: number): Promise<http.HttpResponse> {
+  return new Promise<http.HttpResponse>((resolve: (value: http.HttpResponse) => void, reject: (reason: Error) => void) => {
+    let finished = false;
+    const timer = setTimeout(() => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      try {
+        request.destroy();
+      } catch (error) {
+      }
+      reject(new Error('Image request timed out after ' + Math.floor(timeoutMs / 1000).toString() + 's'));
+    }, timeoutMs);
+
+    request.request(url, options).then((response: http.HttpResponse) => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      clearTimeout(timer);
+      resolve(response);
+    }).catch((error: Error) => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      clearTimeout(timer);
+      reject(error);
+    });
+  });
 }
 
 function sleepImageRetry(attempt: number): Promise<void> {

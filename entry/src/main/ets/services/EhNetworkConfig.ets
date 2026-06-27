@@ -16,6 +16,7 @@ const DIRECT_PROBE_TIMEOUT_MS: number = 1000;
 const IP_FAILURE_LATENCY_PENALTY_MS: number = 2500;
 const IP_SUCCESS_LATENCY_BONUS_MS: number = 120;
 const IP_RETRY_DEMOTE_THRESHOLD: number = 2;
+const IP_UNTESTED_LATENCY_MS: number = 2200;
 const IP_QUALITY_SAVE_THROTTLE_MS: number = 30000;
 const FRONTING_PROBE_USER_AGENT: string =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36';
@@ -598,7 +599,7 @@ function qualityForHostIp(host: string, ip: string): HostIpQuality {
     host: host,
     ip: ip,
     ok: true,
-    latencyMs: FRONTING_PROBE_DEADLINE_MS,
+    latencyMs: IP_UNTESTED_LATENCY_MS,
     testedAt: Date.now(),
     successCount: 0,
     failureCount: 0,
@@ -620,13 +621,18 @@ function hasUsableIpQualities(): boolean {
 function ipQualityScore(item: HostIpQuality): number {
   const successCount = item.successCount === undefined ? 0 : item.successCount;
   const failureCount = item.failureCount === undefined ? 0 : item.failureCount;
-  return item.latencyMs + failureCount * IP_FAILURE_LATENCY_PENALTY_MS -
-    Math.min(600, successCount * IP_SUCCESS_LATENCY_BONUS_MS);
+  const testedPenalty = item.lastResultAt === undefined || item.lastResultAt <= 0 ? 700 : 0;
+  const okPenalty = item.ok ? 0 : IP_FAILURE_LATENCY_PENALTY_MS;
+  return item.latencyMs + testedPenalty + okPenalty + failureCount * IP_FAILURE_LATENCY_PENALTY_MS -
+    Math.min(1200, successCount * IP_SUCCESS_LATENCY_BONUS_MS);
 }
 
 function ipQualityWeight(item: HostIpQuality): number {
   const score = Math.max(100, ipQualityScore(item));
-  return Math.max(1, Math.round(100000 / score));
+  const successCount = item.successCount === undefined ? 0 : item.successCount;
+  const failureCount = item.failureCount === undefined ? 0 : item.failureCount;
+  const reliability = Math.max(1, 8 + successCount * 2 - failureCount * 5);
+  return Math.max(1, Math.round(100000 * reliability / score));
 }
 
 function replaceIpQualities(results: HostIpQuality[]): boolean {
