@@ -400,8 +400,8 @@ export class EhHttpClient {
 
   async runNetworkDiagnostics(): Promise<NetworkDiagnosticResult[]> {
     const targets: NetworkDiagnosticTarget[] = [
-      { label: 'E', url: EhUrl.HOST_E + '/', referer: EhUrl.HOST_E + '/' },
-      { label: 'EX', url: EhUrl.HOST_EX + '/', referer: EhUrl.HOST_EX + '/' },
+      { label: 'E', url: EhUrl.HOST_E, referer: EhUrl.HOST_E },
+      { label: 'EX', url: EhUrl.HOST_EX, referer: EhUrl.HOST_EX },
       { label: 'Forums', url: EhUrl.FORUM_ORIGIN + '/', referer: EhUrl.FORUM_ORIGIN + '/' },
       { label: 'Repo', url: 'https://repo.e-hentai.org/', referer: EhUrl.HOST_E + '/' }
     ];
@@ -1062,7 +1062,7 @@ function parseHtmlTitle(body: string): string {
 }
 
 function networkErrorMessage(error: Object): string {
-  let message = String(error);
+  let message = readableErrorMessage(error);
   if (message.indexOf('Error: ') === 0) {
     message = message.substring(7);
   }
@@ -1080,6 +1080,33 @@ function networkErrorMessage(error: Object): string {
     return 'Connection refused: check proxy settings';
   }
   return message.length > 0 ? message : 'Network request failed';
+}
+
+function readableErrorMessage(error: Object): string {
+  if (error instanceof Error && error.message.length > 0) {
+    return error.message;
+  }
+  const record = error as Record<string, Object>;
+  const message = record['message'];
+  const code = record['code'];
+  if (typeof message === 'string' && message.length > 0) {
+    if (typeof code === 'number' || typeof code === 'string') {
+      return 'code ' + String(code) + ': ' + message;
+    }
+    return message;
+  }
+  const name = record['name'];
+  if (typeof name === 'string' && name.length > 0) {
+    return name;
+  }
+  try {
+    const json = JSON.stringify(error);
+    if (json.length > 0 && json !== '{}') {
+      return json;
+    }
+  } catch (jsonError) {
+  }
+  return String(error);
 }
 
 function buildRequestHeader(plan: EhRequestPlan, referer: string, cookieHeader: string, cacheTtlMs: number): RequestHeader {
