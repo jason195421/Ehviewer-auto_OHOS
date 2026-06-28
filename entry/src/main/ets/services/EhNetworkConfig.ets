@@ -18,7 +18,7 @@ const IP_SUCCESS_LATENCY_BONUS_MS: number = 120;
 const IP_RETRY_DEMOTE_THRESHOLD: number = 2;
 const IP_UNTESTED_LATENCY_MS: number = 2200;
 const IP_QUALITY_SAVE_THROTTLE_MS: number = 30000;
-const IP_SLOW_RESPONSE_THRESHOLD_MS: number = 6000;
+const IP_SLOW_RESPONSE_THRESHOLD_MS: number = 4000;
 const IP_SLOW_LATENCY_PENALTY_MS: number = 350;
 const FRONTING_PROBE_USER_AGENT: string =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36';
