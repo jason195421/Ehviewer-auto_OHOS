@@ -252,11 +252,6 @@ export struct SettingsScene {
         ? 'Identity authentication enabled: app will verify identity on resume'
         : 'Identity authentication disabled';
     }
-    if (key === 'clipboard_gallery_url_scan') {
-      this.statusText = normalizedValue === 'On'
-        ? 'Clipboard gallery URL scan enabled'
-        : 'Clipboard gallery URL scan disabled';
-    }
     if (key === 'enable_secure') {
       applyWindowPrivacyMode(value === 'On', (status: string) => {
         this.statusText = status;

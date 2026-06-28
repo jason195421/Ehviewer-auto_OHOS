@@ -111,7 +111,7 @@ export const SETTINGS_HEADERS: SettingsHeaderItem[] = [
   { panel: SettingsPanel.Eh, title: 'EH', icon: 'E', summary: 'Account, site, gallery list and comments' },
   { panel: SettingsPanel.Read, title: 'Read', icon: 'R', summary: 'Reader direction, scaling and screen behavior' },
   { panel: SettingsPanel.Download, title: 'Download', icon: 'D', summary: 'Location, threads, preload and cleanup' },
-  { panel: SettingsPanel.Privacy, title: 'Privacy', icon: 'P', summary: 'Lock, clipboard and local data controls' },
+  { panel: SettingsPanel.Privacy, title: 'Privacy', icon: 'P', summary: 'Lock and local data controls' },
   { panel: SettingsPanel.Advanced, title: 'Advanced', icon: 'A', summary: 'Network, cache, hosts and diagnostics' },
   { panel: SettingsPanel.About, title: 'About', icon: 'I', summary: 'Version, license and migration status' }
 ];
@@ -663,7 +663,7 @@ export function zhText(text: string): string {
     case 'Account, site, gallery list and comments': return '账号、站点、画廊列表和评论';
     case 'Reader direction, scaling and screen behavior': return '阅读方向、缩放和屏幕行为';
     case 'Location, threads, preload and cleanup': return '位置、线程、预加载和清理';
-    case 'Lock, clipboard and local data controls': return '锁定、剪贴板和本地数据控制';
+    case 'Lock and local data controls': return '锁定和本地数据控制';
     case 'Network, cache, hosts and diagnostics': return '网络、缓存、hosts 和诊断';
     case 'Version, license and migration status': return '版本、许可和迁移状态';
     case 'Settings follow the original Android header groups': return '设置按原 Android 应用分组';
@@ -775,17 +775,6 @@ export function zhText(text: string): string {
     case 'Unlock to continue using EhViewer': return '解锁后继续使用 EhViewer';
     case 'Secure screen': return '安全屏幕';
     case 'Prevent screenshots and insecure previews': return '禁止截图和不安全预览';
-    case 'Clipboard gallery URL scan': return '剪贴板画廊链接检测';
-    case 'Use the system Paste button to scan gallery links from clipboard': return '使用系统粘贴按钮检测剪贴板中的画廊链接';
-    case 'Read clipboard on startup/resume and offer to open gallery links': return '启动或恢复时读取剪贴板并提示打开画廊链接';
-    case 'There is a gallery url in the clipboard': return '剪贴板里有画廊链接';
-    case 'Paste clipboard to scan gallery URL': return '粘贴剪贴板以检测画廊链接';
-    case 'Tap the system Paste button to grant one-time clipboard access': return '点击系统粘贴按钮授权单次读取剪贴板';
-    case 'Clipboard scan failed': return '剪贴板检测失败';
-    case 'No gallery URL in clipboard': return '剪贴板中没有画廊链接';
-    case 'Clipboard content already checked': return '剪贴板内容已检测过';
-    case 'Clipboard gallery URL scan enabled': return '剪贴板画廊链接检测已开启';
-    case 'Clipboard gallery URL scan disabled': return '剪贴板画廊链接检测已关闭';
     case 'Analytics': return '数据统计';
     case 'Allow privacy-preserving analytics prompt equivalent': return '允许隐私提示对应的数据统计设置';
     case 'About analytics': return '关于数据统计';
@@ -1886,8 +1875,6 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
     return [
       optionSettingsRow('pattern_protection', 'Identity authentication', 'Verify identity when the app returns from background', entries, ON_OFF_OPTIONS),
       optionSettingsRow('enable_secure', 'Secure screen', 'Prevent screenshots and insecure previews', entries, ON_OFF_OPTIONS),
-      optionSettingsRow('clipboard_gallery_url_scan', 'Clipboard gallery URL scan',
-        'Use the system Paste button to scan gallery links from clipboard', entries, ON_OFF_OPTIONS),
       optionSettingsRow('enable_analytics', 'Analytics', 'Allow privacy-preserving analytics prompt equivalent', entries, ON_OFF_OPTIONS),
       staticSettingsRow('about_analytics', 'About analytics', 'Explanation dialog from the original privacy settings', 'Info', 'message'),
       optionSettingsRow('save_parse_error_body', 'Save parse error body', 'Persist parser failures for debugging', entries, ON_OFF_OPTIONS),
