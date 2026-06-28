@@ -5,6 +5,7 @@ import {
 } from '../../shared/EhShared';
 import {
   themeFavoriteText,
+  themeDetailActionColor,
   themeInactiveActionText,
   themeOnPrimaryText,
   themePrimaryColor,
@@ -213,11 +214,11 @@ export struct DetailActionItem {
     Column({ space: 6 }) {
       SymbolGlyph(this.symbolIcon)
         .fontSize(26)
-        .fontColor([this.isActive ? (this.isFilled ? themeFavoriteText() : themePrimaryColor()) :
+        .fontColor([this.isActive ? (this.isFilled ? themeFavoriteText() : themeDetailActionColor()) :
           themeInactiveActionText()])
       Text(this.label)
         .fontSize(11)
-        .fontColor(this.isActive ? themePrimaryColor() : themeInactiveActionText())
+        .fontColor(this.isActive ? themeDetailActionColor() : themeInactiveActionText())
         .textAlign(TextAlign.Center)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })

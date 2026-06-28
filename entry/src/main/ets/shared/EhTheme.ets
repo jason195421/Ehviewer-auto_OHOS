@@ -269,6 +269,10 @@ export function themePrimaryColor(): string {
   return currentThemePalette().primary;
 }
 
+export function themeDetailActionColor(): string {
+  return isDarkTheme() ? currentThemePalette().selectedIndicator : currentThemePalette().primary;
+}
+
 export function themeSurface(): string {
   return currentThemePalette().surface;
 }

@@ -11,7 +11,6 @@ import {
   GalleryPreview,
   GalleryRoute,
   GallerySite,
-  GalleryTagGroup,
   HathArchiveList
 } from '../model/GalleryModels';
 import { ehCookieStore } from '../services/EhCookieStore';
@@ -35,6 +34,15 @@ import { createReaderSessionState, readerSessionStore } from '../services/Reader
 import { ehSettingsStore } from '../services/EhSettingsStore';
 import { ehDownloadManager } from '../services/EhDownloadManager';
 import { readerImageCache } from '../services/ReaderImageCache';
+import {
+  archiveUnavailableReason,
+  createCoverSearchRequest,
+  createSimilarGallerySearch,
+  createTagSearchRequest,
+  detailArchiveReferer,
+  detailCoverCacheKey,
+  DetailSearchRequest
+} from '../services/GalleryDetailActionSupport';
 import { common } from '@kit.AbilityKit';
 import {
   confirmCellularNetworkWarningForSession,
@@ -973,18 +981,16 @@ export struct GalleryListScene {
   }
 
   private openTagSearch(namespace: string, tag: string): void {
-    const trimmedNamespace = namespace.trim();
-    const trimmedTag = tag.trim();
-    if (trimmedNamespace.length === 0 || trimmedTag.length === 0) {
+    const request = createTagSearchRequest(namespace, tag);
+    if (request === null) {
       return;
     }
     this.showComments = false;
     this.showReader = false;
-    this.showDetail = false;
     this.showSearchResultScene = false;
     this.searchResultDraft = {
-      keyword: trimmedNamespace + ':' + trimmedTag,
-      mode: ListMode.Tag,
+      keyword: request.keyword,
+      mode: request.mode,
       category: GalleryCategory.None,
       advancedEnabled: false,
       advanceSearch: DEFAULT_ADVANCE_SEARCH,
@@ -996,10 +1002,10 @@ export struct GalleryListScene {
       searchAdvancedPanelOpened: false,
       submitted: true,
       sourceRoute: GalleryRoute.Home,
-      imagePath: '',
-      imageUseSimilarityScan: false,
-      imageOnlySearchCovers: false,
-      imageShowExpunged: false
+      imagePath: request.imagePath,
+      imageUseSimilarityScan: request.useSimilarityScan,
+      imageOnlySearchCovers: request.onlySearchCovers,
+      imageShowExpunged: request.showExpunged
     };
     this.fabExpanded = false;
     setTimeout(() => {
@@ -1742,13 +1748,9 @@ export struct GalleryListScene {
   }
 
   private ensureArchiveSession(): boolean {
-    if (!this.detailLoaded || this.detail.gid <= 0 || this.detail.archiveUrl.length === 0) {
-      this.detailStatus = 'Archive needs a loaded gallery';
-      this.renderVersion++;
-      return false;
-    }
-    if (this.detail.apiUid < 0) {
-      this.detailStatus = 'Sign in first';
+    const reason = archiveUnavailableReason(this.detailLoaded, this.detail);
+    if (reason.length > 0) {
+      this.detailStatus = reason;
       this.renderVersion++;
       return false;
     }
@@ -1762,8 +1764,7 @@ export struct GalleryListScene {
     this.archiveBusy = true;
     this.archivePanelStatus = 'Submitting...';
     this.renderVersion++;
-    const referer = this.detail.archiveUrl.length > 0 ? this.detail.archiveUrl :
-      EhUrl.getGalleryDetailUrl(this.detail.gid, this.detail.token, 0, false, this.activeSite);
+    const referer = detailArchiveReferer(this.detail, this.activeSite);
     this.client.requestArchiverDownload(option, referer, this.activeSite).then((result: ArchiverDownloadResult) => {
       this.archiveBusy = false;
       this.archivePanelStatus = result.message;
@@ -1804,18 +1805,9 @@ export struct GalleryListScene {
       this.renderVersion++;
       return;
     }
-    const title = extractSimilarTitle(this.detail.title);
-    if (title.length > 0) {
-      this.openSearchResult('"' + title + '"', ListMode.Normal, 'Similar galleries');
-      return;
-    }
-    const artist = firstArtistTag(this.detail.tags);
-    if (artist.length > 0) {
-      this.openSearchResult('artist:' + artist, ListMode.Tag, 'Similar galleries');
-      return;
-    }
-    if (this.detail.uploader !== undefined && this.detail.uploader.length > 0) {
-      this.openSearchResult(this.detail.uploader, ListMode.Uploader, 'Similar galleries');
+    const request = createSimilarGallerySearch(this.detail);
+    if (request !== null) {
+      this.openSearchResult(request);
     }
   }
 
@@ -1831,28 +1823,27 @@ export struct GalleryListScene {
     this.renderVersion++;
     const referer = this.detailRequestUrl.length > 0 ? this.detailRequestUrl :
       EhUrl.getGalleryDetailUrl(this.detail.gid, this.detail.token, 0, false, this.activeSite);
-    readerImageCache.ensureCached(context, thumb, referer, true, undefined, 'cover-search-' + this.detail.gid.toString())
+    readerImageCache.ensureCached(context, thumb, referer, true, undefined, detailCoverCacheKey(this.detail))
       .then((path: string) => {
         if (path.length === 0) {
           this.detailStatus = 'Cover image cache failed';
           this.renderVersion++;
           return;
         }
-        this.openImageSearchResult(path);
+        this.openSearchResult(createCoverSearchRequest(path));
       }).catch((error: Error) => {
         this.detailStatus = 'Cover search failed: ' + error.message;
         this.renderVersion++;
       });
   }
 
-  private openSearchResult(keyword: string, mode: ListMode, title: string): void {
+  private openSearchResult(request: DetailSearchRequest): void {
     this.showComments = false;
     this.showReader = false;
-    this.showDetail = false;
     this.showSearchResultScene = false;
     this.searchResultDraft = {
-      keyword: keyword,
-      mode: mode,
+      keyword: request.keyword,
+      mode: request.mode,
       category: GalleryCategory.None,
       advancedEnabled: false,
       advanceSearch: DEFAULT_ADVANCE_SEARCH,
@@ -1864,42 +1855,12 @@ export struct GalleryListScene {
       searchAdvancedPanelOpened: false,
       submitted: true,
       sourceRoute: GalleryRoute.Home,
-      imagePath: '',
-      imageUseSimilarityScan: false,
-      imageOnlySearchCovers: false,
-      imageShowExpunged: false
+      imagePath: request.imagePath,
+      imageUseSimilarityScan: request.useSimilarityScan,
+      imageOnlySearchCovers: request.onlySearchCovers,
+      imageShowExpunged: request.showExpunged
     };
-    this.detailStatus = title;
-    this.fabExpanded = false;
-    setTimeout(() => {
-      this.showSearchResultScene = true;
-    }, 0);
-  }
-
-  private openImageSearchResult(imagePath: string): void {
-    this.showComments = false;
-    this.showReader = false;
-    this.showDetail = false;
-    this.showSearchResultScene = false;
-    this.searchResultDraft = {
-      keyword: '',
-      mode: ListMode.ImageSearch,
-      category: GalleryCategory.None,
-      advancedEnabled: false,
-      advanceSearch: DEFAULT_ADVANCE_SEARCH,
-      minRating: -1,
-      pageFrom: -1,
-      pageTo: -1,
-      filterActive: false,
-      searchFilterEnabled: true,
-      searchAdvancedPanelOpened: false,
-      submitted: true,
-      sourceRoute: GalleryRoute.Home,
-      imagePath: imagePath,
-      imageUseSimilarityScan: true,
-      imageOnlySearchCovers: false,
-      imageShowExpunged: true
-    };
+    this.detailStatus = request.title;
     this.fabExpanded = false;
     setTimeout(() => {
       this.showSearchResultScene = true;
@@ -2224,25 +2185,6 @@ export struct GalleryListScene {
   }
 }
 
-function extractSimilarTitle(title: string): string {
-  let value = title
-    .replace(/^(?:(?:\([^\)]*\))|(?:\[[^\]]*\])|(?:\{[^\}]*\})|(?:~[^~]*~)|\s+)*/g, '')
-    .replace(/(?:\s+ch\.[\s\d-]+)?(?:(?:\([^\)]*\))|(?:\[[^\]]*\])|(?:\{[^\}]*\})|(?:~[^~]*~)|\s+)*$/gi, '');
-  const splitIndex = value.indexOf('|');
-  if (splitIndex >= 0) {
-    value = value.substring(0, splitIndex);
-  }
-  return value.trim();
-}
-
-function firstArtistTag(groups: GalleryTagGroup[]): string {
-  for (let i = 0; i < groups.length; i++) {
-    if (groups[i].namespace === 'artist' && groups[i].tags.length > 0) {
-      return groups[i].tags[0];
-    }
-  }
-  return '';
-}
 
 @Component
 export struct GalleryListContent {

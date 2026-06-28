@@ -10,7 +10,6 @@ import {
   GalleryPage,
   GalleryPreview,
   GalleryRoute,
-  GalleryTagGroup,
   HathArchiveList
 } from '../model/GalleryModels';
 import { ehDownloadFileStore, RestoredDownloadGallery } from '../services/EhDownloadFileStore';
@@ -33,6 +32,15 @@ import { DEFAULT_ADVANCE_SEARCH, EhUrl, ListMode } from '../services/EhUrl';
 import { galleryMatchesLocalSearch, LocalGallerySearchOptions } from '../services/LocalGallerySearch';
 import { createReaderSessionState, readerSessionStore } from '../services/ReaderSessionStore';
 import { readerImageCache } from '../services/ReaderImageCache';
+import {
+  archiveUnavailableReason,
+  createCoverSearchRequest,
+  createSimilarGallerySearch,
+  createTagSearchRequest,
+  detailArchiveReferer,
+  detailCoverCacheKey,
+  DetailSearchRequest
+} from '../services/GalleryDetailActionSupport';
 import { ehAppLog } from '../services/EhAppLog';
 import {
   applyAppChromeImmersiveMode,
@@ -141,26 +149,6 @@ function mergeDownloadDetailTitles(detail: GalleryDetail, item: DownloadInfo): G
     next.titleJpn = item.titleJpn;
   }
   return next;
-}
-
-function extractSimilarTitle(title: string): string {
-  let value = title
-    .replace(/^(?:(?:\([^\)]*\))|(?:\[[^\]]*\])|(?:\{[^\}]*\})|(?:~[^~]*~)|\s+)*/g, '')
-    .replace(/(?:\s+ch\.[\s\d-]+)?(?:(?:\([^\)]*\))|(?:\[[^\]]*\])|(?:\{[^\}]*\})|(?:~[^~]*~)|\s+)*$/gi, '');
-  const splitIndex = value.indexOf('|');
-  if (splitIndex >= 0) {
-    value = value.substring(0, splitIndex);
-  }
-  return value.trim();
-}
-
-function firstArtistTag(groups: GalleryTagGroup[]): string {
-  for (let i = 0; i < groups.length; i++) {
-    if (groups[i].namespace === 'artist' && groups[i].tags.length > 0) {
-      return groups[i].tags[0];
-    }
-  }
-  return '';
 }
 
 @Component
@@ -1033,11 +1021,11 @@ export struct DownloadScene {
   }
 
   private openTagSearch(namespace: string, tag: string): void {
-    const keyword = this.buildTagSearchKeyword(namespace, tag);
-    if (keyword.length === 0) {
+    const request = createTagSearchRequest(namespace, tag);
+    if (request === null) {
       return;
     }
-    this.openRemoteSearch(keyword, ListMode.Tag, keyword);
+    this.openRemoteSearch(request);
   }
 
   private closeTagSearch(): void {
@@ -1054,32 +1042,21 @@ export struct DownloadScene {
     }, 0);
   }
 
-  private openRemoteSearch(keyword: string, mode: ListMode, title: string): void {
-    this.tagSearchTitle = title.length > 0 ? title : 'Search';
-    this.tagSearchKeyword = keyword;
-    this.tagSearchMode = mode;
-    this.tagSearchImagePath = '';
-    this.tagSearchImageUseSimilarity = false;
-    this.tagSearchImageOnlyCovers = false;
-    this.tagSearchImageShowExpunged = false;
-    this.showDetail = false;
+  private openRemoteSearch(request: DetailSearchRequest): void {
+    this.tagSearchTitle = request.title;
+    this.tagSearchKeyword = request.keyword;
+    this.tagSearchMode = request.mode;
+    this.tagSearchImagePath = request.imagePath;
+    this.tagSearchImageUseSimilarity = request.useSimilarityScan;
+    this.tagSearchImageOnlyCovers = request.onlySearchCovers;
+    this.tagSearchImageShowExpunged = request.showExpunged;
     this.showReader = false;
     this.showComments = false;
     this.showTagSearch = true;
   }
 
   private openImageSearch(path: string): void {
-    this.tagSearchTitle = 'Search cover';
-    this.tagSearchKeyword = '';
-    this.tagSearchMode = ListMode.ImageSearch;
-    this.tagSearchImagePath = path;
-    this.tagSearchImageUseSimilarity = true;
-    this.tagSearchImageOnlyCovers = false;
-    this.tagSearchImageShowExpunged = true;
-    this.showDetail = false;
-    this.showReader = false;
-    this.showComments = false;
-    this.showTagSearch = true;
+    this.openRemoteSearch(createCoverSearchRequest(path));
   }
 
   private buildTagSearchKeyword(namespace: string, tag: string): string {
@@ -1102,13 +1079,9 @@ export struct DownloadScene {
   }
 
   private ensureArchiveSession(): boolean {
-    if (!this.detailLoaded || this.detail.gid <= 0 || this.detail.archiveUrl.length === 0) {
-      this.detailStatus = 'Archive needs a loaded gallery';
-      this.detailRenderVersion++;
-      return false;
-    }
-    if (this.detail.apiUid < 0) {
-      this.detailStatus = 'Sign in first';
+    const reason = archiveUnavailableReason(this.detailLoaded, this.detail);
+    if (reason.length > 0) {
+      this.detailStatus = reason;
       this.detailRenderVersion++;
       return false;
     }
@@ -1168,8 +1141,7 @@ export struct DownloadScene {
     this.archiveBusy = true;
     this.archivePanelStatus = 'Submitting...';
     this.detailRenderVersion++;
-    const referer = this.detail.archiveUrl.length > 0 ? this.detail.archiveUrl :
-      EhUrl.getGalleryDetailUrl(this.detail.gid, this.detail.token, 0, false, currentGallerySite());
+    const referer = detailArchiveReferer(this.detail, currentGallerySite());
     this.client.requestArchiverDownload(option, referer, currentGallerySite()).then((result: ArchiverDownloadResult) => {
       this.archiveBusy = false;
       this.archivePanelStatus = result.message;
@@ -1226,18 +1198,9 @@ export struct DownloadScene {
       this.detailRenderVersion++;
       return;
     }
-    const title = extractSimilarTitle(this.detail.title);
-    if (title.length > 0) {
-      this.openRemoteSearch('"' + title + '"', ListMode.Normal, 'Similar');
-      return;
-    }
-    const artist = firstArtistTag(this.detail.tags);
-    if (artist.length > 0) {
-      this.openRemoteSearch('artist:' + artist, ListMode.Tag, 'Similar');
-      return;
-    }
-    if (this.detail.uploader !== undefined && this.detail.uploader.length > 0) {
-      this.openRemoteSearch(this.detail.uploader, ListMode.Uploader, 'Similar');
+    const request = createSimilarGallerySearch(this.detail);
+    if (request !== null) {
+      this.openRemoteSearch(request);
     }
   }
 
@@ -1253,7 +1216,7 @@ export struct DownloadScene {
     this.detailRenderVersion++;
     const referer = this.detailRequestUrl.length > 0 ? this.detailRequestUrl :
       EhUrl.getGalleryDetailUrl(this.detail.gid, this.detail.token, 0, false, currentGallerySite());
-    readerImageCache.ensureCached(context, thumb, referer, true, undefined, 'cover-search-' + this.detail.gid.toString())
+    readerImageCache.ensureCached(context, thumb, referer, true, undefined, detailCoverCacheKey(this.detail))
       .then((path: string) => {
         if (path.length === 0) {
           this.detailStatus = 'Cover image cache failed';
