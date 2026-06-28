@@ -6,7 +6,12 @@ import { MAIN_WINDOW_KEY, prepareAppChromeBeforeContent, rememberMainWindow } fr
 import { applyWindowPrivacyMode, WINDOW_PRIVACY_STATUS_KEY } from '../services/EhWindowPrivacy';
 import { ehSettingsStore } from '../services/EhSettingsStore';
 import { ehAppLog } from '../services/EhAppLog';
-import { startEhDirectConnectionProbe, startEhFrontingBenchmark } from '../services/EhNetworkConfig';
+import {
+  isEhDirectConnectionProbeEnabled,
+  startEhDirectConnectionProbe,
+  startEhFrontingBenchmark
+} from '../services/EhNetworkConfig';
+import { uiText } from '../shared/EhShared';
 
 const SETTINGS_PREF_NAME: string = 'ehviewer_settings';
 const SETTINGS_VALUES_KEY: string = 'values';
@@ -23,6 +28,7 @@ interface SettingEntry {
 export default class EntryAbility extends UIAbility {
   private windowStage: window.WindowStage | undefined = undefined;
   private authPending: boolean = false;
+  private startupDirectProbeToast: string = '';
   // Largest bottom avoid (nav bar / gesture indicator) height observed this session, in px.
   // The reader hides system bars (setWindowSystemBarEnable([])), which makes the live avoid
   // area report 0 — but the gesture indicator zone physically persists. We keep the max-seen
@@ -50,7 +56,13 @@ export default class EntryAbility extends UIAbility {
       });
     }).catch(() => {});
     const settingsReady = ehSettingsStore.load(this.context).then(() => {
+      if (!isEhDirectConnectionProbeEnabled()) {
+        return;
+      }
       return startEhDirectConnectionProbe(this.context).then((directAvailable: boolean) => {
+        this.startupDirectProbeToast = directAvailable
+          ? 'Direct connection available, domain fronting disabled'
+          : 'Direct connection unavailable, domain fronting enabled';
         if (!directAvailable) {
           startEhFrontingBenchmark(this.context);
         }
@@ -68,8 +80,27 @@ export default class EntryAbility extends UIAbility {
       if (error.code) {
         console.error(`Failed to load the main page. code=${error.code}, message=${error.message}`);
         ehAppLog.error(this.context, 'EntryAbility', 'Failed to load main page: ' + error.message);
+        return;
       }
+      this.showStartupDirectProbeToast();
     });
+  }
+
+  private showStartupDirectProbeToast(): void {
+    if (this.startupDirectProbeToast.length === 0 || this.windowStage === undefined) {
+      return;
+    }
+    const message = this.startupDirectProbeToast;
+    this.startupDirectProbeToast = '';
+    try {
+      this.windowStage.getMainWindow().then((win) => {
+        try {
+          win.getUIContext().getPromptAction().showToast({ message: uiText(message) });
+        } catch (error) {
+        }
+      }).catch(() => {});
+    } catch (error) {
+    }
   }
 
   private updateWindowAvoidAreas(win: window.Window): void {

@@ -187,6 +187,10 @@ export function startEhDirectConnectionProbe(context?: common.UIAbilityContext):
   return directProbePending;
 }
 
+export function isEhDirectConnectionProbeEnabled(): boolean {
+  return ehSettingsStore.getValue('auto_direct_connection', 'On') === 'On';
+}
+
 export function recordEhRequestOutcome(plan: EhRequestPlan, ok: boolean, elapsedMs: number): void {
   if (!plan.fronted) {
     return;

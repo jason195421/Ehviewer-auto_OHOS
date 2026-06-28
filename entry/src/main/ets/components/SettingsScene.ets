@@ -16,7 +16,11 @@ import { DownloadInfo, DownloadLabel, DownloadState, ehDownloadStore } from '../
 import { ehHistoryStore } from '../services/EhHistoryStore';
 import { ehSettingsStore, SettingEntry, defaultSettingEntries } from '../services/EhSettingsStore';
 import { EhHttpClient, NetworkDiagnosticResult } from '../services/EhHttpClient';
-import { startEhDirectConnectionProbe, startEhFrontingBenchmark } from '../services/EhNetworkConfig';
+import {
+  isEhDirectConnectionProbeEnabled,
+  startEhDirectConnectionProbe,
+  startEhFrontingBenchmark
+} from '../services/EhNetworkConfig';
 import { EhUrl } from '../services/EhUrl';
 import { ehUpdateChecker, ReleaseInfo, UpdateCheckResult } from '../services/EhUpdateChecker';
 import { galleryPageCache } from '../services/GalleryPageCache';
@@ -797,7 +801,7 @@ export struct SettingsScene {
 
   private showToast(message: string): void {
     try {
-      this.getUIContext().getPromptAction().showToast({ message: message });
+      this.getUIContext().getPromptAction().showToast({ message: uiText(message) });
     } catch (error) {
     }
   }
@@ -1078,11 +1082,18 @@ export struct SettingsScene {
 
   private refreshNetworkRuntime(): void {
     const context = getAbilityContext();
+    if (!isEhDirectConnectionProbeEnabled()) {
+      return;
+    }
     startEhDirectConnectionProbe(context).then((directAvailable: boolean) => {
       if (!directAvailable) {
+        this.showFloatingStatus('Direct connection unavailable, domain fronting enabled');
         startEhFrontingBenchmark(context);
+        return;
       }
+      this.showFloatingStatus('Direct connection available, domain fronting disabled');
     }).catch(() => {
+      this.showFloatingStatus('Direct connection unavailable, domain fronting enabled');
       startEhFrontingBenchmark(context);
     });
   }

@@ -655,6 +655,8 @@ export function zhText(text: string): string {
     case 'DNS over HTTPS': return 'DNS over HTTPS';
     case 'Domain fronting': return '域名前置';
     case 'Direct connection check': return '直连检测';
+    case 'Direct connection available, domain fronting disabled': return '可直接访问，已关闭域名前置';
+    case 'Direct connection unavailable, domain fronting enabled': return '无法直接访问，开启域名前置';
     case 'Account, site, gallery list and comments': return '账号、站点、画廊列表和评论';
     case 'Reader direction, scaling and screen behavior': return '阅读方向、缩放和屏幕行为';
     case 'Location, threads, preload and cleanup': return '位置、线程、预加载和清理';
