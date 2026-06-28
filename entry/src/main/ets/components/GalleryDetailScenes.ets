@@ -1,6 +1,14 @@
 ﻿import { GalleryDetail, GalleryPreview } from '../model/GalleryModels';
-import { STATUS_BAR_HEIGHT_KEY, createEmptyDetail, galleryDisplayTitle } from '../shared/EhShared';
+import { ArchiveOption, ArchiverInfo, ArchiverOption, HathArchiveList } from '../model/GalleryModels';
+import { STATUS_BAR_HEIGHT_KEY, createEmptyDetail, galleryDisplayTitle, uiText } from '../shared/EhShared';
 import { themePageBackground, themeScrimColor } from '../shared/EhTheme';
+import {
+  themeDividerColor,
+  themePrimaryText,
+  themeSecondaryText,
+  themeSurface,
+  themeSurfaceVariant
+} from '../shared/EhTheme';
 import { EhSubNavBar } from './NavigationComponents';
 import { CommentsScene } from './ReaderScenes';
 import { DetailHeader } from './detail/DetailHeader';
@@ -20,6 +28,12 @@ export struct GalleryDetailOverlayScene {
   @Prop statusText: string = '';
   @Prop requestUrl: string = '';
   @Prop downloadText: string = 'Download';
+  @Prop archivePanelVisible: boolean = false;
+  @Prop archivePanelMode: string = '';
+  @Prop archivePanelStatus: string = '';
+  @Prop archiveBusy: boolean = false;
+  @Prop archiverInfo: ArchiverInfo = { funds: '', options: [] };
+  @Prop hathArchiveList: HathArchiveList = { formParamOr: '', options: [] };
   initialDetailScrollOffset: number = 0;
   onBack: () => void = () => {};
   onCloseComments: () => void = () => {};
@@ -32,6 +46,12 @@ export struct GalleryDetailOverlayScene {
   onRate: (rating: number) => void = (_rating: number) => {};
   onTorrent: () => void = () => {};
   onArchive: () => void = () => {};
+  onHath: () => void = () => {};
+  onSimilar: () => void = () => {};
+  onSearchCover: () => void = () => {};
+  onCloseArchivePanel: () => void = () => {};
+  onSelectArchiverOption: (option: ArchiverOption) => void = (_option: ArchiverOption) => {};
+  onSelectHathOption: (option: ArchiveOption) => void = (_option: ArchiveOption) => {};
   onLoadMorePreviews: () => void = () => {};
   onDetailScrollUpdate: (offset: number) => void = () => {};
   onTagSearch: (namespace: string, tag: string) => void = (_namespace: string, _tag: string) => {};
@@ -53,6 +73,12 @@ export struct GalleryDetailOverlayScene {
         statusText: this.statusText,
         requestUrl: this.requestUrl,
         downloadText: this.downloadText,
+        archivePanelVisible: this.archivePanelVisible,
+        archivePanelMode: this.archivePanelMode,
+        archivePanelStatus: this.archivePanelStatus,
+        archiveBusy: this.archiveBusy,
+        archiverInfo: this.archiverInfo,
+        hathArchiveList: this.hathArchiveList,
         onBack: this.onBack,
         onDownload: this.onDownload,
         onRead: this.onRead,
@@ -63,6 +89,12 @@ export struct GalleryDetailOverlayScene {
         onRate: this.onRate,
         onTorrent: this.onTorrent,
         onArchive: this.onArchive,
+        onHath: this.onHath,
+        onSimilar: this.onSimilar,
+        onSearchCover: this.onSearchCover,
+        onCloseArchivePanel: this.onCloseArchivePanel,
+        onSelectArchiverOption: this.onSelectArchiverOption,
+        onSelectHathOption: this.onSelectHathOption,
         onLoadMorePreviews: this.onLoadMorePreviews,
         initialDetailScrollOffset: this.initialDetailScrollOffset,
         onDetailScrollUpdate: this.onDetailScrollUpdate,
@@ -81,6 +113,12 @@ export struct GalleryDetailScene {
   @Prop statusText: string = '';
   @Prop requestUrl: string = '';
   @Prop downloadText: string = 'Download';
+  @Prop archivePanelVisible: boolean = false;
+  @Prop archivePanelMode: string = '';
+  @Prop archivePanelStatus: string = '';
+  @Prop archiveBusy: boolean = false;
+  @Prop archiverInfo: ArchiverInfo = { funds: '', options: [] };
+  @Prop hathArchiveList: HathArchiveList = { formParamOr: '', options: [] };
   onBack: () => void = () => {};
   onDownload: () => void = () => {};
   onRead: () => void = () => {};
@@ -91,6 +129,12 @@ export struct GalleryDetailScene {
   onRate: (rating: number) => void = (_rating: number) => {};
   onTorrent: () => void = () => {};
   onArchive: () => void = () => {};
+  onHath: () => void = () => {};
+  onSimilar: () => void = () => {};
+  onSearchCover: () => void = () => {};
+  onCloseArchivePanel: () => void = () => {};
+  onSelectArchiverOption: (option: ArchiverOption) => void = (_option: ArchiverOption) => {};
+  onSelectHathOption: (option: ArchiveOption) => void = (_option: ArchiveOption) => {};
   onLoadMorePreviews: () => void = () => {};
   initialDetailScrollOffset: number = 0;
   onDetailScrollUpdate: (offset: number) => void = () => {};
@@ -147,7 +191,10 @@ export struct GalleryDetailScene {
                 this.startRating();
               },
               onTorrent: this.onTorrent,
-              onArchive: this.onArchive
+              onArchive: this.onArchive,
+              onHath: this.onHath,
+              onSimilar: this.onSimilar,
+              onSearchCover: this.onSearchCover
             })
           }
           .reuseId('detail-actions')
@@ -219,7 +266,19 @@ export struct GalleryDetailScene {
         .justifyContent(FlexAlign.Center)
         .alignItems(HorizontalAlign.Center)
         .padding(24)
-        .backgroundColor(themeScrimColor())
+          .backgroundColor(themeScrimColor())
+      }
+      if (this.archivePanelVisible) {
+        ArchiveOptionsOverlay({
+          mode: this.archivePanelMode,
+          statusText: this.archivePanelStatus,
+          busy: this.archiveBusy,
+          archiverInfo: this.archiverInfo,
+          hathArchiveList: this.hathArchiveList,
+          onDismiss: this.onCloseArchivePanel,
+          onSelectArchiverOption: this.onSelectArchiverOption,
+          onSelectHathOption: this.onSelectHathOption
+        })
       }
     }
     .width('100%')
@@ -228,3 +287,178 @@ export struct GalleryDetailScene {
   }
 }
 
+@Component
+struct ArchiveOptionsOverlay {
+  @Prop mode: string = '';
+  @Prop statusText: string = '';
+  @Prop busy: boolean = false;
+  @Prop archiverInfo: ArchiverInfo = { funds: '', options: [] };
+  @Prop hathArchiveList: HathArchiveList = { formParamOr: '', options: [] };
+  onDismiss: () => void = () => {};
+  onSelectArchiverOption: (option: ArchiverOption) => void = (_option: ArchiverOption) => {};
+  onSelectHathOption: (option: ArchiveOption) => void = (_option: ArchiveOption) => {};
+
+  private title(): string {
+    return this.mode === 'hath' ? 'H@H' : uiText('Archive');
+  }
+
+  private emptyText(): string {
+    if (this.busy) {
+      return uiText('Loading...');
+    }
+    return this.mode === 'hath' ? uiText('No H@H archives') : uiText('No archiver options');
+  }
+
+  build() {
+    Stack({ alignContent: Alignment.Bottom }) {
+      Column() {}
+        .width('100%')
+        .height('100%')
+        .backgroundColor(themeScrimColor())
+        .onClick(() => {
+          if (!this.busy) {
+            this.onDismiss();
+          }
+        })
+
+      Column({ space: 0 }) {
+        Row() {
+          Text(this.title())
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(themePrimaryText())
+            .layoutWeight(1)
+          Button(uiText('Cancel'))
+            .type(ButtonType.Normal)
+            .height(34)
+            .fontSize(13)
+            .fontColor(themeSecondaryText())
+            .backgroundColor(themeSurfaceVariant())
+            .borderRadius(6)
+            .onClick(() => {
+              if (!this.busy) {
+                this.onDismiss();
+              }
+            })
+        }
+        .width('100%')
+        .padding({ left: 18, right: 18, top: 16, bottom: 12 })
+
+        if (this.statusText.length > 0 || this.archiverInfo.funds.length > 0) {
+          Text(this.statusText.length > 0 ? uiText(this.statusText) : this.archiverInfo.funds)
+            .fontSize(13)
+            .fontColor(themeSecondaryText())
+            .width('100%')
+            .padding({ left: 18, right: 18, bottom: 10 })
+        }
+
+        Divider().height(1).color(themeDividerColor())
+
+        Scroll() {
+          Column({ space: 0 }) {
+            if (this.mode === 'hath') {
+              if (this.hathArchiveList.options.length === 0) {
+                ArchiveEmptyRow({ text: this.emptyText() })
+              }
+              ForEach(this.hathArchiveList.options, (option: ArchiveOption) => {
+                ArchiveOptionRow({
+                  title: option.label,
+                  subtitle: option.value,
+                  busy: this.busy,
+                  onTap: () => {
+                    this.onSelectHathOption(option);
+                  }
+                })
+              }, (option: ArchiveOption) => option.value + ':' + option.label)
+            } else {
+              if (this.archiverInfo.options.length === 0) {
+                ArchiveEmptyRow({ text: this.emptyText() })
+              }
+              ForEach(this.archiverInfo.options, (option: ArchiverOption) => {
+                ArchiveOptionRow({
+                  title: uiText(option.label),
+                  subtitle: option.cost.length > 0 || option.size.length > 0 ?
+                    option.cost + (option.cost.length > 0 && option.size.length > 0 ? ' / ' : '') + option.size :
+                    option.url,
+                  busy: this.busy,
+                  onTap: () => {
+                    this.onSelectArchiverOption(option);
+                  }
+                })
+              }, (option: ArchiverOption) => option.kind + ':' + option.url)
+            }
+          }
+        }
+        .width('100%')
+        .constraintSize({ maxHeight: 360 })
+      }
+      .width('100%')
+      .constraintSize({ maxWidth: 520 })
+      .backgroundColor(themeSurface())
+      .borderRadius({ topLeft: 12, topRight: 12 })
+      .clip(true)
+      .transition(TransitionEffect.move(TransitionEdge.BOTTOM).animation({ duration: 220, curve: Curve.EaseOut }))
+    }
+    .width('100%')
+    .height('100%')
+  }
+}
+
+@Component
+struct ArchiveOptionRow {
+  @Prop title: string = '';
+  @Prop subtitle: string = '';
+  @Prop busy: boolean = false;
+  onTap: () => void = () => {};
+
+  build() {
+    Column() {
+      Row() {
+        Column({ space: 4 }) {
+          Text(this.title)
+            .fontSize(15)
+            .fontColor(this.busy ? themeSecondaryText() : themePrimaryText())
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .width('100%')
+          if (this.subtitle.length > 0) {
+            Text(this.subtitle)
+              .fontSize(12)
+              .fontColor(themeSecondaryText())
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .width('100%')
+          }
+        }
+        .layoutWeight(1)
+        SymbolGlyph($r('sys.symbol.chevron_forward'))
+          .fontSize(18)
+          .fontColor([themeSecondaryText()])
+      }
+      .width('100%')
+      .padding({ left: 18, right: 18, top: 12, bottom: 12 })
+      Divider().height(1).color(themeDividerColor()).margin({ left: 18 })
+    }
+    .width('100%')
+    .backgroundColor(themeSurface())
+    .onClick(() => {
+      if (!this.busy) {
+        this.onTap();
+      }
+    })
+  }
+}
+
+@Component
+struct ArchiveEmptyRow {
+  @Prop text: string = '';
+
+  build() {
+    Text(this.text)
+      .fontSize(14)
+      .fontColor(themeSecondaryText())
+      .width('100%')
+      .padding(24)
+      .textAlign(TextAlign.Center)
+  }
+}

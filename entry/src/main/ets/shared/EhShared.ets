@@ -532,6 +532,16 @@ export function zhText(text: string): string {
     case 'Favorite': return '收藏';
     case 'Archive': return '归档';
     case 'Archive -': return '归档 -';
+    case 'Similar': return '相似画廊';
+    case 'Search cover': return '搜索封面';
+    case 'No H@H archives': return '没有可用的 H@H 档案';
+    case 'No archiver options': return '没有可用的档案选项';
+    case 'Loading...': return '加载中...';
+    case 'Submitting...': return '正在提交...';
+    case 'Parsed H@H archive list': return '已解析 H@H 档案列表';
+    case 'Parsed archiver options': return '已解析档案选项';
+    case 'H@H download request submitted': return 'H@H 下载请求已提交';
+    case 'Archiver download URL ready': return '档案下载链接已就绪';
     case 'Share': return '分享';
     case 'Save': return '保存';
     case 'Save to album': return '保存到相册';

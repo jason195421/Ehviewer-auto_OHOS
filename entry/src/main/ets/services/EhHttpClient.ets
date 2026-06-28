@@ -1,14 +1,30 @@
 import { http } from '@kit.NetworkKit';
 import { webview } from '@kit.ArkWeb';
-import { GalleryDetail, GalleryInfo, GalleryPage, GallerySite, TopListDetail } from '../model/GalleryModels';
+import { fileIo as fs } from '@kit.CoreFileKit';
+import {
+  ArchiverInfo,
+  ArchiverOption,
+  GalleryDetail,
+  GalleryInfo,
+  GalleryPage,
+  GallerySite,
+  HathArchiveList,
+  TopListDetail
+} from '../model/GalleryModels';
 import { ehCookieStore } from './EhCookieStore';
-import { EhUrl, FavListUrlBuilder, ListUrlBuilder } from './EhUrl';
+import { EhUrl, FavListUrlBuilder, ListMode, ListUrlBuilder } from './EhUrl';
 import { GalleryDetailParseResult, parseGalleryDetail } from './GalleryDetailParser';
 import { mergeGalleryApiMetadata } from './GalleryApiParser';
 import { GalleryListParseResult, parseGalleryList } from './GalleryListParser';
 import { GalleryPageApiParseResult, parseGalleryPageApi } from './GalleryPageApiParser';
 import { GalleryPageParseResult, parseGalleryPage } from './GalleryPageParser';
 import { GalleryPageUrlInfo, parseGalleryPageUrl } from './GalleryPageUrlParser';
+import {
+  parseArchiverContinueUrl,
+  parseArchiverDownloadUrl,
+  parseArchiverInfo,
+  parseHathArchiveList
+} from './ArchiveParser';
 import { ehSpiderInfoStore } from './EhSpiderInfoStore';
 import {
   applyEhNetworkOptions,
@@ -133,6 +149,35 @@ export interface RateGalleryResult {
   message: string;
   rating: number;
   ratingCount: number;
+}
+
+export interface HathArchiveListLoadResult {
+  ok: boolean;
+  url: string;
+  statusCode: number;
+  message: string;
+  list: HathArchiveList | null;
+}
+
+export interface HathArchiveSubmitResult {
+  ok: boolean;
+  statusCode: number;
+  message: string;
+}
+
+export interface ArchiverLoadResult {
+  ok: boolean;
+  url: string;
+  statusCode: number;
+  message: string;
+  info: ArchiverInfo | null;
+}
+
+export interface ArchiverDownloadResult {
+  ok: boolean;
+  statusCode: number;
+  message: string;
+  downloadUrl: string;
 }
 
 export interface NetworkDiagnosticResult {
@@ -564,6 +609,9 @@ export class EhHttpClient {
 
   async loadGalleryList(builder: ListUrlBuilder, site: GallerySite = GallerySite.E,
     includeUConfig: boolean = true): Promise<GalleryListLoadResult> {
+    if (builder.mode === ListMode.ImageSearch) {
+      return this.loadImageSearchList(builder, site);
+    }
     const url = builder.build(site);
     return this.loadGalleryListUrl(url, site, includeUConfig);
   }
@@ -686,6 +734,145 @@ export class EhHttpClient {
   async loadGalleryPage(pageUrl: string, site: GallerySite = GallerySite.E,
     referer: string = EhUrl.getReferer(site)): Promise<GalleryPageLoadResult> {
     return this.loadGalleryPageFast(pageUrl, site, referer, true);
+  }
+
+  async loadHathArchiveList(gid: number, token: string, archiveUrl: string,
+    site: GallerySite = GallerySite.E): Promise<HathArchiveListLoadResult> {
+    const url = archiveUrl.length > 0 ? archiveUrl : EhUrl.getDownloadArchiveUrl(gid, token, '', site);
+    try {
+      const response = await this.getText(url, EhUrl.getGalleryDetailUrl(gid, token, 0, false, site), 0);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return {
+          ok: false,
+          url: url,
+          statusCode: response.statusCode,
+          message: httpStatusMessage(response.statusCode, response.body),
+          list: null
+        };
+      }
+      const list = parseHathArchiveList(response.body);
+      return {
+        ok: list.options.length > 0,
+        url: url,
+        statusCode: response.statusCode,
+        message: list.options.length > 0 ? 'Parsed H@H archive list' : 'No H@H archives',
+        list: list
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        url: url,
+        statusCode: 0,
+        message: networkErrorMessage(error),
+        list: null
+      };
+    }
+  }
+
+  async submitHathArchive(gid: number, token: string, formParamOr: string, resolution: string,
+    site: GallerySite = GallerySite.E): Promise<HathArchiveSubmitResult> {
+    if (resolution.length === 0) {
+      return { ok: false, statusCode: 0, message: 'Invalid H@H resolution' };
+    }
+    const url = EhUrl.getDownloadArchiveUrl(gid, token, formParamOr, site);
+    const referer = EhUrl.getGalleryDetailUrl(gid, token, 0, false, site);
+    const origin = EhUrl.getReferer(site);
+    try {
+      const response = await this.postForm(url, buildFormBody([{ key: 'hathdl_xres', value: resolution }]), referer, origin);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return { ok: false, statusCode: response.statusCode, message: httpStatusMessage(response.statusCode, response.body) };
+      }
+      if (/No H@H client|H@H client/i.test(response.body) && /not|no|need|requires/i.test(response.body)) {
+        return { ok: false, statusCode: response.statusCode, message: 'No H@H client available' };
+      }
+      return { ok: true, statusCode: response.statusCode, message: 'H@H download request submitted' };
+    } catch (error) {
+      return { ok: false, statusCode: 0, message: networkErrorMessage(error) };
+    }
+  }
+
+  async loadArchiver(gid: number, token: string, archiveUrl: string,
+    site: GallerySite = GallerySite.E): Promise<ArchiverLoadResult> {
+    const url = archiveUrl.length > 0 ? archiveUrl : EhUrl.getDownloadArchiveUrl(gid, token, '', site);
+    try {
+      const response = await this.getText(url, EhUrl.getGalleryDetailUrl(gid, token, 0, false, site), 0);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return {
+          ok: false,
+          url: url,
+          statusCode: response.statusCode,
+          message: httpStatusMessage(response.statusCode, response.body),
+          info: null
+        };
+      }
+      const info = parseArchiverInfo(response.body);
+      return {
+        ok: info.options.length > 0,
+        url: url,
+        statusCode: response.statusCode,
+        message: info.options.length > 0 ? 'Parsed archiver options' : 'No archiver options',
+        info: info
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        url: url,
+        statusCode: 0,
+        message: networkErrorMessage(error),
+        info: null
+      };
+    }
+  }
+
+  async requestArchiverDownload(option: ArchiverOption, referer: string,
+    site: GallerySite = GallerySite.E): Promise<ArchiverDownloadResult> {
+    const form = buildFormBody([
+      { key: 'dltype', value: option.dlType },
+      { key: 'dlcheck', value: option.dlCheck }
+    ]);
+    try {
+      const response = await this.postForm(option.url, form, referer, EhUrl.getReferer(site));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return {
+          ok: false,
+          statusCode: response.statusCode,
+          message: httpStatusMessage(response.statusCode, response.body),
+          downloadUrl: ''
+        };
+      }
+      const continueUrl = parseArchiverContinueUrl(response.body);
+      if (continueUrl.length === 0) {
+        return {
+          ok: false,
+          statusCode: response.statusCode,
+          message: 'No archiver continuation URL',
+          downloadUrl: ''
+        };
+      }
+      const continueResponse = await this.getText(absoluteUrl(continueUrl, EhUrl.getHost(site)), EhUrl.getReferer(site), 0);
+      const path = parseArchiverDownloadUrl(continueResponse.body);
+      if (path.length === 0) {
+        return {
+          ok: false,
+          statusCode: continueResponse.statusCode,
+          message: 'No archiver download URL',
+          downloadUrl: ''
+        };
+      }
+      return {
+        ok: true,
+        statusCode: continueResponse.statusCode,
+        message: 'Archiver download URL ready',
+        downloadUrl: absoluteUrl(path, continueUrl)
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        statusCode: 0,
+        message: networkErrorMessage(error),
+        downloadUrl: ''
+      };
+    }
   }
 
   async skipHathAndReloadPage(pageUrl: string, skipHathKey: string, site: GallerySite = GallerySite.E,
@@ -853,6 +1040,91 @@ export class EhHttpClient {
       };
     }
   }
+
+  private async loadImageSearchList(builder: ListUrlBuilder, site: GallerySite): Promise<GalleryListLoadResult> {
+    const url = EhUrl.getImageSearchUrl(site);
+    if (builder.imagePath.length === 0) {
+      return emptyGalleryListResult(url, 'No image selected for search');
+    }
+    try {
+      const multipart = buildImageSearchMultipartBody(builder.imagePath, builder.useSimilarityScan,
+        builder.onlySearchCovers, builder.showExpunged);
+      const response = await this.postMultipart(url, multipart.body, multipart.contentType, EhUrl.getReferer(site) + '/',
+        EhUrl.getReferer(site));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return emptyGalleryListResult(url, httpStatusMessage(response.statusCode, response.body), response.statusCode);
+      }
+      const parsed: GalleryListParseResult = parseGalleryList(response.body);
+      await this.fillGalleryListByApi(parsed.galleries, url, site);
+      return {
+        ok: parsed.galleries.length > 0,
+        url: url,
+        statusCode: response.statusCode,
+        message: parsed.warning.length > 0 ? parsed.warning : 'Parsed image search results',
+        pages: parsed.pages,
+        nextPage: parsed.nextPage,
+        nextUrl: parsed.nextUrl,
+        resultCount: parsed.resultCount,
+        galleries: parsed.galleries
+      };
+    } catch (error) {
+      return emptyGalleryListResult(url, networkErrorMessage(error));
+    }
+  }
+
+  private async postMultipart(url: string, body: ArrayBuffer, contentType: string, referer: string,
+    origin: string): Promise<EhHttpResponse> {
+    return requestTextWithRetry((): Promise<EhHttpResponse> => {
+      return this.postMultipartOnce(url, body, contentType, referer, origin);
+    }, 2);
+  }
+
+  private async postMultipartOnce(url: string, body: ArrayBuffer, contentType: string, referer: string,
+    origin: string): Promise<EhHttpResponse> {
+    const request = http.createHttp();
+    let plan: EhRequestPlan | null = null;
+    const startedAt = Date.now();
+    let outcomeRecorded = false;
+    await acquireTextSlot();
+    try {
+      plan = createEhRequestPlan(url);
+      const header = buildMultipartRequestHeader(plan, referer, origin, ehCookieStore.getCookieHeaderForUrl(url),
+        contentType);
+      await ensureEhHostRules();
+      const options: http.HttpRequestOptions = {
+        method: http.RequestMethod.POST,
+        header: header,
+        extraData: body,
+        expectDataType: http.HttpDataType.STRING,
+        connectTimeout: TEXT_CONNECT_TIMEOUT_MS,
+        readTimeout: TEXT_READ_TIMEOUT_MS
+      };
+      applyEhNetworkOptions(options, plan);
+      const response = await requestWithDeadline(request, plan.url, options, TEXT_DEADLINE_TIMEOUT_MS);
+      const statusCode = Number(response.responseCode);
+      recordEhRequestOutcome(plan, statusCode >= 200 && statusCode < 500, Date.now() - startedAt);
+      outcomeRecorded = true;
+
+      ehCookieStore.absorbSetCookieHeader(response.cookies);
+      syncSetCookiesToWebView(url, response.cookies);
+      return {
+        statusCode: statusCode,
+        body: response.result as string,
+        cookies: response.cookies
+      };
+    } catch (error) {
+      if (plan !== null && !outcomeRecorded) {
+        recordEhRequestOutcome(plan, false, Date.now() - startedAt);
+      }
+      throw new Error(networkErrorMessage(error));
+    } finally {
+      try {
+        request.destroy();
+      } catch (error) {
+      }
+      releaseTextSlot();
+    }
+  }
 }
 
 interface RequestHeader {
@@ -873,6 +1145,11 @@ interface RequestHeader {
 interface FormField {
   key: string;
   value: string;
+}
+
+interface ImageSearchMultipartBody {
+  body: ArrayBuffer;
+  contentType: string;
 }
 
 interface ParsedSignIn {
@@ -1182,12 +1459,146 @@ function buildJsonRequestHeader(plan: EhRequestPlan, referer: string, origin: st
   return header;
 }
 
+function buildMultipartRequestHeader(plan: EhRequestPlan, referer: string, origin: string, cookieHeader: string,
+  contentType: string): RequestHeader {
+  const header: RequestHeader = {
+    'Host': plan.host,
+    'User-Agent': CHROME_USER_AGENT,
+    'Accept': CHROME_ACCEPT,
+    'Accept-Language': CHROME_ACCEPT_LANGUAGE,
+    'Referer': referer,
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache',
+    'Connection': plan.fronted ? 'close' : 'keep-alive',
+    'Content-Type': contentType,
+    'Origin': origin
+  };
+  if (cookieHeader.length > 0) {
+    header.Cookie = cookieHeader;
+  }
+  return header;
+}
+
 function buildFormBody(fields: FormField[]): string {
   const parts: string[] = [];
   for (let i = 0; i < fields.length; i++) {
     parts.push(encodeURIComponent(fields[i].key) + '=' + encodeURIComponent(fields[i].value));
   }
   return parts.join('&');
+}
+
+function emptyGalleryListResult(url: string, message: string, statusCode: number = 0): GalleryListLoadResult {
+  return {
+    ok: false,
+    url: url,
+    statusCode: statusCode,
+    message: message,
+    pages: 0,
+    nextPage: -1,
+    nextUrl: '',
+    resultCount: '',
+    galleries: []
+  };
+}
+
+function buildImageSearchMultipartBody(imagePath: string, useSimilarityScan: boolean, onlySearchCovers: boolean,
+  showExpunged: boolean): ImageSearchMultipartBody {
+  const boundary = '----EhViewerOHOS' + Date.now().toString(16);
+  const fileName = imageFileName(imagePath);
+  const fileData = readFileBuffer(imagePath);
+  const chunks: ArrayBuffer[] = [];
+  chunks.push(stringToUtf8Buffer('--' + boundary + '\r\n'));
+  chunks.push(stringToUtf8Buffer('Content-Disposition: form-data; name="sfile"; filename="' + fileName + '"\r\n'));
+  chunks.push(stringToUtf8Buffer('Content-Type: image/jpeg\r\n\r\n'));
+  chunks.push(fileData);
+  chunks.push(stringToUtf8Buffer('\r\n'));
+  if (useSimilarityScan) {
+    appendMultipartText(chunks, boundary, 'fs_similar', 'on');
+  }
+  if (onlySearchCovers) {
+    appendMultipartText(chunks, boundary, 'fs_covers', 'on');
+  }
+  if (showExpunged) {
+    appendMultipartText(chunks, boundary, 'fs_exp', 'on');
+  }
+  appendMultipartText(chunks, boundary, 'f_sfile', 'File Search');
+  chunks.push(stringToUtf8Buffer('--' + boundary + '--\r\n'));
+  return {
+    body: concatBuffers(chunks),
+    contentType: 'multipart/form-data; boundary=' + boundary
+  };
+}
+
+function appendMultipartText(chunks: ArrayBuffer[], boundary: string, name: string, value: string): void {
+  chunks.push(stringToUtf8Buffer('--' + boundary + '\r\n'));
+  chunks.push(stringToUtf8Buffer('Content-Disposition: form-data; name="' + name + '"\r\n\r\n'));
+  chunks.push(stringToUtf8Buffer(value + '\r\n'));
+}
+
+function readFileBuffer(path: string): ArrayBuffer {
+  const stat = fs.statSync(path);
+  const buffer = new ArrayBuffer(stat.size);
+  const file = fs.openSync(path, fs.OpenMode.READ_ONLY);
+  try {
+    fs.readSync(file.fd, buffer);
+  } finally {
+    fs.closeSync(file.fd);
+  }
+  return buffer;
+}
+
+function stringToUtf8Buffer(value: string): ArrayBuffer {
+  const bytes: number[] = [];
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code < 0x80) {
+      bytes.push(code);
+    } else if (code < 0x800) {
+      bytes.push(0xc0 | (code >> 6));
+      bytes.push(0x80 | (code & 0x3f));
+    } else {
+      bytes.push(0xe0 | (code >> 12));
+      bytes.push(0x80 | ((code >> 6) & 0x3f));
+      bytes.push(0x80 | (code & 0x3f));
+    }
+  }
+  return new Uint8Array(bytes).buffer;
+}
+
+function concatBuffers(chunks: ArrayBuffer[]): ArrayBuffer {
+  let length = 0;
+  for (let i = 0; i < chunks.length; i++) {
+    length += chunks[i].byteLength;
+  }
+  const merged = new Uint8Array(length);
+  let offset = 0;
+  for (let i = 0; i < chunks.length; i++) {
+    merged.set(new Uint8Array(chunks[i]), offset);
+    offset += chunks[i].byteLength;
+  }
+  return merged.buffer;
+}
+
+function imageFileName(path: string): string {
+  const index = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+  const name = index >= 0 ? path.substring(index + 1) : path;
+  return name.indexOf('.') > 0 ? name : name + '.jpg';
+}
+
+function absoluteUrl(url: string, base: string): string {
+  if (url.indexOf('http://') === 0 || url.indexOf('https://') === 0) {
+    return url;
+  }
+  if (url.indexOf('//') === 0) {
+    return 'https:' + url;
+  }
+  const hostMatch = /^(https?:\/\/[^/]+)/i.exec(base);
+  const host = hostMatch === null ? base : hostMatch[1];
+  if (url.indexOf('/') === 0) {
+    return host + url;
+  }
+  const slash = base.lastIndexOf('/');
+  return (slash > 'https://'.length ? base.substring(0, slash + 1) : host + '/') + url;
 }
 
 function buildCacheKey(method: string, url: string, referer: string, cookieHeader: string): string {

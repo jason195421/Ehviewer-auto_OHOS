@@ -1,20 +1,29 @@
 ﻿import { pasteboard } from '@kit.BasicServicesKit';
 import {
   ALL_CATEGORY,
+  ArchiveOption,
+  ArchiverInfo,
+  ArchiverOption,
   GalleryCategory,
   GalleryDetail,
   GalleryInfo,
   GalleryPage,
   GalleryPreview,
   GalleryRoute,
-  GallerySite
+  GallerySite,
+  GalleryTagGroup,
+  HathArchiveList
 } from '../model/GalleryModels';
 import { ehCookieStore } from '../services/EhCookieStore';
 import {
   EhHttpClient,
+  ArchiverDownloadResult,
+  ArchiverLoadResult,
   GalleryDetailLoadResult,
   GalleryListLoadResult,
   GalleryPageLoadResult,
+  HathArchiveListLoadResult,
+  HathArchiveSubmitResult,
   RateGalleryResult,
   ToggleFavoriteResult
 } from '../services/EhHttpClient';
@@ -25,6 +34,7 @@ import { DetailPreviewPager, mergeGalleryPreviewSets, seedPreviewMap } from '../
 import { createReaderSessionState, readerSessionStore } from '../services/ReaderSessionStore';
 import { ehSettingsStore } from '../services/EhSettingsStore';
 import { ehDownloadManager } from '../services/EhDownloadManager';
+import { readerImageCache } from '../services/ReaderImageCache';
 import { common } from '@kit.AbilityKit';
 import {
   confirmCellularNetworkWarningForSession,
@@ -166,6 +176,10 @@ interface SearchResultDraft {
   searchFilterEnabled: boolean;
   searchAdvancedPanelOpened: boolean;
   submitted: boolean;
+  imagePath: string;
+  imageUseSimilarityScan: boolean;
+  imageOnlySearchCovers: boolean;
+  imageShowExpunged: boolean;
 }
 
 const galleryListSceneCache: Map<string, GalleryListSceneCache> = new Map();
@@ -184,7 +198,11 @@ function createEmptySearchResultDraft(): SearchResultDraft {
     filterActive: false,
     searchFilterEnabled: true,
     searchAdvancedPanelOpened: false,
-    submitted: false
+    submitted: false,
+    imagePath: '',
+    imageUseSimilarityScan: false,
+    imageOnlySearchCovers: false,
+    imageShowExpunged: false
   };
 }
 
@@ -247,6 +265,10 @@ export struct GalleryListScene {
   initialPageTo: number = -1;
   initialSearchSubmitted: boolean = false;
   initialSearchAdvancedPanelOpened: boolean = false;
+  initialImagePath: string = '';
+  initialImageUseSimilarityScan: boolean = false;
+  initialImageOnlySearchCovers: boolean = false;
+  initialImageShowExpunged: boolean = false;
   isSearchResultScene: boolean = false;
   useForcedMode: boolean = false;
   forcedMode: ListMode = ListMode.Normal;
@@ -311,6 +333,12 @@ export struct GalleryListScene {
   @State detailLoaded: boolean = false;
   @State optimisticFavorite: boolean = false;
   @State favoriteBusy: boolean = false;
+  @State archivePanelVisible: boolean = false;
+  @State archivePanelMode: string = '';
+  @State archivePanelStatus: string = '';
+  @State archiveBusy: boolean = false;
+  @State archiverInfo: ArchiverInfo = { funds: '', options: [] };
+  @State hathArchiveList: HathArchiveList = { formParamOr: '', options: [] };
   @State readerStatus: string = 'Reader is ready';
   @State readerPage: GalleryPage = createEmptyPage();
   @State readerPages: ReaderPageState[] = [];
@@ -336,6 +364,9 @@ export struct GalleryListScene {
       return this.sourceRoute.toString() + '|search-result|' + this.keyword + '|' + this.searchMode.toString() + '|' +
         this.searchCategory.toString() + '|' + (this.advancedSearchEnabled ? '1' : '0') + '|' +
         this.advanceSearch.toString() + '|' + this.minRating.toString() + '|' +
+        this.initialImagePath + '|' + (this.initialImageUseSimilarityScan ? 'sim' : 'nosim') + '|' +
+        (this.initialImageOnlySearchCovers ? 'covers' : 'all') + '|' +
+        (this.initialImageShowExpunged ? 'exp' : 'noexp') + '|' +
         (this.accountFilterEnabled ? 'account-filter-on' : 'account-filter-off') + '|' +
         (this.searchFilterEnabled ? 'search-filter-on' : 'search-filter-off') + '|' +
         (this.searchAdvancedPanelOpened ? 'advanced-panel-opened' : 'advanced-panel-closed');
@@ -793,6 +824,10 @@ export struct GalleryListScene {
     builder.mode = this.searchModeForRoute(routeMode, builder.keyword);
     builder.follow = this.follow;
     builder.category = this.requestCategoryForMode(builder.mode);
+    builder.imagePath = this.initialImagePath;
+    builder.useSimilarityScan = this.initialImageUseSimilarityScan;
+    builder.onlySearchCovers = this.initialImageOnlySearchCovers;
+    builder.showExpunged = this.initialImageShowExpunged;
     if (this.shouldApplySearchFilters() && this.advancedSearchEnabled && this.searchSupportsAdvanced(builder.mode)) {
       builder.advanceSearch = this.advanceSearch;
       builder.minRating = this.minRating;
@@ -893,7 +928,11 @@ export struct GalleryListScene {
       filterActive: false,
       searchFilterEnabled: true,
       searchAdvancedPanelOpened: false,
-      submitted: false
+      submitted: false,
+      imagePath: '',
+      imageUseSimilarityScan: false,
+      imageOnlySearchCovers: false,
+      imageShowExpunged: false
     };
     this.showSearchResultScene = true;
   }
@@ -952,7 +991,11 @@ export struct GalleryListScene {
       filterActive: false,
       searchFilterEnabled: true,
       searchAdvancedPanelOpened: false,
-      submitted: true
+      submitted: true,
+      imagePath: '',
+      imageUseSimilarityScan: false,
+      imageOnlySearchCovers: false,
+      imageShowExpunged: false
     };
     this.fabExpanded = false;
     setTimeout(() => {
@@ -1074,6 +1117,7 @@ export struct GalleryListScene {
     this.detailLoaded = false;
     this.optimisticFavorite = false;
     this.favoriteBusy = false;
+    this.closeArchivePanel();
     this.detailPreviewPager.reset();
     this.readerStatus = 'Reader is ready';
     this.readerPage = createEmptyPage();
@@ -1632,6 +1676,230 @@ export struct GalleryListScene {
     this.copyDetailLink(url, 'Gallery URL');
   }
 
+  private closeArchivePanel(): void {
+    this.archivePanelVisible = false;
+    this.archivePanelMode = '';
+    this.archivePanelStatus = '';
+    this.archiveBusy = false;
+    this.archiverInfo = { funds: '', options: [] };
+    this.hathArchiveList = { formParamOr: '', options: [] };
+  }
+
+  private openArchiverPanel(): void {
+    if (!this.ensureArchiveSession()) {
+      return;
+    }
+    this.archivePanelVisible = true;
+    this.archivePanelMode = 'archiver';
+    this.archivePanelStatus = 'Loading...';
+    this.archiveBusy = true;
+    this.archiverInfo = { funds: '', options: [] };
+    this.renderVersion++;
+    this.client.loadArchiver(this.detail.gid, this.detail.token, this.detail.archiveUrl, this.activeSite)
+      .then((result: ArchiverLoadResult) => {
+        if (!this.archivePanelVisible || this.archivePanelMode !== 'archiver') {
+          return;
+        }
+        this.archiveBusy = false;
+        this.archivePanelStatus = result.ok ? result.message : 'Archive failed: ' + result.message;
+        this.archiverInfo = result.info === null ? { funds: '', options: [] } : result.info;
+        this.renderVersion++;
+      }).catch((error: Error) => {
+        this.archiveBusy = false;
+        this.archivePanelStatus = 'Archive failed: ' + error.message;
+        this.renderVersion++;
+      });
+  }
+
+  private openHathPanel(): void {
+    if (!this.ensureArchiveSession()) {
+      return;
+    }
+    this.archivePanelVisible = true;
+    this.archivePanelMode = 'hath';
+    this.archivePanelStatus = 'Loading...';
+    this.archiveBusy = true;
+    this.hathArchiveList = { formParamOr: '', options: [] };
+    this.renderVersion++;
+    this.client.loadHathArchiveList(this.detail.gid, this.detail.token, this.detail.archiveUrl, this.activeSite)
+      .then((result: HathArchiveListLoadResult) => {
+        if (!this.archivePanelVisible || this.archivePanelMode !== 'hath') {
+          return;
+        }
+        this.archiveBusy = false;
+        this.archivePanelStatus = result.ok ? result.message : 'H@H failed: ' + result.message;
+        this.hathArchiveList = result.list === null ? { formParamOr: '', options: [] } : result.list;
+        this.renderVersion++;
+      }).catch((error: Error) => {
+        this.archiveBusy = false;
+        this.archivePanelStatus = 'H@H failed: ' + error.message;
+        this.renderVersion++;
+      });
+  }
+
+  private ensureArchiveSession(): boolean {
+    if (!this.detailLoaded || this.detail.gid <= 0 || this.detail.archiveUrl.length === 0) {
+      this.detailStatus = 'Archive needs a loaded gallery';
+      this.renderVersion++;
+      return false;
+    }
+    if (this.detail.apiUid < 0) {
+      this.detailStatus = 'Sign in first';
+      this.renderVersion++;
+      return false;
+    }
+    return true;
+  }
+
+  private submitArchiverOption(option: ArchiverOption): void {
+    if (this.archiveBusy) {
+      return;
+    }
+    this.archiveBusy = true;
+    this.archivePanelStatus = 'Submitting...';
+    this.renderVersion++;
+    const referer = this.detail.archiveUrl.length > 0 ? this.detail.archiveUrl :
+      EhUrl.getGalleryDetailUrl(this.detail.gid, this.detail.token, 0, false, this.activeSite);
+    this.client.requestArchiverDownload(option, referer, this.activeSite).then((result: ArchiverDownloadResult) => {
+      this.archiveBusy = false;
+      this.archivePanelStatus = result.message;
+      if (result.ok && result.downloadUrl.length > 0) {
+        this.copyDetailLink(result.downloadUrl, 'Archive');
+      }
+      this.renderVersion++;
+    }).catch((error: Error) => {
+      this.archiveBusy = false;
+      this.archivePanelStatus = 'Archive failed: ' + error.message;
+      this.renderVersion++;
+    });
+  }
+
+  private submitHathOption(option: ArchiveOption): void {
+    if (this.archiveBusy) {
+      return;
+    }
+    this.archiveBusy = true;
+    this.archivePanelStatus = 'Submitting...';
+    this.renderVersion++;
+    this.client.submitHathArchive(this.detail.gid, this.detail.token, this.hathArchiveList.formParamOr, option.value,
+      this.activeSite).then((result: HathArchiveSubmitResult) => {
+      this.archiveBusy = false;
+      this.archivePanelStatus = result.message;
+      this.detailStatus = result.message;
+      this.renderVersion++;
+    }).catch((error: Error) => {
+      this.archiveBusy = false;
+      this.archivePanelStatus = 'H@H failed: ' + error.message;
+      this.renderVersion++;
+    });
+  }
+
+  private openSimilarGalleryList(): void {
+    if (!this.detailLoaded || this.detail.gid <= 0) {
+      this.detailStatus = 'Similar search needs a loaded gallery';
+      this.renderVersion++;
+      return;
+    }
+    const title = extractSimilarTitle(this.detail.title);
+    if (title.length > 0) {
+      this.openSearchResult('"' + title + '"', ListMode.Normal, 'Similar galleries');
+      return;
+    }
+    const artist = firstArtistTag(this.detail.tags);
+    if (artist.length > 0) {
+      this.openSearchResult('artist:' + artist, ListMode.Tag, 'Similar galleries');
+      return;
+    }
+    if (this.detail.uploader !== undefined && this.detail.uploader.length > 0) {
+      this.openSearchResult(this.detail.uploader, ListMode.Uploader, 'Similar galleries');
+    }
+  }
+
+  private openCoverSearch(): void {
+    const context = getAbilityContext();
+    const thumb = this.detail.thumb === undefined ? '' : this.detail.thumb;
+    if (context === undefined || thumb.length === 0) {
+      this.detailStatus = 'Cover image is unavailable';
+      this.renderVersion++;
+      return;
+    }
+    this.detailStatus = 'Preparing cover search...';
+    this.renderVersion++;
+    const referer = this.detailRequestUrl.length > 0 ? this.detailRequestUrl :
+      EhUrl.getGalleryDetailUrl(this.detail.gid, this.detail.token, 0, false, this.activeSite);
+    readerImageCache.ensureCached(context, thumb, referer, true, undefined, 'cover-search-' + this.detail.gid.toString())
+      .then((path: string) => {
+        if (path.length === 0) {
+          this.detailStatus = 'Cover image cache failed';
+          this.renderVersion++;
+          return;
+        }
+        this.openImageSearchResult(path);
+      }).catch((error: Error) => {
+        this.detailStatus = 'Cover search failed: ' + error.message;
+        this.renderVersion++;
+      });
+  }
+
+  private openSearchResult(keyword: string, mode: ListMode, title: string): void {
+    this.showComments = false;
+    this.showReader = false;
+    this.showDetail = false;
+    this.showSearchResultScene = false;
+    this.searchResultDraft = {
+      keyword: keyword,
+      mode: mode,
+      category: GalleryCategory.None,
+      advancedEnabled: false,
+      advanceSearch: DEFAULT_ADVANCE_SEARCH,
+      minRating: -1,
+      pageFrom: -1,
+      pageTo: -1,
+      filterActive: false,
+      searchFilterEnabled: true,
+      searchAdvancedPanelOpened: false,
+      submitted: true,
+      imagePath: '',
+      imageUseSimilarityScan: false,
+      imageOnlySearchCovers: false,
+      imageShowExpunged: false
+    };
+    this.detailStatus = title;
+    this.fabExpanded = false;
+    setTimeout(() => {
+      this.showSearchResultScene = true;
+    }, 0);
+  }
+
+  private openImageSearchResult(imagePath: string): void {
+    this.showComments = false;
+    this.showReader = false;
+    this.showDetail = false;
+    this.showSearchResultScene = false;
+    this.searchResultDraft = {
+      keyword: '',
+      mode: ListMode.ImageSearch,
+      category: GalleryCategory.None,
+      advancedEnabled: false,
+      advanceSearch: DEFAULT_ADVANCE_SEARCH,
+      minRating: -1,
+      pageFrom: -1,
+      pageTo: -1,
+      filterActive: false,
+      searchFilterEnabled: true,
+      searchAdvancedPanelOpened: false,
+      submitted: true,
+      imagePath: imagePath,
+      imageUseSimilarityScan: true,
+      imageOnlySearchCovers: false,
+      imageShowExpunged: true
+    };
+    this.fabExpanded = false;
+    setTimeout(() => {
+      this.showSearchResultScene = true;
+    }, 0);
+  }
+
   build() {
     Column() {
       if (this.showSearchResultScene) {
@@ -1649,6 +1917,10 @@ export struct GalleryListScene {
           initialPageTo: this.searchResultDraft.pageTo,
           initialSearchSubmitted: this.searchResultDraft.submitted,
           initialSearchAdvancedPanelOpened: this.searchResultDraft.searchAdvancedPanelOpened,
+          initialImagePath: this.searchResultDraft.imagePath,
+          initialImageUseSimilarityScan: this.searchResultDraft.imageUseSimilarityScan,
+          initialImageOnlySearchCovers: this.searchResultDraft.imageOnlySearchCovers,
+          initialImageShowExpunged: this.searchResultDraft.imageShowExpunged,
           isSearchResultScene: true,
           onBack: () => {
             this.closeSearchResultScene();
@@ -1861,6 +2133,12 @@ export struct GalleryListScene {
               statusText: this.detailStatus,
               requestUrl: this.detailRequestUrl,
               downloadText: this.detailDownloadText,
+              archivePanelVisible: this.archivePanelVisible,
+              archivePanelMode: this.archivePanelMode,
+              archivePanelStatus: this.archivePanelStatus,
+              archiveBusy: this.archiveBusy,
+              archiverInfo: this.archiverInfo,
+              hathArchiveList: this.hathArchiveList,
               onBack: () => {
                 this.closeDetail();
               },
@@ -1892,7 +2170,26 @@ export struct GalleryListScene {
                 this.copyDetailLink(this.detail.torrentUrl, 'Torrent');
               },
               onArchive: () => {
-                this.copyDetailLink(this.detail.archiveUrl, 'Archive');
+                this.openArchiverPanel();
+              },
+              onHath: () => {
+                this.openHathPanel();
+              },
+              onSimilar: () => {
+                this.openSimilarGalleryList();
+              },
+              onSearchCover: () => {
+                this.openCoverSearch();
+              },
+              onCloseArchivePanel: () => {
+                this.closeArchivePanel();
+                this.renderVersion++;
+              },
+              onSelectArchiverOption: (option: ArchiverOption) => {
+                this.submitArchiverOption(option);
+              },
+              onSelectHathOption: (option: ArchiveOption) => {
+                this.submitHathOption(option);
               },
               onLoadMorePreviews: () => {
                 this.loadNextDetailPreviewPage();
@@ -1919,6 +2216,26 @@ export struct GalleryListScene {
     .width('100%')
     .height('100%')
   }
+}
+
+function extractSimilarTitle(title: string): string {
+  let value = title
+    .replace(/^(?:(?:\([^\)]*\))|(?:\[[^\]]*\])|(?:\{[^\}]*\})|(?:~[^~]*~)|\s+)*/g, '')
+    .replace(/(?:\s+ch\.[\s\d-]+)?(?:(?:\([^\)]*\))|(?:\[[^\]]*\])|(?:\{[^\}]*\})|(?:~[^~]*~)|\s+)*$/gi, '');
+  const splitIndex = value.indexOf('|');
+  if (splitIndex >= 0) {
+    value = value.substring(0, splitIndex);
+  }
+  return value.trim();
+}
+
+function firstArtistTag(groups: GalleryTagGroup[]): string {
+  for (let i = 0; i < groups.length; i++) {
+    if (groups[i].namespace === 'artist' && groups[i].tags.length > 0) {
+      return groups[i].tags[0];
+    }
+  }
+  return '';
 }
 
 @Component

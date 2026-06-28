@@ -63,6 +63,18 @@ export class EhUrl {
     return EhUrl.getHost(site) + 'gallerypopups.php?gid=' + gid.toString() + '&t=' + token + '&act=addfav';
   }
 
+  static getDownloadArchiveUrl(gid: number, token: string, formParamOr: string = '',
+    site: GallerySite = GallerySite.E): string {
+    const params: QueryParam[] = [
+      { key: 'gid', value: gid.toString() },
+      { key: 'token', value: token }
+    ];
+    if (formParamOr.length > 0) {
+      params.push({ key: 'or', value: formParamOr });
+    }
+    return buildUrl(EhUrl.getHost(site) + 'archiver.php', params);
+  }
+
   static getImageSearchUrl(site: GallerySite = GallerySite.E): string {
     return site === GallerySite.Ex ? 'https://upld.exhentai.org/upld/image_lookup.php' :
       'https://upld.e-hentai.org/image_lookup.php';
@@ -101,6 +113,9 @@ export class ListUrlBuilder {
   pageFrom: number = -1;
   pageTo: number = -1;
   showExpunged: boolean = false;
+  imagePath: string = '';
+  useSimilarityScan: boolean = false;
+  onlySearchCovers: boolean = false;
 
   reset(): void {
     this.mode = ListMode.Normal;
@@ -114,6 +129,9 @@ export class ListUrlBuilder {
     this.pageFrom = -1;
     this.pageTo = -1;
     this.showExpunged = false;
+    this.imagePath = '';
+    this.useSimilarityScan = false;
+    this.onlySearchCovers = false;
   }
 
   build(site: GallerySite = GallerySite.E): string {

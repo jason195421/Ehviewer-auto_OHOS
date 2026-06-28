@@ -24,6 +24,9 @@ export struct DetailActions {
   onRate: () => void = () => {};
   onTorrent: () => void = () => {};
   onArchive: () => void = () => {};
+  onHath: () => void = () => {};
+  onSimilar: () => void = () => {};
+  onSearchCover: () => void = () => {};
 
   build() {
     Column() {
@@ -57,10 +60,28 @@ export struct DetailActions {
             onTap: this.onTorrent
           })
           DetailActionItem({
-            symbolIcon: $r('sys.symbol.doc_plaintext'),
+            symbolIcon: $r('sys.symbol.archivebox'),
             label: uiText('Archive'),
             isActive: this.isDetailLoaded && this.detail.archiveUrl.length > 0,
             onTap: this.onArchive
+          })
+          DetailActionItem({
+            symbolIcon: $r('sys.symbol.arrow_down_circle'),
+            label: 'H@H',
+            isActive: this.isDetailLoaded && this.detail.archiveUrl.length > 0,
+            onTap: this.onHath
+          })
+          DetailActionItem({
+            symbolIcon: $r('sys.symbol.play_arrow_triangle_2_circlepath'),
+            label: uiText('Similar'),
+            isActive: this.isDetailLoaded && this.detail.gid > 0,
+            onTap: this.onSimilar
+          })
+          DetailActionItem({
+            symbolIcon: $r('sys.symbol.magnifyingglass'),
+            label: uiText('Search cover'),
+            isActive: this.isDetailLoaded && this.detail.thumb !== undefined && this.detail.thumb.length > 0,
+            onTap: this.onSearchCover
           })
         }
       }

@@ -73,6 +73,31 @@ export interface GalleryPage {
   cachedOriginImagePath?: string;
 }
 
+export interface ArchiveOption {
+  value: string;
+  label: string;
+}
+
+export interface HathArchiveList {
+  formParamOr: string;
+  options: ArchiveOption[];
+}
+
+export interface ArchiverOption {
+  kind: string;
+  label: string;
+  cost: string;
+  size: string;
+  url: string;
+  dlType: string;
+  dlCheck: string;
+}
+
+export interface ArchiverInfo {
+  funds: string;
+  options: ArchiverOption[];
+}
+
 export interface TopListItem {
   href: string;
   gid: string;
