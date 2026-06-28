@@ -52,6 +52,10 @@ export const LANGUAGE_REVISION_KEY: string = 'ehviewer_language_revision';
 export const HISTORY_READ_REVISION_KEY: string = 'ehviewer_history_read_revision';
 export const GALLERY_TITLE_REVISION_KEY: string = 'ehviewer_gallery_title_revision';
 export const IDENTITY_AUTH_LOCKED_KEY: string = 'ehviewer_identity_auth_locked';
+export const IDENTITY_AUTH_OFF: string = 'Off';
+export const IDENTITY_AUTH_FINGERPRINT_FIRST: string = 'Fingerprint first';
+export const IDENTITY_AUTH_FACE_FIRST: string = 'Face first';
+export const IDENTITY_AUTH_PASSWORD_FIRST: string = 'Password first';
 
 export interface DrawerItem {
   route: GalleryRoute;
@@ -187,6 +191,9 @@ export function plainTextFromHtml(html: string): string {
 export function uiStatusText(text: string): string {
   if (!shouldUseChineseUi()) {
     return text;
+  }
+  if (text.indexOf('Identity authentication mode: ') === 0) {
+    return '身份验证模式：' + uiText(text.substring('Identity authentication mode: '.length));
   }
   if (text === 'Loading galleries...') {
     return '正在加载画廊...';
@@ -766,10 +773,14 @@ export function zhText(text: string): string {
     case 'Scan downloaded folders not present in queue': return '扫描不在队列中的下载文件夹';
     case 'Identity authentication': return '身份验证';
     case 'Verify identity when the app returns from background': return '应用从后台恢复时验证身份';
+    case 'Fingerprint first': return '指纹优先';
+    case 'Face first': return '人脸优先';
+    case 'Password first': return '密码优先';
     case 'Biometric lock enabled: app will prompt for fingerprint/face on resume': return '身份验证已开启：应用恢复时会提示指纹/人脸验证';
     case 'Biometric lock disabled': return '身份验证已关闭';
     case 'Identity authentication enabled: app will verify identity on resume': return '身份验证已开启：应用恢复时会验证身份';
     case 'Identity authentication disabled': return '身份验证已关闭';
+    case 'Identity authentication mode: ': return '身份验证模式：';
     case 'Identity authentication requires an ability context': return '身份验证需要 Ability 上下文';
     case 'Identity authentication required': return '需要身份验证';
     case 'Unlock to continue using EhViewer': return '解锁后继续使用 EhViewer';
@@ -1873,7 +1884,8 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
 
   if (panel === SettingsPanel.Privacy) {
     return [
-      optionSettingsRow('pattern_protection', 'Identity authentication', 'Verify identity when the app returns from background', entries, ON_OFF_OPTIONS),
+      optionSettingsRow('pattern_protection', 'Identity authentication', 'Verify identity when the app returns from background',
+        entries, identityAuthenticationOptions()),
       optionSettingsRow('enable_secure', 'Secure screen', 'Prevent screenshots and insecure previews', entries, ON_OFF_OPTIONS),
       optionSettingsRow('enable_analytics', 'Analytics', 'Allow privacy-preserving analytics prompt equivalent', entries, ON_OFF_OPTIONS),
       staticSettingsRow('about_analytics', 'About analytics', 'Explanation dialog from the original privacy settings', 'Info', 'message'),
@@ -1952,6 +1964,15 @@ export function readerUltraDarkLightnessOptions(): string[] {
     options.push(i.toString() + '%');
   }
   return options;
+}
+
+export function identityAuthenticationOptions(): string[] {
+  return [
+    IDENTITY_AUTH_OFF,
+    IDENTITY_AUTH_FINGERPRINT_FIRST,
+    IDENTITY_AUTH_FACE_FIRST,
+    IDENTITY_AUTH_PASSWORD_FIRST
+  ];
 }
 
 function optionSettingsRow(key: string, title: string, summary: string, entries: SettingEntry[], options: string[]): SettingsRowItem {
@@ -2047,7 +2068,23 @@ function normalizeReaderSettingOption(key: string, value: string): string {
   if (key === 'ultra_dark_lightness') {
     return normalizeUltraDarkLightnessOption(value);
   }
+  if (key === 'pattern_protection') {
+    return normalizeIdentityAuthenticationOption(value);
+  }
   return value;
+}
+
+export function normalizeIdentityAuthenticationOption(value: string): string {
+  if (value === 'On' || value === IDENTITY_AUTH_FINGERPRINT_FIRST) {
+    return IDENTITY_AUTH_FINGERPRINT_FIRST;
+  }
+  if (value === IDENTITY_AUTH_FACE_FIRST) {
+    return IDENTITY_AUTH_FACE_FIRST;
+  }
+  if (value === IDENTITY_AUTH_PASSWORD_FIRST) {
+    return IDENTITY_AUTH_PASSWORD_FIRST;
+  }
+  return IDENTITY_AUTH_OFF;
 }
 
 export function normalizeAutoTransferTimeOption(value: string): string {

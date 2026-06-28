@@ -72,7 +72,7 @@ import {
   themedSelectSelectedOptionBackground,
   themedSelectSelectedOptionText
 } from '../shared/EhSelectStyle';
-import { EhBackupBundle, SettingsHeaderItem, SettingsRowItem, SettingsPanel, SETTINGS_HEADERS, uiText, uiValue, uiStatusText, setActiveBackHandler, padTwo, getAbilityContext, downloadSizeText, settingsPanelTitle, settingsRowsForPanel, settingEntryValue, cloneStringOptions, settingMigrationMessage, isValidProxyPortText, formatNetworkDiagnostics, normalizeAutoTransferTimeOption, normalizeBrightnessLevelOption } from '../shared/EhShared';
+import { EhBackupBundle, SettingsHeaderItem, SettingsRowItem, SettingsPanel, SETTINGS_HEADERS, uiText, uiValue, uiStatusText, setActiveBackHandler, padTwo, getAbilityContext, downloadSizeText, settingsPanelTitle, settingsRowsForPanel, settingEntryValue, cloneStringOptions, settingMigrationMessage, isValidProxyPortText, formatNetworkDiagnostics, normalizeAutoTransferTimeOption, normalizeBrightnessLevelOption, normalizeIdentityAuthenticationOption } from '../shared/EhShared';
 import { FilterPanel, MigrationScene } from './DownloadMigrationScenes';
 import { AppSubToolbar, AppToolbar } from './NavigationComponents';
 import { collectWebCookies, hasLoginCookie, SessionScene, syncCookieHeaderToWebView } from './SessionScene';
@@ -245,12 +245,12 @@ export struct SettingsScene {
       applyAppChromeImmersiveMode();
     }
     if (key === 'pattern_protection') {
-      if (normalizedValue !== 'On') {
+      if (normalizedValue === 'Off') {
         AppStorage.setOrCreate<boolean>(IDENTITY_AUTH_LOCKED_KEY, false);
       }
-      this.statusText = normalizedValue === 'On'
-        ? 'Identity authentication enabled: app will verify identity on resume'
-        : 'Identity authentication disabled';
+      this.statusText = normalizedValue === 'Off'
+        ? 'Identity authentication disabled'
+        : 'Identity authentication mode: ' + normalizedValue;
     }
     if (key === 'enable_secure') {
       applyWindowPrivacyMode(value === 'On', (status: string) => {
@@ -308,6 +308,9 @@ export struct SettingsScene {
       settingEntryValue(this.settingEntries, 'reading_direction', 'Right to left') === 'Top to bottom' &&
       (value === 'Fit height' || value === 'Fit screen')) {
       return 'Fixed scale';
+    }
+    if (key === 'pattern_protection') {
+      return normalizeIdentityAuthenticationOption(value);
     }
     return value;
   }
@@ -626,10 +629,6 @@ export struct SettingsScene {
       }
       return true;
     }
-    if (key === 'pattern_protection') {
-      this.runBiometricLock();
-      return true;
-    }
     if (key === 'export_data') {
       this.exportData();
       return true;
@@ -663,24 +662,6 @@ export struct SettingsScene {
     }).catch((error: Error) => {
       this.statusText = 'Open link failed: ' + error.message;
     });
-  }
-
-  private runBiometricLock(): void {
-    const context = getAbilityContext();
-    if (context === undefined) {
-      this.statusText = 'Identity authentication requires an ability context';
-      return;
-    }
-    const enabled = ehSettingsStore.getValue('pattern_protection', 'Off') === 'On';
-    const next = enabled ? 'Off' : 'On';
-    ehSettingsStore.setValue('pattern_protection', next);
-    this.settingEntries = ehSettingsStore.getEntries();
-    ehSettingsStore.save(context).catch((error: Error) => {
-      this.statusText = 'Save failed: ' + error.message;
-    });
-    this.statusText = next === 'On'
-      ? 'Identity authentication enabled: app will verify identity on resume'
-      : 'Identity authentication disabled';
   }
 
   private exportData(): void {

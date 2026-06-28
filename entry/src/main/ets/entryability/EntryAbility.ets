@@ -11,7 +11,15 @@ import {
   startEhDirectConnectionProbe,
   startEhFrontingBenchmark
 } from '../services/EhNetworkConfig';
-import { IDENTITY_AUTH_LOCKED_KEY, uiText } from '../shared/EhShared';
+import {
+  IDENTITY_AUTH_FACE_FIRST,
+  IDENTITY_AUTH_FINGERPRINT_FIRST,
+  IDENTITY_AUTH_LOCKED_KEY,
+  IDENTITY_AUTH_OFF,
+  IDENTITY_AUTH_PASSWORD_FIRST,
+  normalizeIdentityAuthenticationOption,
+  uiText
+} from '../shared/EhShared';
 
 const SETTINGS_PREF_NAME: string = 'ehviewer_settings';
 const SETTINGS_VALUES_KEY: string = 'values';
@@ -213,13 +221,13 @@ export default class EntryAbility extends UIAbility {
       if (typeof raw !== 'string' || raw.length === 0) {
         return;
       }
-      let enabled = false;
+      let mode = IDENTITY_AUTH_OFF;
       try {
         const entries = JSON.parse(raw) as SettingEntry[];
         if (Array.isArray(entries)) {
           for (let i = 0; i < entries.length; i++) {
-            if (entries[i].key === 'pattern_protection' && entries[i].value === 'On') {
-              enabled = true;
+            if (entries[i].key === 'pattern_protection') {
+              mode = normalizeIdentityAuthenticationOption(entries[i].value);
               break;
             }
           }
@@ -227,16 +235,16 @@ export default class EntryAbility extends UIAbility {
       } catch (error) {
         return;
       }
-      if (!enabled) {
+      if (mode === IDENTITY_AUTH_OFF) {
         this.setIdentityAuthLocked(false);
         return;
       }
       this.setIdentityAuthLocked(true);
-      this.promptBiometricAuth();
+      this.promptBiometricAuth(mode);
     }).catch(() => {});
   }
 
-  private promptBiometricAuth(): void {
+  private promptBiometricAuth(mode: string): void {
     if (this.authPending) {
       return;
     }
@@ -244,7 +252,7 @@ export default class EntryAbility extends UIAbility {
       const challenge = generateChallenge();
       const authParam: userAuth.AuthParam = {
         challenge: challenge,
-        authType: [userAuth.UserAuthType.FINGERPRINT, userAuth.UserAuthType.FACE, userAuth.UserAuthType.PIN],
+        authType: this.identityAuthTypesForMode(mode),
         authTrustLevel: userAuth.AuthTrustLevel.ATL1
       };
       const widgetParam: userAuth.WidgetParam = {
@@ -271,11 +279,25 @@ export default class EntryAbility extends UIAbility {
   }
 
   private identityAuthEnabledInMemory(): boolean {
-    return ehSettingsStore.getValue('pattern_protection', 'Off') === 'On';
+    return normalizeIdentityAuthenticationOption(ehSettingsStore.getValue('pattern_protection', 'Off')) !== IDENTITY_AUTH_OFF;
   }
 
   private setIdentityAuthLocked(locked: boolean): void {
     AppStorage.setOrCreate<boolean>(IDENTITY_AUTH_LOCKED_KEY, locked);
+  }
+
+  private identityAuthTypesForMode(mode: string): userAuth.UserAuthType[] {
+    const normalizedMode = normalizeIdentityAuthenticationOption(mode);
+    if (normalizedMode === IDENTITY_AUTH_FACE_FIRST) {
+      return [userAuth.UserAuthType.FACE, userAuth.UserAuthType.FINGERPRINT, userAuth.UserAuthType.PIN];
+    }
+    if (normalizedMode === IDENTITY_AUTH_PASSWORD_FIRST) {
+      return [userAuth.UserAuthType.PIN, userAuth.UserAuthType.FINGERPRINT, userAuth.UserAuthType.FACE];
+    }
+    if (normalizedMode === IDENTITY_AUTH_FINGERPRINT_FIRST) {
+      return [userAuth.UserAuthType.FINGERPRINT, userAuth.UserAuthType.FACE, userAuth.UserAuthType.PIN];
+    }
+    return [userAuth.UserAuthType.FINGERPRINT, userAuth.UserAuthType.FACE, userAuth.UserAuthType.PIN];
   }
 
   private minimizeApp(): void {
