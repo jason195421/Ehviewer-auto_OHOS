@@ -34,7 +34,7 @@ export const migrationTasks: MigrationTask[] = [
     name: 'Settings hierarchy',
     source: 'SettingsActivity and res/xml/*_settings.xml',
     target: 'ArkUI SettingsScene',
-    status: 'started: drawer matches Android nav_drawer_main; all setting panels implemented; UConfig/MyTags open in embedded WebView; Filter/Blacklist rules managed via EhFilterStore with local preferences persistence and applied to gallery list; Export/Import data via DocumentViewPicker (cookies, settings, history, downloads, filters bundled to JSON); Pattern protection via userIAM.userAuth biometric/PIN prompt on app foreground'
+    status: 'started: drawer matches Android nav_drawer_main; all setting panels implemented; UConfig/MyTags open in embedded WebView; Filter/Blacklist rules managed via EhFilterStore with local preferences persistence and applied to gallery list; Export/Import data via DocumentViewPicker (cookies, settings, history, downloads, filters bundled to JSON); Identity authentication via userIAM.userAuth biometric/PIN prompt on app foreground'
   },
   {
     name: 'Reader and image pipeline',

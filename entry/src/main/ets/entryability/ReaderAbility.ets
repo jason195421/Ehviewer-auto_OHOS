@@ -9,6 +9,7 @@ import {
 } from '../services/EhWindowImmersive';
 import { ehAppLog } from '../services/EhAppLog';
 import { ehSettingsStore } from '../services/EhSettingsStore';
+import { applyWindowPrivacyMode } from '../services/EhWindowPrivacy';
 
 export const READER_ABILITY_CONTEXT_KEY: string = 'readerAbilityContext';
 
@@ -58,6 +59,7 @@ export default class ReaderAbility extends UIAbility {
   private loadSettingsAndApplyReaderChrome(win: window.Window): void {
     ehSettingsStore.load(this.context).finally(() => {
       this.applyReaderChrome(win);
+      applyWindowPrivacyMode(ehSettingsStore.getValue('enable_secure', 'Off') === 'On');
       this.scheduleReaderChrome(win, 80);
       this.scheduleReaderChrome(win, 260);
     });

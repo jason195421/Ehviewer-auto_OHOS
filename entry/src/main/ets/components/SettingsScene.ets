@@ -42,7 +42,13 @@ import {
   EH_REPOSITORY_URL,
   EH_TARGET_PLATFORM
 } from '../services/EhBuildInfo';
-import { LANGUAGE_REVISION_KEY, notifyGalleryTitleChanged, notifyLanguageChanged, notifyThemeChanged } from '../shared/EhShared';
+import {
+  IDENTITY_AUTH_LOCKED_KEY,
+  LANGUAGE_REVISION_KEY,
+  notifyGalleryTitleChanged,
+  notifyLanguageChanged,
+  notifyThemeChanged
+} from '../shared/EhShared';
 import {
   themeFieldBackground,
   themeOnPrimaryText,
@@ -239,9 +245,12 @@ export struct SettingsScene {
       applyAppChromeImmersiveMode();
     }
     if (key === 'pattern_protection') {
+      if (normalizedValue !== 'On') {
+        AppStorage.setOrCreate<boolean>(IDENTITY_AUTH_LOCKED_KEY, false);
+      }
       this.statusText = normalizedValue === 'On'
-        ? 'Biometric lock enabled: app will prompt for fingerprint/face on resume'
-        : 'Biometric lock disabled';
+        ? 'Identity authentication enabled: app will verify identity on resume'
+        : 'Identity authentication disabled';
     }
     if (key === 'clipboard_gallery_url_scan') {
       this.statusText = normalizedValue === 'On'
@@ -664,7 +673,7 @@ export struct SettingsScene {
   private runBiometricLock(): void {
     const context = getAbilityContext();
     if (context === undefined) {
-      this.statusText = 'Biometric lock requires an ability context';
+      this.statusText = 'Identity authentication requires an ability context';
       return;
     }
     const enabled = ehSettingsStore.getValue('pattern_protection', 'Off') === 'On';
@@ -675,8 +684,8 @@ export struct SettingsScene {
       this.statusText = 'Save failed: ' + error.message;
     });
     this.statusText = next === 'On'
-      ? 'Biometric lock enabled: app will prompt for fingerprint/face on resume'
-      : 'Biometric lock disabled';
+      ? 'Identity authentication enabled: app will verify identity on resume'
+      : 'Identity authentication disabled';
   }
 
   private exportData(): void {

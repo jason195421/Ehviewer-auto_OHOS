@@ -51,6 +51,7 @@ export interface EhBackupBundle {
 export const LANGUAGE_REVISION_KEY: string = 'ehviewer_language_revision';
 export const HISTORY_READ_REVISION_KEY: string = 'ehviewer_history_read_revision';
 export const GALLERY_TITLE_REVISION_KEY: string = 'ehviewer_gallery_title_revision';
+export const IDENTITY_AUTH_LOCKED_KEY: string = 'ehviewer_identity_auth_locked';
 
 export interface DrawerItem {
   route: GalleryRoute;
@@ -460,6 +461,8 @@ export function zhText(text: string): string {
     case 'Search galleries': return '搜索画廊';
     case 'Search downloads': return '搜索下载';
     case 'Advanced': return '高级';
+    case 'Privacy': return '隐私';
+    case 'About': return '关于';
     case 'Advanced search': return '高级搜索';
     case 'Options': return '选项';
     case 'Pages': return '页数';
@@ -761,10 +764,15 @@ export function zhText(text: string): string {
     case 'Rebuild queue from downloaded folders': return '从已下载文件夹重建队列';
     case 'Clean redundancy': return '清理冗余';
     case 'Scan downloaded folders not present in queue': return '扫描不在队列中的下载文件夹';
-    case 'Pattern protection': return '图案保护';
+    case 'Identity authentication': return '身份验证';
     case 'Verify identity when the app returns from background': return '应用从后台恢复时验证身份';
     case 'Biometric lock enabled: app will prompt for fingerprint/face on resume': return '身份验证已开启：应用恢复时会提示指纹/人脸验证';
     case 'Biometric lock disabled': return '身份验证已关闭';
+    case 'Identity authentication enabled: app will verify identity on resume': return '身份验证已开启：应用恢复时会验证身份';
+    case 'Identity authentication disabled': return '身份验证已关闭';
+    case 'Identity authentication requires an ability context': return '身份验证需要 Ability 上下文';
+    case 'Identity authentication required': return '需要身份验证';
+    case 'Unlock to continue using EhViewer': return '解锁后继续使用 EhViewer';
     case 'Secure screen': return '安全屏幕';
     case 'Prevent screenshots and insecure previews': return '禁止截图和不安全预览';
     case 'Clipboard gallery URL scan': return '剪贴板画廊链接检测';
@@ -1876,7 +1884,7 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
 
   if (panel === SettingsPanel.Privacy) {
     return [
-      optionSettingsRow('pattern_protection', 'Pattern protection', 'Verify identity when the app returns from background', entries, ON_OFF_OPTIONS),
+      optionSettingsRow('pattern_protection', 'Identity authentication', 'Verify identity when the app returns from background', entries, ON_OFF_OPTIONS),
       optionSettingsRow('enable_secure', 'Secure screen', 'Prevent screenshots and insecure previews', entries, ON_OFF_OPTIONS),
       optionSettingsRow('clipboard_gallery_url_scan', 'Clipboard gallery URL scan',
         'Use the system Paste button to scan gallery links from clipboard', entries, ON_OFF_OPTIONS),
@@ -2130,7 +2138,7 @@ export function settingMigrationMessage(key: string): string {
     return 'Blacklist storage and list filtering are not migrated yet.';
   }
   if (key === 'pattern_protection') {
-    return 'Pattern protection needs a HarmonyOS lock screen flow. Secure screen preference is available.';
+    return 'Identity authentication uses HarmonyOS biometric, face or PIN verification.';
   }
   if (key === 'export_data') {
     return 'Export data needs a backup bundle writer for settings, cookies, downloads and history.';

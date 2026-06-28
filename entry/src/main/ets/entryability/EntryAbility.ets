@@ -11,7 +11,7 @@ import {
   startEhDirectConnectionProbe,
   startEhFrontingBenchmark
 } from '../services/EhNetworkConfig';
-import { uiText } from '../shared/EhShared';
+import { IDENTITY_AUTH_LOCKED_KEY, uiText } from '../shared/EhShared';
 
 const SETTINGS_PREF_NAME: string = 'ehviewer_settings';
 const SETTINGS_VALUES_KEY: string = 'values';
@@ -44,6 +44,7 @@ export default class EntryAbility extends UIAbility {
     AppStorage.setOrCreate<window.Window | undefined>(MAIN_WINDOW_KEY, undefined);
     AppStorage.setOrCreate<number>(LANGUAGE_REVISION_KEY, 0);
     AppStorage.setOrCreate<string>(WINDOW_PRIVACY_STATUS_KEY, '');
+    AppStorage.setOrCreate<boolean>(IDENTITY_AUTH_LOCKED_KEY, false);
     const windowReady = stage.getMainWindow().then((win) => {
       rememberMainWindow(win);
       this.updateWindowAvoidAreas(win);
@@ -56,6 +57,7 @@ export default class EntryAbility extends UIAbility {
       });
     }).catch(() => {});
     const settingsReady = ehSettingsStore.load(this.context).then(() => {
+      this.setIdentityAuthLocked(this.identityAuthEnabledInMemory());
       if (!isEhDirectConnectionProbeEnabled()) {
         return;
       }
@@ -82,6 +84,7 @@ export default class EntryAbility extends UIAbility {
         ehAppLog.error(this.context, 'EntryAbility', 'Failed to load main page: ' + error.message);
         return;
       }
+      this.checkAndPromptBiometricLock();
       this.showStartupDirectProbeToast();
     });
   }
@@ -164,7 +167,17 @@ export default class EntryAbility extends UIAbility {
     if (this.authPending) {
       return;
     }
+    if (this.identityAuthEnabledInMemory()) {
+      this.setIdentityAuthLocked(true);
+    }
     this.checkAndPromptBiometricLock();
+  }
+
+  onBackground(): void {
+    if (this.identityAuthEnabledInMemory()) {
+      this.setIdentityAuthLocked(true);
+    }
+    this.applyPersistedSecureScreen();
   }
 
   private applyPersistedSecureScreen(): void {
@@ -215,13 +228,18 @@ export default class EntryAbility extends UIAbility {
         return;
       }
       if (!enabled) {
+        this.setIdentityAuthLocked(false);
         return;
       }
+      this.setIdentityAuthLocked(true);
       this.promptBiometricAuth();
     }).catch(() => {});
   }
 
   private promptBiometricAuth(): void {
+    if (this.authPending) {
+      return;
+    }
     try {
       const challenge = generateChallenge();
       const authParam: userAuth.AuthParam = {
@@ -230,14 +248,17 @@ export default class EntryAbility extends UIAbility {
         authTrustLevel: userAuth.AuthTrustLevel.ATL1
       };
       const widgetParam: userAuth.WidgetParam = {
-        title: 'EhViewer — Verify identity'
+        title: 'EhViewer ' + uiText('Identity authentication')
       };
       const authInstance = userAuth.getUserAuthInstance(authParam, widgetParam);
       this.authPending = true;
       authInstance.on('result', {
         onResult: (result: userAuth.UserAuthResult) => {
           this.authPending = false;
-          if (result.result !== userAuth.UserAuthResultCode.SUCCESS) {
+          if (result.result === userAuth.UserAuthResultCode.SUCCESS) {
+            this.setIdentityAuthLocked(false);
+          } else {
+            this.setIdentityAuthLocked(true);
             this.minimizeApp();
           }
         }
@@ -245,7 +266,16 @@ export default class EntryAbility extends UIAbility {
       authInstance.start();
     } catch (error) {
       this.authPending = false;
+      this.setIdentityAuthLocked(true);
     }
+  }
+
+  private identityAuthEnabledInMemory(): boolean {
+    return ehSettingsStore.getValue('pattern_protection', 'Off') === 'On';
+  }
+
+  private setIdentityAuthLocked(locked: boolean): void {
+    AppStorage.setOrCreate<boolean>(IDENTITY_AUTH_LOCKED_KEY, locked);
   }
 
   private minimizeApp(): void {

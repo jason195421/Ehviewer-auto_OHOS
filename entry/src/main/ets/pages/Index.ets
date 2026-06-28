@@ -16,6 +16,7 @@ import { DownloadScene, MigrationScene } from '../components/DownloadMigrationSc
 import { SessionScene, SettingsScene } from '../components/SessionSettingsScenes';
 import {
   LANGUAGE_REVISION_KEY,
+  IDENTITY_AUTH_LOCKED_KEY,
   STATUS_BAR_HEIGHT_KEY,
   getAbilityContext,
   launchRouteFromSetting,
@@ -60,6 +61,7 @@ struct Index {
   @State homeInitialDetailNonce: number = 0;
   @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeight: number = 0;
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
+  @StorageProp(IDENTITY_AUTH_LOCKED_KEY) identityAuthLocked: boolean = false;
 
   private statusBarVp(): number {
     return this.getUIContext().px2vp(this.statusBarHeight);
@@ -430,6 +432,25 @@ struct Index {
         .margin({ bottom: 32 })
         .zIndex(31)
         .shadow({ radius: 18, color: themeShadowColor(), offsetX: 0, offsetY: 6 })
+      }
+
+      if (this.identityAuthLocked) {
+        Column() {
+          Text(uiText('Identity authentication required'))
+            .fontSize(22)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(themePrimaryText())
+          Text(uiText('Unlock to continue using EhViewer'))
+            .fontSize(14)
+            .fontColor(themeSecondaryText())
+            .margin({ top: 10 })
+        }
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .width('100%')
+        .height('100%')
+        .backgroundColor(themePageBackground())
+        .zIndex(100)
       }
     }
     .width('100%')
