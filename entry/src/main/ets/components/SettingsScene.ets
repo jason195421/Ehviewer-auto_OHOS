@@ -234,6 +234,16 @@ export struct SettingsScene {
       this.settingsRenderRevision++;
       applyAppChromeImmersiveMode();
     }
+    if (key === 'pattern_protection') {
+      this.statusText = normalizedValue === 'On'
+        ? 'Biometric lock enabled: app will prompt for fingerprint/face on resume'
+        : 'Biometric lock disabled';
+    }
+    if (key === 'clipboard_gallery_url_scan') {
+      this.statusText = normalizedValue === 'On'
+        ? 'Clipboard gallery URL scan enabled'
+        : 'Clipboard gallery URL scan disabled';
+    }
     if (key === 'enable_secure') {
       applyWindowPrivacyMode(value === 'On', (status: string) => {
         this.statusText = status;

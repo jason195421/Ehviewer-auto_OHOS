@@ -28,7 +28,11 @@ const BUILT_IN_RULES: HostRule[] = [
   { host: 'forums.e-hentai.org', ips: ['172.66.132.196', '172.66.140.62'] },
   { host: 'upld.e-hentai.org', ips: ['89.149.221.236', '95.211.208.236'] },
   { host: 'ehgt.org', ips: ['109.236.85.28', '62.112.8.21', '89.39.106.43', '2a00:7c80:0:123::3a85', '2a00:7c80:0:12d::38a1', '2a00:7c80:0:13b::37a4'] },
-  { host: 'raw.githubusercontent.com', ips: ['151.101.0.133', '151.101.64.133', '151.101.128.133', '151.101.192.133'] }
+  { host: 'github.com', ips: ['140.82.112.4', '140.82.113.4', '140.82.114.4', '140.82.121.4'] },
+  { host: 'api.github.com', ips: ['140.82.112.6', '140.82.113.6', '140.82.114.6', '140.82.121.6'] },
+  { host: 'raw.githubusercontent.com', ips: ['151.101.0.133', '151.101.64.133', '151.101.128.133', '151.101.192.133'] },
+  { host: 'objects.githubusercontent.com', ips: ['185.199.108.133', '185.199.109.133', '185.199.110.133', '185.199.111.133'] },
+  { host: 'github-releases.githubusercontent.com', ips: ['185.199.108.154', '185.199.109.154', '185.199.110.154', '185.199.111.154'] }
 ];
 const BUILT_EX_RULES: HostRule[] = [
   { host: 'exhentai.org', ips: ['178.175.128.251', '178.175.128.252', '178.175.128.253', '178.175.128.254', '178.175.129.251', '178.175.129.252', '178.175.129.253', '178.175.129.254', '178.175.132.19', '178.175.132.20', '178.175.132.21', '178.175.132.22'] },
@@ -315,7 +319,7 @@ function proxyOption(): boolean | http.HttpProxy {
 
 function eFrontingIpForUrl(url: string, host: string): string {
   if (shouldUseDirectConnection(host) || ehSettingsStore.getValue('domain_fronting', 'On') !== 'On' ||
-    !isHttpsUrl(url) || host.length === 0) {
+    !isHttpsUrl(url) || host.length === 0 || !supportsDomainFrontingHost(host)) {
     return '';
   }
   const normalizedHost = host.toLowerCase();
@@ -330,7 +334,7 @@ function eFrontingIpForUrl(url: string, host: string): string {
 
 function exFrontingIpForUrl(url: string, host: string): string {
   if (shouldUseDirectConnection(host) || ehSettingsStore.getValue('domain_fronting', 'On') !== 'On' ||
-    !isHttpsUrl(url) || host.length === 0) {
+    !isHttpsUrl(url) || host.length === 0 || !supportsDomainFrontingHost(host)) {
     return '';
   }
   const normalizedHost = host.toLowerCase();
@@ -567,6 +571,9 @@ function collectFrontingProbeTargets(): HostIpProbeTarget[] {
 
 function pushProbeTargets(targets: HostIpProbeTarget[], rules: HostRule[]): void {
   for (let i = 0; i < rules.length; i++) {
+    if (!supportsDomainFrontingHost(rules[i].host)) {
+      continue;
+    }
     const ips = ipv4ListForHost(rules[i].host, rules);
     for (let j = 0; j < ips.length; j++) {
       if (!containsProbeTarget(targets, rules[i].host, ips[j])) {
@@ -873,6 +880,13 @@ function isIpv4(value: string): boolean {
 
 function isHttpsUrl(url: string): boolean {
   return /^https:\/\//i.test(url);
+}
+
+function supportsDomainFrontingHost(host: string): boolean {
+  const normalized = host.toLowerCase();
+  return normalized === 'ehgt.org' || normalized === 'e-hentai.org' ||
+    normalized.endsWith('.e-hentai.org') || normalized === 'exhentai.org' ||
+    normalized.endsWith('.exhentai.org');
 }
 
 function waitHostRuleTask(task: Promise<void>, timeoutMs: number): Promise<void> {

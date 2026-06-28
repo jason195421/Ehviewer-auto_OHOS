@@ -440,6 +440,8 @@ export function zhText(text: string): string {
     case 'Hide': return '隐藏';
     case 'Actions': return '操作';
     case 'Close': return '关闭';
+    case 'Ignore': return '忽略';
+    case 'View': return '查看';
     case 'Filter': return '过滤';
     case 'Filter On': return '过滤已开';
     case 'Filter mode': return '过滤模式';
@@ -758,9 +760,16 @@ export function zhText(text: string): string {
     case 'Clean redundancy': return '清理冗余';
     case 'Scan downloaded folders not present in queue': return '扫描不在队列中的下载文件夹';
     case 'Pattern protection': return '图案保护';
-    case 'Original SetSecurityActivity equivalent': return '原 SetSecurityActivity 对应功能';
+    case 'Verify identity when the app returns from background': return '应用从后台恢复时验证身份';
+    case 'Biometric lock enabled: app will prompt for fingerprint/face on resume': return '身份验证已开启：应用恢复时会提示指纹/人脸验证';
+    case 'Biometric lock disabled': return '身份验证已关闭';
     case 'Secure screen': return '安全屏幕';
     case 'Prevent screenshots and insecure previews': return '禁止截图和不安全预览';
+    case 'Clipboard gallery URL scan': return '剪贴板画廊链接检测';
+    case 'Read clipboard on startup/resume and offer to open gallery links': return '启动或恢复时读取剪贴板并提示打开画廊链接';
+    case 'There is a gallery url in the clipboard': return '剪贴板里有画廊链接';
+    case 'Clipboard gallery URL scan enabled': return '剪贴板画廊链接检测已开启';
+    case 'Clipboard gallery URL scan disabled': return '剪贴板画廊链接检测已关闭';
     case 'Analytics': return '数据统计';
     case 'Allow privacy-preserving analytics prompt equivalent': return '允许隐私提示对应的数据统计设置';
     case 'About analytics': return '关于数据统计';
@@ -815,6 +824,7 @@ export function zhText(text: string): string {
     case 'Branch and release from the build workspace': return '构建工作区分支和发布版本';
     case 'Check for updates': return '检查更新';
     case 'Check the latest GitHub release': return '检查 GitHub 最新发布版本';
+    case 'Disable startup update check': return '关闭启动时自动检查更新';
     case 'New version available': return '发现新版本';
     case 'New version found': return '发现新版本';
     case 'No updates available': return '当前已是最新版本';
@@ -1858,19 +1868,21 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
 
   if (panel === SettingsPanel.Privacy) {
     return [
-      staticSettingsRow('pattern_protection', 'Pattern protection', 'Toggle biometric/screen-lock protection on app resume', 'Toggle', 'action'),
+      optionSettingsRow('pattern_protection', 'Pattern protection', 'Verify identity when the app returns from background', entries, ON_OFF_OPTIONS),
       optionSettingsRow('enable_secure', 'Secure screen', 'Prevent screenshots and insecure previews', entries, ON_OFF_OPTIONS),
+      optionSettingsRow('clipboard_gallery_url_scan', 'Clipboard gallery URL scan',
+        'Read clipboard on startup/resume and offer to open gallery links', entries, ON_OFF_OPTIONS),
       optionSettingsRow('enable_analytics', 'Analytics', 'Allow privacy-preserving analytics prompt equivalent', entries, ON_OFF_OPTIONS),
-      staticSettingsRow('about_analytics', 'About analytics', 'Explanation dialog from the original privacy settings', 'Info', 'message')
+      staticSettingsRow('about_analytics', 'About analytics', 'Explanation dialog from the original privacy settings', 'Info', 'message'),
+      optionSettingsRow('save_parse_error_body', 'Save parse error body', 'Persist parser failures for debugging', entries, ON_OFF_OPTIONS),
+      optionSettingsRow('save_crash_log', 'Save crash log', 'Persist app errors and debug messages locally', entries, ON_OFF_OPTIONS),
+      staticSettingsRow('clear_app_log', 'Clear saved log', 'Delete the local app log file', 'Clear', 'action')
     ];
   }
 
   if (panel === SettingsPanel.Advanced) {
     const rows: SettingsRowItem[] = [
-      optionSettingsRow('save_parse_error_body', 'Save parse error body', 'Persist parser failures for debugging', entries, ON_OFF_OPTIONS),
-      optionSettingsRow('save_crash_log', 'Save crash log', 'Persist app errors and debug messages locally', entries, ON_OFF_OPTIONS),
       staticSettingsRow('dump_logcat', 'Export log', 'Save the local app log to a text file', 'Export', 'action'),
-      staticSettingsRow('clear_app_log', 'Clear saved log', 'Delete the local app log file', 'Clear', 'action'),
       staticSettingsRow('clear_download_path_cache', 'Clear download path cache', 'Refresh cached file path and size lookups', 'Run', 'action'),
       staticSettingsRow('clear_memory_cache', 'Clear memory cache', 'Drop reader image and page caches', 'Run', 'action'),
       optionSettingsRow('read_cache_size', 'Read cache size', 'Reader cache budget', entries, ['40 MB', '80 MB', '160 MB', '320 MB', '640 MB']),

@@ -7,6 +7,13 @@ import {
   EH_REPOSITORY_NAME,
   EH_REPOSITORY_URL
 } from './EhBuildInfo';
+import {
+  applyEhNetworkOptions,
+  createEhRequestPlan,
+  EhRequestPlan,
+  ensureEhHostRules,
+  recordEhRequestOutcome
+} from './EhNetworkConfig';
 
 export interface AppVersionInfo {
   versionName: string;
@@ -43,6 +50,15 @@ interface GitHubReleaseJson {
   assets?: GitHubReleaseAssetJson[];
   draft?: boolean;
   prerelease?: boolean;
+}
+
+interface GitHubReleaseRequestHeader {
+  'Host': string;
+  'User-Agent': string;
+  'Accept': string;
+  'Accept-Language': string;
+  'Cache-Control': string;
+  'Connection': string;
 }
 
 const LATEST_RELEASE_API: string = 'https://api.github.com/repos/' + EH_REPOSITORY_NAME + '/releases/latest';
@@ -110,19 +126,24 @@ async function getCurrentAppVersion(): Promise<AppVersionInfo> {
 
 async function fetchLatestRelease(): Promise<ReleaseInfo> {
   const request = http.createHttp();
+  const plan = createEhRequestPlan(LATEST_RELEASE_API);
+  const startedAt = Date.now();
+  let outcomeRecorded = false;
   try {
-    const response = await request.request(LATEST_RELEASE_API, {
+    await ensureEhHostRules();
+    const options: http.HttpRequestOptions = {
       method: http.RequestMethod.GET,
-      header: {
-        'User-Agent': 'EhViewerHarmony/' + EH_APP_VERSION_NAME,
-        'Accept': 'application/vnd.github+json'
-      },
+      header: buildGitHubReleaseHeader(plan),
       expectDataType: http.HttpDataType.STRING,
       usingCache: false,
       connectTimeout: REQUEST_TIMEOUT_MS,
       readTimeout: REQUEST_TIMEOUT_MS
-    });
+    };
+    applyEhNetworkOptions(options, plan);
+    const response = await request.request(plan.url, options);
     const statusCode = Number(response.responseCode);
+    recordEhRequestOutcome(plan, statusCode >= 200 && statusCode < 500, Date.now() - startedAt);
+    outcomeRecorded = true;
     if (statusCode < 200 || statusCode >= 300) {
       throw new Error('HTTP ' + statusCode.toString());
     }
@@ -131,12 +152,28 @@ async function fetchLatestRelease(): Promise<ReleaseInfo> {
       throw new Error('无法解析 GitHub release');
     }
     return release;
+  } catch (error) {
+    if (!outcomeRecorded) {
+      recordEhRequestOutcome(plan, false, Date.now() - startedAt);
+    }
+    throw new Error(errorMessage(error as Object));
   } finally {
     try {
       request.destroy();
     } catch (error) {
     }
   }
+}
+
+function buildGitHubReleaseHeader(plan: EhRequestPlan): GitHubReleaseRequestHeader {
+  return {
+    'Host': plan.host,
+    'User-Agent': 'EhViewerHarmony/' + EH_APP_VERSION_NAME,
+    'Accept': 'application/vnd.github+json',
+    'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+    'Cache-Control': 'no-cache',
+    'Connection': plan.fronted ? 'close' : 'keep-alive'
+  };
 }
 
 function parseGitHubRelease(body: string): ReleaseInfo | null {

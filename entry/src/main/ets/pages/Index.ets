@@ -1,5 +1,6 @@
-import { common } from '@kit.AbilityKit';
-import { GalleryRoute } from '../model/GalleryModels';
+import { abilityAccessCtrl, common, Permissions } from '@kit.AbilityKit';
+import { pasteboard } from '@kit.BasicServicesKit';
+import { GalleryRoute, GallerySite } from '../model/GalleryModels';
 import { ehCookieStore } from '../services/EhCookieStore';
 import { ehDownloadStore } from '../services/EhDownloadStore';
 import { ehSearchHistoryStore } from '../services/EhSearchHistoryStore';
@@ -18,13 +19,25 @@ import {
   STATUS_BAR_HEIGHT_KEY,
   getAbilityContext,
   launchRouteFromSetting,
-  runActiveBackHandler
+  runActiveBackHandler,
+  uiText
 } from '../shared/EhShared';
-import { themePageBackground, themeScrimColor, themeShadowColor, themePrimaryColor } from '../shared/EhTheme';
+import {
+  themeOnPrimaryText,
+  themePageBackground,
+  themePrimaryColor,
+  themePrimaryText,
+  themeScrimColor,
+  themeSecondaryText,
+  themeShadowColor,
+  themeSurface
+} from '../shared/EhTheme';
 
 // ----------------------------------------------------------------
 // Root page: full-screen immersive shell with slide-in side drawer
 // ----------------------------------------------------------------
+const READ_PASTEBOARD_PERMISSION: Permissions = 'ohos.permission.READ_PASTEBOARD';
+
 @Entry
 @Component
 struct Index {
@@ -37,6 +50,15 @@ struct Index {
   @State updateDialogVisible: boolean = false;
   @State updateCurrentVersion: string = '';
   @State updateRelease: ReleaseInfo | null = null;
+  @State clipboardPromptVisible: boolean = false;
+  @State clipboardPromptUrl: string = '';
+  @State clipboardPromptGid: number = 0;
+  @State clipboardPromptToken: string = '';
+  @State clipboardPromptSite: GallerySite = GallerySite.E;
+  @State homeInitialDetailGid: number = 0;
+  @State homeInitialDetailToken: string = '';
+  @State homeInitialDetailSite: GallerySite = GallerySite.E;
+  @State homeInitialDetailNonce: number = 0;
   @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeight: number = 0;
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
 
@@ -108,10 +130,12 @@ struct Index {
       this.settingsReady = true;
       this.loadSessionRoute(context);
       this.checkForUpdatesOnStartup();
+      this.checkClipboardGalleryUrl(context);
     }).catch(() => {
       this.settingsReady = true;
       this.loadSessionRoute(context);
       this.checkForUpdatesOnStartup();
+      this.checkClipboardGalleryUrl(context);
     });
   }
 
@@ -134,6 +158,58 @@ struct Index {
     }).catch(() => {
       this.setRootRoute(this.routeAfterSignIn());
     });
+  }
+
+  private checkClipboardGalleryUrl(context: common.UIAbilityContext): void {
+    if (ehSettingsStore.getValue('clipboard_gallery_url_scan', 'Off') !== 'On') {
+      return;
+    }
+    requestClipboardPermission(context).then((granted: boolean) => {
+      if (!granted) {
+        return;
+      }
+      setTimeout(() => {
+        pasteboard.getSystemPasteboard().getData().then((data: pasteboard.PasteData) => {
+        const text = data.getPrimaryText();
+        if (text === undefined || text.length === 0) {
+          this.rememberClipboardTextHash(context, 0);
+          return;
+        }
+        const hash = textHashCode(text);
+        if (hash === Number.parseInt(ehSettingsStore.getValue('clipboard_text_hash', '0'))) {
+          return;
+        }
+        this.rememberClipboardTextHash(context, hash);
+        const parsed = parseClipboardGalleryUrl(text);
+        if (parsed === null) {
+          return;
+        }
+        this.clipboardPromptUrl = parsed.url;
+        this.clipboardPromptGid = parsed.gid;
+        this.clipboardPromptToken = parsed.token;
+        this.clipboardPromptSite = parsed.site;
+        this.clipboardPromptVisible = true;
+        }).catch(() => {});
+      }, 300);
+    }).catch(() => {});
+  }
+
+  private rememberClipboardTextHash(context: common.UIAbilityContext, hash: number): void {
+    ehSettingsStore.setValue('clipboard_text_hash', hash.toString());
+    ehSettingsStore.save(context).catch(() => {});
+  }
+
+  private openClipboardGallery(): void {
+    if (this.clipboardPromptGid <= 0 || this.clipboardPromptToken.length === 0) {
+      this.clipboardPromptVisible = false;
+      return;
+    }
+    this.homeInitialDetailGid = this.clipboardPromptGid;
+    this.homeInitialDetailToken = this.clipboardPromptToken;
+    this.homeInitialDetailSite = this.clipboardPromptSite;
+    this.homeInitialDetailNonce++;
+    this.clipboardPromptVisible = false;
+    this.setRootRoute(GalleryRoute.Home);
   }
 
   private routeAfterSignIn(): GalleryRoute {
@@ -248,6 +324,51 @@ struct Index {
           .zIndex(30)
           .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseOut }))
       }
+
+      if (this.clipboardPromptVisible) {
+        Column() {
+          Text(uiText('There is a gallery url in the clipboard'))
+            .fontSize(15)
+            .fontColor(themePrimaryText())
+            .fontWeight(FontWeight.Medium)
+            .width('100%')
+          Text(this.clipboardPromptUrl)
+            .fontSize(12)
+            .fontColor(themeSecondaryText())
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .width('100%')
+            .margin({ top: 4, bottom: 12 })
+          Row() {
+            Button(uiText('Ignore'), { type: ButtonType.Normal, stateEffect: true })
+              .height(36)
+              .fontSize(13)
+              .fontColor(themeSecondaryText())
+              .backgroundColor(Color.Transparent)
+              .onClick(() => {
+                this.clipboardPromptVisible = false;
+              })
+            Button(uiText('View'), { type: ButtonType.Normal, stateEffect: true })
+              .height(36)
+              .fontSize(13)
+              .fontColor(themeOnPrimaryText())
+              .backgroundColor(themePrimaryColor())
+              .onClick(() => {
+                this.openClipboardGallery();
+              })
+          }
+          .justifyContent(FlexAlign.End)
+          .width('100%')
+        }
+        .width('92%')
+        .padding(14)
+        .backgroundColor(themeSurface())
+        .borderRadius(8)
+        .align(Alignment.Bottom)
+        .margin({ bottom: 32 })
+        .zIndex(31)
+        .shadow({ radius: 18, color: themeShadowColor(), offsetX: 0, offsetY: 6 })
+      }
     }
     .width('100%')
     .height('100%')
@@ -262,7 +383,14 @@ struct Index {
   @Builder
   private RouteContent() {
     if (this.activeRoute === GalleryRoute.Home) {
-      HomeGalleryScene({ onMenu: () => { this.openDrawer(); } })
+      HomeGalleryScene({
+        onMenu: () => { this.openDrawer(); },
+        initialDetailGid: this.homeInitialDetailGid,
+        initialDetailToken: this.homeInitialDetailToken,
+        initialDetailSite: this.homeInitialDetailSite,
+        initialDetailNonce: this.homeInitialDetailNonce
+      })
+        .id('home-gallery-' + this.homeInitialDetailNonce.toString())
         .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
     } else if (this.activeRoute === GalleryRoute.Subscription) {
       SubscriptionGalleryScene({ onMenu: () => { this.openDrawer(); } })
@@ -297,5 +425,49 @@ struct Index {
       })
         .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
     }
+  }
+}
+
+interface ClipboardGalleryUrl {
+  gid: number;
+  token: string;
+  site: GallerySite;
+  url: string;
+}
+
+function parseClipboardGalleryUrl(text: string): ClipboardGalleryUrl | null {
+  const match = /(https?:\/\/)?(e-hentai\.org|exhentai\.org)\/g\/(\d+)\/([A-Za-z0-9]+)\/?/i.exec(text);
+  if (match === null) {
+    return null;
+  }
+  const gid = Number.parseInt(match[3]);
+  if (Number.isNaN(gid) || gid <= 0) {
+    return null;
+  }
+  const host = match[2].toLowerCase();
+  const token = match[4];
+  return {
+    gid: gid,
+    token: token,
+    site: host === 'exhentai.org' ? GallerySite.Ex : GallerySite.E,
+    url: 'https://' + host + '/g/' + gid.toString() + '/' + token + '/'
+  };
+}
+
+function textHashCode(text: string): number {
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+  }
+  return hash;
+}
+
+async function requestClipboardPermission(context: common.UIAbilityContext): Promise<boolean> {
+  try {
+    const atManager = abilityAccessCtrl.createAtManager();
+    const result = await atManager.requestPermissionsFromUser(context, [READ_PASTEBOARD_PERMISSION]);
+    return result.authResults.length > 0 && result.authResults[0] === 0;
+  } catch (error) {
+    return false;
   }
 }

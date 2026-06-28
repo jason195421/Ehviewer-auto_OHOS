@@ -242,6 +242,10 @@ export struct GalleryListScene {
   initialPageTo: number = -1;
   initialSearchSubmitted: boolean = false;
   initialSearchAdvancedPanelOpened: boolean = false;
+  initialDetailGid: number = 0;
+  initialDetailToken: string = '';
+  initialDetailSite: GallerySite = GallerySite.E;
+  initialDetailNonce: number = 0;
   isSearchResultScene: boolean = false;
   useForcedMode: boolean = false;
   forcedMode: ListMode = ListMode.Normal;
@@ -319,6 +323,7 @@ export struct GalleryListScene {
   private readerPreviewPageRequests: Map<number, Promise<GalleryPreview | null>> = new Map();
   private readerPreviewPageSize: number = 0;
   private detailPreviewPager: DetailPreviewPager = new DetailPreviewPager();
+  private openedInitialDetailNonce: number = -1;
 
   private cacheKey(): string {
     const mode = this.useForcedMode ? this.forcedMode.toString() : listModeForRoute(this.sourceRoute).toString();
@@ -445,6 +450,9 @@ export struct GalleryListScene {
         if (!this.isSearchResultScene && previousAccountFilterEnabled !== this.accountFilterEnabled && !this.useLocalProvider) {
           this.hasFirstRefresh = false;
         }
+        if (this.openInitialDetailIfNeeded()) {
+          return;
+        }
         if (this.isSearchResultScene && this.initialSearchSubmitted && !this.hasFirstRefresh) {
           this.searchSubmitted = true;
         }
@@ -453,6 +461,10 @@ export struct GalleryListScene {
         }
       });
     } else {
+      if (this.openInitialDetailIfNeeded()) {
+        setActiveBackHandler(() => this.handleSystemBack());
+        return;
+      }
       if (this.isSearchResultScene && this.initialSearchSubmitted && !this.hasFirstRefresh) {
         this.searchSubmitted = true;
       }
@@ -461,6 +473,20 @@ export struct GalleryListScene {
       }
     }
     setActiveBackHandler(() => this.handleSystemBack());
+  }
+
+  private openInitialDetailIfNeeded(): boolean {
+    if (this.initialDetailGid <= 0 || this.initialDetailToken.length === 0 ||
+      this.initialDetailNonce === this.openedInitialDetailNonce) {
+      return false;
+    }
+    this.openedInitialDetailNonce = this.initialDetailNonce;
+    this.activeSite = this.initialDetailSite;
+    this.searchSubmitted = true;
+    this.hasFirstRefresh = true;
+    this.resetListScroll();
+    this.loadDetailByToken(this.initialDetailGid, this.initialDetailToken);
+    return true;
   }
 
   aboutToDisappear(): void {
