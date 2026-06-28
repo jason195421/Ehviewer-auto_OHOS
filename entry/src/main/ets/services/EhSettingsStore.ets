@@ -18,6 +18,7 @@ export function defaultSettingEntries(): SettingEntry[] {
   return [
     { key: 'gallery_site', value: 'E-Hentai' },
     { key: 'use_account_default_filter', value: 'On' },
+    { key: 'follow_system_dark_mode', value: 'Off' },
     { key: 'theme', value: 'Light' },
     { key: 'launch_page', value: 'Homepage' },
     { key: 'list_mode', value: 'Detail' },

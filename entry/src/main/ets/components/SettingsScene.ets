@@ -50,6 +50,7 @@ import {
   notifyThemeChanged
 } from '../shared/EhShared';
 import {
+  currentThemeName,
   themeFieldBackground,
   themeOnPrimaryText,
   themePageBackground,
@@ -127,7 +128,7 @@ export struct SettingsScene {
       });
       ehSettingsStore.load(context).then(() => {
         this.settingEntries = ehSettingsStore.getEntries();
-        this.themeName = settingEntryValue(this.settingEntries, 'theme', 'Light');
+        this.themeName = currentThemeName();
       }).catch((error: Error) => {
         this.statusText = 'Settings load failed: ' + error.message;
       });
@@ -135,7 +136,7 @@ export struct SettingsScene {
       this.signedIn = ehCookieStore.hasCookies();
       this.statusText = this.signedIn ? 'Cookie session loaded' : 'Tourist mode';
       this.settingEntries = ehSettingsStore.getEntries();
-      this.themeName = settingEntryValue(this.settingEntries, 'theme', 'Light');
+      this.themeName = currentThemeName();
     }
   }
 
@@ -224,12 +225,16 @@ export struct SettingsScene {
     }
     const normalizedValue = this.normalizedSettingValue(key, value);
     ehSettingsStore.setValue(key, normalizedValue);
+    if (key === 'follow_system_dark_mode' && normalizedValue === 'On' &&
+      ehSettingsStore.getValue('theme', 'Light') === 'Light') {
+      ehSettingsStore.setValue('theme', 'Dark');
+    }
     if (key === 'reading_direction' && normalizedValue === 'Top to bottom') {
       ehSettingsStore.setValue('screen_rotation', 'Default');
       ehSettingsStore.setValue('page_scaling', 'Fixed scale');
     }
     this.settingEntries = ehSettingsStore.getEntries();
-    this.themeName = settingEntryValue(this.settingEntries, 'theme', 'Light');
+    this.themeName = currentThemeName();
     if (key === this.optionKey) {
       this.optionValue = normalizedValue;
     }
@@ -239,7 +244,7 @@ export struct SettingsScene {
     if (key === 'show_jpn_title') {
       notifyGalleryTitleChanged();
     }
-    if (key === 'theme') {
+    if (key === 'theme' || key === 'follow_system_dark_mode') {
       notifyThemeChanged();
       this.settingsRenderRevision++;
       applyAppChromeImmersiveMode();
@@ -269,7 +274,7 @@ export struct SettingsScene {
     ehSettingsStore.save(context).then(() => {
       this.statusText = isNetworkSettingKey(key) ? 'Saved network setting: ' + key + ' = ' + normalizedValue +
         '. Refresh Homepage or run Network diagnostics.' : 'Saved: ' + key + ' = ' + normalizedValue;
-      if (key === 'theme') {
+      if (key === 'theme' || key === 'follow_system_dark_mode') {
         this.restartEntryAbility();
       }
     }).catch((error: Error) => {
@@ -311,6 +316,9 @@ export struct SettingsScene {
     }
     if (key === 'pattern_protection') {
       return normalizeIdentityAuthenticationOption(value);
+    }
+    if (key === 'theme' && ehSettingsStore.getValue('follow_system_dark_mode', 'Off') === 'On') {
+      return value === 'Black' ? 'Black' : 'Dark';
     }
     return value;
   }
@@ -853,7 +861,7 @@ export struct SettingsScene {
           }
           saves.push(ehSettingsStore.save(context));
           this.settingEntries = ehSettingsStore.getEntries();
-          this.themeName = settingEntryValue(this.settingEntries, 'theme', 'Light');
+          this.themeName = currentThemeName();
           if (languageChanged) {
             notifyLanguageChanged();
           }

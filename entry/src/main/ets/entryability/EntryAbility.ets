@@ -1,4 +1,4 @@
-import { UIAbility } from '@kit.AbilityKit';
+import { Configuration, ConfigurationConstant, UIAbility } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { preferences } from '@kit.ArkData';
 import { userAuth } from '@kit.UserAuthenticationKit';
@@ -6,6 +6,7 @@ import { MAIN_WINDOW_KEY, prepareAppChromeBeforeContent, rememberMainWindow } fr
 import { applyWindowPrivacyMode, WINDOW_PRIVACY_STATUS_KEY } from '../services/EhWindowPrivacy';
 import { ehSettingsStore } from '../services/EhSettingsStore';
 import { ehAppLog } from '../services/EhAppLog';
+import { EH_SYSTEM_COLOR_MODE_DARK, EH_SYSTEM_COLOR_MODE_KEY } from '../shared/EhTheme';
 import {
   isEhDirectConnectionProbeEnabled,
   startEhDirectConnectionProbe,
@@ -17,6 +18,7 @@ import {
   IDENTITY_AUTH_LOCKED_KEY,
   IDENTITY_AUTH_OFF,
   IDENTITY_AUTH_PASSWORD_FIRST,
+  notifyThemeChanged,
   normalizeIdentityAuthenticationOption,
   uiText
 } from '../shared/EhShared';
@@ -53,6 +55,7 @@ export default class EntryAbility extends UIAbility {
     AppStorage.setOrCreate<number>(LANGUAGE_REVISION_KEY, 0);
     AppStorage.setOrCreate<string>(WINDOW_PRIVACY_STATUS_KEY, '');
     AppStorage.setOrCreate<boolean>(IDENTITY_AUTH_LOCKED_KEY, false);
+    this.updateSystemColorMode(this.context.config.colorMode);
     const windowReady = stage.getMainWindow().then((win) => {
       rememberMainWindow(win);
       this.updateWindowAvoidAreas(win);
@@ -83,6 +86,16 @@ export default class EntryAbility extends UIAbility {
     }).catch(() => {
       this.loadIndexContent(stage);
     });
+  }
+
+  onConfigurationUpdate(newConfig: Configuration): void {
+    this.updateSystemColorMode(newConfig.colorMode);
+  }
+
+  private updateSystemColorMode(colorMode: ConfigurationConstant.ColorMode | undefined): void {
+    const normalized = colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK ? EH_SYSTEM_COLOR_MODE_DARK : 0;
+    AppStorage.setOrCreate<number>(EH_SYSTEM_COLOR_MODE_KEY, normalized);
+    notifyThemeChanged();
   }
 
   private loadIndexContent(stage: window.WindowStage): void {

@@ -3,6 +3,8 @@ import { ehSettingsStore } from '../services/EhSettingsStore';
 // Keep this file limited to theme color palettes and color accessors only.
 // Component styles, modifiers, and window/UI behavior belong in focused helper files.
 export const EH_THEME_PRIMARY_COLOR: string = '#2F6F8F';
+export const EH_SYSTEM_COLOR_MODE_KEY: string = 'ehviewer_system_color_mode';
+export const EH_SYSTEM_COLOR_MODE_DARK: number = 1;
 
 export interface EhColorPalette {
   name: string;
@@ -213,7 +215,30 @@ const BLACK_PALETTE: EhColorPalette = {
 };
 
 export function currentThemeName(): string {
-  return ehSettingsStore.getValue('theme', 'Light');
+  const storedThemeName = normalizeThemeName(ehSettingsStore.getValue('theme', 'Light'));
+  if (ehSettingsStore.getValue('follow_system_dark_mode', 'Off') !== 'On') {
+    return storedThemeName;
+  }
+  const colorMode = AppStorage.get<number>(EH_SYSTEM_COLOR_MODE_KEY);
+  if (colorMode === EH_SYSTEM_COLOR_MODE_DARK) {
+    return storedThemeName === 'Black' ? 'Black' : 'Dark';
+  }
+  return 'Light';
+}
+
+export function currentDarkModeThemeName(): string {
+  const storedThemeName = normalizeThemeName(ehSettingsStore.getValue('theme', 'Dark'));
+  return storedThemeName === 'Black' ? 'Black' : 'Dark';
+}
+
+function normalizeThemeName(themeName: string): string {
+  if (themeName === 'Black') {
+    return 'Black';
+  }
+  if (themeName === 'Dark') {
+    return 'Dark';
+  }
+  return 'Light';
 }
 
 function currentThemePalette(): EhColorPalette {

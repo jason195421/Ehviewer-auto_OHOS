@@ -14,6 +14,7 @@ import { FilterRule, ehFilterStore } from '../services/EhFilterStore';
 import { EH_APP_VERSION_NAME, EH_AUTHOR_NAME, EH_GIT_BRANCH, EH_RELEASE_TAG } from '../services/EhBuildInfo';
 import {
   EH_THEME_PRIMARY_COLOR,
+  currentDarkModeThemeName as themeCurrentDarkModeThemeName,
   currentThemeName as themeCurrentThemeName,
   isBlackTheme as themeIsBlackTheme,
   isDarkTheme as themeIsDarkTheme,
@@ -704,6 +705,10 @@ export function zhText(text: string): string {
     case 'Display page count in gallery list rows': return '在画廊列表中显示页数';
     case 'Show tag translations': return '显示标签翻译';
     case 'Use translated tag labels when data is available': return '有数据时使用翻译后的标签名称';
+    case 'Follow system dark mode': return '跟随系统深色模式';
+    case 'Use Light in system light mode and the selected dark theme in system dark mode': return '系统浅色时使用亮色，系统深色时使用选定的深色主题';
+    case 'Dark mode theme': return '深色模式主题';
+    case 'Choose Dark or Black when the system enters dark mode': return '系统进入深色模式时使用暗色或黑色主题';
     case 'Keyword/gallery filtering rules': return '关键字/画廊过滤规则';
     case 'Blacklist': return '黑名单';
     case 'Hide matching galleries': return '隐藏匹配的画廊';
@@ -1586,6 +1591,10 @@ export function currentThemeName(): string {
   return themeCurrentThemeName();
 }
 
+export function currentDarkModeThemeName(): string {
+  return themeCurrentDarkModeThemeName();
+}
+
 export function isDarkTheme(): boolean {
   return themeIsDarkTheme();
 }
@@ -1817,6 +1826,7 @@ export function settingsPanelTitle(panel: SettingsPanel): string {
 
 export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, entries: SettingEntry[]): SettingsRowItem[] {
   if (panel === SettingsPanel.Eh) {
+    const followSystemDarkMode = settingEntryValue(entries, 'follow_system_dark_mode', 'Off') === 'On';
     return [
       staticSettingsRow('identity_cookie', 'Identity cookies', 'View or import ipb_member_id, ipb_pass_hash and igneous', 'Session', 'action'),
       optionSettingsRow('gallery_site', 'Gallery site', 'Original setting chooses E-Hentai or ExHentai where supported', entries, ['E-Hentai', 'ExHentai']),
@@ -1830,7 +1840,12 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
       optionSettingsRow('show_jpn_title', 'Show Japanese title', 'Prefer original title when available', entries, ON_OFF_OPTIONS),
       optionSettingsRow('show_gallery_pages', 'Show gallery pages', 'Display page count in gallery list rows', entries, ON_OFF_OPTIONS),
       optionSettingsRow('show_tag_translations', 'Show tag translations', 'Use translated tag labels when data is available', entries, ON_OFF_OPTIONS),
-      optionSettingsRow('theme', 'Theme', 'Original app cycles Light, Dark and Black from drawer/footer and Settings', entries, ['Light', 'Dark', 'Black']),
+      optionSettingsRow('follow_system_dark_mode', 'Follow system dark mode', 'Use Light in system light mode and the selected dark theme in system dark mode', entries, ON_OFF_OPTIONS),
+      optionSettingsRow('theme',
+        followSystemDarkMode ? 'Dark mode theme' : 'Theme',
+        followSystemDarkMode ? 'Choose Dark or Black when the system enters dark mode' :
+          'Original app cycles Light, Dark and Black from drawer/footer and Settings',
+        entries, followSystemDarkMode ? ['Dark', 'Black'] : ['Light', 'Dark', 'Black']),
       staticSettingsRow('filter', 'Filter', 'Keyword/gallery filtering rules', 'Open', 'action'),
       staticSettingsRow('blacklist', 'Blacklist', 'Hide matching galleries from lists (uses same filter rules)', 'Open', 'action'),
       optionSettingsRow('show_eh_limits', 'Show EH limits', 'Display account and image limits in the drawer', entries, ON_OFF_OPTIONS),
@@ -1976,7 +1991,10 @@ export function identityAuthenticationOptions(): string[] {
 }
 
 function optionSettingsRow(key: string, title: string, summary: string, entries: SettingEntry[], options: string[]): SettingsRowItem {
-  const rawValue = settingEntryValue(entries, key, options.length > 0 ? options[0] : '');
+  let rawValue = settingEntryValue(entries, key, options.length > 0 ? options[0] : '');
+  if (key === 'theme' && options.length > 0 && options.indexOf(rawValue) < 0) {
+    rawValue = options[0];
+  }
   const sliderRow = key === 'start_transfer_time' || key === 'screen_lightness' || key === 'ultra_dark_lightness';
   return {
     key: key,

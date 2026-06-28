@@ -1,4 +1,4 @@
-import { UIAbility, common } from '@kit.AbilityKit';
+import { Configuration, ConfigurationConstant, UIAbility, common } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import {
   applyReaderBrightnessFromSettings,
@@ -10,6 +10,8 @@ import {
 import { ehAppLog } from '../services/EhAppLog';
 import { ehSettingsStore } from '../services/EhSettingsStore';
 import { applyWindowPrivacyMode } from '../services/EhWindowPrivacy';
+import { EH_SYSTEM_COLOR_MODE_DARK, EH_SYSTEM_COLOR_MODE_KEY } from '../shared/EhTheme';
+import { notifyThemeChanged } from '../shared/EhShared';
 
 export const READER_ABILITY_CONTEXT_KEY: string = 'readerAbilityContext';
 
@@ -18,6 +20,7 @@ export default class ReaderAbility extends UIAbility {
 
   onWindowStageCreate(stage: window.WindowStage): void {
     AppStorage.setOrCreate(READER_ABILITY_CONTEXT_KEY, this.context);
+    this.updateSystemColorMode(this.context.config.colorMode);
     try {
       const win = stage.getMainWindowSync();
       this.readerWindow = win;
@@ -63,6 +66,16 @@ export default class ReaderAbility extends UIAbility {
       this.scheduleReaderChrome(win, 80);
       this.scheduleReaderChrome(win, 260);
     });
+  }
+
+  onConfigurationUpdate(newConfig: Configuration): void {
+    this.updateSystemColorMode(newConfig.colorMode);
+  }
+
+  private updateSystemColorMode(colorMode: ConfigurationConstant.ColorMode | undefined): void {
+    const normalized = colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK ? EH_SYSTEM_COLOR_MODE_DARK : 0;
+    AppStorage.setOrCreate<number>(EH_SYSTEM_COLOR_MODE_KEY, normalized);
+    notifyThemeChanged();
   }
 
   private ensureReaderWindow(stage: window.WindowStage): window.Window | undefined {
