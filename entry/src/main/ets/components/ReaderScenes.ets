@@ -19,7 +19,6 @@ import {
   readerOrientationFromImageMatch,
   readerOrientationFromSetting,
   readerScreenRotationSetting,
-  restoreAppWindowState,
   setEmbeddedReaderActive
 } from '../services/EhWindowImmersive';
 import { ehSettingsStore } from '../services/EhSettingsStore';
@@ -218,14 +217,6 @@ export struct ReaderScene {
     this.clearOverlayRefreshTimer();
     this.unregisterVolumePageKeys();
     this.resetReaderBrightness().catch(() => {});
-    this.restoreWindowSettings();
-  }
-
-  private restoreWindowSettings(): void {
-    if (!this.restoreAppChromeOnExit) {
-      return;
-    }
-    this.restoreWindowSettingsAsync().catch(() => {});
   }
 
   private applyReaderWindowSettings(): void {
@@ -286,15 +277,6 @@ export struct ReaderScene {
       return readerOrientationFromImageMatch(win, this.activeImageWidth, this.activeImageHeight);
     }
     return readerOrientationFromSetting(orientation);
-  }
-
-  private async restoreWindowSettingsAsync(): Promise<void> {
-    setEmbeddedReaderActive(false);
-    const win = await this.obtainReaderWindow();
-    if (win === undefined) {
-      return;
-    }
-    await restoreAppWindowState(win);
   }
 
   onRenderVersionChange(): void {
