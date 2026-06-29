@@ -9,7 +9,7 @@ export const MAIN_CONTENT_WIDTH_VP_KEY: string = 'mainContentWidthVp';
 type SystemBarName = 'status' | 'navigation';
 type SpecificSystemBarName = 'status' | 'navigationIndicator';
 
-const VISIBLE_SYSTEM_BARS: SystemBarName[] = ['status', 'navigation'];
+const VISIBLE_SYSTEM_BARS: SystemBarName[] = ['status'];
 const HIDDEN_SYSTEM_BARS: SystemBarName[] = [];
 const READER_STATUS_BAR_VISIBLE_SYSTEM_BARS: SystemBarName[] = ['status'];
 const savedReaderPreferredOrientations: Map<number, window.Orientation> = new Map();

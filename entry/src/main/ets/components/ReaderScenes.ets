@@ -238,7 +238,7 @@ export struct ReaderScene {
       return;
     }
     window.getLastWindow(hostContext).then(async (win: window.Window) => {
-      const visibleBars: Array<'status' | 'navigation'> = ['status', 'navigation'];
+      const visibleBars: Array<'status' | 'navigation'> = ['status'];
       try {
         await win.setWindowSystemBarEnable(visibleBars);
       } catch (error) {
