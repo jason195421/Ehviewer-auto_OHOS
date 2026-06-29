@@ -1146,6 +1146,9 @@ export struct GalleryListScene {
             isLoadingMore: this.isLoadingMore,
             galleries: this.galleries,
             onKeywordChange: (value: string) => {
+              if (value === this.keyword) {
+                return;
+              }
               this.keyword = value;
               if (this.isSearchResultScene || this.useLocalProvider) {
                 this.searchSubmitted = false;
@@ -1157,22 +1160,20 @@ export struct GalleryListScene {
               }
             },
             onSearchFocus: () => {
-              if (this.isSearchResultScene || this.useLocalProvider) {
-                this.searchSubmitted = false;
-                this.galleries = [];
-                this.resultCount = '';
-                this.nextUrl = '';
-                this.statusText = '';
-                this.saveListCache();
-              }
             },
             onSearchModeChange: (mode: ListMode) => {
+              if (mode === this.searchMode) {
+                return;
+              }
               this.searchMode = mode;
               if (this.isSearchResultScene || this.useLocalProvider) {
                 this.searchSubmitted = false;
               }
             },
             onSearchCategoryChange: (category: number) => {
+              if (category === this.searchCategory) {
+                return;
+              }
               this.searchAdvancedPanelOpened = true;
               this.searchCategory = category;
               if (this.isSearchResultScene || this.useLocalProvider) {
@@ -1180,6 +1181,9 @@ export struct GalleryListScene {
               }
             },
             onAdvancedEnabledChange: (enabled: boolean) => {
+              if (enabled === this.advancedSearchEnabled) {
+                return;
+              }
               this.searchAdvancedPanelOpened = true;
               this.advancedSearchEnabled = enabled;
               if (this.isSearchResultScene || this.useLocalProvider) {
@@ -1187,6 +1191,9 @@ export struct GalleryListScene {
               }
             },
             onAdvanceSearchChange: (flags: number) => {
+              if (flags === this.advanceSearch) {
+                return;
+              }
               this.searchAdvancedPanelOpened = true;
               this.advanceSearch = flags;
               if (this.isSearchResultScene || this.useLocalProvider) {
@@ -1194,6 +1201,9 @@ export struct GalleryListScene {
               }
             },
             onMinRatingChange: (rating: number) => {
+              if (rating === this.minRating) {
+                return;
+              }
               this.searchAdvancedPanelOpened = true;
               this.minRating = rating;
               if (this.isSearchResultScene || this.useLocalProvider) {
