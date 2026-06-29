@@ -1536,15 +1536,24 @@ function appendMultipartText(chunks: ArrayBuffer[], boundary: string, name: stri
 }
 
 function readFileBuffer(path: string): ArrayBuffer {
-  const stat = fs.statSync(path);
-  const buffer = new ArrayBuffer(stat.size);
-  const file = fs.openSync(path, fs.OpenMode.READ_ONLY);
+  let fd = -1;
   try {
-    fs.readSync(file.fd, buffer);
+    const stat = fs.statSync(path);
+    const buffer = new ArrayBuffer(stat.size);
+    const file = fs.openSync(path, fs.OpenMode.READ_ONLY);
+    fd = file.fd;
+    fs.readSync(fd, buffer);
+    return buffer;
+  } catch (error) {
+    throw new Error('Failed to read image file');
   } finally {
-    fs.closeSync(file.fd);
+    if (fd >= 0) {
+      try {
+        fs.closeSync(fd);
+      } catch (error) {
+      }
+    }
   }
-  return buffer;
 }
 
 function stringToUtf8Buffer(value: string): ArrayBuffer {

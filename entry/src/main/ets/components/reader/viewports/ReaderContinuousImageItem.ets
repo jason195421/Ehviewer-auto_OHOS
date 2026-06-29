@@ -220,9 +220,7 @@ export struct ReaderContinuousImageItem {
     const panEvent = event as PanGestureEvent;
     return this.imageModel.shouldHandleContinuousImagePan(
       panEvent.offsetX,
-      panEvent.velocityX,
-      panEvent.offsetY,
-      panEvent.velocityY
+      panEvent.velocityX
     );
   }
 

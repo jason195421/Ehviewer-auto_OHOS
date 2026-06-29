@@ -163,19 +163,20 @@ export class HathQualityStore {
       updatedAt: Date.now(),
       hosts: this.entries
     };
+    let fd = -1;
     try {
-      let fd = -1;
-      try {
-        const file = fs.openSync(this.cachePath, fs.OpenMode.CREATE | fs.OpenMode.TRUNC | fs.OpenMode.READ_WRITE);
-        fd = file.fd;
-        fs.writeSync(fd, JSON.stringify(data));
-      } finally {
-        if (fd >= 0) {
-          fs.closeSync(fd);
-        }
-      }
+      const file = fs.openSync(this.cachePath, fs.OpenMode.CREATE | fs.OpenMode.TRUNC | fs.OpenMode.READ_WRITE);
+      fd = file.fd;
+      fs.writeSync(fd, JSON.stringify(data));
       this.lastSaveAt = Date.now();
     } catch (error) {
+    } finally {
+      if (fd >= 0) {
+        try {
+          fs.closeSync(fd);
+        } catch (error) {
+        }
+      }
     }
   }
 

@@ -100,7 +100,7 @@ struct ReaderSliderBubble {
     Text(this.displayText)
       .fontSize(14)
       .fontWeight(FontWeight.Medium)
-      .fontColor('#FFFFFF')
+      .fontColor(Color.White)
       .lineHeight(40)
       .textAlign(TextAlign.Center)
       .textVerticalAlign(TextVerticalAlign.CENTER)

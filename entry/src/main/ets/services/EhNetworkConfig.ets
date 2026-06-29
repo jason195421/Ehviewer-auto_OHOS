@@ -855,15 +855,6 @@ function frontingBenchmarkKey(): string {
     ehSettingsStore.getValue('proxy_port', '');
 }
 
-function containsString(values: string[], value: string): boolean {
-  for (let i = 0; i < values.length; i++) {
-    if (values[i] === value) {
-      return true;
-    }
-  }
-  return false;
-}
-
 function requestHost(url: string): string {
   const match = /^https?:\/\/([^\/?#:]+)/i.exec(url);
   return match === null ? '' : match[1];

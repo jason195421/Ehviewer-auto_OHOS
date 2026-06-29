@@ -319,7 +319,6 @@ export class EhDownloadManager {
     detailUrl: string, pageIndex: number, total: number, state: DownloadWorkerState): Promise<DownloadedPageResult> {
     let lastError = '';
     let previousPage: GalleryPage | null = null;
-    const preview = detail.previewSet[pageIndex];
     for (let attempt = 0; attempt <= DOWNLOAD_PAGE_RETRY_LIMIT; attempt++) {
       if (this.shouldStop || this.isStopped(item.gid)) {
         throw new Error('Download stopped');

@@ -38,7 +38,6 @@ import {
   EH_ISSUES_URL,
   EH_RELEASE_TAG,
   EH_RELEASE_URL,
-  EH_REPOSITORY_NAME,
   EH_REPOSITORY_URL,
   EH_TARGET_PLATFORM
 } from '../services/EhBuildInfo';
@@ -713,7 +712,7 @@ export struct SettingsScene {
         this.statusText = uiText('New version found') + ': ' + result.latest.tagName;
       } else {
         this.statusText = result.message;
-        this.getUIContext().getPromptAction().showToast({ message: result.message });
+        this.showToast(result.message);
       }
     }).catch((error: Error) => {
       this.statusText = '检查更新失败: ' + error.message;
@@ -1969,19 +1968,6 @@ function sanitizeExportFileName(fileName: string): string {
   return fileName.replace(/[\\/:*?"<>|]/g, '_');
 }
 
-function uniqueDiagnosticLogPath(root: string, fileName: string): string {
-  const dot = fileName.lastIndexOf('.');
-  const base = dot > 0 ? fileName.substring(0, dot) : fileName;
-  const extension = dot > 0 ? fileName.substring(dot) : '';
-  let path = root + '/' + fileName;
-  let index = 1;
-  while (pathExists(path)) {
-    path = root + '/' + base + '_' + index.toString() + extension;
-    index++;
-  }
-  return path;
-}
-
 async function writeTextFileChunked(path: string, content: string): Promise<void> {
   let fd = -1;
   try {
@@ -2057,15 +2043,6 @@ function yieldToUi(): Promise<void> {
       resolve();
     }, 0);
   });
-}
-
-function pathExists(path: string): boolean {
-  try {
-    fs.accessSync(path);
-    return true;
-  } catch (error) {
-    return false;
-  }
 }
 
 function optionIndex(options: string[], value: string): number {

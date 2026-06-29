@@ -46,7 +46,6 @@ const ACTION_BUBBLE_SIZE: number = 44;
 const ACTION_BUBBLE_GAP: number = 8;
 const ACTION_BUBBLE_PRIMARY_SIZE: number = 54;
 const ACTION_BUBBLE_PRIMARY_GAP: number = 10;
-let rememberedSearchCategory: number = GalleryCategory.None;
 const TAG_NAMESPACE_OPTIONS: TagNamespaceOption[] = [
   { label: 'Artist', value: 'artist' },
   { label: 'Group', value: 'group' },
@@ -494,7 +493,6 @@ export struct SearchAdvancedPanel {
   private emitCategoryMask(mask: number): void {
     const next = mask === ALL_CATEGORY ? GalleryCategory.None : mask;
     this.categoryDraft = next;
-    rememberedSearchCategory = next;
     this.onSearchCategoryChange(next);
   }
 

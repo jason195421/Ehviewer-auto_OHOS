@@ -1,45 +1,14 @@
-import { pasteboard } from '@kit.BasicServicesKit';
-import { common } from '@kit.AbilityKit';
-import { ArchiveOption, ArchiverInfo, ArchiverOption, GalleryCategory, GalleryDetail, GalleryPage, GalleryPreview, GalleryRoute, GallerySite, HathArchiveList, TopListBucket, TopListDetail, TopListInfo, TopListItem, TopListKind } from '../model/GalleryModels';
-import { ehSettingsStore } from '../services/EhSettingsStore';
-import { ArchiverDownloadResult, ArchiverLoadResult, EhHttpClient, GalleryDetailLoadResult, GalleryPageLoadResult, HathArchiveListLoadResult, HathArchiveSubmitResult, RateGalleryResult, ToggleFavoriteResult, TopListLoadResult } from '../services/EhHttpClient';
-import { DEFAULT_ADVANCE_SEARCH, EhUrl, ListMode } from '../services/EhUrl';
-import { galleryPageCache } from '../services/GalleryPageCache';
-import { DetailPreviewPager, mergeGalleryPreviewSets, seedPreviewMap } from '../services/GalleryPreviewLoader';
-import { createReaderSessionState, readerSessionStore } from '../services/ReaderSessionStore';
-import { readerImageCache } from '../services/ReaderImageCache';
-import {
-  archiveUnavailableReason,
-  createCoverSearchRequest,
-  createSimilarGallerySearch,
-  createTagSearchRequest,
-  detailArchiveReferer,
-  detailCoverCacheKey,
-  DetailSearchRequest
-} from '../services/GalleryDetailActionSupport';
-import {
-  createDownloadReaderSessionState,
-  detailDownloadButtonText,
-  DetailDownloadToggleResult,
-  findDetailDownloadItem,
-  refreshDetailDownloadItem,
-  toggleDetailDownloadTask
-} from '../services/GalleryDetailDownloadSupport';
+import { GalleryCategory, GalleryDetail, GalleryRoute, GallerySite, TopListBucket, TopListDetail, TopListInfo, TopListItem, TopListKind } from '../model/GalleryModels';
+import { EhHttpClient, TopListLoadResult } from '../services/EhHttpClient';
+import { DEFAULT_ADVANCE_SEARCH, ListMode } from '../services/EhUrl';
+import { DetailSearchRequest } from '../services/GalleryDetailActionSupport';
 import {
   createGalleryDetailLink,
   createEmptyGalleryDetailLink,
   GalleryDetailLink,
   initialDetailForLink
 } from '../services/GalleryDetailModule';
-import { ehDownloadManager } from '../services/EhDownloadManager';
-import { DownloadInfo, ehDownloadStore } from '../services/EhDownloadStore';
-import {
-  confirmCellularNetworkWarningForSession,
-  shouldConfirmCellularNetworkOperation
-} from '../services/EhCellularNetworkGuard';
-import { ehAppLog } from '../services/EhAppLog';
 import { applyAppChromeImmersiveMode, enterEmbeddedReaderFullscreen, leaveEmbeddedReaderFullscreen } from '../services/EhWindowImmersive';
-import { LANGUAGE_REVISION_KEY, nextFloatingToolbarOffset } from '../shared/EhShared';
 import {
   themeOnPrimaryText,
   themePageBackground,
@@ -50,8 +19,8 @@ import {
   themeTransparentColor
 } from '../shared/EhTheme';
 import { ArrayDataSource } from '../shared/ListDataSource';
-import { STATUS_BAR_HEIGHT_KEY, setActiveBackHandler, createEmptyDetail, createEmptyPage, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneGalleryDetail, cloneGalleryPage, createReaderLoadingPage, cloneTopListDetail, getAbilityContext, saveGalleryToHistory, saveGalleryReadPosition, readerStartIndex, readerStartIndexAsync, readerPageReferer, cacheReaderImageForPage, readerPreloadCount, topListChipColor, currentGallerySite, uiText } from '../shared/EhShared';
-import { GalleryDetailOverlayScene, GalleryListScene, GalleryListStateView, ReaderPageState, ReaderScene } from './GalleryScenes';
+import { LANGUAGE_REVISION_KEY, STATUS_BAR_HEIGHT_KEY, setActiveBackHandler, createEmptyDetail, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneTopListDetail, nextFloatingToolbarOffset, topListChipColor, currentGallerySite } from '../shared/EhShared';
+import { GalleryListScene, GalleryListStateView } from './GalleryScenes';
 import { GalleryDetailHostScene } from './GalleryDetailHostScene';
 import { ReaderSessionScene } from './ReaderHostScene';
 import { FloatingToolbarHost } from './NavigationComponents';
@@ -120,14 +89,6 @@ export struct TopListScene {
     return false;
   }
 
-  private openTagSearch(namespace: string, tag: string): void {
-    const request = createTagSearchRequest(namespace, tag);
-    if (request === null) {
-      return;
-    }
-    this.openRemoteSearch(request);
-  }
-
   private closeTagSearch(): void {
     this.showTagSearch = false;
     this.tagSearchTitle = 'Search';
@@ -152,20 +113,6 @@ export struct TopListScene {
     this.tagSearchImageShowExpunged = request.showExpunged;
     this.showReader = false;
     this.showTagSearch = true;
-  }
-
-  private openImageSearch(path: string): void {
-    this.openRemoteSearch(createCoverSearchRequest(path));
-  }
-
-  private buildTagSearchKeyword(namespace: string, tag: string): string {
-    const trimmedNamespace = namespace.trim();
-    const trimmedTag = tag.trim();
-    if (trimmedNamespace.length === 0 || trimmedTag.length === 0) {
-      return '';
-    }
-    const tagQuery = trimmedTag.indexOf(' ') >= 0 ? '"' + trimmedTag.replace(/"/g, '\\"') + '"' : trimmedTag;
-    return trimmedNamespace + ':' + tagQuery;
   }
 
   private gallerySite(): GallerySite {

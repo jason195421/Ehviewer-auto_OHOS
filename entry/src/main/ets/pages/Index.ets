@@ -24,14 +24,12 @@ import {
   uiText
 } from '../shared/EhShared';
 import {
-  themeOnPrimaryText,
   themePageBackground,
   themePrimaryColor,
   themePrimaryText,
   themeScrimColor,
   themeSecondaryText,
-  themeShadowColor,
-  themeSurface
+  themeShadowColor
 } from '../shared/EhTheme';
 
 // ----------------------------------------------------------------

@@ -280,7 +280,7 @@ export class ReaderPreviewModel {
     return this.canPan();
   }
 
-  shouldHandleContinuousImagePan(offsetX: number, velocityX: number, offsetY: number = 0, velocityY: number = 0): boolean {
+  shouldHandleContinuousImagePan(offsetX: number, velocityX: number): boolean {
     const x = Math.abs(offsetX) >= 1 ? Math.abs(offsetX) : Math.abs(velocityX);
     return this.canPanHorizontally() && x > 0.5;
   }

@@ -24,19 +24,20 @@ export class EhAppLog {
     }
     const line = new Date().toISOString() + ' [' + level + '] ' + tag + ': ' + message + '\n';
     const path = this.logPath(context);
+    let fd = -1;
     try {
       this.trimIfNeeded(path);
-      let fd = -1;
-      try {
-        const file = fs.openSync(path, fs.OpenMode.CREATE | fs.OpenMode.READ_WRITE | fs.OpenMode.APPEND);
-        fd = file.fd;
-        fs.writeSync(fd, line);
-      } finally {
-        if (fd >= 0) {
+      const file = fs.openSync(path, fs.OpenMode.CREATE | fs.OpenMode.READ_WRITE | fs.OpenMode.APPEND);
+      fd = file.fd;
+      fs.writeSync(fd, line);
+    } catch (error) {
+    } finally {
+      if (fd >= 0) {
+        try {
           fs.closeSync(fd);
+        } catch (error) {
         }
       }
-    } catch (error) {
     }
   }
 
@@ -75,17 +76,25 @@ export class EhAppLog {
       }
       const text = fs.readTextSync(path);
       const keep = text.length > 200000 ? text.substring(text.length - 200000) : text;
-      let fd = -1;
-      try {
-        const file = fs.openSync(path, fs.OpenMode.CREATE | fs.OpenMode.TRUNC | fs.OpenMode.READ_WRITE);
-        fd = file.fd;
-        fs.writeSync(fd, keep);
-      } finally {
-        if (fd >= 0) {
+      this.writeTextReplacing(path, keep);
+    } catch (error) {
+    }
+  }
+
+  private writeTextReplacing(path: string, text: string): void {
+    let fd = -1;
+    try {
+      const file = fs.openSync(path, fs.OpenMode.CREATE | fs.OpenMode.TRUNC | fs.OpenMode.READ_WRITE);
+      fd = file.fd;
+      fs.writeSync(fd, text);
+    } catch (error) {
+    } finally {
+      if (fd >= 0) {
+        try {
           fs.closeSync(fd);
+        } catch (error) {
         }
       }
-    } catch (error) {
     }
   }
 }

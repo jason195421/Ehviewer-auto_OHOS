@@ -1,15 +1,9 @@
 import { common } from '@kit.AbilityKit';
-import { pasteboard } from '@kit.BasicServicesKit';
 import { fileUri, picker } from '@kit.CoreFileKit';
 import {
-  ArchiveOption,
-  ArchiverInfo,
-  ArchiverOption,
   GalleryCategory,
   GalleryDetail,
-  GalleryPreview,
-  GalleryRoute,
-  HathArchiveList
+  GalleryRoute
 } from '../model/GalleryModels';
 import { ehDownloadFileStore, RestoredDownloadGallery } from '../services/EhDownloadFileStore';
 import { ehDownloadManager } from '../services/EhDownloadManager';
@@ -18,42 +12,15 @@ import {
   confirmCellularNetworkWarningForSession,
   shouldConfirmCellularNetworkOperation
 } from '../services/EhCellularNetworkGuard';
-import {
-  ArchiverDownloadResult,
-  ArchiverLoadResult,
-  EhHttpClient,
-  HathArchiveListLoadResult,
-  HathArchiveSubmitResult
-} from '../services/EhHttpClient';
-import { ehHistoryStore } from '../services/EhHistoryStore';
-import { ehSettingsStore } from '../services/EhSettingsStore';
 import { DEFAULT_ADVANCE_SEARCH, EhUrl, ListMode } from '../services/EhUrl';
 import { galleryMatchesLocalSearch, LocalGallerySearchOptions } from '../services/LocalGallerySearch';
-import { readerSessionStore } from '../services/ReaderSessionStore';
-import { readerImageCache } from '../services/ReaderImageCache';
-import {
-  archiveUnavailableReason,
-  createCoverSearchRequest,
-  createSimilarGallerySearch,
-  createTagSearchRequest,
-  detailArchiveReferer,
-  detailCoverCacheKey,
-  DetailSearchRequest
-} from '../services/GalleryDetailActionSupport';
-import {
-  createDownloadReaderSessionState,
-  detailDownloadButtonText,
-  DetailDownloadToggleResult,
-  findDetailDownloadItem,
-  toggleDetailDownloadTask
-} from '../services/GalleryDetailDownloadSupport';
+import { DetailSearchRequest } from '../services/GalleryDetailActionSupport';
 import {
   createEmptyGalleryDetailLink,
   createGalleryDetailLinkFromGallery,
   GalleryDetailLink,
   initialDetailForLink
 } from '../services/GalleryDetailModule';
-import { ehAppLog } from '../services/EhAppLog';
 import {
   applyAppChromeImmersiveMode,
   enterEmbeddedReaderFullscreen,
@@ -66,7 +33,6 @@ import {
   createEmptyDownloadInfo,
   createEmptyDetail,
   currentGallerySite,
-  downloadPageIndexes,
   downloadProgressText,
   downloadSizeText,
   downloadStateColor,
@@ -76,7 +42,6 @@ import {
   galleryThumbWidth,
   getAbilityContext,
   nextDownloadStatusFilter,
-  readerStartIndexAsync,
   uiText,
   uiValue
 } from '../shared/EhShared';
@@ -96,7 +61,6 @@ import {
 import { ArrayDataSource } from '../shared/ListDataSource';
 import { FloatingToolbarHost } from './NavigationComponents';
 import { ActionBubble, GalleryListRow, GalleryListScene, GalleryThumbCard } from './GalleryScenes';
-import { GalleryDetailOverlayScene } from './GalleryDetailScenes';
 import { GalleryDetailHostScene } from './GalleryDetailHostScene';
 import { ReaderSessionScene } from './ReaderHostScene';
 import {
@@ -150,7 +114,6 @@ const DOWNLOAD_JUMP_PAGE_SIZE: number = 25;
 
 @Component
 export struct DownloadScene {
-  private client: EhHttpClient = new EhHttpClient();
   private unsubscribeStore: () => void = () => {};
   private unsubscribeDownloadManager: () => void = () => {};
   onMenu: () => void = () => {};
@@ -330,16 +293,6 @@ export struct DownloadScene {
       this.statusText = 'Download load failed: ' + error.message;
       this.items = ehDownloadStore.getItems();
     });
-  }
-
-  private hasWaitingDownloads(): boolean {
-    const items = ehDownloadStore.getItems();
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].state === DownloadState.Wait) {
-        return true;
-      }
-    }
-    return false;
   }
 
   private persistDownloads(): void {
@@ -791,12 +744,6 @@ export struct DownloadScene {
     this.persistDownloads();
   }
 
-  private clearFinished(): void {
-    ehDownloadStore.clearFinished();
-    this.statusText = 'Cleared finished downloads';
-    this.persistDownloads();
-  }
-
   private restoreDownloadedItems(): void {
     const context = getAbilityContext();
     if (context === undefined) {
@@ -969,14 +916,6 @@ export struct DownloadScene {
     this.detailRequestUrl = '';
   }
 
-  private openTagSearch(namespace: string, tag: string): void {
-    const request = createTagSearchRequest(namespace, tag);
-    if (request === null) {
-      return;
-    }
-    this.openRemoteSearch(request);
-  }
-
   private closeTagSearch(): void {
     this.showTagSearch = false;
     this.tagSearchTitle = 'Search';
@@ -1001,55 +940,6 @@ export struct DownloadScene {
     this.tagSearchImageShowExpunged = request.showExpunged;
     this.showReader = false;
     this.showTagSearch = true;
-  }
-
-  private openImageSearch(path: string): void {
-    this.openRemoteSearch(createCoverSearchRequest(path));
-  }
-
-  private buildTagSearchKeyword(namespace: string, tag: string): string {
-    const trimmedNamespace = namespace.trim();
-    const trimmedTag = tag.trim();
-    if (trimmedNamespace.length === 0 || trimmedTag.length === 0) {
-      return '';
-    }
-    const tagQuery = trimmedTag.indexOf(' ') >= 0 ? '"' + trimmedTag.replace(/"/g, '\\"') + '"' : trimmedTag;
-    return trimmedNamespace + ':' + tagQuery;
-  }
-
-  private openDownloadedItem(item: DownloadInfo): void {
-    this.openDownloadedItemAt(item, ehHistoryStore.getReadPage(item.gid));
-  }
-
-  private openDownloadedItemAt(item: DownloadInfo, requestedIndex: number): void {
-    this.openDownloadedItemAtAsync(item, requestedIndex).catch((error: Error) => {
-      this.statusText = 'Reader launch failed: ' + error.message;
-    });
-  }
-
-  private async openDownloadedItemAtAsync(item: DownloadInfo, requestedIndex: number): Promise<void> {
-    const context = getAbilityContext();
-    if (context === undefined) {
-      this.statusText = 'Reader launch failed: Ability context is not ready';
-      return;
-    }
-
-    readerSessionStore.setSession(createDownloadReaderSessionState(item, requestedIndex, currentGallerySite(),
-      this.detailRequestUrl, '', this.detail));
-
-    if (ehSettingsStore.getValue('reader_standalone', 'On') !== 'On') {
-      enterEmbeddedReaderFullscreen();
-      this.showReader = true;
-      return;
-    }
-
-    context.startAbility({
-      bundleName: 'yt.ehviewer.huawei',
-      moduleName: 'entry',
-      abilityName: 'ReaderAbility'
-    }).catch((error: Error) => {
-      this.statusText = 'Reader launch failed: ' + error.message;
-    });
   }
 
   private closeEmbeddedReader(): void {

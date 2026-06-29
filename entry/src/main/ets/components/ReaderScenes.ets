@@ -295,10 +295,6 @@ export struct ReaderScene {
     return this.getUIContext().px2vp(this.statusBarHeightPx);
   }
 
-  private readingFullscreenEnabled(): boolean {
-    return ehSettingsStore.getValue('reading_fullscreen', 'On') === 'On';
-  }
-
   private readerStatusOverlayTop(): number {
     return Math.max(12, this.statusBarHeightVp() + 8);
   }
@@ -799,6 +795,13 @@ export struct ReaderScene {
     this.imageActionsVisible = false;
   }
 
+  private showToast(message: string): void {
+    try {
+      this.getUIContext().getPromptAction().showToast({ message: message });
+    } catch (error) {
+    }
+  }
+
   private refreshCurrentImage(): void {
     const page = this.pageForIndex(this.currentIndex);
     const index = this.currentIndex;
@@ -888,7 +891,7 @@ export struct ReaderScene {
     }
     const sourcePath = await this.ensureLocalImagePathForPage(page);
     if (sourcePath.length === 0) {
-      this.getUIContext().getPromptAction().showToast({ message: uiText('Save failed') });
+      this.showToast(uiText('Save failed'));
       return;
     }
     try {
@@ -897,15 +900,13 @@ export struct ReaderScene {
       const title = mediaAssetTitle(fileName);
       const uri = await helper.createAsset(photoAccessHelper.PhotoType.IMAGE, albumImageFileType(sourcePath), { title: title });
       if (copyFileContent(sourcePath, uri)) {
-        this.getUIContext().getPromptAction().showToast({
-          message: uiText('Saved to album') + ': ' + fileName
-        });
+        this.showToast(uiText('Saved to album') + ': ' + fileName);
         this.hideImageActions();
       } else {
-        this.getUIContext().getPromptAction().showToast({ message: uiText('Save failed') });
+        this.showToast(uiText('Save failed'));
       }
     } catch (error) {
-      this.getUIContext().getPromptAction().showToast({ message: uiText('Save failed') });
+      this.showToast(uiText('Save failed'));
     }
   }
 
@@ -1436,7 +1437,7 @@ export struct ReaderScene {
             if (result === SaveButtonOnClickResult.SUCCESS) {
               this.saveCurrentImageToAlbum();
             } else {
-              this.getUIContext().getPromptAction().showToast({ message: uiText('Save failed') });
+              this.showToast(uiText('Save failed'));
             }
           },
           onSave: () => {

@@ -1,57 +1,13 @@
-﻿import { pasteboard } from '@kit.BasicServicesKit';
-import {
-  ALL_CATEGORY,
-  ArchiveOption,
-  ArchiverInfo,
-  ArchiverOption,
-  GalleryCategory,
-  GalleryDetail,
-  GalleryInfo,
-  GalleryPage,
-  GalleryPreview,
-  GalleryRoute,
-  GallerySite,
-  HathArchiveList
-} from '../model/GalleryModels';
+import { ALL_CATEGORY, GalleryCategory, GalleryDetail, GalleryInfo, GalleryRoute, GallerySite } from '../model/GalleryModels';
 import { ehCookieStore } from '../services/EhCookieStore';
 import {
   EhHttpClient,
-  ArchiverDownloadResult,
-  ArchiverLoadResult,
-  GalleryDetailLoadResult,
   GalleryListLoadResult,
-  GalleryPageLoadResult,
-  HathArchiveListLoadResult,
-  HathArchiveSubmitResult,
-  RateGalleryResult,
-  ToggleFavoriteResult
 } from '../services/EhHttpClient';
 import { DEFAULT_ADVANCE_SEARCH, EhUrl, FavListUrlBuilder, ListMode, ListUrlBuilder, buildJumpSeekUrl } from '../services/EhUrl';
-import { galleryPageCache } from '../services/GalleryPageCache';
 import { ehFilterStore } from '../services/EhFilterStore';
-import { DetailPreviewPager, mergeGalleryPreviewSets, seedPreviewMap } from '../services/GalleryPreviewLoader';
-import { createReaderSessionState, readerSessionStore } from '../services/ReaderSessionStore';
 import { ehSettingsStore } from '../services/EhSettingsStore';
-import { ehDownloadManager } from '../services/EhDownloadManager';
-import { DownloadInfo, ehDownloadStore } from '../services/EhDownloadStore';
-import { readerImageCache } from '../services/ReaderImageCache';
-import {
-  archiveUnavailableReason,
-  createCoverSearchRequest,
-  createSimilarGallerySearch,
-  createTagSearchRequest,
-  detailArchiveReferer,
-  detailCoverCacheKey,
-  DetailSearchRequest
-} from '../services/GalleryDetailActionSupport';
-import {
-  createDownloadReaderSessionState,
-  detailDownloadButtonText,
-  DetailDownloadToggleResult,
-  findDetailDownloadItem,
-  refreshDetailDownloadItem,
-  toggleDetailDownloadTask
-} from '../services/GalleryDetailDownloadSupport';
+import { DetailSearchRequest } from '../services/GalleryDetailActionSupport';
 import {
   createGalleryDetailLink,
   createGalleryDetailLinkFromGallery,
@@ -59,12 +15,6 @@ import {
   GalleryDetailLink,
   initialDetailForLink
 } from '../services/GalleryDetailModule';
-import { common } from '@kit.AbilityKit';
-import {
-  confirmCellularNetworkWarningForSession,
-  shouldConfirmCellularNetworkOperation
-} from '../services/EhCellularNetworkGuard';
-import { ehAppLog } from '../services/EhAppLog';
 import { LocalGallerySearchOptions } from '../services/LocalGallerySearch';
 import {
   applyAppChromeImmersiveMode,
@@ -93,7 +43,6 @@ import {
 import { ArrayDataSource } from '../shared/ListDataSource';
 import { EhNavBar } from '../components/NavigationComponents';
 import { CategoryBadge, GalleryListRow, GalleryThumb, GalleryThumbCard } from './GalleryCards';
-import { GalleryDetailOverlayScene, GalleryDetailScene } from './GalleryDetailScenes';
 import { GalleryDetailHostScene } from './GalleryDetailHostScene';
 import { ReaderSessionScene } from './ReaderHostScene';
 import {
@@ -107,35 +56,23 @@ import {
   SearchSummaryStrip,
   recordSearchHistory
 } from './GallerySearchScenes';
-import { CommentsScene, PlaceholderScene, ReaderPageState, ReaderScene } from './ReaderScenes';
 import {
   uiText,
   uiStatusText,
   setActiveBackHandler,
-  createEmptyGallery,
   createEmptyDetail,
-  createEmptyPage,
   cloneGalleryInfos,
   applyGalleryFilters,
-  cloneGalleryDetail,
-  cloneGalleryPage,
-  createReaderLoadingPage,
   getAbilityContext,
   immersiveChromeHeightFromOffset,
   nextFloatingToolbarOffset,
   saveGalleryToHistory,
-  saveGalleryReadPosition,
-  readerStartIndex,
-  readerStartIndexAsync,
   listModeForRoute,
   routeUsesKeyword,
   defaultKeywordForRoute,
   gallerySearchTitle,
   effectiveListSite,
   galleryListFailureMessage,
-  readerPageReferer,
-  cacheReaderImageForPage,
-  readerPreloadCount,
   galleryListMode,
   galleryThumbWidth,
   galleryThumbHeight,
@@ -950,38 +887,6 @@ export struct GalleryListScene {
     this.showSearchResultScene = false;
     setTimeout(() => {
       setActiveBackHandler(() => this.handleSystemBack());
-    }, 0);
-  }
-
-  private openTagSearch(namespace: string, tag: string): void {
-    const request = createTagSearchRequest(namespace, tag);
-    if (request === null) {
-      return;
-    }
-    this.showReader = false;
-    this.showSearchResultScene = false;
-    this.searchResultDraft = {
-      keyword: request.keyword,
-      mode: request.mode,
-      category: GalleryCategory.None,
-      advancedEnabled: false,
-      advanceSearch: DEFAULT_ADVANCE_SEARCH,
-      minRating: -1,
-      pageFrom: -1,
-      pageTo: -1,
-      filterActive: false,
-      searchFilterEnabled: true,
-      searchAdvancedPanelOpened: false,
-      submitted: true,
-      sourceRoute: GalleryRoute.Home,
-      imagePath: request.imagePath,
-      imageUseSimilarityScan: request.useSimilarityScan,
-      imageOnlySearchCovers: request.onlySearchCovers,
-      imageShowExpunged: request.showExpunged
-    };
-    this.fabExpanded = false;
-    setTimeout(() => {
-      this.showSearchResultScene = true;
     }, 0);
   }
 
