@@ -12,7 +12,9 @@ import {
   ReaderImageCompleteEvent,
   ReaderPreviewModel,
   cachedReaderSourceImageSize,
+  cacheReaderImageComplete,
   cacheReaderSourceImageSize,
+  isReaderImageComplete,
   readReaderSourceImageSize,
   readerBackgroundColor,
   readerLocalSourceImagePath
@@ -67,7 +69,7 @@ export struct ReaderContinuousImageItem {
     const requestId = this.sourceSizeRequestId + 1;
     this.sourceSizeRequestId = requestId;
     if (this.completedImageUrl !== url) {
-      this.completedImageUrl = '';
+      this.completedImageUrl = isReaderImageComplete(url) ? url : '';
     }
     if (this.failedImageUrl !== url) {
       this.failedImageUrl = '';
@@ -266,6 +268,7 @@ export struct ReaderContinuousImageItem {
               this.updateDisplayImageSize();
               this.reportImageSize();
             }
+            cacheReaderImageComplete(this.imageUrl());
             this.completedImageUrl = this.imageUrl();
             this.failedImageUrl = '';
           })

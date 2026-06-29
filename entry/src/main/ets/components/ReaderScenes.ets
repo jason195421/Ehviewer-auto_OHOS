@@ -425,31 +425,6 @@ export struct ReaderScene {
     return READER_OFFSCREEN_RENDER_COUNT;
   }
 
-  private readerPreRenderIndexes(): number[] {
-    const total = this.totalPages <= 0 ? 1 : this.totalPages;
-    const center = Math.max(0, Math.min(total - 1, this.currentIndex));
-    const indexes: number[] = [];
-    for (let offset = 1; offset <= READER_OFFSCREEN_RENDER_COUNT; offset++) {
-      const previous = center - offset;
-      const next = center + offset;
-      if (previous >= 0) {
-        indexes.push(previous);
-      }
-      if (next < total) {
-        indexes.push(next);
-      }
-    }
-    return indexes;
-  }
-
-  private offscreenTranslateX(index: number): number {
-    return index < this.currentIndex ? -100000 : 100000;
-  }
-
-  private offscreenTranslateY(index: number): number {
-    return index < this.currentIndex ? -100000 : 100000;
-  }
-
   private syncReaderPageIndexSource(): void {
     const count = this.totalPages <= 0 ? 1 : this.totalPages;
     if (count === this.readerPageIndexesCount && this.readerPageIndexesReversed === this.swiperReversed) {
@@ -1340,8 +1315,6 @@ export struct ReaderScene {
         .backgroundColor(readerBackgroundColor())
       }
 
-      this.PreRenderAdjacentPages()
-
       if (this.menuUltraDarkMode) {
         Stack() {}
           .width('100%')
@@ -1549,62 +1522,5 @@ export struct ReaderScene {
     const visualIndex = this.visualIndexForPageIndex(this.currentIndex);
     const targetVisualIndex = visualIndex + (direction < 0 ? 1 : -1);
     this.jumpTo(this.pageIndexForVisualIndex(targetVisualIndex));
-  }
-
-  @Builder
-  private PreRenderAdjacentPages() {
-    ForEach(this.readerPreRenderIndexes(), (index: number) => {
-      if (this.isContinuousVerticalMode()) {
-        ReaderContinuousImageItem({
-          page: this.pageForIndex(index),
-          statusText: uiText('Image page is loading'),
-          preferOriginal: this.preferOriginal,
-          fitMode: this.fitMode,
-          zoomScale: this.fixedScale,
-          sharedOffsetX: this.continuousOffsetX,
-          isActive: false,
-          onTap: () => {},
-          onRetry: () => {
-            this.onRefreshPage(index);
-          },
-          onImageLongPress: () => {},
-          onImageSizeChange: () => {},
-          onZoomChange: () => {},
-          onHorizontalBoundsChange: () => {},
-          onHorizontalDragStart: () => {},
-          onHorizontalDragUpdate: () => {},
-          onHorizontalDragEnd: () => {}
-        })
-          .width('100%')
-          .translate({ y: this.offscreenTranslateY(index) })
-          .hitTestBehavior(HitTestMode.Transparent)
-      } else {
-        ReaderImageViewport({
-          page: this.pageForIndex(index),
-          statusText: uiText('Image page is loading'),
-          preferOriginal: this.preferOriginal,
-          fitMode: this.fitMode,
-          fixedScale: this.fixedScale,
-          startPosition: this.startPosition,
-          isActive: false,
-          allowEdgeSwipe: false,
-          command: '',
-          commandVersion: 0,
-          onTap: () => {},
-          onRetry: () => {
-            this.onRefreshPage(index);
-          },
-          onImageLongPress: () => {},
-          onSwipeLockChange: () => {},
-          onZoomChange: () => {},
-          onImageSizeChange: () => {},
-          onEdgeSwipe: () => {}
-        })
-          .width('100%')
-          .height('100%')
-          .translate({ x: this.offscreenTranslateX(index) })
-          .hitTestBehavior(HitTestMode.Transparent)
-      }
-    }, (index: number) => 'reader-prerender-' + index.toString())
   }
 }
