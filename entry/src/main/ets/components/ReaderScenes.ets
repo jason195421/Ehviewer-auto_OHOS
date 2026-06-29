@@ -14,6 +14,7 @@ import {
   applyReaderBrightnessFromSettings,
   getMainWindow,
   getReaderWindow,
+  isEmbeddedReaderActive,
   rememberMainWindow,
   rememberReaderWindow,
   readerOrientationFromImageMatch,
@@ -179,6 +180,7 @@ export struct ReaderScene {
   };
   private volumeUpRegistered: boolean = false;
   private volumeDownRegistered: boolean = false;
+  private transientDisappearCleanupTimer: number = -1;
   private volumeUpCallback: (event: KeyEvent) => void = (event: KeyEvent) => {
     this.handleVolumePageKey(event);
   };
@@ -187,6 +189,10 @@ export struct ReaderScene {
   };
 
   aboutToAppear(): void {
+    if (this.transientDisappearCleanupTimer !== -1) {
+      clearTimeout(this.transientDisappearCleanupTimer);
+      this.transientDisappearCleanupTimer = -1;
+    }
     this.readerWindowActive = true;
     this.syncReaderPageIndexSource();
     if (this.restoreAppChromeOnExit) {
@@ -210,6 +216,26 @@ export struct ReaderScene {
   }
 
   aboutToDisappear(): void {
+    if (this.restoreAppChromeOnExit && isEmbeddedReaderActive()) {
+      this.scheduleTransientDisappearCleanup();
+      return;
+    }
+    this.cleanupReaderScene();
+  }
+
+  private scheduleTransientDisappearCleanup(): void {
+    if (this.transientDisappearCleanupTimer !== -1) {
+      clearTimeout(this.transientDisappearCleanupTimer);
+    }
+    this.transientDisappearCleanupTimer = setTimeout(() => {
+      this.transientDisappearCleanupTimer = -1;
+      if (!this.restoreAppChromeOnExit || !isEmbeddedReaderActive()) {
+        this.cleanupReaderScene();
+      }
+    }, 120) as number;
+  }
+
+  private cleanupReaderScene(): void {
     this.readerWindowActive = false;
     this.clearSliderTimer();
     this.clearScreenTapTimer();

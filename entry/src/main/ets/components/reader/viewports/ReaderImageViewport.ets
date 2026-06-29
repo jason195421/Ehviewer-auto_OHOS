@@ -114,6 +114,11 @@ export struct ReaderImageViewport {
     return url.length > 0 && this.completedImageUrl === url && this.failedImageUrl !== url;
   }
 
+  private shouldSyncLoadImage(): boolean {
+    const url = this.imageUrl();
+    return this.localSourceImagePath().length > 0 || isReaderImageComplete(url);
+  }
+
   private onImageSourceChange(): void {
     const url = this.imageUrl();
     const requestId = this.sourceSizeRequestId + 1;
@@ -364,6 +369,7 @@ export struct ReaderImageViewport {
             .width(this.imageDisplayWidth())
             .height(this.imageDisplayHeight())
             .objectFit(this.imageObjectFit())
+            .syncLoad(this.shouldSyncLoadImage())
             .draggable(false)
             .backgroundColor(readerBackgroundColor())
             .opacity(this.failedImageUrl === this.imageUrl() ? 0 : 1)

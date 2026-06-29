@@ -206,6 +206,11 @@ export struct ReaderContinuousImageItem {
     return url.length > 0 && this.completedImageUrl !== url && this.failedImageUrl !== url;
   }
 
+  private shouldSyncLoadImage(): boolean {
+    const url = this.imageUrl();
+    return this.localSourceImagePath().length > 0 || isReaderImageComplete(url);
+  }
+
   private reportImageSize(): void {
     if (!this.isActive || this.sourceImageWidth <= 0 || this.sourceImageHeight <= 0) {
       return;
@@ -257,6 +262,7 @@ export struct ReaderContinuousImageItem {
           .width(this.displayWidth())
           .height(this.displayHeight())
           .objectFit(this.imageObjectFit())
+          .syncLoad(this.shouldSyncLoadImage())
           .draggable(false)
           .backgroundColor(readerBackgroundColor())
           .opacity(this.failedImageUrl === this.imageUrl() ? 0 : 1)
