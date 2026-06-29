@@ -129,10 +129,20 @@ export function leaveEmbeddedReaderFullscreen(): void {
     return;
   }
   restoreAppWindowState(target).then(() => {
-    setTimeout(() => {
-      applyAppChromeImmersiveMode(target);
-    }, 32);
+    scheduleAppChromeImmersiveMode(target, 32);
+    scheduleAppChromeImmersiveMode(target, 120);
+    scheduleAppChromeImmersiveMode(target, 320);
+    scheduleAppChromeImmersiveMode(target, 800);
   }).catch(() => {});
+}
+
+function scheduleAppChromeImmersiveMode(win: window.Window, delayMs: number): void {
+  setTimeout(() => {
+    if (isEmbeddedReaderActive()) {
+      return;
+    }
+    applyAppChromeImmersiveMode(win);
+  }, delayMs);
 }
 
 export function scheduleReaderFullscreenImmersiveMode(win: window.Window, delayMs: number): void {

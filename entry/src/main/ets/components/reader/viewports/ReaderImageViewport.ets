@@ -166,7 +166,7 @@ export struct ReaderImageViewport {
   }
 
   private imageObjectFit(): ImageFit {
-    if (!this.hasSourceImageSize()) {
+    if (!this.hasSourceImageSize() || this.displayImageWidth <= 1 || this.displayImageHeight <= 1) {
       return ImageFit.Contain;
     }
     return ImageFit.Fill;

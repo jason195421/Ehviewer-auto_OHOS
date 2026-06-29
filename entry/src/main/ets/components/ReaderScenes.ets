@@ -292,6 +292,9 @@ export struct ReaderScene {
     if (win === undefined) {
       return;
     }
+    if (this.restoreAppChromeOnExit && !isEmbeddedReaderActive()) {
+      return;
+    }
     if (this.restoreAppChromeOnExit) {
       setEmbeddedReaderActive(true);
     }
@@ -336,6 +339,9 @@ export struct ReaderScene {
   private scheduleReaderChromeMode(delay: number): void {
     setTimeout(() => {
       if (!this.readerWindowActive) {
+        return;
+      }
+      if (this.restoreAppChromeOnExit && !isEmbeddedReaderActive()) {
         return;
       }
       const keepOn = ehSettingsStore.getValue('keep_screen_on', 'Off') === 'On';

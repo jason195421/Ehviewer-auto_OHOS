@@ -165,7 +165,7 @@ export struct ReaderContinuousImageItem {
   }
 
   private imageObjectFit(): ImageFit {
-    if (this.sourceImageWidth <= 0 || this.sourceImageHeight <= 0) {
+    if (this.sourceImageWidth <= 0 || this.sourceImageHeight <= 0 || this.componentWidth <= 1) {
       return ImageFit.Contain;
     }
     return ImageFit.Fill;
