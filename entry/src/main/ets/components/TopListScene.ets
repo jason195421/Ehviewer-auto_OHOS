@@ -45,6 +45,7 @@ export struct TopListScene {
   @State galleryListModeLabel: string = 'Top List';
   @State galleryFollow: string = '';
   @State galleryKeyword: string = '';
+  @State gallerySearchMode: ListMode = ListMode.Normal;
   @State galleryRoute: GalleryRoute = GalleryRoute.TopLists;
   @State galleryUseForcedMode: boolean = false;
   @State galleryForcedMode: ListMode = ListMode.Normal;
@@ -145,6 +146,7 @@ export struct TopListScene {
     this.galleryListModeLabel = bucket.title;
     this.galleryFollow = bucket.follow;
     this.galleryKeyword = '';
+    this.gallerySearchMode = ListMode.Normal;
     this.galleryRoute = GalleryRoute.TopLists;
     this.galleryUseForcedMode = false;
     this.showGalleryList = true;
@@ -159,17 +161,37 @@ export struct TopListScene {
     this.galleryListTitle = info.title;
     this.galleryListModeLabel = 'Related galleries';
     this.galleryFollow = '';
-    this.galleryKeyword = item.value;
+    this.gallerySearchMode = this.searchModeForTopListItem(item, info);
+    this.galleryKeyword = this.searchKeywordForTopListItem(item, this.gallerySearchMode);
     this.galleryRoute = GalleryRoute.Home;
-    this.galleryUseForcedMode = true;
-    this.galleryForcedMode = info.kind === TopListKind.Uploader ? ListMode.Uploader : ListMode.Normal;
+    this.galleryUseForcedMode = false;
+    this.galleryForcedMode = ListMode.Normal;
     this.showGalleryList = true;
+  }
+
+  private searchModeForTopListItem(item: TopListItem, info: TopListInfo): ListMode {
+    const normalizedHref = item.href.toLowerCase();
+    if (info.kind === TopListKind.Uploader || normalizedHref.indexOf('/uploader/') >= 0) {
+      return ListMode.Uploader;
+    }
+    if (item.tag.length > 0 || info.kind === TopListKind.Tagging || normalizedHref.indexOf('/tag/') >= 0) {
+      return ListMode.Tag;
+    }
+    return ListMode.Normal;
+  }
+
+  private searchKeywordForTopListItem(item: TopListItem, mode: ListMode): string {
+    if (mode === ListMode.Tag && item.tag.length > 0) {
+      return item.tag;
+    }
+    return item.value;
   }
 
   private closeGalleryList(): void {
     this.showGalleryList = false;
     this.galleryFollow = '';
     this.galleryKeyword = '';
+    this.gallerySearchMode = ListMode.Normal;
     this.galleryUseForcedMode = false;
     setTimeout(() => {
       setActiveBackHandler(() => this.handleSystemBack());
@@ -347,6 +369,11 @@ export struct TopListScene {
         sourceRoute: this.galleryRoute,
         follow: this.galleryFollow,
         initialKeyword: this.galleryKeyword,
+        initialSearchMode: this.gallerySearchMode,
+        initialSearchCategory: GalleryCategory.None,
+        initialAdvancedSearchEnabled: false,
+        initialAdvanceSearch: DEFAULT_ADVANCE_SEARCH,
+        initialSearchSubmitted: true,
         useForcedMode: this.galleryUseForcedMode,
         forcedMode: this.galleryForcedMode,
         isSearchResultScene: true,
