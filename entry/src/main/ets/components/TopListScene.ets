@@ -8,7 +8,13 @@ import {
   GalleryDetailLink,
   initialDetailForLink
 } from '../services/GalleryDetailModule';
-import { applyAppChromeImmersiveMode, enterEmbeddedReaderFullscreen, leaveEmbeddedReaderFullscreen } from '../services/EhWindowImmersive';
+import {
+  applyAppChromeImmersiveMode,
+  enterEmbeddedReaderFullscreen,
+  isEmbeddedReaderActive,
+  leaveEmbeddedReaderFullscreen
+} from '../services/EhWindowImmersive';
+import { hasActiveReaderSession } from '../services/ReaderSessionStore';
 import {
   themeOnPrimaryText,
   themePageBackground,
@@ -75,8 +81,16 @@ export struct TopListScene {
 
   aboutToAppear(): void {
     applyAppChromeImmersiveMode();
+    this.restoreEmbeddedReaderAfterRebuild();
     setActiveBackHandler(() => this.handleSystemBack());
     this.loadTopList();
+  }
+
+  private restoreEmbeddedReaderAfterRebuild(): void {
+    if (this.showReader || !isEmbeddedReaderActive() || !hasActiveReaderSession()) {
+      return;
+    }
+    this.showReader = true;
   }
 
   aboutToDisappear(): void {

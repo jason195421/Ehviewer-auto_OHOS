@@ -19,10 +19,12 @@ import { LocalGallerySearchOptions } from '../services/LocalGallerySearch';
 import {
   applyAppChromeImmersiveMode,
   enterEmbeddedReaderFullscreen,
+  isEmbeddedReaderActive,
   leaveEmbeddedReaderFullscreen,
   mainContentWidthFallbackVp,
   rememberMainContentWidthVp
 } from '../services/EhWindowImmersive';
+import { hasActiveReaderSession } from '../services/ReaderSessionStore';
 import { LANGUAGE_REVISION_KEY } from '../shared/EhShared';
 import {
   themeFieldBackground,
@@ -402,6 +404,7 @@ export struct GalleryListScene {
       this.searchSubmitted = !this.isSearchResultScene || this.initialSearchSubmitted;
       this.localSearchBarVisible = false;
     }
+    this.restoreEmbeddedReaderAfterRebuild();
     const context = getAbilityContext();
     if (context !== undefined) {
       Promise.all([
@@ -432,6 +435,14 @@ export struct GalleryListScene {
       }
     }
     setActiveBackHandler(() => this.handleSystemBack());
+  }
+
+  private restoreEmbeddedReaderAfterRebuild(): void {
+    if (this.showReader || !isEmbeddedReaderActive() || !hasActiveReaderSession()) {
+      return;
+    }
+    this.showReader = true;
+    this.fabExpanded = false;
   }
 
   aboutToDisappear(): void {

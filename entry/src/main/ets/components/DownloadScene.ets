@@ -24,10 +24,12 @@ import {
 import {
   applyAppChromeImmersiveMode,
   enterEmbeddedReaderFullscreen,
+  isEmbeddedReaderActive,
   leaveEmbeddedReaderFullscreen,
   mainContentWidthFallbackVp,
   rememberMainContentWidthVp
 } from '../services/EhWindowImmersive';
+import { hasActiveReaderSession } from '../services/ReaderSessionStore';
 import { LANGUAGE_REVISION_KEY, STATUS_BAR_HEIGHT_KEY, nextFloatingToolbarOffset, setActiveBackHandler } from '../shared/EhShared';
 import {
   createEmptyDownloadInfo,
@@ -172,6 +174,7 @@ export struct DownloadScene {
 
   aboutToAppear(): void {
     applyAppChromeImmersiveMode();
+    this.restoreEmbeddedReaderAfterRebuild();
     this.syncDownloadContentWidthFromWindow();
     setActiveBackHandler(() => this.handleSystemBack());
     this.unsubscribeStore = ehDownloadStore.subscribe((items: DownloadInfo[]) => {
@@ -186,6 +189,14 @@ export struct DownloadScene {
     setTimeout(() => {
       this.syncDownloadContentWidthFromWindow();
     }, 0);
+  }
+
+  private restoreEmbeddedReaderAfterRebuild(): void {
+    if (this.showReader || !isEmbeddedReaderActive() || !hasActiveReaderSession()) {
+      return;
+    }
+    this.showReader = true;
+    this.downloadActionsExpanded = false;
   }
 
   aboutToDisappear(): void {
