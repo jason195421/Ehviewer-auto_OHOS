@@ -318,6 +318,9 @@ async function setWindowBrightnessQuietly(target: window.Window, brightness: num
 async function setPreferredOrientationQuietly(target: window.Window, orientation: window.Orientation,
   operation: string): Promise<void> {
   try {
+    if (target.getPreferredOrientation() === orientation) {
+      return;
+    }
     await target.setPreferredOrientation(orientation);
   } catch (error) {
     logWindowError(operation, error);
