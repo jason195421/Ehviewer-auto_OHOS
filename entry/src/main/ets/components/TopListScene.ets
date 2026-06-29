@@ -153,7 +153,7 @@ export struct TopListScene {
   }
 
   private openTopListItem(item: TopListItem, info: TopListInfo): void {
-    if (item.gid.length > 0 && item.token.length > 0) {
+    if (info.kind === TopListKind.Gallery && item.gid.length > 0 && item.token.length > 0) {
       this.loadDetailFromItem(item);
       return;
     }
@@ -169,12 +169,11 @@ export struct TopListScene {
     this.showGalleryList = true;
   }
 
-  private searchModeForTopListItem(item: TopListItem, info: TopListInfo): ListMode {
-    const normalizedHref = item.href.toLowerCase();
-    if (info.kind === TopListKind.Uploader || normalizedHref.indexOf('/uploader/') >= 0) {
+  private searchModeForTopListItem(_item: TopListItem, info: TopListInfo): ListMode {
+    if (info.kind !== TopListKind.Gallery) {
       return ListMode.Uploader;
     }
-    if (item.tag.length > 0 || info.kind === TopListKind.Tagging || normalizedHref.indexOf('/tag/') >= 0) {
+    if (_item.tag.length > 0) {
       return ListMode.Tag;
     }
     return ListMode.Normal;
