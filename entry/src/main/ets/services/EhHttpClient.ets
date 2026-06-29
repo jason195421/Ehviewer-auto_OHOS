@@ -1061,12 +1061,12 @@ export class EhHttpClient {
       }
       const parsed: GalleryListParseResult = parseGalleryList(response.body);
       await this.fillGalleryListByApi(parsed.galleries, url, site);
-      const ok = parsed.galleries.length > 0 || isSuccessfulEmptyImageSearch(parsed.warning);
+      const ok = true;
       return {
         ok: ok,
         url: redirectUrl.length > 0 ? redirectUrl : url,
         statusCode: response.statusCode,
-        message: parsed.warning.length > 0 ? parsed.warning : 'Parsed image search results',
+        message: parsed.galleries.length > 0 ? 'Parsed image search results' : 'No results',
         pages: parsed.pages,
         nextPage: parsed.nextPage,
         nextUrl: parsed.nextUrl,
@@ -1630,10 +1630,6 @@ function imageSearchRedirectUrl(response: EhHttpResponse, baseUrl: string): stri
     return '';
   }
   return absoluteUrl(location, baseUrl);
-}
-
-function isSuccessfulEmptyImageSearch(warning: string): boolean {
-  return warning === 'No hits found';
 }
 
 function responseHeaderValue(headers: Record<string, Object>, name: string): string {

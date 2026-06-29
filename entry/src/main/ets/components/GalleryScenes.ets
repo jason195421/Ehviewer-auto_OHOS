@@ -1,3 +1,5 @@
+import { fileIo as fs, picker } from '@kit.CoreFileKit';
+import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { ALL_CATEGORY, GalleryCategory, GalleryDetail, GalleryInfo, GalleryRoute, GallerySite } from '../model/GalleryModels';
 import { ehCookieStore } from '../services/EhCookieStore';
 import {
@@ -123,6 +125,10 @@ interface GalleryListSceneCache {
   minRating: number;
   pageFrom: number;
   pageTo: number;
+  imagePath?: string;
+  imageUseSimilarityScan?: boolean;
+  imageOnlySearchCovers?: boolean;
+  imageShowExpunged?: boolean;
   searchFilterEnabled: boolean;
   searchAdvancedPanelOpened: boolean;
   searchSubmitted: boolean;
@@ -152,6 +158,7 @@ interface SearchResultDraft {
 
 const galleryListSceneCache: Map<string, GalleryListSceneCache> = new Map();
 const ACCOUNT_DEFAULT_FILTER_DISABLE_FLAGS: number = 0x100 | 0x200 | 0x400;
+const IMAGE_SEARCH_FILE_SUFFIXES: string[] = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
 
 function createEmptySearchResultDraft(): SearchResultDraft {
   return {
@@ -173,6 +180,54 @@ function createEmptySearchResultDraft(): SearchResultDraft {
     imageOnlySearchCovers: false,
     imageShowExpunged: false
   };
+}
+
+async function copyImageSearchSourceToCache(sourceUri: string): Promise<string> {
+  const context = getAbilityContext();
+  if (context === undefined || sourceUri.length === 0) {
+    return '';
+  }
+  const targetPath = context.cacheDir + '/image_search_' + Date.now().toString() + imageSearchExtension(sourceUri);
+  let sourceFd = -1;
+  let targetFd = -1;
+  try {
+    const sourceFile = fs.openSync(sourceUri, fs.OpenMode.READ_ONLY);
+    sourceFd = sourceFile.fd;
+    const stat = fs.statSync(sourceFd);
+    const buffer = new ArrayBuffer(stat.size);
+    fs.readSync(sourceFd, buffer);
+    const targetFile = fs.openSync(targetPath, fs.OpenMode.CREATE | fs.OpenMode.TRUNC | fs.OpenMode.READ_WRITE);
+    targetFd = targetFile.fd;
+    fs.writeSync(targetFd, buffer);
+    return targetPath;
+  } catch (error) {
+    return '';
+  } finally {
+    if (sourceFd >= 0) {
+      try {
+        fs.closeSync(sourceFd);
+      } catch (error) {
+      }
+    }
+    if (targetFd >= 0) {
+      try {
+        fs.closeSync(targetFd);
+      } catch (error) {
+      }
+    }
+  }
+}
+
+function imageSearchExtension(value: string): string {
+  const lower = value.toLowerCase();
+  const queryIndex = lower.indexOf('?');
+  const clean = queryIndex >= 0 ? lower.substring(0, queryIndex) : lower;
+  for (let i = 0; i < IMAGE_SEARCH_FILE_SUFFIXES.length; i++) {
+    if (clean.endsWith(IMAGE_SEARCH_FILE_SUFFIXES[i])) {
+      return IMAGE_SEARCH_FILE_SUFFIXES[i];
+    }
+  }
+  return '.jpg';
 }
 
 function updateGalleryListScrollCache(key: string, offset: number): void {
@@ -272,6 +327,10 @@ export struct GalleryListScene {
   @State minRating: number = -1;
   @State pageFrom: number = -1;
   @State pageTo: number = -1;
+  @State imageSearchPath: string = '';
+  @State imageSearchUseSimilarityScan: boolean = false;
+  @State imageSearchOnlyCovers: boolean = false;
+  @State imageSearchShowExpunged: boolean = false;
   @State searchSubmitted: boolean = false;
   @State showDetail: boolean = false;
   @StorageLink(EMBEDDED_READER_ACTIVE_KEY) showReader: boolean = false;
@@ -297,9 +356,9 @@ export struct GalleryListScene {
       return this.sourceRoute.toString() + '|search-result|' + this.keyword + '|' + this.searchMode.toString() + '|' +
         this.searchCategory.toString() + '|' + (this.advancedSearchEnabled ? '1' : '0') + '|' +
         this.advanceSearch.toString() + '|' + this.minRating.toString() + '|' +
-        this.initialImagePath + '|' + (this.initialImageUseSimilarityScan ? 'sim' : 'nosim') + '|' +
-        (this.initialImageOnlySearchCovers ? 'covers' : 'all') + '|' +
-        (this.initialImageShowExpunged ? 'exp' : 'noexp') + '|' +
+        this.imageSearchPath + '|' + (this.imageSearchUseSimilarityScan ? 'sim' : 'nosim') + '|' +
+        (this.imageSearchOnlyCovers ? 'covers' : 'all') + '|' +
+        (this.imageSearchShowExpunged ? 'exp' : 'noexp') + '|' +
         (this.accountFilterEnabled ? 'account-filter-on' : 'account-filter-off') + '|' +
         (this.searchFilterEnabled ? 'search-filter-on' : 'search-filter-off') + '|' +
         (this.searchAdvancedPanelOpened ? 'advanced-panel-opened' : 'advanced-panel-closed');
@@ -341,6 +400,10 @@ export struct GalleryListScene {
     this.minRating = cache.minRating;
     this.pageFrom = cache.pageFrom;
     this.pageTo = cache.pageTo;
+    this.imageSearchPath = cache.imagePath === undefined ? '' : cache.imagePath;
+    this.imageSearchUseSimilarityScan = cache.imageUseSimilarityScan === true;
+    this.imageSearchOnlyCovers = cache.imageOnlySearchCovers === true;
+    this.imageSearchShowExpunged = cache.imageShowExpunged === true;
     this.searchSubmitted = cache.searchSubmitted === true;
     this.listScrollOffset = cache.listScrollOffset;
     this.appendExhausted = cache.appendExhausted === true;
@@ -370,6 +433,10 @@ export struct GalleryListScene {
       minRating: this.minRating,
       pageFrom: this.pageFrom,
       pageTo: this.pageTo,
+      imagePath: this.imageSearchPath,
+      imageUseSimilarityScan: this.imageSearchUseSimilarityScan,
+      imageOnlySearchCovers: this.imageSearchOnlyCovers,
+      imageShowExpunged: this.imageSearchShowExpunged,
       searchSubmitted: this.searchSubmitted,
       listScrollOffset: this.listScrollOffset,
       appendExhausted: this.appendExhausted
@@ -396,6 +463,10 @@ export struct GalleryListScene {
       this.minRating = this.initialMinRating;
       this.pageFrom = this.initialPageFrom;
       this.pageTo = this.initialPageTo;
+      this.imageSearchPath = this.initialImagePath;
+      this.imageSearchUseSimilarityScan = this.initialImageUseSimilarityScan;
+      this.imageSearchOnlyCovers = this.initialImageOnlySearchCovers;
+      this.imageSearchShowExpunged = this.initialImageShowExpunged;
       this.filterActive = this.isSearchResultScene ? false : this.searchResultDraft.filterActive;
       this.searchFilterEnabled = this.isSearchResultScene ? this.searchResultDraft.searchFilterEnabled : true;
       this.searchAdvancedPanelOpened = this.isSearchResultScene ?
@@ -813,10 +884,10 @@ export struct GalleryListScene {
     builder.mode = this.searchModeForRoute(routeMode, builder.keyword);
     builder.follow = this.follow;
     builder.category = this.requestCategoryForMode(builder.mode);
-    builder.imagePath = this.initialImagePath;
-    builder.useSimilarityScan = this.initialImageUseSimilarityScan;
-    builder.onlySearchCovers = this.initialImageOnlySearchCovers;
-    builder.showExpunged = this.initialImageShowExpunged;
+    builder.imagePath = this.imageSearchPath;
+    builder.useSimilarityScan = this.imageSearchUseSimilarityScan;
+    builder.onlySearchCovers = this.imageSearchOnlyCovers;
+    builder.showExpunged = this.imageSearchShowExpunged;
     if (this.shouldApplySearchFilters() && this.advancedSearchEnabled && this.searchSupportsAdvanced(builder.mode)) {
       builder.advanceSearch = this.advanceSearch;
       builder.minRating = this.minRating;
@@ -889,6 +960,54 @@ export struct GalleryListScene {
       this.openDetailByToken(directGallery.gid, directGallery.token);
       return;
     }
+    this.searchSubmitted = true;
+    this.hasFirstRefresh = true;
+    this.resetListScroll();
+    this.loadListPage(0);
+  }
+
+  private startImageSearch(path: string, useSimilarityScan: boolean, onlySearchCovers: boolean): void {
+    if (path.length === 0) {
+      this.statusText = 'No image selected for search';
+      return;
+    }
+    this.fabExpanded = false;
+    const draft: SearchResultDraft = {
+      keyword: '',
+      mode: ListMode.ImageSearch,
+      category: GalleryCategory.None,
+      advancedEnabled: false,
+      advanceSearch: DEFAULT_ADVANCE_SEARCH,
+      minRating: -1,
+      pageFrom: -1,
+      pageTo: -1,
+      filterActive: false,
+      searchFilterEnabled: true,
+      searchAdvancedPanelOpened: false,
+      submitted: true,
+      sourceRoute: GalleryRoute.Home,
+      imagePath: path,
+      imageUseSimilarityScan: useSimilarityScan,
+      imageOnlySearchCovers: onlySearchCovers,
+      imageShowExpunged: true
+    };
+    if (!this.isSearchResultScene) {
+      this.searchResultDraft = draft;
+      this.showSearchResultScene = true;
+      return;
+    }
+    this.keyword = '';
+    this.searchMode = ListMode.ImageSearch;
+    this.searchCategory = GalleryCategory.None;
+    this.advancedSearchEnabled = false;
+    this.advanceSearch = DEFAULT_ADVANCE_SEARCH;
+    this.minRating = -1;
+    this.pageFrom = -1;
+    this.pageTo = -1;
+    this.imageSearchPath = path;
+    this.imageSearchUseSimilarityScan = useSimilarityScan;
+    this.imageSearchOnlyCovers = onlySearchCovers;
+    this.imageSearchShowExpunged = true;
     this.searchSubmitted = true;
     this.hasFirstRefresh = true;
     this.resetListScroll();
@@ -1304,6 +1423,9 @@ export struct GalleryListScene {
             onRandom: () => {
               this.openRandomGallery();
             },
+            onImageSearch: (path: string, useSimilarityScan: boolean, onlySearchCovers: boolean) => {
+              this.startImageSearch(path, useSimilarityScan, onlySearchCovers);
+            },
             onSelectGallery: (gallery: GalleryInfo) => {
               this.loadDetail(gallery);
             },
@@ -1350,6 +1472,221 @@ export struct GalleryListScene {
     }
     .width('100%')
     .height('100%')
+  }
+}
+
+
+@Component
+struct ImageSearchPanel {
+  @Prop panelWidth: number = 320;
+  onClose: () => void = () => {
+  };
+  onSearch: (path: string, useSimilarityScan: boolean, onlySearchCovers: boolean) => void =
+    (_path: string, _useSimilarityScan: boolean, _onlySearchCovers: boolean) => {
+    };
+  @State selectedPath: string = '';
+  @State statusText: string = 'No image selected';
+  @State useSimilarityScan: boolean = true;
+  @State onlySearchCovers: boolean = false;
+  @State busy: boolean = false;
+
+  private selectedName(): string {
+    if (this.selectedPath.length === 0) {
+      return uiText('No image selected');
+    }
+    const slash = Math.max(this.selectedPath.lastIndexOf('/'), this.selectedPath.lastIndexOf('\\'));
+    return slash >= 0 ? this.selectedPath.substring(slash + 1) : this.selectedPath;
+  }
+
+  private async chooseFromAlbum(): Promise<void> {
+    try {
+      const options = new photoAccessHelper.PhotoSelectOptions();
+      options.MIMEType = photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE;
+      options.maxSelectNumber = 1;
+      const photoPicker: photoAccessHelper.PhotoViewPicker = new photoAccessHelper.PhotoViewPicker();
+      const result = await photoPicker.select(options);
+      if (result.photoUris.length > 0) {
+        await this.usePickedUri(result.photoUris[0]);
+      }
+    } catch (error) {
+      this.busy = false;
+      this.statusText = 'Image selection failed';
+    }
+  }
+
+  private async chooseFromFile(): Promise<void> {
+    const context = getAbilityContext();
+    if (context === undefined) {
+      this.statusText = 'Ability context is not ready';
+      return;
+    }
+    try {
+      const options = new picker.DocumentSelectOptions();
+      options.maxSelectNumber = 1;
+      options.fileSuffixFilters = ['图片(.jpg,.jpeg,.png,.webp,.gif)|.jpg,.jpeg,.png,.webp,.gif'];
+      const documentPicker = new picker.DocumentViewPicker(context);
+      const uris = await documentPicker.select(options);
+      if (uris.length > 0) {
+        await this.usePickedUri(uris[0]);
+      }
+    } catch (error) {
+      this.busy = false;
+      this.statusText = 'Image selection failed';
+    }
+  }
+
+  private async usePickedUri(uri: string): Promise<void> {
+    this.busy = true;
+    this.statusText = 'Preparing image...';
+    const path = await copyImageSearchSourceToCache(uri);
+    this.busy = false;
+    if (path.length === 0) {
+      this.statusText = 'Image selection failed';
+      return;
+    }
+    this.selectedPath = path;
+    this.statusText = 'Image selected';
+  }
+
+  private submit(): void {
+    if (this.selectedPath.length === 0 || this.busy) {
+      this.statusText = 'No image selected';
+      return;
+    }
+    this.onSearch(this.selectedPath, this.useSimilarityScan, this.onlySearchCovers);
+  }
+
+  build() {
+    Column({ space: 12 }) {
+      Row() {
+        Text(uiText('Image search'))
+          .fontSize(16)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(themePrimaryText())
+          .layoutWeight(1)
+        Button({ type: ButtonType.Circle, stateEffect: true }) {
+          SymbolGlyph($r('sys.symbol.xmark'))
+            .fontSize(18)
+            .fontColor([themePrimaryText()])
+        }
+        .width(34)
+        .height(34)
+        .backgroundColor(themeFieldBackground())
+        .onClick(() => {
+          this.onClose();
+        })
+      }
+      .width('100%')
+
+      Row({ space: 8 }) {
+        Button({ type: ButtonType.Normal, stateEffect: true }) {
+          Row({ space: 6 }) {
+            SymbolGlyph($r('sys.symbol.magnifyingglass'))
+              .fontSize(18)
+              .fontColor([themeOnPrimaryText()])
+            Text(uiText('From album'))
+              .fontSize(13)
+              .fontColor(themeOnPrimaryText())
+          }
+          .justifyContent(FlexAlign.Center)
+          .alignItems(VerticalAlign.Center)
+          .width('100%')
+        }
+        .height(38)
+        .layoutWeight(1)
+        .borderRadius(6)
+        .backgroundColor(themePrimaryColor())
+        .enabled(!this.busy)
+        .onClick(() => {
+          this.chooseFromAlbum();
+        })
+
+        Button({ type: ButtonType.Normal, stateEffect: true }) {
+          Row({ space: 6 }) {
+            SymbolGlyph($r('sys.symbol.folder'))
+              .fontSize(18)
+              .fontColor([themePrimaryColor()])
+            Text(uiText('From file'))
+              .fontSize(13)
+              .fontColor(themePrimaryColor())
+          }
+          .justifyContent(FlexAlign.Center)
+          .alignItems(VerticalAlign.Center)
+          .width('100%')
+        }
+        .height(38)
+        .layoutWeight(1)
+        .borderRadius(6)
+        .backgroundColor(themeFieldBackground())
+        .enabled(!this.busy)
+        .onClick(() => {
+          this.chooseFromFile();
+        })
+      }
+      .width('100%')
+
+      Column({ space: 4 }) {
+        Text(uiText('Selected image'))
+          .fontSize(12)
+          .fontColor(themeSecondaryText())
+        Text(this.selectedName())
+          .fontSize(13)
+          .fontColor(this.selectedPath.length > 0 ? themePrimaryText() : themeTertiaryText())
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+      .width('100%')
+      .padding(10)
+      .backgroundColor(themeFieldBackground())
+      .borderRadius(6)
+
+      Row() {
+        Text(uiText('Similarity scan'))
+          .fontSize(14)
+          .fontColor(themePrimaryText())
+          .layoutWeight(1)
+        Toggle({ type: ToggleType.Switch, isOn: this.useSimilarityScan })
+          .onChange((isOn: boolean) => {
+            this.useSimilarityScan = isOn;
+          })
+      }
+      .width('100%')
+
+      Row() {
+        Text(uiText('Only cover search'))
+          .fontSize(14)
+          .fontColor(themePrimaryText())
+          .layoutWeight(1)
+        Toggle({ type: ToggleType.Switch, isOn: this.onlySearchCovers })
+          .onChange((isOn: boolean) => {
+            this.onlySearchCovers = isOn;
+          })
+      }
+      .width('100%')
+
+      Text(uiStatusText(this.statusText))
+        .fontSize(12)
+        .fontColor(this.statusText === 'Image selection failed' ? themeDangerText() : themeSecondaryText())
+        .width('100%')
+        .maxLines(2)
+
+      Button(uiText('Search image'))
+        .height(40)
+        .width('100%')
+        .fontSize(14)
+        .fontColor(themeOnPrimaryText())
+        .backgroundColor(themePrimaryColor())
+        .borderRadius(6)
+        .enabled(this.selectedPath.length > 0 && !this.busy)
+        .onClick(() => {
+          this.submit();
+        })
+    }
+    .width(this.panelWidth)
+    .padding(14)
+    .backgroundColor(themeSurface())
+    .borderRadius(8)
+    .shadow({ radius: 14, color: themeShadowColor(), offsetX: 0, offsetY: 4 })
   }
 }
 
@@ -1423,6 +1760,9 @@ export struct GalleryListContent {
   };
   onRandom: () => void = () => {
   };
+  onImageSearch: (path: string, useSimilarityScan: boolean, onlySearchCovers: boolean) => void =
+    (_path: string, _useSimilarityScan: boolean, _onlySearchCovers: boolean) => {
+    };
   onSelectGallery: (gallery: GalleryInfo) => void = () => {
   };
   initialScrollOffset: number = 0;
@@ -1436,6 +1776,7 @@ export struct GalleryListContent {
   @State seekMonthDraft: string = '';
   @State seekDayDraft: string = '';
   @State jumpPanelVisible: boolean = false;
+  @State imageSearchPanelVisible: boolean = false;
   @State selectedTagNamespaces: string[] = [];
   @State searchSuggestionItems: SearchSuggestionItem[] = [];
   @State searchSuggestionRevision: number = 0;
@@ -1569,8 +1910,25 @@ export struct GalleryListContent {
     this.jumpPanelVisible = false;
   }
 
+  private openImageSearchPanel(): void {
+    this.advancedPanelVisible = false;
+    this.jumpPanelVisible = false;
+    this.imageSearchPanelVisible = true;
+  }
+
+  private closeImageSearchPanel(): void {
+    this.imageSearchPanelVisible = false;
+  }
+
   private totalBarHeight(): number {
     return this.statusBarVp() + this.barHeight;
+  }
+
+  private imageSearchPanelWidth(): number {
+    if (this.contentWidth <= 0) {
+      return 320;
+    }
+    return Math.min(320, Math.max(260, this.contentWidth - 24));
   }
 
   private visibleBarHeight(): number {
@@ -2118,13 +2476,17 @@ export struct GalleryListContent {
           accountFilterEnabled: this.isSearchResultScene ? this.searchFilterEnabled : this.accountFilterEnabled,
           canJump: this.canJump,
           canRandom: this.canRandom,
+          canImageSearch: !this.useLocalSearchBar,
           onToggle: this.onToggleActions,
           onFilter: this.onFilter,
           onJump: () => {
             this.openJumpPanel();
           },
           onRefresh: this.onRefresh,
-          onRandom: this.onRandom
+          onRandom: this.onRandom,
+          onImageSearch: () => {
+            this.openImageSearchPanel();
+          }
         })
       }
       .width('100%')
@@ -2170,6 +2532,33 @@ export struct GalleryListContent {
           .transition(TransitionEffect.move(TransitionEdge.TOP)
             .animation({ duration: 180, curve: Curve.EaseOut }))
           .zIndex(12)
+      }
+
+      if (this.imageSearchPanelVisible) {
+        Column()
+          .width('100%')
+          .height('100%')
+          .backgroundColor(themeScrimColor())
+          .onClick(() => {
+            this.closeImageSearchPanel();
+          })
+          .zIndex(13)
+
+        ImageSearchPanel({
+          panelWidth: this.imageSearchPanelWidth(),
+          onClose: () => {
+            this.closeImageSearchPanel();
+          },
+          onSearch: (path: string, useSimilarityScan: boolean, onlySearchCovers: boolean) => {
+            this.closeImageSearchPanel();
+            this.onImageSearch(path, useSimilarityScan, onlySearchCovers);
+          }
+        })
+          .position({
+            x: this.contentWidth > 0 ? Math.max(12, this.contentWidth - this.imageSearchPanelWidth() - 12) : 12,
+            y: this.viewportHeight > 0 ? Math.max(96, this.viewportHeight - 330) : 280
+          })
+          .zIndex(14)
       }
 
       if (this.jumpPanelVisible) {

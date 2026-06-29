@@ -202,6 +202,9 @@ export function uiStatusText(text: string): string {
   if (text === 'Loading galleries...') {
     return '正在加载画廊...';
   }
+  if (text === 'No results') {
+    return '无结果';
+  }
   if (text === 'Loading history...') {
     return '正在加载历史...';
   }
@@ -458,6 +461,18 @@ export function zhText(text: string): string {
     case 'Jump': return '跳转';
     case 'Seek date': return '按日期查找';
     case 'Random': return '随机';
+    case 'Image search': return '图片搜索';
+    case 'Select image': return '选择图片';
+    case 'From album': return '从相册选择';
+    case 'From file': return '从文件选择';
+    case 'Similarity scan': return '相似扫描';
+    case 'Only cover search': return '仅搜索封面';
+    case 'Selected image': return '已选择图片';
+    case 'No image selected': return '未选择图片';
+    case 'Search image': return '搜索图片';
+    case 'Image selected': return '图片已选择';
+    case 'Image selection failed': return '图片选择失败';
+    case 'Preparing image...': return '正在准备图片...';
     case 'Search': return '搜索';
     case 'Search current text': return '搜索当前文本';
     case 'Search history': return '搜索历史';
@@ -2280,6 +2295,9 @@ function gallerySiteName(site: GallerySite): string {
 }
 
 export function galleryListFailureMessage(result: GalleryListLoadResult, site: GallerySite): string {
+  if (result.statusCode >= 200 && result.statusCode < 300) {
+    return 'No results';
+  }
   const status = result.statusCode > 0 ? 'HTTP ' + result.statusCode.toString() + ', ' : '';
   const url = result.url.length > 0 ? ', ' + result.url : '';
   return 'Load failed: ' + gallerySiteName(site) + ', ' + status + result.message + url;

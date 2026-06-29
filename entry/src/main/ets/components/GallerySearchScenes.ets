@@ -803,11 +803,13 @@ export struct QuickActionColumn {
   @Prop accountFilterEnabled: boolean = true;
   @Prop canJump: boolean = false;
   @Prop canRandom: boolean = false;
+  @Prop canImageSearch: boolean = false;
   onToggle: () => void = () => {};
   onFilter: () => void = () => {};
   onJump: () => void = () => {};
   onRefresh: () => void = () => {};
   onRandom: () => void = () => {};
+  onImageSearch: () => void = () => {};
   @State activeActionIndex: number = -1;
 
   private toggleExpanded(): void {
@@ -817,7 +819,10 @@ export struct QuickActionColumn {
   }
 
   private actionCount(): number {
-    return this.expanded ? 4 : 0;
+    if (!this.expanded) {
+      return 0;
+    }
+    return this.canImageSearch ? 5 : 4;
   }
 
   private primaryIndex(): number {
@@ -888,7 +893,9 @@ export struct QuickActionColumn {
       this.onJump();
     } else if (index === 2) {
       this.onRefresh();
-    } else if (index === 3 && this.canRandom) {
+    } else if (index === 3 && this.canImageSearch) {
+      this.onImageSearch();
+    } else if (index === (this.canImageSearch ? 4 : 3) && this.canRandom) {
       this.onRandom();
     }
   }
@@ -932,11 +939,20 @@ export struct QuickActionColumn {
             active: this.activeActionIndex === 2,
             directTap: false
           })
+          if (this.canImageSearch) {
+            ActionBubble({
+              label: uiText('Image search'),
+              symbolIcon: $r('sys.symbol.magnifyingglass'),
+              isEnabled: true,
+              active: this.activeActionIndex === 3,
+              directTap: false
+            })
+          }
           ActionBubble({
             label: uiText('Random'),
             symbolIcon: $r('sys.symbol.play_fill'),
             isEnabled: this.canRandom,
-            active: this.activeActionIndex === 3,
+            active: this.activeActionIndex === (this.canImageSearch ? 4 : 3),
             directTap: false
           })
         }

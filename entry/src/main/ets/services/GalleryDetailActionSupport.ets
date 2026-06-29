@@ -44,7 +44,7 @@ export function createCoverSearchRequest(imagePath: string): DetailSearchRequest
     mode: ListMode.ImageSearch,
     imagePath: imagePath,
     useSimilarityScan: true,
-    onlySearchCovers: false,
+    onlySearchCovers: true,
     showExpunged: true
   };
 }
