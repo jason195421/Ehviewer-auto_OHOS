@@ -251,14 +251,6 @@ export struct ReaderScene {
         await win.setSpecificSystemBarEnabled('navigationIndicator', false);
       } catch (error) {
       }
-      try {
-        await win.setWindowLayoutFullScreen(false);
-      } catch (error) {
-      }
-      try {
-        await win.setWindowSystemBarEnable(visibleBars);
-      } catch (error) {
-      }
     }).catch(() => {});
   }
 
