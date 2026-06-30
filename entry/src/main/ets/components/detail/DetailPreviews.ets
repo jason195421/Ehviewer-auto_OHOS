@@ -51,14 +51,13 @@ export struct DetailPreviews {
     return Math.round(this.previewTileWidth() * 4 / 3);
   }
 
-  private previewRows(): GalleryPreview[][] {
+  private previewColumnsTemplate(): string {
     const columns = this.previewColumns();
-    const items = this.previews;
-    const rows: GalleryPreview[][] = [];
-    for (let i = 0; i < items.length; i += columns) {
-      rows.push(items.slice(i, i + columns));
+    let value = '1fr';
+    for (let i = 1; i < columns; i++) {
+      value += ' 1fr';
     }
-    return rows;
+    return value;
   }
 
   private syncContentWidthFromWindow(): void {
@@ -103,27 +102,23 @@ export struct DetailPreviews {
         .height(52)
         .justifyContent(FlexAlign.Center)
       } else {
-        Column() {
-          ForEach(this.previewRows(), (row: GalleryPreview[], rowIndex: number) => {
-            Row() {
-              ForEach(row, (preview: GalleryPreview, colIndex: number) => {
-                PreviewTile({
-                  preview: preview,
-                  tileWidth: this.previewTileWidth(),
-                  imageHeight: this.previewTileHeight(),
-                  onSelectPreview: (selected: GalleryPreview) => {
-                    this.onSelectPreview(selected);
-                  }
-                })
-                  .margin({ right: colIndex < row.length - 1 ? this.previewGap() : 0 })
-              }, (preview: GalleryPreview) => preview.index.toString())
+        Grid() {
+          ForEach(this.previews, (preview: GalleryPreview) => {
+            GridItem() {
+              PreviewTile({
+                preview: preview,
+                tileWidth: this.previewTileWidth(),
+                imageHeight: this.previewTileHeight(),
+                onSelectPreview: (selected: GalleryPreview) => {
+                  this.onSelectPreview(selected);
+                }
+              })
             }
-            .width('100%')
-            .justifyContent(FlexAlign.Start)
-            .margin({ bottom: rowIndex < this.previewRows().length - 1 ? 12 : 0 })
-            .animation({ duration: 220, curve: Curve.EaseOut })
-          }, (_row: GalleryPreview[], rowIndex: number) => this.previewColumns().toString() + ':' + rowIndex.toString())
+          }, (preview: GalleryPreview) => preview.index.toString())
         }
+        .columnsTemplate(this.previewColumnsTemplate())
+        .columnsGap(this.previewGap())
+        .rowsGap(12)
         .width('100%')
         .animation({ duration: 220, curve: Curve.EaseOut })
       }
