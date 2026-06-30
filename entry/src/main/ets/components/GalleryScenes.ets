@@ -2,6 +2,7 @@ import { uniformTypeDescriptor as utd } from '@kit.ArkData';
 import { fileIo as fs, picker } from '@kit.CoreFileKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { systemShare } from '@kit.ShareKit';
+import { KeyCode } from '@ohos.multimodalInput.keyCode';
 import { ALL_CATEGORY, GalleryCategory, GalleryDetail, GalleryInfo, GalleryRoute, GallerySite } from '../model/GalleryModels';
 import { ehCookieStore } from '../services/EhCookieStore';
 import {
@@ -2380,6 +2381,25 @@ export struct GalleryListContent {
     this.onKeywordChange(removeSearchTagToken(this.keyword, token));
   }
 
+  private searchTagStripMaxWidth(): number {
+    if (this.contentWidth <= 0) {
+      return 160;
+    }
+    return Math.max(80, this.contentWidth - 240);
+  }
+
+  private removeLastSearchTagFromEmptyInput(): boolean {
+    if (this.searchInputText().length > 0) {
+      return false;
+    }
+    const tokens = this.selectedSearchTagTokens();
+    if (tokens.length === 0) {
+      return false;
+    }
+    this.removeSearchTag(tokens[tokens.length - 1]);
+    return true;
+  }
+
   @Builder
   private searchTagChip(token: string) {
     Row({ space: 4 }) {
@@ -2420,6 +2440,7 @@ export struct GalleryListContent {
         .height(30)
         .scrollable(ScrollDirection.Horizontal)
         .scrollBar(BarState.Off)
+        .constraintSize({ maxWidth: this.searchTagStripMaxWidth() })
         .flexShrink(1)
       }
 
@@ -2438,6 +2459,12 @@ export struct GalleryListContent {
         })
         .onChange((value: string) => {
           this.updateSearchInputText(value);
+        })
+        .onKeyEvent((event: KeyEvent): boolean => {
+          if (event.type === KeyType.Down && event.keyCode === KeyCode.KEYCODE_DEL) {
+            return this.removeLastSearchTagFromEmptyInput();
+          }
+          return false;
         })
         .onSubmit(() => {
           this.closeAdvancedPanel();
