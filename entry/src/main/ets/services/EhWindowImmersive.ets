@@ -1,4 +1,6 @@
-import { window } from '@kit.ArkUI';
+import { common } from '@kit.AbilityKit';
+import { settings } from '@kit.BasicServicesKit';
+import { display, window } from '@kit.ArkUI';
 import { ehSettingsStore } from './EhSettingsStore';
 import { isDarkTheme, themeSystemBarContentColor, themeTransparentColor } from '../shared/EhTheme';
 
@@ -13,6 +15,7 @@ const VISIBLE_SYSTEM_BARS: SystemBarName[] = ['status'];
 const HIDDEN_SYSTEM_BARS: SystemBarName[] = [];
 const READER_STATUS_BAR_VISIBLE_SYSTEM_BARS: SystemBarName[] = ['status'];
 const savedReaderPreferredOrientations: Map<number, window.Orientation> = new Map();
+const savedReaderDisplayOrientations: Map<number, display.Orientation> = new Map();
 let readerChromeGeneration: number = 0;
 
 export function rememberMainWindow(win: window.Window): void {
@@ -232,6 +235,10 @@ export function rememberWindowPreferredOrientation(target: window.Window): void 
       return;
     }
     savedReaderPreferredOrientations.set(windowId, target.getPreferredOrientation());
+    const currentDisplayOrientation = readCurrentDisplayOrientation();
+    if (currentDisplayOrientation !== undefined) {
+      savedReaderDisplayOrientations.set(windowId, currentDisplayOrientation);
+    }
   } catch (error) {
     logWindowError('remember reader previous orientation', error);
   }
@@ -322,14 +329,60 @@ async function restoreWindowPreferredOrientation(target: window.Window): Promise
   try {
     const windowId = target.getWindowProperties().id;
     const saved = savedReaderPreferredOrientations.get(windowId);
+    const savedDisplayOrientation = savedReaderDisplayOrientations.get(windowId);
     if (saved !== undefined) {
       orientation = saved;
       savedReaderPreferredOrientations.delete(windowId);
+    }
+    savedReaderDisplayOrientations.delete(windowId);
+    if (isSystemRotationLocked()) {
+      orientation = orientationForDisplayOrientation(savedDisplayOrientation) ?? orientation;
     }
   } catch (error) {
     logWindowError('read previous orientation', error);
   }
   await setPreferredOrientationQuietly(target, orientation, 'restore app orientation');
+}
+
+function readCurrentDisplayOrientation(): display.Orientation | undefined {
+  try {
+    return display.getDefaultDisplaySync().orientation;
+  } catch (error) {
+    logWindowError('read current display orientation', error);
+    return undefined;
+  }
+}
+
+function isSystemRotationLocked(): boolean {
+  try {
+    const context = AppStorage.get<common.UIAbilityContext>('abilityContext') ??
+    AppStorage.get<common.UIAbilityContext>('readerAbilityContext');
+    if (context === undefined) {
+      return false;
+    }
+    const status = settings.getValueSync(context, settings.general.ACCELEROMETER_ROTATION_STATUS, '1',
+      settings.domainName.DEVICE_SHARED);
+    return status === '0';
+  } catch (error) {
+    logWindowError('read system rotation lock', error);
+    return false;
+  }
+}
+
+function orientationForDisplayOrientation(orientation: display.Orientation | undefined): window.Orientation | undefined {
+  if (orientation === display.Orientation.PORTRAIT) {
+    return window.Orientation.USER_ROTATION_PORTRAIT;
+  }
+  if (orientation === display.Orientation.LANDSCAPE) {
+    return window.Orientation.USER_ROTATION_LANDSCAPE;
+  }
+  if (orientation === display.Orientation.PORTRAIT_INVERTED) {
+    return window.Orientation.USER_ROTATION_PORTRAIT_INVERTED;
+  }
+  if (orientation === display.Orientation.LANDSCAPE_INVERTED) {
+    return window.Orientation.USER_ROTATION_LANDSCAPE_INVERTED;
+  }
+  return undefined;
 }
 
 async function setWindowKeepScreenOnQuietly(target: window.Window, keepScreenOn: boolean,
