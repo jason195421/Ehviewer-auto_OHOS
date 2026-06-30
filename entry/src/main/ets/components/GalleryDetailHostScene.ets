@@ -49,6 +49,7 @@ import {
   getAbilityContext,
   readerStartIndex,
   readerStartIndexAsync,
+  readerPageImageCacheKey,
   saveGalleryToHistory,
   uiText
 } from '../shared/EhShared';
@@ -474,7 +475,12 @@ export struct GalleryDetailHostScene {
   private openCoverSearch(): void {
     const context = getAbilityContext();
     const thumb = this.detail.thumb === undefined ? '' : this.detail.thumb;
-    if (context === undefined || thumb.length === 0) {
+    if (context === undefined) {
+      this.detailStatus = 'Cover image is unavailable';
+      this.renderVersion++;
+      return;
+    }
+    if (this.coverSearchPreviewPageUrl().length === 0 && thumb.length === 0) {
       this.detailStatus = 'Cover image is unavailable';
       this.renderVersion++;
       return;
@@ -483,7 +489,7 @@ export struct GalleryDetailHostScene {
     this.renderVersion++;
     const referer = this.detailRequestUrl.length > 0 ? this.detailRequestUrl :
       EhUrl.getGalleryDetailUrl(this.detail.gid, this.detail.token, 0, false, this.detailLink.site);
-    readerImageCache.ensureCached(context, thumb, referer, true, undefined, detailCoverCacheKey(this.detail))
+    this.prepareCoverSearchImage(context, referer)
       .then((path: string) => {
         if (path.length === 0) {
           this.detailStatus = 'Cover image cache failed';
@@ -495,6 +501,43 @@ export struct GalleryDetailHostScene {
         this.detailStatus = 'Cover search failed: ' + error.message;
         this.renderVersion++;
       });
+  }
+
+  private coverSearchPreviewPageUrl(): string {
+    if (this.detail.previewSet.length === 0) {
+      return '';
+    }
+    let best = this.detail.previewSet[0];
+    for (let i = 1; i < this.detail.previewSet.length; i++) {
+      if (this.detail.previewSet[i].index < best.index) {
+        best = this.detail.previewSet[i];
+      }
+    }
+    return best.pageUrl;
+  }
+
+  private async prepareCoverSearchImage(context: common.UIAbilityContext, referer: string): Promise<string> {
+    const previewPageUrl = this.coverSearchPreviewPageUrl();
+    if (previewPageUrl.length > 0) {
+      try {
+        const result = await this.client.loadGalleryPageFast(previewPageUrl, this.detailLink.site, referer);
+        if (result.ok && result.page !== null && result.page.imageUrl.length > 0) {
+          const pageReferer = result.page.pageUrl.length > 0 ? result.page.pageUrl : previewPageUrl;
+          const path = await readerImageCache.ensureCached(context, result.page.imageUrl, pageReferer, true, undefined,
+            readerPageImageCacheKey(result.page, false), { retryLimit: 3 });
+          if (path.length > 0) {
+            return path;
+          }
+        }
+      } catch (error) {
+      }
+    }
+
+    const thumb = this.detail.thumb === undefined ? '' : this.detail.thumb;
+    if (thumb.length === 0) {
+      return '';
+    }
+    return readerImageCache.ensureCached(context, thumb, referer, true, undefined, detailCoverCacheKey(this.detail));
   }
 
   private openTagSearch(namespace: string, tag: string): void {
