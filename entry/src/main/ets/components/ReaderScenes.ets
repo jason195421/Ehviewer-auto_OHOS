@@ -229,7 +229,14 @@ export struct ReaderScene {
 
   onPageHide(): void {
     if (this.restoreAppChromeOnExit) {
-      if (!isEmbeddedReaderActive()) {
+      const hostContext = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+      if (hostContext !== undefined) {
+        window.getLastWindow(hostContext).then((win: window.Window) => {
+          restoreReaderExitOrientationOnPageHide(win);
+        }).catch(() => {
+          restoreReaderExitOrientationOnPageHide(this.hostReaderWindow);
+        });
+      } else {
         restoreReaderExitOrientationOnPageHide(this.hostReaderWindow);
       }
       this.restoreSystemBarsForReaderExit();

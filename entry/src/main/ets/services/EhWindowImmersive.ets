@@ -411,10 +411,10 @@ function readCurrentWindowOrientation(target: window.Window): window.Orientation
   try {
     const rect = target.getWindowProperties().windowRect;
     if (rect.width > rect.height) {
-      return window.Orientation.USER_ROTATION_LANDSCAPE;
+      return window.Orientation.LANDSCAPE;
     }
     if (rect.height > rect.width) {
-      return window.Orientation.USER_ROTATION_PORTRAIT;
+      return window.Orientation.PORTRAIT;
     }
     return undefined;
   } catch (error) {
@@ -450,16 +450,16 @@ function isSystemRotationLocked(): boolean {
 
 function orientationForDisplayOrientation(orientation: display.Orientation | undefined): window.Orientation | undefined {
   if (orientation === display.Orientation.PORTRAIT) {
-    return window.Orientation.USER_ROTATION_PORTRAIT;
+    return window.Orientation.PORTRAIT;
   }
   if (orientation === display.Orientation.LANDSCAPE) {
-    return window.Orientation.USER_ROTATION_LANDSCAPE;
+    return window.Orientation.LANDSCAPE;
   }
   if (orientation === display.Orientation.PORTRAIT_INVERTED) {
-    return window.Orientation.USER_ROTATION_PORTRAIT_INVERTED;
+    return window.Orientation.PORTRAIT_INVERTED;
   }
   if (orientation === display.Orientation.LANDSCAPE_INVERTED) {
-    return window.Orientation.USER_ROTATION_LANDSCAPE_INVERTED;
+    return window.Orientation.LANDSCAPE_INVERTED;
   }
   return undefined;
 }
