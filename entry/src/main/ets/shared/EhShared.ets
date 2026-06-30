@@ -573,6 +573,7 @@ export function zhText(text: string): string {
     case 'Export': return '导出';
     case 'Rate': return '评分';
     case 'Cancel': return '取消';
+    case 'Delete history': return '删除历史';
     case 'Submit': return '提交';
     case 'Read': return '阅读';
     case 'Queued': return '已加入';

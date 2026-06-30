@@ -1,5 +1,7 @@
+import { uniformTypeDescriptor as utd } from '@kit.ArkData';
 import { fileIo as fs, picker } from '@kit.CoreFileKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
+import { systemShare } from '@kit.ShareKit';
 import { ALL_CATEGORY, GalleryCategory, GalleryDetail, GalleryInfo, GalleryRoute, GallerySite } from '../model/GalleryModels';
 import { ehCookieStore } from '../services/EhCookieStore';
 import {
@@ -8,6 +10,7 @@ import {
 } from '../services/EhHttpClient';
 import { DEFAULT_ADVANCE_SEARCH, EhUrl, FavListUrlBuilder, ListMode, ListUrlBuilder, buildJumpSeekUrl } from '../services/EhUrl';
 import { ehFilterStore } from '../services/EhFilterStore';
+import { ehHistoryStore } from '../services/EhHistoryStore';
 import { ehSettingsStore } from '../services/EhSettingsStore';
 import { DetailSearchRequest } from '../services/GalleryDetailActionSupport';
 import {
@@ -67,6 +70,7 @@ import {
   uiText,
   uiStatusText,
   setActiveBackHandler,
+  createEmptyGallery,
   createEmptyDetail,
   cloneGalleryInfos,
   applyGalleryFilters,
@@ -81,8 +85,11 @@ import {
   effectiveListSite,
   galleryListFailureMessage,
   galleryListMode,
+  galleryDisplayTitle,
   galleryThumbWidth,
   galleryThumbHeight,
+  toggleGalleryDownload,
+  downloadButtonText,
   cacheThumbnailImage
 } from '../shared/EhShared';
 
@@ -339,6 +346,8 @@ export struct GalleryListScene {
   @State detail: GalleryDetail = createEmptyDetail();
   @State detailStatus: string = 'Tap a gallery row to load detail';
   @State detailRequestUrl: string = '';
+  @State cardActionVisible: boolean = false;
+  @State cardActionGallery: GalleryInfo = createEmptyGallery();
   @State renderVersion: number = 0;
   @State isLoadingMore: boolean = false;
   @State appendExhausted: boolean = false;
@@ -515,6 +524,10 @@ export struct GalleryListScene {
   }
 
   private handleSystemBack(): boolean {
+    if (this.cardActionVisible) {
+      this.closeCardActions();
+      return true;
+    }
     if (this.showReader) {
       this.closeReader();
       return true;
@@ -550,6 +563,8 @@ export struct GalleryListScene {
     this.detailStatus = 'Tap a gallery row to load detail';
     this.detailRequestUrl = '';
     this.detailScrollOffset = 0;
+    this.cardActionVisible = false;
+    this.cardActionGallery = createEmptyGallery();
     this.showSearchResultScene = false;
     this.searchResultDraft = createEmptySearchResultDraft();
     this.localSearchBarVisible = false;
@@ -1200,6 +1215,85 @@ export struct GalleryListScene {
     }, 0);
   }
 
+  private openCardActions(gallery: GalleryInfo): void {
+    if (gallery.gid <= 0 || gallery.token.length === 0) {
+      return;
+    }
+    this.fabExpanded = false;
+    this.cardActionGallery = gallery;
+    this.cardActionVisible = true;
+  }
+
+  private closeCardActions(): void {
+    this.cardActionVisible = false;
+    this.cardActionGallery = createEmptyGallery();
+  }
+
+  private galleryShareUrl(gallery: GalleryInfo): string {
+    return EhUrl.getGalleryDetailUrl(gallery.gid, gallery.token, 0, false, this.activeSite);
+  }
+
+  private shareCardGallery(gallery: GalleryInfo): void {
+    const context = getAbilityContext();
+    const url = this.galleryShareUrl(gallery);
+    this.closeCardActions();
+    if (context === undefined || url.length === 0) {
+      this.statusText = 'Share failed: Ability context is not ready';
+      this.renderVersion++;
+      return;
+    }
+    const shareData: systemShare.SharedData = new systemShare.SharedData({
+      utd: utd.UniformDataType.PLAIN_TEXT,
+      content: url,
+      title: galleryDisplayTitle(gallery),
+      description: 'EhViewer'
+    });
+    const controller = new systemShare.ShareController(shareData);
+    controller.show(context, {
+      selectionMode: systemShare.SelectionMode.SINGLE,
+      previewMode: systemShare.SharePreviewMode.DETAIL
+    }).then(() => {
+      this.statusText = 'Share panel closed';
+      this.renderVersion++;
+    }).catch((error: Error) => {
+      this.statusText = 'Share failed: ' + error.message;
+      this.renderVersion++;
+    });
+  }
+
+  private toggleCardDownload(gallery: GalleryInfo): void {
+    this.closeCardActions();
+    const queued = toggleGalleryDownload(gallery);
+    this.statusText = queued ? 'Added to download list' : 'Removed from download list';
+    this.renderVersion++;
+  }
+
+  private deleteHistoryGallery(gallery: GalleryInfo): void {
+    const context = getAbilityContext();
+    this.closeCardActions();
+    if (gallery.gid <= 0) {
+      return;
+    }
+    if (context === undefined) {
+      ehHistoryStore.removeGallery(gallery.gid);
+      this.galleries = this.galleries.filter((item: GalleryInfo) => item.gid !== gallery.gid);
+      this.statusText = 'History deleted';
+      this.renderVersion++;
+      this.saveListCache();
+      return;
+    }
+    ehHistoryStore.ensureLoaded(context).then(() => {
+      ehHistoryStore.removeGallery(gallery.gid);
+      return ehHistoryStore.save(context);
+    }).then(() => {
+      this.statusText = 'History deleted';
+      this.loadListPage(0, false);
+    }).catch((error: Error) => {
+      this.statusText = 'Delete history failed: ' + error.message;
+      this.renderVersion++;
+    });
+  }
+
   private openSearchResult(request: DetailSearchRequest): void {
     this.showReader = false;
     this.showSearchResultScene = false;
@@ -1435,6 +1529,9 @@ export struct GalleryListScene {
             onSelectGallery: (gallery: GalleryInfo) => {
               this.loadDetail(gallery);
             },
+            onLongPressGallery: (gallery: GalleryInfo) => {
+              this.openCardActions(gallery);
+            },
             scrollResetVersion: this.scrollResetVersion,
             initialScrollOffset: this.listScrollOffset,
             onScrollUpdate: (offset: number) => {
@@ -1469,6 +1566,26 @@ export struct GalleryListScene {
               .transition(this.restoreDetailWithFade ?
                 TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }) :
                 TransitionEffect.move(TransitionEdge.END).animation({ duration: 300, curve: Curve.EaseOut }))
+          }
+
+          if (this.cardActionVisible) {
+            GalleryCardActionOverlay({
+              gallery: this.cardActionGallery,
+              isHistory: this.sourceRoute === GalleryRoute.History,
+              onDismiss: () => {
+                this.closeCardActions();
+              },
+              onShare: (gallery: GalleryInfo) => {
+                this.shareCardGallery(gallery);
+              },
+              onDownload: (gallery: GalleryInfo) => {
+                this.toggleCardDownload(gallery);
+              },
+              onDeleteHistory: (gallery: GalleryInfo) => {
+                this.deleteHistoryGallery(gallery);
+              }
+            })
+              .zIndex(30)
           }
         }
         .width('100%')
@@ -1718,6 +1835,104 @@ struct ImageSearchPanel {
   }
 }
 
+@Component
+struct GalleryCardActionOverlay {
+  @Prop gallery: GalleryInfo = createEmptyGallery();
+  @Prop isHistory: boolean = false;
+  onDismiss: () => void = () => {
+  };
+  onShare: (gallery: GalleryInfo) => void = (_gallery: GalleryInfo) => {
+  };
+  onDownload: (gallery: GalleryInfo) => void = (_gallery: GalleryInfo) => {
+  };
+  onDeleteHistory: (gallery: GalleryInfo) => void = (_gallery: GalleryInfo) => {
+  };
+
+  @Builder
+  private actionRow(label: string, symbolIcon: Resource, color: string, onTap: () => void) {
+    Button({ type: ButtonType.Normal, stateEffect: true }) {
+      Row() {
+        SymbolGlyph(symbolIcon)
+          .fontSize(20)
+          .fontColor([color])
+        Text(uiText(label))
+          .fontSize(15)
+          .fontColor(color)
+          .margin({ left: 12 })
+          .layoutWeight(1)
+          .textAlign(TextAlign.End)
+      }
+      .width('100%')
+      .padding({ left: 16, right: 16 })
+    }
+    .width('100%')
+    .height(48)
+    .backgroundColor(Color.Transparent)
+    .borderRadius(0)
+    .onClick(onTap)
+  }
+
+  @Builder
+  private divider() {
+    Divider()
+      .height(1)
+      .color(themeFieldBackground())
+      .margin({ left: 16, right: 16 })
+  }
+
+  build() {
+    Stack({ alignContent: Alignment.Center }) {
+      Column()
+        .width('100%')
+        .height('100%')
+        .backgroundColor(themeScrimColor())
+        .onClick(() => {
+          this.onDismiss();
+        })
+
+      Column({ space: 0 }) {
+        Text(galleryDisplayTitle(this.gallery))
+          .fontSize(15)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(themePrimaryText())
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .width('100%')
+          .padding({ left: 16, right: 16, top: 14, bottom: 10 })
+
+        this.divider()
+
+        this.actionRow('Share', $r('sys.symbol.share'), themePrimaryText(), () => {
+          this.onShare(this.gallery);
+        })
+
+        this.divider()
+
+        this.actionRow(downloadButtonText(this.gallery.gid), $r('sys.symbol.arrow_down_circle'), themePrimaryText(), () => {
+          this.onDownload(this.gallery);
+        })
+
+        if (this.isHistory) {
+          this.divider()
+
+          this.actionRow('Delete history', $r('sys.symbol.trash'), themeDangerText(), () => {
+            this.onDeleteHistory(this.gallery);
+          })
+        }
+      }
+      .width('78%')
+      .constraintSize({ maxWidth: 360 })
+      .padding({ top: 4, bottom: 6 })
+      .backgroundColor(themeSurface())
+      .borderRadius(10)
+      .clip(true)
+      .shadow({ radius: 18, color: themeShadowColor(), offsetY: 8 })
+    }
+    .width('100%')
+    .height('100%')
+  }
+}
+
 
 @Component
 export struct GalleryListContent {
@@ -1792,6 +2007,8 @@ export struct GalleryListContent {
     (_path: string, _useSimilarityScan: boolean, _onlySearchCovers: boolean) => {
     };
   onSelectGallery: (gallery: GalleryInfo) => void = () => {
+  };
+  onLongPressGallery: (gallery: GalleryInfo) => void = (_gallery: GalleryInfo) => {
   };
   initialScrollOffset: number = 0;
   onScrollUpdate: (offset: number) => void = () => {
@@ -2394,7 +2611,12 @@ export struct GalleryListContent {
                   Row() {
                     ForEach(row, (gallery: GalleryInfo, colIndex: number) => {
                       if (galleryListMode() === 'Thumb') {
-                        GalleryThumbCard({ gallery: gallery })
+                        GalleryThumbCard({
+                          gallery: gallery,
+                          onLongPress: (pressed: GalleryInfo) => {
+                            this.onLongPressGallery(pressed);
+                          }
+                        })
                           .width(this.galleryCardWidth())
                           .margin({
                             right: colIndex < row.length - 1 ? this.galleryCardGap() : 0
@@ -2404,7 +2626,12 @@ export struct GalleryListContent {
                             this.onSelectGallery(gallery);
                           })
                       } else {
-                        GalleryListRow({ gallery: gallery })
+                        GalleryListRow({
+                          gallery: gallery,
+                          onLongPress: (pressed: GalleryInfo) => {
+                            this.onLongPressGallery(pressed);
+                          }
+                        })
                           .width(this.galleryCardWidth())
                           .margin({
                             right: colIndex < row.length - 1 ? this.galleryCardGap() : 0
@@ -2593,7 +2820,6 @@ export struct GalleryListContent {
         }
           .width('100%')
           .height('100%')
-          .padding(16)
           .zIndex(13)
       }
 

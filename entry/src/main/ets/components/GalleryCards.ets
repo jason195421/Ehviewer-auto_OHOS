@@ -32,6 +32,8 @@ import {
 export struct GalleryListRow {
   @Prop gallery: GalleryInfo = createEmptyGallery();
   @Prop selected: boolean = false;
+  onLongPress: (gallery: GalleryInfo) => void = (_gallery: GalleryInfo) => {
+  };
   @StorageProp(HISTORY_READ_REVISION_KEY) historyReadRevision: number = 0;
   @StorageProp(GALLERY_TITLE_REVISION_KEY) galleryTitleRevision: number = 0;
 
@@ -248,6 +250,12 @@ export struct GalleryListRow {
     .backgroundColor(this.selected ? themeSelectedBackground() : themeSurface())
     .borderRadius(6)
     .clip(true)
+    .gesture(
+      LongPressGesture({ repeat: false })
+        .onAction(() => {
+          this.onLongPress(this.gallery);
+        })
+    )
   }
 }
 
@@ -373,6 +381,8 @@ export struct GalleryThumb {
 export struct GalleryThumbCard {
   @Prop gallery: GalleryInfo = createEmptyGallery();
   @Prop selected: boolean = false;
+  onLongPress: (gallery: GalleryInfo) => void = (_gallery: GalleryInfo) => {
+  };
   @StorageProp(HISTORY_READ_REVISION_KEY) historyReadRevision: number = 0;
   @StorageProp(GALLERY_TITLE_REVISION_KEY) galleryTitleRevision: number = 0;
 
@@ -447,6 +457,12 @@ export struct GalleryThumbCard {
     .backgroundColor(this.selected ? themeSelectedBackground() : themeSurface())
     .borderRadius(6)
     .clip(true)
+    .gesture(
+      LongPressGesture({ repeat: false })
+        .onAction(() => {
+          this.onLongPress(this.gallery);
+        })
+    )
   }
 }
 
