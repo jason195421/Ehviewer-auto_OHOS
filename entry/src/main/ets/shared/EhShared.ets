@@ -467,10 +467,13 @@ export function zhText(text: string): string {
     case 'From file': return '从文件选择';
     case 'Similarity scan': return '相似扫描';
     case 'Only cover search': return '仅搜索封面';
+    case 'Upload original image': return '上传原图';
     case 'Selected image': return '已选择图片';
     case 'No image selected': return '未选择图片';
     case 'Search image': return '搜索图片';
     case 'Image selected': return '图片已选择';
+    case 'Original image selected': return '已选择原图';
+    case 'Compatible image selected': return '已选择兼容图';
     case 'Image selection failed': return '图片选择失败';
     case 'Preparing image...': return '正在准备图片...';
     case 'Search': return '搜索';

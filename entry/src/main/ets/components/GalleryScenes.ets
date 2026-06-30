@@ -1493,6 +1493,7 @@ struct ImageSearchPanel {
   @State statusText: string = 'No image selected';
   @State useSimilarityScan: boolean = true;
   @State onlySearchCovers: boolean = false;
+  @State uploadOriginalPhoto: boolean = true;
   @State busy: boolean = false;
 
   private selectedName(): string {
@@ -1508,10 +1509,15 @@ struct ImageSearchPanel {
       const options = new photoAccessHelper.PhotoSelectOptions();
       options.MIMEType = photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE;
       options.maxSelectNumber = 1;
+      if (this.uploadOriginalPhoto) {
+        options.assetCompatibleCapability = {
+          supportedHighResolution: true
+        } as photoAccessHelper.AssetCompatibleCapability;
+      }
       const photoPicker: photoAccessHelper.PhotoViewPicker = new photoAccessHelper.PhotoViewPicker();
       const result = await photoPicker.select(options);
       if (result.photoUris.length > 0) {
-        await this.usePickedUri(result.photoUris[0]);
+        await this.usePickedUri(result.photoUris[0], result.isOriginalPhoto);
       }
     } catch (error) {
       this.busy = false;
@@ -1532,7 +1538,7 @@ struct ImageSearchPanel {
       const documentPicker = new picker.DocumentViewPicker(context);
       const uris = await documentPicker.select(options);
       if (uris.length > 0) {
-        await this.usePickedUri(uris[0]);
+        await this.usePickedUri(uris[0], true);
       }
     } catch (error) {
       this.busy = false;
@@ -1540,7 +1546,7 @@ struct ImageSearchPanel {
     }
   }
 
-  private async usePickedUri(uri: string): Promise<void> {
+  private async usePickedUri(uri: string, isOriginalPhoto: boolean): Promise<void> {
     this.busy = true;
     this.statusText = 'Preparing image...';
     const path = await copyImageSearchSourceToCache(uri);
@@ -1550,7 +1556,7 @@ struct ImageSearchPanel {
       return;
     }
     this.selectedPath = path;
-    this.statusText = 'Image selected';
+    this.statusText = isOriginalPhoto ? 'Original image selected' : 'Compatible image selected';
   }
 
   private submit(): void {
@@ -1644,6 +1650,18 @@ struct ImageSearchPanel {
       .padding(10)
       .backgroundColor(themeFieldBackground())
       .borderRadius(6)
+
+      Row() {
+        Text(uiText('Upload original image'))
+          .fontSize(14)
+          .fontColor(themePrimaryText())
+          .layoutWeight(1)
+        Toggle({ type: ToggleType.Switch, isOn: this.uploadOriginalPhoto })
+          .onChange((isOn: boolean) => {
+            this.uploadOriginalPhoto = isOn;
+          })
+      }
+      .width('100%')
 
       Row() {
         Text(uiText('Similarity scan'))

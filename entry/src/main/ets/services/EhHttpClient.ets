@@ -1114,7 +1114,8 @@ export class EhHttpClient {
         extraData: body,
         expectDataType: http.HttpDataType.STRING,
         connectTimeout: timeoutMs,
-        readTimeout: timeoutMs
+        readTimeout: timeoutMs,
+        maxRedirects: 0
       };
       applyEhNetworkOptions(options, plan);
       request.on('headersReceive', (header: Object) => {
