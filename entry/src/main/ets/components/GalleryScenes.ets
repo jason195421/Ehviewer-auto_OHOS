@@ -1083,7 +1083,7 @@ export struct GalleryListScene {
 
   private searchSupportsAdvanced(mode: ListMode): boolean {
     return mode === ListMode.Normal || mode === ListMode.Subscription || mode === ListMode.Tag ||
-      mode === ListMode.WhatsHot;
+      mode === ListMode.Uploader || mode === ListMode.WhatsHot;
   }
 
   private applySearch(): void {
