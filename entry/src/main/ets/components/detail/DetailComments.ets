@@ -1,14 +1,14 @@
-﻿import { GalleryComment } from '../../model/GalleryModels';
-import {
-  plainTextFromHtml,
-  uiText
-} from '../../shared/EhShared';
-import { themePrimaryColor, themePrimaryText, themeSecondaryText, themeSurface, themeSurfaceVariant } from '../../shared/EhTheme';
+import { GalleryComment } from '../../model/GalleryModels';
+import { uiText } from '../../shared/EhShared';
+import { themePrimaryColor, themePrimaryText, themeSecondaryText, themeSurface } from '../../shared/EhTheme';
+import { GalleryCommentRow } from './CommentComponents';
+
 @Component
 export struct DetailComments {
   @Prop comments: GalleryComment[] = [];
   @Prop isDetailLoaded: boolean = false;
   onComments: () => void = () => {};
+  onVoteComment: (comment: GalleryComment, vote: number) => void = (_comment: GalleryComment, _vote: number) => {};
 
   build() {
     Column() {
@@ -37,11 +37,6 @@ export struct DetailComments {
       }
       .width('100%')
       .margin({ bottom: 10 })
-      .onClick(() => {
-        if (this.isDetailLoaded && this.comments.length > 0) {
-          this.onComments();
-        }
-      })
 
       if (!this.isDetailLoaded) {
         Text(uiText('Loading comments...'))
@@ -53,38 +48,14 @@ export struct DetailComments {
           .fontColor(themeSecondaryText())
       } else {
         ForEach(this.comments.slice(0, 2), (comment: GalleryComment) => {
-          Column() {
-            Row() {
-              Text(comment.user.length > 0 ? comment.user : uiText('Anonymous'))
-                .fontSize(13)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(themePrimaryText())
-                .layoutWeight(1)
-              Text(comment.posted)
-                .fontSize(11)
-                .fontColor(themeSecondaryText())
-            }
-            .width('100%')
-            .margin({ bottom: 4 })
-
-            Text(plainTextFromHtml(comment.content))
-              .fontSize(13)
-              .fontColor(themePrimaryText())
-              .maxLines(4)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-              .width('100%')
-          }
-          .alignItems(HorizontalAlign.Start)
-          .width('100%')
-          .padding(10)
-          .margin({ bottom: 6 })
-          .backgroundColor(themeSurfaceVariant())
-          .borderRadius(6)
-          .onClick(() => {
-            this.onComments();
+          GalleryCommentRow({
+            comment: comment,
+            maxLines: 4,
+            compact: true,
+            onVoteComment: this.onVoteComment
           })
+            .margin({ bottom: 6 })
         }, (comment: GalleryComment) => comment.id)
-
       }
     }
     .alignItems(HorizontalAlign.Start)
@@ -93,4 +64,3 @@ export struct DetailComments {
     .backgroundColor(themeSurface())
   }
 }
-

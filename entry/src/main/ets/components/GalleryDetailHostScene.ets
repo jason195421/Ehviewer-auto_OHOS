@@ -1,6 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { pasteboard } from '@kit.BasicServicesKit';
-import { ArchiveOption, ArchiverInfo, ArchiverOption, GalleryDetail, GalleryPreview, HathArchiveList } from '../model/GalleryModels';
+import { ArchiveOption, ArchiverInfo, ArchiverOption, GalleryComment, GalleryDetail, GalleryPreview, HathArchiveList } from '../model/GalleryModels';
 import { confirmCellularNetworkWarningForSession, shouldConfirmCellularNetworkOperation } from '../services/EhCellularNetworkGuard';
 import { ehDownloadManager } from '../services/EhDownloadManager';
 import { DownloadInfo, ehDownloadStore } from '../services/EhDownloadStore';
@@ -11,7 +11,8 @@ import {
   HathArchiveListLoadResult,
   HathArchiveSubmitResult,
   RateGalleryResult,
-  ToggleFavoriteResult
+  ToggleFavoriteResult,
+  VoteCommentResult
 } from '../services/EhHttpClient';
 import { EhUrl } from '../services/EhUrl';
 import {
@@ -584,6 +585,56 @@ export struct GalleryDetailHostScene {
     });
   }
 
+  private voteDetailComment(comment: GalleryComment, vote: number): void {
+    if (!this.detailLoaded || this.detail.apiUid < 0 || this.detail.apiKey.length === 0) {
+      this.detailStatus = 'Comment vote requires gallery API key';
+      this.renderVersion++;
+      return;
+    }
+    this.client.voteComment(this.detail.gid, this.detail.token, this.detail.apiUid, this.detail.apiKey, comment.id,
+      vote, this.detailLink.site).then((result: VoteCommentResult) => {
+      if (!result.ok) {
+        this.detailStatus = 'Comment vote failed: ' + result.message;
+        this.renderVersion++;
+        return;
+      }
+      this.applyCommentVoteResult(result);
+    }).catch((error: Error) => {
+      this.detailStatus = 'Comment vote failed: ' + error.message;
+      this.renderVersion++;
+    });
+  }
+
+  private applyCommentVoteResult(result: VoteCommentResult): void {
+    const targetId = result.commentId.length > 0 ? result.commentId : '';
+    const next = cloneGalleryDetail(this.detail);
+    let changed = false;
+    for (let i = 0; i < next.comments.length; i++) {
+      if (next.comments[i].id !== targetId) {
+        continue;
+      }
+      next.comments[i].score = result.score;
+      if (result.expectedVote > 0) {
+        next.comments[i].voteUpEd = result.vote !== 0;
+        next.comments[i].voteDownEd = false;
+      } else {
+        next.comments[i].voteDownEd = result.vote !== 0;
+        next.comments[i].voteUpEd = false;
+      }
+      changed = true;
+      break;
+    }
+    if (!changed) {
+      this.detailStatus = 'Comment vote submitted';
+      this.renderVersion++;
+      return;
+    }
+    this.detail = next;
+    this.detailStatus = 'Comment vote submitted';
+    this.onDetailLoaded(this.detail);
+    this.renderVersion++;
+  }
+
   build() {
     GalleryDetailOverlayScene({
       renderVersion: this.renderVersion,
@@ -617,6 +668,7 @@ export struct GalleryDetailHostScene {
         this.jumpPreviewPage(pageIndex);
       },
       onComments: () => { this.openComments(); },
+      onVoteComment: (comment: GalleryComment, vote: number) => { this.voteDetailComment(comment, vote); },
       onFavorite: () => { this.toggleFavoriteDetail(); },
       onShare: () => {
         this.copyDetailLink(EhUrl.getGalleryDetailUrl(this.detail.gid, this.detail.token, 0, false, this.detailLink.site),

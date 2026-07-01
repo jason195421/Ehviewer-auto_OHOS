@@ -25,6 +25,12 @@ interface StyleOffset {
   y: number;
 }
 
+interface CommentAnchor {
+  id: string;
+  start: number;
+  end: number;
+}
+
 export function parseGalleryDetail(body: string): GalleryDetailParseResult {
   if (body.indexOf('This gallery is unavailable') >= 0) {
     return { detail: null, warning: 'Gallery unavailable' };
@@ -200,20 +206,85 @@ function parseTagGroups(body: string): GalleryTagGroup[] {
 
 function parseComments(body: string): GalleryComment[] {
   const comments: GalleryComment[] = [];
-  const pattern =
-    /<a\s+name=["']c([^"']+)["']><\/a>\s*<div[^>]+class=["']c1["'][\s\S]*?<div[^>]+class=["']c3["'][^>]*>Posted on\s+([\s\S]*?)(?:\s+by:\s*&nbsp;\s*<a[^>]*>([\s\S]*?)<\/a>)?<\/div>[\s\S]*?<div[^>]+class=["']c6["'][^>]*>([\s\S]*?)<\/div>/gi;
-  let match: RegExpExecArray | null = pattern.exec(body);
-  while (match !== null) {
-    comments.push({
-      id: match[1],
-      posted: cleanText(match[2]),
-      user: match[3] === undefined ? '' : cleanText(match[3]),
-      content: match[4],
-      score: 0
+  const anchorPattern = /<a\s+name=["']c([^"']+)["']><\/a>/gi;
+  const anchors: CommentAnchor[] = [];
+  let anchor: RegExpExecArray | null = anchorPattern.exec(body);
+  while (anchor !== null) {
+    anchors.push({
+      id: anchor[1],
+      start: anchor.index,
+      end: anchor.index + anchor[0].length
     });
-    match = pattern.exec(body);
+    anchor = anchorPattern.exec(body);
+  }
+
+  for (let i = 0; i < anchors.length; i++) {
+    const start = anchors[i].end;
+    const end = i + 1 < anchors.length ? anchors[i + 1].start : body.length;
+    const block = body.substring(start, end);
+    const c1 = findClassBlock(block, 'c1');
+    const comment = parseCommentBlock(anchors[i].id, c1.length > 0 ? c1 : block);
+    if (comment !== null) {
+      comments.push(comment);
+    }
   }
   return comments;
+}
+
+function parseCommentBlock(id: string, block: string): GalleryComment | null {
+  const c3 = findClassBlock(block, 'c3');
+  const c4 = findClassBlock(block, 'c4');
+  const c5 = findClassBlock(block, 'c5');
+  const c6 = findClassBlock(block, 'c6');
+  if (c3.length === 0 || c6.length === 0) {
+    return null;
+  }
+  const posted = parseCommentPosted(c3);
+  const user = parseCommentUser(c3, c4);
+  return {
+    id: id,
+    posted: posted,
+    user: user,
+    content: c6,
+    score: parseCommentScore(c5),
+    voteUpAble: /(?:^|>)\s*Vote\+\s*(?:<|$)/i.test(c4),
+    voteUpEd: parseCommentVoteActive(c4, 'Vote+'),
+    voteDownAble: /(?:^|>)\s*Vote-\s*(?:<|$)/i.test(c4),
+    voteDownEd: parseCommentVoteActive(c4, 'Vote-'),
+    voteState: cleanText(findClassBlock(block, 'c7'))
+  };
+}
+
+function parseCommentPosted(c3: string): string {
+  const text = cleanText(c3);
+  const prefix = 'Posted on ';
+  const withoutPrefix = text.indexOf(prefix) === 0 ? text.substring(prefix.length) : text;
+  const byIndex = withoutPrefix.indexOf(' by:');
+  return (byIndex >= 0 ? withoutPrefix.substring(0, byIndex) : withoutPrefix).trim();
+}
+
+function parseCommentUser(c3: string, c4: string): string {
+  const link = /<a[^>]*>([\s\S]*?)<\/a>/i.exec(c3);
+  if (link !== null) {
+    return cleanText(link[1]);
+  }
+  const text = cleanText(c4);
+  return text.replace(/\bVote[+-]\b/gi, '').replace(/\bEdit\b/gi, '').replace(/\s+/g, ' ').trim();
+}
+
+function parseCommentScore(c5: string): number {
+  const score = /<span[^>]*>([-+]?\d+)<\/span>/i.exec(c5);
+  if (score !== null) {
+    return parseIntSafe(score[1], 0);
+  }
+  return parseIntSafe(cleanText(c5), 0);
+}
+
+function parseCommentVoteActive(c4: string, label: string): boolean {
+  const escaped = escapeRegExp(label);
+  const pattern = new RegExp('<[^>]+style=["\']([^"\']+)["\'][^>]*>\\s*' + escaped + '\\s*<', 'i');
+  const active = pattern.exec(c4);
+  return active !== null && cleanText(active[1]).length > 0;
 }
 
 function parsePreviewPages(body: string): number {
@@ -438,6 +509,48 @@ function categoryNameToValue(name: string): number {
 
 function cleanText(value: string): string {
   return decodeHtml(value.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+}
+
+function findClassBlock(source: string, className: string): string {
+  const startPattern = new RegExp("<[^>]+class=[\"'][^\"']*\\b" + escapeRegExp(className) + "\\b[^\"']*[\"'][^>]*>", 'i');
+  const start = startPattern.exec(source);
+  if (start === null) {
+    return '';
+  }
+
+  const openTag = start[0];
+  const tagMatch = /^<([a-z0-9]+)/i.exec(openTag);
+  if (tagMatch === null) {
+    return openTag;
+  }
+
+  const tag = tagMatch[1].toLowerCase();
+  if (isVoidTag(tag)) {
+    return openTag;
+  }
+
+  const startIndex = start.index;
+  const afterStart = start.index + openTag.length;
+  const tagPattern = new RegExp("<\\/?" + tag + "\\b[^>]*>", 'gi');
+  tagPattern.lastIndex = afterStart;
+  let depth = 1;
+  let match: RegExpExecArray | null = tagPattern.exec(source);
+  while (match !== null) {
+    if (match[0].indexOf('</') === 0) {
+      depth--;
+      if (depth === 0) {
+        return source.substring(startIndex, match.index + match[0].length);
+      }
+    } else if (!/\/>$/.test(match[0])) {
+      depth++;
+    }
+    match = tagPattern.exec(source);
+  }
+  return source.substring(startIndex);
+}
+
+function isVoidTag(tag: string): boolean {
+  return tag === 'br' || tag === 'img' || tag === 'input' || tag === 'meta' || tag === 'link' || tag === 'hr';
 }
 
 function decodeHtml(value: string): string {

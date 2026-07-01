@@ -1,5 +1,5 @@
 import { GalleryComment } from '../../../model/GalleryModels';
-import { plainTextFromHtml, uiText } from '../../../shared/EhShared';
+import { uiText } from '../../../shared/EhShared';
 import {
   themeDividerColor,
   themePageBackground,
@@ -8,6 +8,7 @@ import {
   themeSurface
 } from '../../../shared/EhTheme';
 import { EhSubNavBar } from '../../NavigationComponents';
+import { GalleryCommentRow } from '../../detail/CommentComponents';
 
 @Component
 export struct CommentsScene {
@@ -15,6 +16,7 @@ export struct CommentsScene {
   @Prop comments: GalleryComment[] = [];
   @Prop galleryTitle: string = '';
   onBack: () => void = () => {};
+  onVoteComment: (comment: GalleryComment, vote: number) => void = (_comment: GalleryComment, _vote: number) => {};
   @StorageProp('statusBarHeight') statusBarHeightPx: number = 0;
 
   private statusBarVp(): number {
@@ -53,37 +55,12 @@ export struct CommentsScene {
         List({ space: 0 }) {
           ForEach(this.comments, (comment: GalleryComment) => {
             ListItem() {
-              Column() {
-                Row() {
-                  Text(comment.user.length > 0 ? comment.user : uiText('Anonymous'))
-                    .fontSize(14)
-                    .fontWeight(FontWeight.Medium)
-                    .fontColor(themePrimaryText())
-                    .layoutWeight(1)
-                  if (comment.score !== 0) {
-                    Text((comment.score > 0 ? '+' : '') + comment.score.toString())
-                      .fontSize(12)
-                      .fontColor(comment.score > 0 ? '#0A6B45' : '#B03060')
-                      .margin({ left: 8 })
-                  }
-                }
-                .width('100%')
-                .margin({ bottom: 4 })
-
-                Text(comment.posted)
-                  .fontSize(11)
-                  .fontColor(themeSecondaryText())
-                  .margin({ bottom: 8 })
-
-                Text(plainTextFromHtml(comment.content))
-                  .fontSize(14)
-                  .fontColor(themePrimaryText())
-                  .width('100%')
-              }
-              .alignItems(HorizontalAlign.Start)
-              .width('100%')
-              .padding({ left: 16, right: 16, top: 14, bottom: 14 })
-              .backgroundColor(themeSurface())
+              GalleryCommentRow({
+                comment: comment,
+                maxLines: 1000,
+                compact: false,
+                onVoteComment: this.onVoteComment
+              })
             }
             .reuseId('comment-row')
           }, (comment: GalleryComment) => comment.id)

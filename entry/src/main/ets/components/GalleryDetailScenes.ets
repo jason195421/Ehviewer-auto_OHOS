@@ -1,4 +1,5 @@
 ﻿import { GalleryDetail, GalleryPreview } from '../model/GalleryModels';
+import { GalleryComment } from '../model/GalleryModels';
 import { ArchiveOption, ArchiverInfo, ArchiverOption, HathArchiveList } from '../model/GalleryModels';
 import { STATUS_BAR_HEIGHT_KEY, createEmptyDetail, galleryDisplayTitle, uiText } from '../shared/EhShared';
 import { themePageBackground, themeScrimColor } from '../shared/EhTheme';
@@ -42,6 +43,7 @@ export struct GalleryDetailOverlayScene {
   onSelectPreview: (preview: GalleryPreview) => void = () => {};
   onJumpPreviewPage: (pageIndex: number) => void = (_pageIndex: number) => {};
   onComments: () => void = () => {};
+  onVoteComment: (comment: GalleryComment, vote: number) => void = (_comment: GalleryComment, _vote: number) => {};
   onFavorite: () => void = () => {};
   onShare: () => void = () => {};
   onRate: (rating: number) => void = (_rating: number) => {};
@@ -63,7 +65,8 @@ export struct GalleryDetailOverlayScene {
         renderVersion: this.renderVersion,
         comments: this.detail.comments,
         galleryTitle: galleryDisplayTitle(this.detail),
-        onBack: this.onCloseComments
+        onBack: this.onCloseComments,
+        onVoteComment: this.onVoteComment
       })
     } else {
       GalleryDetailScene({
@@ -86,6 +89,7 @@ export struct GalleryDetailOverlayScene {
         onSelectPreview: this.onSelectPreview,
         onJumpPreviewPage: this.onJumpPreviewPage,
         onComments: this.onComments,
+        onVoteComment: this.onVoteComment,
         onFavorite: this.onFavorite,
         onShare: this.onShare,
         onRate: this.onRate,
@@ -127,6 +131,7 @@ export struct GalleryDetailScene {
   onSelectPreview: (preview: GalleryPreview) => void = () => {};
   onJumpPreviewPage: (pageIndex: number) => void = (_pageIndex: number) => {};
   onComments: () => void = () => {};
+  onVoteComment: (comment: GalleryComment, vote: number) => void = (_comment: GalleryComment, _vote: number) => {};
   onFavorite: () => void = () => {};
   onShare: () => void = () => {};
   onRate: (rating: number) => void = (_rating: number) => {};
@@ -241,7 +246,8 @@ export struct GalleryDetailScene {
             DetailComments({
               comments: this.detail.comments,
               isDetailLoaded: this.isDetailLoaded,
-              onComments: this.onComments
+              onComments: this.onComments,
+              onVoteComment: this.onVoteComment
             })
           }
           .reuseId('detail-comments')

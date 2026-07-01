@@ -156,6 +156,16 @@ export interface RateGalleryResult {
   ratingCount: number;
 }
 
+export interface VoteCommentResult {
+  ok: boolean;
+  statusCode: number;
+  message: string;
+  commentId: string;
+  score: number;
+  vote: number;
+  expectedVote: number;
+}
+
 export interface HathArchiveListLoadResult {
   ok: boolean;
   url: string;
@@ -1095,6 +1105,68 @@ export class EhHttpClient {
     }, 2);
   }
 
+  async voteComment(gid: number, token: string, apiUid: number, apiKey: string, commentId: string, vote: number,
+    site: GallerySite = GallerySite.E): Promise<VoteCommentResult> {
+    const commentIdNumber = Number.parseInt(commentId);
+    if (Number.isNaN(commentIdNumber) || commentIdNumber <= 0) {
+      return {
+        ok: false,
+        statusCode: 0,
+        message: 'Comment is not voteable',
+        commentId: commentId,
+        score: 0,
+        vote: 0,
+        expectedVote: vote
+      };
+    }
+    const payload = JSON.stringify({
+      method: 'votecomment',
+      apiuid: apiUid,
+      apikey: apiKey,
+      gid: gid,
+      token: token,
+      comment_id: commentIdNumber,
+      comment_vote: vote
+    });
+    const url = EhUrl.getApiUrl(site);
+    const referer = EhUrl.getGalleryDetailUrl(gid, token, 0, false, site);
+    const origin = EhUrl.getHost(site);
+    try {
+      const response = await this.postJson(url, payload, referer, origin);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return {
+          ok: false,
+          statusCode: response.statusCode,
+          message: httpStatusMessage(response.statusCode, response.body),
+          commentId: commentId,
+          score: 0,
+          vote: 0,
+          expectedVote: vote
+        };
+      }
+      const parsed = parseVoteCommentResponse(response.body, vote);
+      return {
+        ok: true,
+        statusCode: response.statusCode,
+        message: 'Comment vote submitted',
+        commentId: parsed.commentId.length > 0 ? parsed.commentId : commentId,
+        score: parsed.score,
+        vote: parsed.vote,
+        expectedVote: vote
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        statusCode: 0,
+        message: networkErrorMessage(error),
+        commentId: commentId,
+        score: 0,
+        vote: 0,
+        expectedVote: vote
+      };
+    }
+  }
+
   private async postMultipartOnce(url: string, body: ArrayBuffer, contentType: string, referer: string,
     origin: string, timeoutMs: number): Promise<EhHttpResponse> {
     const request = http.createHttp();
@@ -1828,6 +1900,12 @@ interface RateGalleryParsed {
   ratingCount: number;
 }
 
+interface VoteCommentParsed {
+  commentId: string;
+  score: number;
+  vote: number;
+}
+
 function parseRateGalleryResponse(body: string, fallbackRating: number): RateGalleryParsed {
   try {
     const obj = JSON.parse(body) as Record<string, Object>;
@@ -1836,6 +1914,18 @@ function parseRateGalleryResponse(body: string, fallbackRating: number): RateGal
     return { rating: avg, ratingCount: count };
   } catch (error) {
     return { rating: fallbackRating, ratingCount: 0 };
+  }
+}
+
+function parseVoteCommentResponse(body: string, expectedVote: number): VoteCommentParsed {
+  try {
+    const obj = JSON.parse(body) as Record<string, Object>;
+    const id = typeof obj['comment_id'] === 'number' ? (obj['comment_id'] as number).toString() : '';
+    const score = typeof obj['comment_score'] === 'number' ? obj['comment_score'] as number : 0;
+    const vote = typeof obj['comment_vote'] === 'number' ? obj['comment_vote'] as number : 0;
+    return { commentId: id, score: score, vote: vote };
+  } catch (error) {
+    return { commentId: '', score: 0, vote: expectedVote };
   }
 }
 

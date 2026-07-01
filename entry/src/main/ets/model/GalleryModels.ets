@@ -51,6 +51,11 @@ export interface GalleryComment {
   posted: string;
   content: string;
   score: number;
+  voteUpAble?: boolean;
+  voteUpEd?: boolean;
+  voteDownAble?: boolean;
+  voteDownEd?: boolean;
+  voteState?: string;
 }
 
 export interface GalleryPreview {

@@ -1244,7 +1244,12 @@ function cloneGalleryComments(comments: GalleryComment[]): GalleryComment[] {
       user: comments[i].user,
       posted: comments[i].posted,
       content: comments[i].content,
-      score: comments[i].score
+      score: comments[i].score,
+      voteUpAble: comments[i].voteUpAble,
+      voteUpEd: comments[i].voteUpEd,
+      voteDownAble: comments[i].voteDownAble,
+      voteDownEd: comments[i].voteDownEd,
+      voteState: comments[i].voteState
     });
   }
   return result;
