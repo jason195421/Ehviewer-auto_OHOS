@@ -17,6 +17,7 @@ export struct CommentsScene {
   @Prop galleryTitle: string = '';
   onBack: () => void = () => {};
   onVoteComment: (comment: GalleryComment, vote: number) => void = (_comment: GalleryComment, _vote: number) => {};
+  onOpenGalleryLink: (url: string) => void = (_url: string) => {};
   @StorageProp('statusBarHeight') statusBarHeightPx: number = 0;
 
   private statusBarVp(): number {
@@ -59,7 +60,9 @@ export struct CommentsScene {
                 comment: comment,
                 maxLines: 1000,
                 compact: false,
-                onVoteComment: this.onVoteComment
+                openGalleryLinksInApp: true,
+                onVoteComment: this.onVoteComment,
+                onOpenGalleryLink: this.onOpenGalleryLink
               })
             }
             .reuseId('comment-row')

@@ -44,6 +44,7 @@ export struct GalleryDetailOverlayScene {
   onJumpPreviewPage: (pageIndex: number) => void = (_pageIndex: number) => {};
   onComments: () => void = () => {};
   onVoteComment: (comment: GalleryComment, vote: number) => void = (_comment: GalleryComment, _vote: number) => {};
+  onOpenCommentGalleryLink: (url: string) => void = (_url: string) => {};
   onFavorite: () => void = () => {};
   onShare: () => void = () => {};
   onRate: (rating: number) => void = (_rating: number) => {};
@@ -66,7 +67,8 @@ export struct GalleryDetailOverlayScene {
         comments: this.detail.comments,
         galleryTitle: galleryDisplayTitle(this.detail),
         onBack: this.onCloseComments,
-        onVoteComment: this.onVoteComment
+        onVoteComment: this.onVoteComment,
+        onOpenGalleryLink: this.onOpenCommentGalleryLink
       })
     } else {
       GalleryDetailScene({

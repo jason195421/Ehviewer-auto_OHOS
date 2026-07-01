@@ -95,10 +95,16 @@ function openCommentUrl(url: string): void {
   }).catch(() => {});
 }
 
+function isGalleryDetailUrl(url: string): boolean {
+  return /(?:^https?:\/\/(?:e-hentai\.org|exhentai\.org)|^)\/g\/\d+\/[^\/?#]+\/?/i.test(url);
+}
+
 @Component
 export struct CommentLinkedText {
   @Prop html: string = '';
   @Prop maxLines: number = 1000;
+  @Prop openGalleryLinksInApp: boolean = false;
+  onOpenGalleryLink: (url: string) => void = (_url: string) => {};
 
   build() {
     Text() {
@@ -111,14 +117,18 @@ export struct CommentLinkedText {
           })
           .onClick(() => {
             if (segment.url.length > 0) {
-              openCommentUrl(segment.url);
+              if (this.openGalleryLinksInApp && isGalleryDetailUrl(segment.url)) {
+                this.onOpenGalleryLink(segment.url);
+              } else {
+                openCommentUrl(segment.url);
+              }
             }
           })
       }, (segment: CommentTextSegment, index: number) => index.toString() + '-' + segment.text)
     }
-    .fontSize(14)
+    .fontSize(16)
     .fontColor(themePrimaryText())
-    .lineHeight(21)
+    .lineHeight(24)
     .copyOption(CopyOptions.LocalDevice)
     .textSelectable(TextSelectableMode.SELECTABLE_FOCUSABLE)
     .draggable(false)
@@ -137,12 +147,13 @@ export struct CommentVoteButton {
 
   build() {
     Button(this.label, { type: ButtonType.Normal, stateEffect: true })
-      .height(28)
-      .width(38)
-      .fontSize(15)
+      .height(36)
+      .width(46)
+      .fontSize(20)
       .fontColor(this.enabledValue ? (this.selected ? themeOnPrimaryText() : themePrimaryText()) : themeInactiveActionText())
       .backgroundColor(this.selected ? themePrimaryColor() : themeSurfaceVariant())
       .borderRadius(5)
+      .padding(0)
       .enabled(this.enabledValue)
       .opacity(this.enabledValue ? 1 : 0.56)
       .onClick(() => {
@@ -162,7 +173,9 @@ export struct GalleryCommentRow {
   };
   maxLines: number = 1000;
   compact: boolean = false;
+  openGalleryLinksInApp: boolean = false;
   onVoteComment: (comment: GalleryComment, vote: number) => void = (_comment: GalleryComment, _vote: number) => {};
+  onOpenGalleryLink: (url: string) => void = (_url: string) => {};
 
   private canVoteUp(): boolean {
     return this.comment.id !== '0' && this.comment.voteUpAble === true;
@@ -219,7 +232,12 @@ export struct GalleryCommentRow {
       .width('100%')
       .margin({ bottom: 8 })
 
-      CommentLinkedText({ html: this.comment.content, maxLines: this.maxLines })
+      CommentLinkedText({
+        html: this.comment.content,
+        maxLines: this.maxLines,
+        openGalleryLinksInApp: this.openGalleryLinksInApp,
+        onOpenGalleryLink: this.onOpenGalleryLink
+      })
 
       if (this.comment.voteState !== undefined && this.comment.voteState.length > 0) {
         Text(this.comment.voteState)

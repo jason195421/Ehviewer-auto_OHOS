@@ -1,6 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { pasteboard } from '@kit.BasicServicesKit';
-import { ArchiveOption, ArchiverInfo, ArchiverOption, GalleryComment, GalleryDetail, GalleryPreview, HathArchiveList } from '../model/GalleryModels';
+import { ArchiveOption, ArchiverInfo, ArchiverOption, GalleryComment, GalleryDetail, GalleryPreview, GallerySite, HathArchiveList } from '../model/GalleryModels';
 import { confirmCellularNetworkWarningForSession, shouldConfirmCellularNetworkOperation } from '../services/EhCellularNetworkGuard';
 import { ehDownloadManager } from '../services/EhDownloadManager';
 import { DownloadInfo, ehDownloadStore } from '../services/EhDownloadStore';
@@ -34,6 +34,7 @@ import {
 } from '../services/GalleryDetailDownloadSupport';
 import {
   createEmptyGalleryDetailLink,
+  createGalleryDetailLinkFromUrl,
   GalleryDetailLink,
   GalleryDetailModuleLoadResult,
   initialDetailForLink,
@@ -89,6 +90,7 @@ export struct GalleryDetailHostScene {
   @State archiveBusy: boolean = false;
   @State archiverInfo: ArchiverInfo = { funds: '', options: [] };
   @State hathArchiveList: HathArchiveList = { formParamOr: '', options: [] };
+  @State commentGalleryLink: GalleryDetailLink = createEmptyGalleryDetailLink();
 
   aboutToAppear(): void {
     this.loadDetailFromLink();
@@ -114,6 +116,7 @@ export struct GalleryDetailHostScene {
     this.previewMap.clear();
     this.previewPageSize = 0;
     this.showComments = false;
+    this.commentGalleryLink = createEmptyGalleryDetailLink();
     this.detail = initialDetailForLink(this.detailLink);
     this.detailRequestUrl = this.detailLink.url;
     this.detailStatus = 'Loading detail for gid ' + this.detailLink.gid.toString() + '...';
@@ -165,6 +168,25 @@ export struct GalleryDetailHostScene {
       return;
     }
     this.showComments = true;
+    this.renderVersion++;
+  }
+
+  private showToast(message: string): void {
+    try {
+      this.getUIContext().getPromptAction().showToast({ message: uiText(message) });
+    } catch (error) {
+    }
+  }
+
+  private openCommentGalleryLink(url: string): void {
+    const site = url.indexOf('exhentai.org') >= 0 ? GallerySite.Ex :
+      (url.indexOf('e-hentai.org') >= 0 ? GallerySite.E : this.detailLink.site);
+    const link = createGalleryDetailLinkFromUrl(url, site, this.detailRequestUrl.length > 0 ?
+      this.detailRequestUrl : this.detailLink.url);
+    if (link === null) {
+      return;
+    }
+    this.commentGalleryLink = link;
     this.renderVersion++;
   }
 
@@ -595,12 +617,14 @@ export struct GalleryDetailHostScene {
       vote, this.detailLink.site).then((result: VoteCommentResult) => {
       if (!result.ok) {
         this.detailStatus = 'Comment vote failed: ' + result.message;
+        this.showToast(this.detailStatus);
         this.renderVersion++;
         return;
       }
       this.applyCommentVoteResult(result);
     }).catch((error: Error) => {
       this.detailStatus = 'Comment vote failed: ' + error.message;
+      this.showToast(this.detailStatus);
       this.renderVersion++;
     });
   }
@@ -626,68 +650,94 @@ export struct GalleryDetailHostScene {
     }
     if (!changed) {
       this.detailStatus = 'Comment vote submitted';
+      this.showToast(this.detailStatus);
       this.renderVersion++;
       return;
     }
     this.detail = next;
     this.detailStatus = 'Comment vote submitted';
+    this.showToast(this.detailStatus);
     this.onDetailLoaded(this.detail);
     this.renderVersion++;
   }
 
   build() {
-    GalleryDetailOverlayScene({
-      renderVersion: this.renderVersion,
-      showComments: this.showComments,
-      detail: this.detail,
-      isDetailLoaded: this.detailLoaded,
-      isFavorited: this.optimisticFavorite || this.detail.isFavorited,
-      statusText: this.detailStatus,
-      requestUrl: this.detailRequestUrl,
-      downloadText: this.detailDownloadText,
-      archivePanelVisible: this.archivePanelVisible,
-      archivePanelMode: this.archivePanelMode,
-      archivePanelStatus: this.archivePanelStatus,
-      archiveBusy: this.archiveBusy,
-      archiverInfo: this.archiverInfo,
-      hathArchiveList: this.hathArchiveList,
-      initialDetailScrollOffset: this.initialDetailScrollOffset,
-      onBack: this.onBack,
-      onCloseComments: () => { this.showComments = false; this.renderVersion++; },
-      onDownload: () => { this.toggleDownloadDetail(); },
-      onRead: () => { this.readDetail(); },
-      onSelectPreview: (preview: GalleryPreview) => {
-        const item = findDetailDownloadItem(this.detail.gid);
-        if (item !== null) {
-          this.openDownloadedReaderAt(item, preview.index);
-        } else {
-          this.openRemoteReaderAt(preview.index);
-        }
-      },
-      onJumpPreviewPage: (pageIndex: number) => {
-        this.jumpPreviewPage(pageIndex);
-      },
-      onComments: () => { this.openComments(); },
-      onVoteComment: (comment: GalleryComment, vote: number) => { this.voteDetailComment(comment, vote); },
-      onFavorite: () => { this.toggleFavoriteDetail(); },
-      onShare: () => {
-        this.copyDetailLink(EhUrl.getGalleryDetailUrl(this.detail.gid, this.detail.token, 0, false, this.detailLink.site),
-          'Gallery URL');
-      },
-      onRate: (rating: number) => { this.rateDetail(rating); },
-      onTorrent: () => { this.copyDetailLink(this.detail.torrentUrl, 'Torrent'); },
-      onArchive: () => { this.openArchiverPanel(); },
-      onHath: () => { this.openHathPanel(); },
-      onSimilar: () => { this.openSimilarGalleryList(); },
-      onSearchCover: () => { this.openCoverSearch(); },
-      onCloseArchivePanel: () => { this.closeArchivePanel(); },
-      onSelectArchiverOption: (option: ArchiverOption) => { this.submitArchiverOption(option); },
-      onSelectHathOption: (option: ArchiveOption) => { this.submitHathOption(option); },
-      onLoadMorePreviews: () => {
-        this.loadNextDetailPreviewPage();
-      },
-      onDetailScrollUpdate: this.onDetailScrollUpdate,
-      onTagSearch: (namespace: string, tag: string) => { this.openTagSearch(namespace, tag); }
-    })
+    Stack() {
+      GalleryDetailOverlayScene({
+        renderVersion: this.renderVersion,
+        showComments: this.showComments,
+        detail: this.detail,
+        isDetailLoaded: this.detailLoaded,
+        isFavorited: this.optimisticFavorite || this.detail.isFavorited,
+        statusText: this.detailStatus,
+        requestUrl: this.detailRequestUrl,
+        downloadText: this.detailDownloadText,
+        archivePanelVisible: this.archivePanelVisible,
+        archivePanelMode: this.archivePanelMode,
+        archivePanelStatus: this.archivePanelStatus,
+        archiveBusy: this.archiveBusy,
+        archiverInfo: this.archiverInfo,
+        hathArchiveList: this.hathArchiveList,
+        initialDetailScrollOffset: this.initialDetailScrollOffset,
+        onBack: this.onBack,
+        onCloseComments: () => {
+          this.commentGalleryLink = createEmptyGalleryDetailLink();
+          this.showComments = false;
+          this.renderVersion++;
+        },
+        onDownload: () => { this.toggleDownloadDetail(); },
+        onRead: () => { this.readDetail(); },
+        onSelectPreview: (preview: GalleryPreview) => {
+          const item = findDetailDownloadItem(this.detail.gid);
+          if (item !== null) {
+            this.openDownloadedReaderAt(item, preview.index);
+          } else {
+            this.openRemoteReaderAt(preview.index);
+          }
+        },
+        onJumpPreviewPage: (pageIndex: number) => {
+          this.jumpPreviewPage(pageIndex);
+        },
+        onComments: () => { this.openComments(); },
+        onVoteComment: (comment: GalleryComment, vote: number) => { this.voteDetailComment(comment, vote); },
+        onOpenCommentGalleryLink: (url: string) => { this.openCommentGalleryLink(url); },
+        onFavorite: () => { this.toggleFavoriteDetail(); },
+        onShare: () => {
+          this.copyDetailLink(EhUrl.getGalleryDetailUrl(this.detail.gid, this.detail.token, 0, false, this.detailLink.site),
+            'Gallery URL');
+        },
+        onRate: (rating: number) => { this.rateDetail(rating); },
+        onTorrent: () => { this.copyDetailLink(this.detail.torrentUrl, 'Torrent'); },
+        onArchive: () => { this.openArchiverPanel(); },
+        onHath: () => { this.openHathPanel(); },
+        onSimilar: () => { this.openSimilarGalleryList(); },
+        onSearchCover: () => { this.openCoverSearch(); },
+        onCloseArchivePanel: () => { this.closeArchivePanel(); },
+        onSelectArchiverOption: (option: ArchiverOption) => { this.submitArchiverOption(option); },
+        onSelectHathOption: (option: ArchiveOption) => { this.submitHathOption(option); },
+        onLoadMorePreviews: () => {
+          this.loadNextDetailPreviewPage();
+        },
+        onDetailScrollUpdate: this.onDetailScrollUpdate,
+        onTagSearch: (namespace: string, tag: string) => { this.openTagSearch(namespace, tag); }
+      })
+
+      if (this.commentGalleryLink.gid > 0) {
+        GalleryDetailHostScene({
+          detailLink: this.commentGalleryLink,
+          listRequestUrl: this.detailRequestUrl,
+          onBack: () => {
+            this.commentGalleryLink = createEmptyGalleryDetailLink();
+            this.renderVersion++;
+          },
+          onShowEmbeddedReader: this.onShowEmbeddedReader,
+          onOpenSearch: this.onOpenSearch
+        })
+        .transition(TransitionEffect.move(TransitionEdge.END).animation({ duration: 220, curve: Curve.EaseOut }))
+        .zIndex(20)
+      }
+    }
+    .width('100%')
+    .height('100%')
   }
 }

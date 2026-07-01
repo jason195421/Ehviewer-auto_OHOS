@@ -1145,6 +1145,17 @@ export class EhHttpClient {
         };
       }
       const parsed = parseVoteCommentResponse(response.body, vote);
+      if (!parsed.ok) {
+        return {
+          ok: false,
+          statusCode: response.statusCode,
+          message: parsed.message.length > 0 ? parsed.message : httpStatusMessage(response.statusCode, response.body),
+          commentId: commentId,
+          score: 0,
+          vote: 0,
+          expectedVote: vote
+        };
+      }
       return {
         ok: true,
         statusCode: response.statusCode,
@@ -1901,6 +1912,8 @@ interface RateGalleryParsed {
 }
 
 interface VoteCommentParsed {
+  ok: boolean;
+  message: string;
   commentId: string;
   score: number;
   vote: number;
@@ -1920,12 +1933,23 @@ function parseRateGalleryResponse(body: string, fallbackRating: number): RateGal
 function parseVoteCommentResponse(body: string, expectedVote: number): VoteCommentParsed {
   try {
     const obj = JSON.parse(body) as Record<string, Object>;
-    const id = typeof obj['comment_id'] === 'number' ? (obj['comment_id'] as number).toString() : '';
-    const score = typeof obj['comment_score'] === 'number' ? obj['comment_score'] as number : 0;
-    const vote = typeof obj['comment_vote'] === 'number' ? obj['comment_vote'] as number : 0;
-    return { commentId: id, score: score, vote: vote };
+    const rawId = obj['comment_id'];
+    const rawScore = obj['comment_score'];
+    const rawVote = obj['comment_vote'];
+    const id = typeof rawId === 'number' ? rawId.toString() : (typeof rawId === 'string' ? rawId : '');
+    if (id.length === 0 || rawScore === undefined || rawVote === undefined) {
+      const error = obj['error'];
+      const message = typeof error === 'string' && error.length > 0 ? error : 'Invalid comment vote response';
+      return { ok: false, message: message, commentId: '', score: 0, vote: expectedVote };
+    }
+    const score = typeof rawScore === 'number' ? rawScore : Number(rawScore);
+    const vote = typeof rawVote === 'number' ? rawVote : Number(rawVote);
+    if (!Number.isFinite(score) || !Number.isFinite(vote)) {
+      return { ok: false, message: 'Invalid comment vote response', commentId: '', score: 0, vote: expectedVote };
+    }
+    return { ok: true, message: '', commentId: id, score: score, vote: vote };
   } catch (error) {
-    return { commentId: '', score: 0, vote: expectedVote };
+    return { ok: false, message: galleryListBodyDiagnostic(body), commentId: '', score: 0, vote: expectedVote };
   }
 }
 
