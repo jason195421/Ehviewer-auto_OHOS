@@ -2945,32 +2945,39 @@ export struct GalleryListContent {
           })
           .zIndex(11)
 
-        SearchAdvancedPanel({
-          searchModeValue: this.searchModeValue,
-          searchCategory: this.searchCategory,
-          advancedSearchEnabled: this.advancedSearchEnabled,
-          advanceSearch: this.advanceSearch,
-          searchFilterEnabled: this.searchFilterEnabled,
-          minRating: this.minRating,
-          pageFrom: -1,
-          pageTo: -1,
-          panelMaxHeight: this.advancedPanelMaxHeight(),
-          onSearchModeChange: this.onSearchModeChange,
-          onSearchCategoryChange: this.onSearchCategoryChange,
-          onAdvancedEnabledChange: this.onAdvancedEnabledChange,
-          onAdvanceSearchChange: this.onAdvanceSearchChange,
-          onMinRatingChange: this.onMinRatingChange,
-          onClose: () => {
-            this.closeAdvancedPanel();
-          },
-          onSearch: () => {
-            this.closeAdvancedPanel();
-            this.onSearch();
-          }
-        })
-          .margin({ top: this.statusBarVp() + this.barHeight + 8, left: 10, right: 10 })
-          .transition(TransitionEffect.move(TransitionEdge.TOP)
-            .animation({ duration: 180, curve: Curve.EaseOut }))
+        Column() {
+          SearchAdvancedPanel({
+            searchModeValue: this.searchModeValue,
+            searchCategory: this.searchCategory,
+            advancedSearchEnabled: this.advancedSearchEnabled,
+            advanceSearch: this.advanceSearch,
+            searchFilterEnabled: this.searchFilterEnabled,
+            minRating: this.minRating,
+            pageFrom: -1,
+            pageTo: -1,
+            panelMaxHeight: this.advancedPanelMaxHeight(),
+            onSearchModeChange: this.onSearchModeChange,
+            onSearchCategoryChange: this.onSearchCategoryChange,
+            onAdvancedEnabledChange: this.onAdvancedEnabledChange,
+            onAdvanceSearchChange: this.onAdvanceSearchChange,
+            onMinRatingChange: this.onMinRatingChange,
+            onClose: () => {
+              this.closeAdvancedPanel();
+            },
+            onSearch: () => {
+              this.closeAdvancedPanel();
+              this.onSearch();
+            }
+          })
+            .constraintSize({ maxHeight: this.advancedPanelMaxHeight() })
+            .transition(TransitionEffect.move(TransitionEdge.TOP)
+              .animation({ duration: 180, curve: Curve.EaseOut }))
+        }
+          .width('100%')
+          .height('100%')
+          .justifyContent(FlexAlign.Start)
+          .alignItems(HorizontalAlign.Center)
+          .padding({ top: this.statusBarVp() + this.barHeight + 8, left: 10, right: 10 })
           .zIndex(12)
       }
 

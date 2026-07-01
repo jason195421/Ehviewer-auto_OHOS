@@ -344,24 +344,30 @@ async function restoreAppWindowChrome(target: window.Window): Promise<void> {
 }
 
 async function restoreWindowPreferredOrientation(target: window.Window): Promise<void> {
-  let orientation = window.Orientation.UNSPECIFIED;
+  let orientation = window.Orientation.AUTO_ROTATION_UNSPECIFIED;
   let shouldConfirmOrientation = false;
   try {
     const windowId = target.getWindowProperties().id;
     const saved = savedReaderPreferredOrientations.get(windowId);
     const savedDisplayOrientation = savedReaderDisplayOrientations.get(windowId);
     const savedWindowOrientation = savedReaderWindowOrientations.get(windowId);
+    const rotationLocked = isSystemRotationLocked();
     if (saved !== undefined) {
       orientation = saved;
       savedReaderPreferredOrientations.delete(windowId);
     }
     savedReaderDisplayOrientations.delete(windowId);
     savedReaderWindowOrientations.delete(windowId);
-    const readerExitOrientation = savedWindowOrientation ?? orientationForDisplayOrientation(savedDisplayOrientation);
-    if (readerExitOrientation !== undefined && shouldRestoreReaderExitOrientation(readerExitOrientation)) {
-      orientation = readerExitOrientation;
-      pendingReaderExitOrientations.set(windowId, orientation);
-      shouldConfirmOrientation = true;
+    if (rotationLocked) {
+      const readerExitOrientation = savedWindowOrientation ?? orientationForDisplayOrientation(savedDisplayOrientation);
+      if (readerExitOrientation !== undefined) {
+        orientation = readerExitOrientation;
+        pendingReaderExitOrientations.set(windowId, orientation);
+        shouldConfirmOrientation = true;
+      }
+    } else {
+      orientation = window.Orientation.AUTO_ROTATION_UNSPECIFIED;
+      pendingReaderExitOrientations.delete(windowId);
     }
   } catch (error) {
     logWindowError('read previous orientation', error);
@@ -424,12 +430,7 @@ function readCurrentWindowOrientation(target: window.Window): window.Orientation
 }
 
 function shouldRestoreReaderExitOrientation(_orientation: window.Orientation): boolean {
-  if (isSystemRotationLocked()) {
-    return true;
-  }
-  const readerOrientation = readerOrientationFromSetting(readerScreenRotationSetting());
-  return readerOrientation === window.Orientation.AUTO_ROTATION_PORTRAIT ||
-  readerOrientation === window.Orientation.AUTO_ROTATION_LANDSCAPE;
+  return isSystemRotationLocked();
 }
 
 function isSystemRotationLocked(): boolean {
