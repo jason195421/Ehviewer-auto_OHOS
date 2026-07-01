@@ -232,6 +232,14 @@ export struct DownloadScene {
   }
 
   private handleSystemBack(): boolean {
+    if (this.advancedPanelVisible) {
+      this.advancedPanelVisible = false;
+      return true;
+    }
+    if (this.downloadJumpPanelVisible) {
+      this.downloadJumpPanelVisible = false;
+      return true;
+    }
     if (this.downloadSelectionCount() > 0) {
       this.clearDownloadSelection();
       return true;
@@ -1425,6 +1433,7 @@ export struct DownloadScene {
             .width('100%')
             .height('100%')
             .padding({ top: this.statusBarVp() + 56 + 8, left: 10, right: 10 })
+            .hitTestBehavior(HitTestMode.Transparent)
             .zIndex(16)
         }
 

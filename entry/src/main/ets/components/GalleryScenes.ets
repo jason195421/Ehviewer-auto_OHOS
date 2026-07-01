@@ -1669,6 +1669,9 @@ export struct GalleryListScene {
             onLongPressGallery: (gallery: GalleryInfo) => {
               this.openCardActions(gallery);
             },
+            onSystemBack: () => {
+              return this.handleSystemBack();
+            },
             scrollResetVersion: this.scrollResetVersion,
             initialScrollOffset: this.listScrollOffset,
             onScrollUpdate: (offset: number) => {
@@ -2147,6 +2150,7 @@ export struct GalleryListContent {
   };
   onLongPressGallery: (gallery: GalleryInfo) => void = (_gallery: GalleryInfo) => {
   };
+  onSystemBack: () => boolean = () => false;
   initialScrollOffset: number = 0;
   onScrollUpdate: (offset: number) => void = () => {
   };
@@ -2200,6 +2204,7 @@ export struct GalleryListContent {
   }
 
   aboutToAppear(): void {
+    setActiveBackHandler(() => this.handleContentBack());
     this.galleryRowsDataSource.setPrefetchCallback((row: GalleryInfo[]) => {
       for (let i = 0; i < row.length; i++) {
         const thumb = row[i].thumb;
@@ -2219,6 +2224,22 @@ export struct GalleryListContent {
       this.syncContentWidthFromWindow();
       this.refreshGalleryRows();
     }, 0);
+  }
+
+  private handleContentBack(): boolean {
+    if (this.advancedPanelVisible) {
+      this.closeAdvancedPanel();
+      return true;
+    }
+    if (this.imageSearchPanelVisible) {
+      this.closeImageSearchPanel();
+      return true;
+    }
+    if (this.jumpPanelVisible) {
+      this.closeJumpPanel();
+      return true;
+    }
+    return this.onSystemBack();
   }
 
   private syncPageJumpDraft(): void {
@@ -2976,6 +2997,7 @@ export struct GalleryListContent {
           .width('100%')
           .height('100%')
           .padding({ top: this.statusBarVp() + this.barHeight + 8, left: 10, right: 10 })
+          .hitTestBehavior(HitTestMode.Transparent)
           .zIndex(12)
       }
 
