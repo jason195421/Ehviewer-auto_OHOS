@@ -593,6 +593,13 @@ export struct SearchAdvancedPanel {
     this.onMinRatingChange(next);
   }
 
+  private setAdvancedEnabledDraft(enabled: boolean): void {
+    this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseInOut }, () => {
+      this.advancedEnabledDraft = enabled;
+    });
+    this.onAdvancedEnabledChange(enabled);
+  }
+
   private flagOn(flag: number): boolean {
     if (!this.searchFilterEnabled && isDefaultFilterDisableFlag(flag)) {
       return true;
@@ -676,8 +683,7 @@ export struct SearchAdvancedPanel {
             Blank()
             Toggle({ type: ToggleType.Switch, isOn: this.advancedEnabledDraft })
               .onChange((isOn: boolean) => {
-                this.advancedEnabledDraft = isOn;
-                this.onAdvancedEnabledChange(isOn);
+                this.setAdvancedEnabledDraft(isOn);
               })
           }
           .width('100%')
@@ -687,43 +693,50 @@ export struct SearchAdvancedPanel {
           .borderRadius(6)
 
           if (this.advancedEnabledDraft) {
-            this.sectionTitle('Search galleries')
-            Row({ space: 8 }) {
-              SearchFlagChip({ label: 'Name', isOn: this.flagOn(0x1), onToggle: (isOn: boolean) => { this.setFlag(0x1, isOn); } })
-              SearchFlagChip({ label: 'Tags', isOn: this.flagOn(0x2), onToggle: (isOn: boolean) => { this.setFlag(0x2, isOn); } })
-            }
-            Row({ space: 8 }) {
-              SearchFlagChip({ label: 'Description', isOn: this.flagOn(0x4), onToggle: (isOn: boolean) => { this.setFlag(0x4, isOn); } })
-              SearchFlagChip({ label: 'Torrent', isOn: this.flagOn(0x8), onToggle: (isOn: boolean) => { this.setFlag(0x8, isOn); } })
-            }
-
-            this.sectionTitle('Options')
-            Row({ space: 8 }) {
-              SearchFlagChip({ label: 'Has torrent', isOn: this.flagOn(0x10), onToggle: (isOn: boolean) => { this.setFlag(0x10, isOn); } })
-              SearchFlagChip({ label: 'Low power', isOn: this.flagOn(0x20), onToggle: (isOn: boolean) => { this.setFlag(0x20, isOn); } })
-            }
-            Row({ space: 8 }) {
-              SearchFlagChip({ label: 'Downvoted', isOn: this.flagOn(0x40), onToggle: (isOn: boolean) => { this.setFlag(0x40, isOn); } })
-              SearchFlagChip({ label: 'Expunged', isOn: this.flagOn(0x80), onToggle: (isOn: boolean) => { this.setFlag(0x80, isOn); } })
-            }
-
-            this.sectionTitle('Disable default filter')
-            Row({ space: 8 }) {
-              SearchFlagChip({ label: 'No lang filter', isOn: this.flagOn(0x100), isEnabled: this.searchFilterEnabled, onToggle: (isOn: boolean) => { this.setFlag(0x100, isOn); } })
-              SearchFlagChip({ label: 'No uploader filter', isOn: this.flagOn(0x200), isEnabled: this.searchFilterEnabled, onToggle: (isOn: boolean) => { this.setFlag(0x200, isOn); } })
-            }
-            Row({ space: 8 }) {
-              SearchFlagChip({ label: 'No tag filter', isOn: this.flagOn(0x400), isEnabled: this.searchFilterEnabled, onToggle: (isOn: boolean) => { this.setFlag(0x400, isOn); } })
-              Blank().layoutWeight(1)
-            }
-
-            this.sectionTitle('Rating')
-            RatingStarBar({
-              level: this.ratingLevel(),
-              onSelect: (level: number) => {
-                this.setRatingLevel(level);
+            Column({ space: 10 }) {
+              this.sectionTitle('Search galleries')
+              Row({ space: 8 }) {
+                SearchFlagChip({ label: 'Name', isOn: this.flagOn(0x1), onToggle: (isOn: boolean) => { this.setFlag(0x1, isOn); } })
+                SearchFlagChip({ label: 'Tags', isOn: this.flagOn(0x2), onToggle: (isOn: boolean) => { this.setFlag(0x2, isOn); } })
               }
-            })
+              Row({ space: 8 }) {
+                SearchFlagChip({ label: 'Description', isOn: this.flagOn(0x4), onToggle: (isOn: boolean) => { this.setFlag(0x4, isOn); } })
+                SearchFlagChip({ label: 'Torrent', isOn: this.flagOn(0x8), onToggle: (isOn: boolean) => { this.setFlag(0x8, isOn); } })
+              }
+
+              this.sectionTitle('Options')
+              Row({ space: 8 }) {
+                SearchFlagChip({ label: 'Has torrent', isOn: this.flagOn(0x10), onToggle: (isOn: boolean) => { this.setFlag(0x10, isOn); } })
+                SearchFlagChip({ label: 'Low power', isOn: this.flagOn(0x20), onToggle: (isOn: boolean) => { this.setFlag(0x20, isOn); } })
+              }
+              Row({ space: 8 }) {
+                SearchFlagChip({ label: 'Downvoted', isOn: this.flagOn(0x40), onToggle: (isOn: boolean) => { this.setFlag(0x40, isOn); } })
+                SearchFlagChip({ label: 'Expunged', isOn: this.flagOn(0x80), onToggle: (isOn: boolean) => { this.setFlag(0x80, isOn); } })
+              }
+
+              this.sectionTitle('Disable default filter')
+              Row({ space: 8 }) {
+                SearchFlagChip({ label: 'No lang filter', isOn: this.flagOn(0x100), isEnabled: this.searchFilterEnabled, onToggle: (isOn: boolean) => { this.setFlag(0x100, isOn); } })
+                SearchFlagChip({ label: 'No uploader filter', isOn: this.flagOn(0x200), isEnabled: this.searchFilterEnabled, onToggle: (isOn: boolean) => { this.setFlag(0x200, isOn); } })
+              }
+              Row({ space: 8 }) {
+                SearchFlagChip({ label: 'No tag filter', isOn: this.flagOn(0x400), isEnabled: this.searchFilterEnabled, onToggle: (isOn: boolean) => { this.setFlag(0x400, isOn); } })
+                Blank().layoutWeight(1)
+              }
+
+              this.sectionTitle('Rating')
+              RatingStarBar({
+                level: this.ratingLevel(),
+                onSelect: (level: number) => {
+                  this.setRatingLevel(level);
+                }
+              })
+            }
+            .width('100%')
+            .clip(true)
+            .transition(TransitionEffect.OPACITY
+              .combine(TransitionEffect.translate({ y: -8 }))
+              .animation({ duration: 180, curve: Curve.EaseInOut }))
           }
         }
         .width('100%')
