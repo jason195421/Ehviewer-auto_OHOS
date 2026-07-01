@@ -560,6 +560,12 @@ export struct GalleryListScene {
     this.onBack();
   }
 
+  private refreshSearchResultNavigationCache(): void {
+    if (this.showSearchResultScene) {
+      this.saveNavigationCache();
+    }
+  }
+
   private resetListScroll(): void {
     this.listScrollOffset = 0;
     this.saveListCache();
@@ -625,6 +631,11 @@ export struct GalleryListScene {
   }
 
   aboutToDisappear(): void {
+    this.saveListCache();
+    this.saveNavigationCache();
+  }
+
+  onPageHide(): void {
     this.saveListCache();
     this.saveNavigationCache();
   }
@@ -1135,6 +1146,9 @@ export struct GalleryListScene {
       this.searchResultDraft = draft;
       this.showSearchResultScene = true;
       this.saveNavigationCache();
+      setTimeout(() => {
+        this.refreshSearchResultNavigationCache();
+      }, 0);
       return;
     }
     this.keyword = '';
@@ -1186,6 +1200,9 @@ export struct GalleryListScene {
     };
     this.showSearchResultScene = true;
     this.saveNavigationCache();
+    setTimeout(() => {
+      this.refreshSearchResultNavigationCache();
+    }, 0);
   }
 
   private openLocalSearchBar(): void {
@@ -1455,6 +1472,9 @@ export struct GalleryListScene {
     setTimeout(() => {
       this.showSearchResultScene = true;
       this.saveNavigationCache();
+      setTimeout(() => {
+        this.refreshSearchResultNavigationCache();
+      }, 0);
     }, 0);
   }
 
@@ -2290,11 +2310,15 @@ export struct GalleryListContent {
     if (this.isSearchResultScene) {
       this.onAdvancedPanelOpen();
     }
-    this.advancedPanelVisible = !this.advancedPanelVisible;
+    this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseInOut }, () => {
+      this.advancedPanelVisible = !this.advancedPanelVisible;
+    });
   }
 
   private closeAdvancedPanel(): void {
-    this.advancedPanelVisible = false;
+    this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseInOut }, () => {
+      this.advancedPanelVisible = false;
+    });
   }
 
   private openJumpPanel(): void {
@@ -2964,6 +2988,7 @@ export struct GalleryListContent {
           .onClick(() => {
             this.closeAdvancedPanel();
           })
+          .transition(TransitionEffect.OPACITY.animation({ duration: 160, curve: Curve.EaseInOut }))
           .zIndex(11)
 
         Stack({ alignContent: Alignment.Top }) {

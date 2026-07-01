@@ -233,7 +233,7 @@ export struct DownloadScene {
 
   private handleSystemBack(): boolean {
     if (this.advancedPanelVisible) {
-      this.advancedPanelVisible = false;
+      this.closeAdvancedPanel();
       return true;
     }
     if (this.downloadJumpPanelVisible) {
@@ -291,6 +291,18 @@ export struct DownloadScene {
     this.tagSearchImageShowExpunged = false;
     this.restoreBackHandler();
     this.clearNavigationCache();
+  }
+
+  private toggleAdvancedPanel(): void {
+    this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseInOut }, () => {
+      this.advancedPanelVisible = !this.advancedPanelVisible;
+    });
+  }
+
+  private closeAdvancedPanel(): void {
+    this.getUIContext().animateTo({ duration: 180, curve: Curve.EaseInOut }, () => {
+      this.advancedPanelVisible = false;
+    });
   }
 
   private restoreNavigationCache(): void {
@@ -1235,7 +1247,7 @@ export struct DownloadScene {
               }
             },
             onAdvanced: () => {
-              this.advancedPanelVisible = !this.advancedPanelVisible;
+              this.toggleAdvancedPanel();
             }
       }) {
       Stack({ alignContent: Alignment.BottomEnd }) {
@@ -1379,8 +1391,9 @@ export struct DownloadScene {
             .height('100%')
             .backgroundColor(themeScrimColor())
             .onClick(() => {
-              this.advancedPanelVisible = false;
+              this.closeAdvancedPanel();
             })
+            .transition(TransitionEffect.OPACITY.animation({ duration: 160, curve: Curve.EaseInOut }))
             .zIndex(15)
 
           Stack({ alignContent: Alignment.Top }) {
@@ -1419,10 +1432,10 @@ export struct DownloadScene {
                 this.refreshDownloadRows();
               },
               onClose: () => {
-                this.advancedPanelVisible = false;
+                this.closeAdvancedPanel();
               },
               onSearch: () => {
-                this.advancedPanelVisible = false;
+                this.closeAdvancedPanel();
                 this.applyDownloadSearch();
               }
             })

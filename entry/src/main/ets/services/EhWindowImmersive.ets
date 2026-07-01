@@ -344,8 +344,9 @@ async function restoreAppWindowChrome(target: window.Window): Promise<void> {
 }
 
 async function restoreWindowPreferredOrientation(target: window.Window): Promise<void> {
-  let orientation = window.Orientation.AUTO_ROTATION;
+  let orientation = readerExitAutoRotationOrientation(target);
   let shouldConfirmOrientation = false;
+  let forceOrientation = true;
   try {
     const windowId = target.getWindowProperties().id;
     const saved = savedReaderPreferredOrientations.get(windowId);
@@ -364,20 +365,27 @@ async function restoreWindowPreferredOrientation(target: window.Window): Promise
         orientation = readerExitOrientation;
         pendingReaderExitOrientations.set(windowId, orientation);
         shouldConfirmOrientation = true;
+        forceOrientation = false;
       }
     } else {
-      orientation = window.Orientation.AUTO_ROTATION;
+      orientation = readerExitAutoRotationOrientation(target);
       pendingReaderExitOrientations.delete(windowId);
+      forceOrientation = true;
     }
   } catch (error) {
     logWindowError('read previous orientation', error);
   }
-  await setPreferredOrientationQuietly(target, orientation, 'restore app orientation');
+  await setPreferredOrientationQuietly(target, orientation, 'restore app orientation', forceOrientation);
   if (shouldConfirmOrientation) {
     schedulePendingReaderExitOrientation(target, 80);
     schedulePendingReaderExitOrientation(target, 260);
     schedulePendingReaderExitOrientation(target, 620);
     schedulePendingReaderExitOrientation(target, 1200);
+  } else {
+    scheduleReaderExitAutoRotationOrientation(target, 80);
+    scheduleReaderExitAutoRotationOrientation(target, 260);
+    scheduleReaderExitAutoRotationOrientation(target, 620);
+    scheduleReaderExitAutoRotationOrientation(target, 1200);
   }
 }
 
@@ -392,7 +400,7 @@ async function restorePendingReaderExitOrientation(target: window.Window): Promi
       pendingReaderExitOrientations.delete(windowId);
       return;
     }
-    await setPreferredOrientationQuietly(target, orientation, 'confirm reader exit orientation');
+    await setPreferredOrientationQuietly(target, orientation, 'confirm reader exit orientation', true);
   } catch (error) {
     logWindowError('confirm reader exit orientation', error);
   }
@@ -401,6 +409,16 @@ async function restorePendingReaderExitOrientation(target: window.Window): Promi
 function schedulePendingReaderExitOrientation(target: window.Window, delayMs: number): void {
   setTimeout(() => {
     restorePendingReaderExitOrientation(target).catch(() => {});
+  }, delayMs);
+}
+
+function scheduleReaderExitAutoRotationOrientation(target: window.Window, delayMs: number): void {
+  setTimeout(() => {
+    if (isSystemRotationLocked()) {
+      return;
+    }
+    setPreferredOrientationQuietly(target, readerExitAutoRotationOrientation(target),
+      'confirm reader exit auto rotation', true).catch(() => {});
   }, delayMs);
 }
 
@@ -426,6 +444,17 @@ function readCurrentWindowOrientation(target: window.Window): window.Orientation
   } catch (error) {
     logWindowError('read current window orientation', error);
     return undefined;
+  }
+}
+
+function readerExitAutoRotationOrientation(target: window.Window): window.Orientation {
+  try {
+    const rect = target.getWindowProperties().windowRect;
+    return rect.width > rect.height ? window.Orientation.USER_ROTATION_LANDSCAPE :
+    window.Orientation.USER_ROTATION_PORTRAIT;
+  } catch (error) {
+    logWindowError('read reader exit window orientation', error);
+    return window.Orientation.AUTO_ROTATION_UNSPECIFIED;
   }
 }
 
@@ -484,9 +513,9 @@ async function setWindowBrightnessQuietly(target: window.Window, brightness: num
 }
 
 async function setPreferredOrientationQuietly(target: window.Window, orientation: window.Orientation,
-  operation: string): Promise<void> {
+  operation: string, force: boolean = false): Promise<void> {
   try {
-    if (target.getPreferredOrientation() === orientation) {
+    if (!force && target.getPreferredOrientation() === orientation) {
       return;
     }
     await target.setPreferredOrientation(orientation);

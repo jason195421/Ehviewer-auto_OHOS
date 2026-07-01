@@ -59,6 +59,28 @@ import {
 import { themePrimaryColor, themeSecondaryText } from '../shared/EhTheme';
 import { GalleryDetailOverlayScene } from './GalleryDetailScenes';
 
+interface DetailHostNavigationState {
+  showComments: boolean;
+  commentGalleryLink: GalleryDetailLink;
+}
+
+const detailHostNavigationCache: Map<string, DetailHostNavigationState> = new Map<string, DetailHostNavigationState>();
+
+function detailHostCacheKey(link: GalleryDetailLink): string {
+  return link.site.toString() + '|' + link.gid.toString() + '|' + link.token + '|' + link.url;
+}
+
+function cloneDetailHostLink(link: GalleryDetailLink): GalleryDetailLink {
+  return {
+    gid: link.gid,
+    token: link.token,
+    url: link.url,
+    referer: link.referer,
+    site: link.site,
+    seed: link.seed
+  };
+}
+
 @Component
 export struct GalleryDetailHostScene {
   @Prop detailLink: GalleryDetailLink = createEmptyGalleryDetailLink();
@@ -103,22 +125,53 @@ export struct GalleryDetailHostScene {
   }
 
   aboutToDisappear(): void {
+    this.saveNavigationState();
     this.unsubscribeDownloadStore();
     this.unregisterDetailBackHandler();
+  }
+
+  onPageHide(): void {
+    this.saveNavigationState();
   }
 
   private handleDetailSystemBack(): boolean {
     if (this.commentGalleryLink.gid > 0) {
       this.commentGalleryLink = createEmptyGalleryDetailLink();
+      this.saveNavigationState();
       this.renderVersion++;
       return true;
     }
     if (this.showComments) {
       this.showComments = false;
+      this.saveNavigationState();
       this.renderVersion++;
       return true;
     }
     return false;
+  }
+
+  private saveNavigationState(): void {
+    if (this.detailLink.gid <= 0 || this.detailLink.token.length === 0) {
+      return;
+    }
+    detailHostNavigationCache.set(detailHostCacheKey(this.detailLink), {
+      showComments: this.showComments,
+      commentGalleryLink: cloneDetailHostLink(this.commentGalleryLink)
+    });
+  }
+
+  private restoreNavigationState(): DetailHostNavigationState {
+    const saved = detailHostNavigationCache.get(detailHostCacheKey(this.detailLink));
+    if (saved === undefined) {
+      return {
+        showComments: false,
+        commentGalleryLink: createEmptyGalleryDetailLink()
+      };
+    }
+    return {
+      showComments: saved.showComments,
+      commentGalleryLink: cloneDetailHostLink(saved.commentGalleryLink)
+    };
   }
 
   private loadDetailFromLink(): void {
@@ -129,12 +182,13 @@ export struct GalleryDetailHostScene {
       this.renderVersion++;
       return;
     }
+    const navigationState = this.restoreNavigationState();
     this.closeArchivePanel();
     this.detailPreviewPager.start();
     this.previewMap.clear();
     this.previewPageSize = 0;
-    this.showComments = false;
-    this.commentGalleryLink = createEmptyGalleryDetailLink();
+    this.showComments = navigationState.showComments;
+    this.commentGalleryLink = navigationState.commentGalleryLink;
     this.detail = initialDetailForLink(this.detailLink);
     this.detailRequestUrl = this.detailLink.url;
     this.detailStatus = 'Loading detail for gid ' + this.detailLink.gid.toString() + '...';
@@ -186,6 +240,7 @@ export struct GalleryDetailHostScene {
       return;
     }
     this.showComments = true;
+    this.saveNavigationState();
     this.renderVersion++;
   }
 
@@ -205,6 +260,7 @@ export struct GalleryDetailHostScene {
       return;
     }
     this.commentGalleryLink = link;
+    this.saveNavigationState();
     this.renderVersion++;
   }
 
@@ -701,6 +757,7 @@ export struct GalleryDetailHostScene {
         onCloseComments: () => {
           this.commentGalleryLink = createEmptyGalleryDetailLink();
           this.showComments = false;
+          this.saveNavigationState();
           this.renderVersion++;
         },
         onDownload: () => { this.toggleDownloadDetail(); },
@@ -746,6 +803,7 @@ export struct GalleryDetailHostScene {
           listRequestUrl: this.detailRequestUrl,
           onBack: () => {
             this.commentGalleryLink = createEmptyGalleryDetailLink();
+            this.saveNavigationState();
             this.renderVersion++;
           },
           onShowEmbeddedReader: this.onShowEmbeddedReader,
