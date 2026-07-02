@@ -246,7 +246,7 @@ export struct DetailPreviewJumpOverlay {
 
 @Component
 export struct PreviewRow {
-  preview: GalleryPreview = createEmptyPreview();
+  @Prop preview: GalleryPreview = createEmptyPreview();
   onSelectPreview: (preview: GalleryPreview) => void = () => {};
 
   build() {
@@ -282,9 +282,9 @@ export struct PreviewRow {
 
 @Component
 export struct PreviewTile {
-  preview: GalleryPreview = createEmptyPreview();
-  tileWidth: number = 132;
-  imageHeight: number = 96;
+  @Prop preview: GalleryPreview = createEmptyPreview();
+  @Prop tileWidth: number = 132;
+  @Prop imageHeight: number = 96;
   onSelectPreview: (preview: GalleryPreview) => void = () => {};
 
   build() {
@@ -312,9 +312,9 @@ export struct PreviewTile {
 @Component
 export struct PreviewThumb {
   @Prop @Watch('onPreviewChange') preview: GalleryPreview = createEmptyPreview();
-  widthValue: number = 132;
-  heightValue: number = 96;
-  radiusValue: number = 4;
+  @Prop widthValue: number = 132;
+  @Prop heightValue: number = 96;
+  @Prop radiusValue: number = 4;
   @State localUrl: string = '';
   @State loadFailed: boolean = false;
   private cachedUrl: string = '';
