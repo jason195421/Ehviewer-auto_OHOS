@@ -23,7 +23,7 @@ interface PendingImageDownload {
 const PENDING_IMAGE_DOWNLOADS: PendingImageDownload[] = [];
 const WAITING_IMAGE_SLOTS: (() => void)[] = [];
 const MAX_ACTIVE_IMAGE_DOWNLOADS: number = 6;
-const MAX_IMAGE_CACHE_BYTES: number = 320 * 1024 * 1024;
+const DEFAULT_IMAGE_CACHE_BYTES: number = 160 * 1024 * 1024;
 const IMAGE_RETRY_DELAYS_MS: number[] = [300, 900, 1800, 3200];
 const IMAGE_CONNECT_TIMEOUT_MS: number = 4500;
 const DEFAULT_IMAGE_RETRY_LIMIT: number = 5;
@@ -44,6 +44,12 @@ interface CachedImageFile {
 export interface CacheClearResult {
   files: number;
   bytes: number;
+}
+
+export interface CachePruneResult {
+  files: number;
+  bytes: number;
+  remainingBytes: number;
 }
 
 export interface ImageDownloadProgress {
@@ -158,13 +164,24 @@ export class ReaderImageCache {
     return { files: result.files + legacy.files, bytes: result.bytes + legacy.bytes };
   }
 
+  size(context: common.UIAbilityContext): CacheClearResult {
+    return scanImageCacheSize([readerImageCacheDirectory(context), legacyReaderImageCacheDirectory(context)]);
+  }
+
+  prune(context: common.UIAbilityContext, protectedPath: string = ''): CachePruneResult {
+    return pruneImageCache([
+      readerImageCacheDirectory(context),
+      legacyReaderImageCacheDirectory(context)
+    ], readerImageCacheLimitBytes(), protectedPath);
+  }
+
   private async download(context: common.UIAbilityContext, imageUrl: string, referer: string, path: string,
     priority: boolean, onProgress?: ImageDownloadProgressCallback, options?: ImageDownloadOptions): Promise<string> {
     ensureDirectory(readerImageCacheDirectory(context));
     await acquireImageSlot(priority);
     try {
       await this.downloadWithRetry(context, imageUrl, referer, path, onProgress, options);
-      pruneImageCache(readerImageCacheDirectory(context));
+      this.prune(context, path);
       return path;
     } finally {
       releaseImageSlot();
@@ -739,37 +756,91 @@ function ensureDirectory(path: string): void {
   }
 }
 
-function pruneImageCache(directory: string): void {
+export function readerImageCacheLimitBytes(): number {
+  return parseCacheSizeBytes(ehSettingsStore.getValue('read_cache_size', '160 MB'));
+}
+
+function parseCacheSizeBytes(value: string): number {
+  const normalized = value.trim().toUpperCase();
+  if (normalized.endsWith('MB')) {
+    const numberPart = normalized.substring(0, normalized.length - 2).trim();
+    const mb = Number.parseInt(numberPart, 10);
+    if (Number.isFinite(mb) && mb > 0) {
+      return mb * 1024 * 1024;
+    }
+  }
+  return DEFAULT_IMAGE_CACHE_BYTES;
+}
+
+function scanImageCacheSize(directories: string[]): CacheClearResult {
+  let files = 0;
+  let bytes = 0;
+  const entries = scanImageCacheFiles(directories);
+  for (let i = 0; i < entries.length; i++) {
+    files++;
+    bytes += entries[i].size;
+  }
+  return { files: files, bytes: bytes };
+}
+
+function pruneImageCache(directories: string[], maxBytes: number, protectedPath: string = ''): CachePruneResult {
   let files: CachedImageFile[] = [];
   let total = 0;
+  let removedFiles = 0;
+  let removedBytes = 0;
+  files = scanImageCacheFiles(directories);
+  for (let i = 0; i < files.length; i++) {
+    total += files[i].size;
+  }
+
+  if (total <= maxBytes) {
+    return { files: 0, bytes: 0, remainingBytes: total };
+  }
+
+  files = files.sort((left: CachedImageFile, right: CachedImageFile) => left.modifiedAt - right.modifiedAt);
+  for (let i = 0; i < files.length && total > maxBytes; i++) {
+    if (protectedPath.length > 0 && files[i].path === protectedPath) {
+      continue;
+    }
+    if (removeFile(files[i].path)) {
+      removedFiles++;
+      removedBytes += files[i].size;
+      total -= files[i].size;
+    }
+  }
+  return { files: removedFiles, bytes: removedBytes, remainingBytes: total };
+}
+
+function scanImageCacheFiles(directories: string[]): CachedImageFile[] {
+  const files: CachedImageFile[] = [];
+  for (let i = 0; i < directories.length; i++) {
+    files.push(...scanImageCacheDirectory(directories[i]));
+  }
+  return files;
+}
+
+function scanImageCacheDirectory(directory: string): CachedImageFile[] {
+  const files: CachedImageFile[] = [];
   try {
     const names = fs.listFileSync(directory);
     for (let i = 0; i < names.length; i++) {
       const path = directory + '/' + names[i];
       try {
         const stat = fs.statSync(path);
+        if (stat.isDirectory()) {
+          continue;
+        }
         files.push({
           path: path,
           size: stat.size,
           modifiedAt: stat.mtime
         });
-        total += stat.size;
       } catch (error) {
       }
     }
   } catch (error) {
-    return;
   }
-
-  if (total <= MAX_IMAGE_CACHE_BYTES) {
-    return;
-  }
-
-  files = files.sort((left: CachedImageFile, right: CachedImageFile) => left.modifiedAt - right.modifiedAt);
-  for (let i = 0; i < files.length && total > MAX_IMAGE_CACHE_BYTES; i++) {
-    removeFileQuietly(files[i].path);
-    total -= files[i].size;
-  }
+  return files;
 }
 
 function exists(path: string): boolean {

@@ -24,7 +24,7 @@ import {
 import { EhUrl } from '../services/EhUrl';
 import { ehUpdateChecker, ReleaseInfo, UpdateCheckResult } from '../services/EhUpdateChecker';
 import { galleryPageCache } from '../services/GalleryPageCache';
-import { CacheClearResult, readerImageCache } from '../services/ReaderImageCache';
+import { CacheClearResult, CachePruneResult, readerImageCache } from '../services/ReaderImageCache';
 import { FilterRule, FILTER_MODE_TITLE, ehFilterStore } from '../services/EhFilterStore';
 import { applyAppChromeImmersiveMode } from '../services/EhWindowImmersive';
 import { applyWindowPrivacyMode } from '../services/EhWindowPrivacy';
@@ -350,11 +350,20 @@ export struct SettingsScene {
         '. Refresh Homepage or run Network diagnostics.' : 'Saved in memory: ' + key + ' = ' + normalizedValue;
       return;
     }
+    let cachePrune: CachePruneResult | null = null;
+    if (key === 'read_cache_size') {
+      cachePrune = readerImageCache.prune(context);
+      this.settingsRenderRevision++;
+    }
     ehSettingsStore.save(context).then(() => {
       this.statusText = isNetworkSettingKey(key) ? 'Saved network setting: ' + key + ' = ' + normalizedValue +
         '. Refresh Homepage or run Network diagnostics.' : 'Saved: ' + key + ' = ' + normalizedValue;
       if (key === 'theme' || key === 'follow_system_dark_mode') {
         this.statusText = 'Theme refreshed';
+      }
+      if (cachePrune !== null && key === 'read_cache_size') {
+        this.statusText = 'Cache limit saved: ' + normalizedValue + '. Cleared oldest cache: ' +
+          downloadSizeText(cachePrune.bytes) + '.';
       }
     }).catch((error: Error) => {
       this.statusText = 'Save failed: ' + error.message;
@@ -1057,6 +1066,7 @@ export struct SettingsScene {
       return;
     }
     const imageResult: CacheClearResult = readerImageCache.clear(context);
+    this.settingsRenderRevision++;
     this.statusText = 'Cleared cache: ' + pageCount.toString() + ' pages, ' +
       imageResult.files.toString() + ' images, ' + downloadSizeText(imageResult.bytes) + '.';
   }

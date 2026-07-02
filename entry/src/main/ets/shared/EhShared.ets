@@ -835,7 +835,7 @@ export function zhText(text: string): string {
     case 'Delete the local app log file': return '删除本地应用日志文件';
     case 'Clear download path cache': return '清除下载路径缓存';
     case 'Refresh cached file path and size lookups': return '刷新缓存的文件路径和大小查询';
-    case 'Clear memory cache': return '清除内存缓存';
+    case 'Clear cache': return '清除缓存';
     case 'Drop reader image and page caches': return '清除阅读器图片和页面缓存';
     case 'Reader cache budget': return '阅读器缓存容量';
     case 'Language override': return '语言覆盖设置';
@@ -1780,6 +1780,14 @@ export function downloadSizeText(size: number): string {
   return Math.round(size / 1024 / 1024).toString() + ' MB';
 }
 
+function currentReaderCacheSizeText(): string {
+  const context = getAbilityContext();
+  if (context === undefined) {
+    return '0 B';
+  }
+  return downloadSizeText(readerImageCache.size(context).bytes);
+}
+
 export function downloadImageUrlForPage(page: GalleryPage): string {
   if (ehSettingsStore.getValue('download_origin_image', 'Off') === 'On' && page.originImageUrl.length > 0) {
     return page.originImageUrl;
@@ -1959,7 +1967,8 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
     const rows: SettingsRowItem[] = [
       staticSettingsRow('dump_logcat', 'Export log', 'Save the local app log to a text file', 'Export', 'action'),
       staticSettingsRow('clear_download_path_cache', 'Clear download path cache', 'Refresh cached file path and size lookups', 'Run', 'action'),
-      staticSettingsRow('clear_memory_cache', 'Clear memory cache', 'Drop reader image and page caches', 'Run', 'action'),
+      staticSettingsRow('clear_memory_cache', 'Clear cache', 'Drop reader image and page caches',
+        currentReaderCacheSizeText(), 'action'),
       optionSettingsRow('read_cache_size', 'Read cache size', 'Reader cache budget', entries, ['40 MB', '80 MB', '160 MB', '320 MB', '640 MB']),
       optionSettingsRow('app_language', 'App language', 'Language override', entries, ['System', 'English', 'zh-CN']),
       optionSettingsRow('proxy', 'Proxy', 'System proxy or direct connection', entries, ['System', 'Off', 'HTTP', 'SOCKS']),
