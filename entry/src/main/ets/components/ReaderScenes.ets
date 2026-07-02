@@ -20,6 +20,7 @@ import {
   readerOrientationFromImageMatch,
   readerOrientationFromSetting,
   readerScreenRotationSetting,
+  restoreAppWindowState,
   setEmbeddedReaderActive
 } from '../services/EhWindowImmersive';
 import { ehSettingsStore } from '../services/EhSettingsStore';
@@ -217,6 +218,7 @@ export struct ReaderScene {
 
   aboutToDisappear(): void {
     if (this.restoreAppChromeOnExit && !isEmbeddedReaderActive()) {
+      this.restoreAppWindowStateForReaderExit();
       this.restoreSystemBarsForReaderExit();
     }
     if (this.restoreAppChromeOnExit && isEmbeddedReaderActive()) {
@@ -224,6 +226,23 @@ export struct ReaderScene {
       return;
     }
     this.cleanupReaderScene();
+  }
+
+  private restoreAppWindowStateForReaderExit(): void {
+    const hostContext = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (hostContext === undefined) {
+      if (this.hostReaderWindow !== undefined) {
+        restoreAppWindowState(this.hostReaderWindow).catch(() => {});
+      }
+      return;
+    }
+    window.getLastWindow(hostContext).then((win: window.Window) => {
+      restoreAppWindowState(win).catch(() => {});
+    }).catch(() => {
+      if (this.hostReaderWindow !== undefined) {
+        restoreAppWindowState(this.hostReaderWindow).catch(() => {});
+      }
+    });
   }
 
   private restoreSystemBarsForReaderExit(): void {
