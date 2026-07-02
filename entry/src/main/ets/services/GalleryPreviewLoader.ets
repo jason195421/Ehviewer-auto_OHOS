@@ -45,11 +45,13 @@ export function mergeGalleryPreviewSets(current: GalleryDetail, loaded: GalleryD
   }
 
   const byIndex: Map<number, GalleryPreview> = new Map();
-  for (let i = 0; i < current.previewSet.length; i++) {
-    byIndex.set(current.previewSet[i].index, current.previewSet[i]);
-  }
   for (let i = 0; i < loaded.previewSet.length; i++) {
     byIndex.set(loaded.previewSet[i].index, loaded.previewSet[i]);
+  }
+  for (let i = 0; i < current.previewSet.length; i++) {
+    if (!byIndex.has(current.previewSet[i].index)) {
+      byIndex.set(current.previewSet[i].index, current.previewSet[i]);
+    }
   }
 
   const merged: GalleryPreview[] = Array.from(byIndex.values());
