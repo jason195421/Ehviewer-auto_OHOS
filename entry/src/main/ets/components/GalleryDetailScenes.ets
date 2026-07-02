@@ -172,10 +172,10 @@ export struct GalleryDetailScene {
   }
 
   private previewJumpTotalPages(): number {
-    if (this.detail.pages > 0) {
-      return this.detail.pages;
+    if (this.detail.previewPages > 0) {
+      return this.detail.previewPages;
     }
-    return Math.max(this.detail.previewPages, this.detail.previewSet.length);
+    return this.detail.previewSet.length > 0 ? 1 : 0;
   }
 
   private openPreviewJumpPanel(): void {

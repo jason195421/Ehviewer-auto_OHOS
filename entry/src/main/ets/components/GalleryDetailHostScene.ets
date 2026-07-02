@@ -40,7 +40,7 @@ import {
   initialDetailForLink,
   loadGalleryDetailModule
 } from '../services/GalleryDetailModule';
-import { DetailPreviewPager, mergeGalleryPreviewSets, seedPreviewMap } from '../services/GalleryPreviewLoader';
+import { DetailPreviewPager, loadGalleryPreviewPage, mergeGalleryPreviewSets, seedPreviewMap } from '../services/GalleryPreviewLoader';
 import { readerImageCache } from '../services/ReaderImageCache';
 import { createReaderSessionState, readerSessionStore } from '../services/ReaderSessionStore';
 import { ehSettingsStore } from '../services/EhSettingsStore';
@@ -299,19 +299,60 @@ export struct GalleryDetailHostScene {
   }
 
   private jumpPreviewPage(pageIndex: number): void {
-    const total = this.detail.pages > 0 ? this.detail.pages : this.detail.previewSet.length;
+    const total = this.detail.previewPages;
     if (total <= 0) {
-      this.detailStatus = 'Read is waiting for preview pages';
+      this.detailStatus = 'Preview pages are unavailable';
       this.renderVersion++;
       return;
     }
     const target = Math.max(0, Math.min(pageIndex, total - 1));
-    const item = findDetailDownloadItem(this.detail.gid);
-    if (item !== null) {
-      this.openDownloadedReaderAt(item, target);
-    } else {
-      this.openRemoteReaderAt(target);
+    if (target === 0 || this.isPreviewPageLoaded(target)) {
+      this.detailStatus = 'Preview page ' + (target + 1).toString() + '/' + total.toString() + ' loaded';
+      this.renderVersion++;
+      return;
     }
+    this.detailStatus = 'Loading preview page ' + (target + 1).toString() + '/' + total.toString() + '...';
+    this.renderVersion++;
+    const referer = this.detailRequestUrl.length > 0 ? this.detailRequestUrl : this.detailLink.referer;
+    loadGalleryPreviewPage({
+      client: this.client,
+      site: this.detailLink.site,
+      referer: referer,
+      pageIndex: target,
+      getDetail: () => this.detail,
+      isCurrent: () => this.detail.gid === this.detailLink.gid,
+      onMerge: (detail: GalleryDetail) => {
+        const merged = mergeGalleryPreviewSets(this.detail, detail, this.previewMap, this.previewPageSize);
+        this.detail = merged.detail;
+        this.previewPageSize = merged.previewPageSize;
+        this.detailStatus = 'Preview page ' + (target + 1).toString() + '/' + total.toString() + ' loaded';
+        this.onDetailLoaded(this.detail);
+        this.renderVersion++;
+      },
+      onError: (message: string) => {
+        this.detailStatus = 'Preview page load failed: ' + message;
+        this.renderVersion++;
+      }
+    }).then((loaded: boolean) => {
+      if (!loaded && this.detailStatus.indexOf('Preview page load failed') !== 0) {
+        this.detailStatus = 'Preview page ' + (target + 1).toString() + '/' + total.toString() + ' unavailable';
+        this.renderVersion++;
+      }
+    }).catch((error: Error) => {
+      this.detailStatus = 'Preview page load failed: ' + error.message;
+      this.renderVersion++;
+    });
+  }
+
+  private isPreviewPageLoaded(pageIndex: number): boolean {
+    if (pageIndex <= 0) {
+      return this.detail.previewSet.length > 0;
+    }
+    if (this.previewPageSize <= 0) {
+      return false;
+    }
+    const firstPreviewIndex = pageIndex * this.previewPageSize;
+    return this.previewMap.has(firstPreviewIndex);
   }
 
   private launchReader(): void {
