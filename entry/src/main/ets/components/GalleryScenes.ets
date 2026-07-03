@@ -1006,7 +1006,12 @@ export struct GalleryListScene {
 
   private visibleRemoteGalleries(galleries: GalleryInfo[]): GalleryInfo[] {
     const cloned = cloneGalleryInfos(galleries);
-    return this.isSearchResultScene ? cloned : applyGalleryFilters(cloned);
+    return this.shouldApplyLocalGalleryFilters() ? applyGalleryFilters(cloned) : cloned;
+  }
+
+  private shouldApplyLocalGalleryFilters(): boolean {
+    return !this.isSearchResultScene && !this.useLocalProvider && this.accountFilterEnabled &&
+      localGalleryFilterRoute(this.sourceRoute);
   }
 
   private loadRoutePage(pageIndex: number, site: GallerySite): Promise<GalleryListLoadResult> {
@@ -3400,4 +3405,8 @@ export struct GalleryListStateView {
     .padding({ left: 24, right: 24, bottom: 48 })
     .backgroundColor(themePageBackground())
   }
+}
+
+function localGalleryFilterRoute(route: GalleryRoute): boolean {
+  return route === GalleryRoute.Home || route === GalleryRoute.Subscription || route === GalleryRoute.WhatsHot;
 }
