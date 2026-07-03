@@ -750,7 +750,6 @@ export function zhText(text: string): string {
     case 'Save settings': return '保存设置';
     case 'Manage watched and hidden tags for the selected site.': return '管理当前站点的订阅和屏蔽标签。';
     case 'Watched tags are used by the subscription page': return '订阅标签会用于订阅页面';
-    case 'Hidden tags are filtered by the account': return '屏蔽标签会由账号过滤';
     case 'Migration': return '迁移状态';
     case 'Open': return '打开';
     case 'Run': return '运行';
@@ -849,7 +848,6 @@ export function zhText(text: string): string {
     case 'Dark mode theme': return '深色模式主题';
     case 'Choose Dark or Black when the system enters dark mode': return '系统进入深色模式时使用暗色或黑色主题';
     case 'Keyword/gallery filtering rules': return '关键字/画廊过滤规则';
-    case 'Blacklist': return '黑名单';
     case 'Hide matching galleries': return '隐藏匹配的画廊';
     case 'Show EH limits': return '显示 EH 限制';
     case 'Display account and image limits in the drawer': return '在抽屉中显示账号和图片限制';
@@ -2034,7 +2032,6 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
           'Original app cycles Light, Dark and Black from drawer/footer and Settings',
         entries, followSystemDarkMode ? ['Dark', 'Black'] : ['Light', 'Dark', 'Black']),
       staticSettingsRow('filter', 'Filter', 'Keyword/gallery filtering rules', 'Open', 'action'),
-      staticSettingsRow('blacklist', 'Blacklist', 'Hide matching galleries from lists (uses same filter rules)', 'Open', 'action'),
       optionSettingsRow('show_eh_limits', 'Show EH limits', 'Display account and image limits in the drawer', entries, ON_OFF_OPTIONS),
       optionSettingsRow('cellular_network_warning', 'Cellular network warning', 'Warn before network-heavy operations on mobile data', entries, ON_OFF_OPTIONS)
     ];
@@ -2375,9 +2372,6 @@ export function settingMigrationMessage(key: string): string {
   }
   if (key === 'filter') {
     return 'Filter rules need the local rule database before they can hide galleries in list scenes.';
-  }
-  if (key === 'blacklist') {
-    return 'Blacklist storage and list filtering are not migrated yet.';
   }
   if (key === 'pattern_protection') {
     return 'Identity authentication uses HarmonyOS biometric, face or PIN verification.';

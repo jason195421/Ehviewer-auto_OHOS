@@ -685,7 +685,7 @@ export struct SettingsScene {
       this.openPanel(SettingsPanel.MyTags);
       return true;
     }
-    if (key === 'filter' || key === 'blacklist') {
+    if (key === 'filter') {
       const context = getAbilityContext();
       if (context !== undefined) {
         ehFilterStore.load(context).then(() => {
