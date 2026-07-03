@@ -7,14 +7,13 @@ import {
 } from '../services/EhMyTagsService';
 import { ehTagTranslationStore, EhTagSuggestion } from '../services/EhTagTranslationStore';
 import { buildSearchSuggestions, SearchSuggestionItem, SearchSuggestionList } from './GallerySearchScenes';
-import { uiStatusText, uiText } from '../shared/EhShared';
+import { uiText } from '../shared/EhShared';
 import {
   themeFieldBackground,
   themeOnPrimaryText,
   themePageBackground,
   themePrimaryColor,
   themePrimaryText,
-  themeSecondaryText,
   themeSurface,
   themeSurfaceVariant,
   themeTertiaryText
@@ -62,6 +61,14 @@ export struct MyTagsPanel {
     this.saveTag(this.hiddenText, MyTagKind.Hidden);
   }
 
+  private deleteWatchedTag(tag: MyTagItem): void {
+    this.deleteTag(tag);
+  }
+
+  private deleteHiddenTag(tag: MyTagItem): void {
+    this.deleteTag(tag);
+  }
+
   private saveTag(text: string, kind: MyTagKind): void {
     const tag = text.trim();
     if (tag.length === 0) {
@@ -82,6 +89,22 @@ export struct MyTagsPanel {
         this.hiddenText = '';
         this.hiddenSuggestions = [];
       }
+      this.statusText = 'My Tags saved';
+    }).catch((error: Error) => {
+      this.statusText = 'My Tags save failed: ' + error.message;
+    }).finally(() => {
+      this.saving = false;
+    });
+  }
+
+  private deleteTag(tag: MyTagItem): void {
+    if (this.saving) {
+      return;
+    }
+    this.saving = true;
+    this.statusText = 'Deleting My Tags...';
+    ehMyTagsService.deleteTag(this.site, this.page, tag).then((page: MyTagsPage) => {
+      this.applyPage(page);
       this.statusText = 'My Tags saved';
     }).catch((error: Error) => {
       this.statusText = 'My Tags save failed: ' + error.message;
@@ -132,7 +155,6 @@ export struct MyTagsPanel {
         Column({ space: 12 }) {
           MyTagsColumn({
             title: 'Subscription',
-            summary: 'Watched tags are used by the subscription page',
             text: this.watchedText,
             placeholder: 'Tag name',
             tags: this.watchedTags,
@@ -147,12 +169,14 @@ export struct MyTagsPanel {
             },
             onSave: () => {
               this.saveWatchedTag();
+            },
+            onDelete: (tag: MyTagItem) => {
+              this.deleteWatchedTag(tag);
             }
           })
 
           MyTagsColumn({
             title: 'Blocked',
-            summary: 'Hidden tags are filtered by the account',
             text: this.hiddenText,
             placeholder: 'Tag name',
             tags: this.hiddenTags,
@@ -167,30 +191,11 @@ export struct MyTagsPanel {
             },
             onSave: () => {
               this.saveHiddenTag();
+            },
+            onDelete: (tag: MyTagItem) => {
+              this.deleteHiddenTag(tag);
             }
           })
-
-          Row() {
-            Button(uiText('Refresh'), { type: ButtonType.Normal, stateEffect: true })
-              .fontSize(13)
-              .fontColor(themeOnPrimaryText())
-              .backgroundColor(themePrimaryColor())
-              .borderRadius(6)
-              .height(36)
-              .enabled(!this.loading && !this.saving)
-              .onClick(() => {
-                this.loadTags();
-              })
-            Text(uiStatusText(this.statusText))
-              .fontSize(12)
-              .fontColor(themeTertiaryText())
-              .maxLines(2)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-              .margin({ left: 10 })
-              .layoutWeight(1)
-          }
-          .width('100%')
-          .alignItems(VerticalAlign.Center)
         }
         .padding({ left: 12, right: 12, top: 12, bottom: 20 })
         .width('100%')
@@ -210,7 +215,6 @@ export struct MyTagsPanel {
 @Component
 struct MyTagsColumn {
   @Prop title: string = '';
-  @Prop summary: string = '';
   @Prop text: string = '';
   @Prop placeholder: string = '';
   @Prop tags: MyTagItem[] = [];
@@ -219,21 +223,30 @@ struct MyTagsColumn {
   onTextChange: (value: string) => void = (_value: string) => {};
   onSuggestionSelect: (value: string) => void = (_value: string) => {};
   onSave: () => void = () => {};
+  onDelete: (tag: MyTagItem) => void = (_tag: MyTagItem) => {};
 
   build() {
     Column({ space: 10 }) {
-      Text(uiText(this.title))
-        .fontSize(16)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(themePrimaryText())
+      Row() {
+        Text(uiText(this.title))
+          .fontSize(17)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(themePrimaryText())
+          .layoutWeight(1)
+        Button(uiText('Save'), { type: ButtonType.Normal, stateEffect: true })
+          .fontSize(13)
+          .fontColor(themeOnPrimaryText())
+          .backgroundColor(themePrimaryColor())
+          .borderRadius(14)
+          .height(28)
+          .padding({ left: 12, right: 12 })
+          .enabled(!this.loading && this.text.trim().length > 0)
+          .onClick(() => {
+            this.onSave();
+          })
+      }
         .width('100%')
-      Text(uiText(this.summary))
-        .fontSize(12)
-        .fontColor(themeSecondaryText())
-        .lineHeight(18)
-        .maxLines(2)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .width('100%')
+        .alignItems(VerticalAlign.Center)
 
       Column({ space: 8 }) {
         TextInput({ text: this.text, placeholder: uiText(this.placeholder) })
@@ -258,17 +271,6 @@ struct MyTagsColumn {
           .width('100%')
           .height(this.suggestionListHeight())
         }
-        Button(uiText('Save'), { type: ButtonType.Normal, stateEffect: true })
-          .fontSize(13)
-          .fontColor(themeOnPrimaryText())
-          .backgroundColor(themePrimaryColor())
-          .borderRadius(6)
-          .height(36)
-          .width('100%')
-          .enabled(!this.loading && this.text.trim().length > 0)
-          .onClick(() => {
-            this.onSave();
-          })
       }
       .width('100%')
 
@@ -281,9 +283,18 @@ struct MyTagsColumn {
           .backgroundColor(themeSurfaceVariant())
           .borderRadius(6)
       } else {
-        ForEach(this.tags, (tag: MyTagItem) => {
-          MyTagRow({ tag: tag })
-        }, (tag: MyTagItem) => tag.id.toString())
+        Flex({ wrap: FlexWrap.Wrap }) {
+          ForEach(this.tags, (tag: MyTagItem) => {
+            MyTagRow({
+              tag: tag,
+              onDelete: (item: MyTagItem) => {
+                this.onDelete(item);
+              }
+            })
+              .margin({ right: 6, bottom: 6 })
+          }, (tag: MyTagItem) => tag.id.toString())
+        }
+        .width('100%')
       }
     }
     .padding(12)
@@ -306,25 +317,30 @@ struct MyTagsColumn {
 @Component
 struct MyTagRow {
   @Prop tag: MyTagItem = { id: 0, tag: '', watched: false, hidden: false, color: '', weight: '10' };
+  onDelete: (tag: MyTagItem) => void = (_tag: MyTagItem) => {};
 
   build() {
-    Row() {
-      Text(this.tag.tag)
-        .fontSize(13)
-        .fontColor(themePrimaryText())
-        .maxLines(2)
+    Row({ space: 4 }) {
+      Text(myTagChipLabel(this.tag.tag))
+        .fontSize(14)
+        .fontColor(themeOnPrimaryText())
+        .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .layoutWeight(1)
-      Text('#' + this.tag.id.toString())
-        .fontSize(11)
-        .fontColor(themeTertiaryText())
-        .margin({ left: 6 })
+        .constraintSize({ maxWidth: 180 })
+
+      SymbolGlyph($r('sys.symbol.xmark'))
+        .fontSize(14)
+        .fontColor([themeOnPrimaryText()])
+        .width(18)
+        .height(18)
+        .onClick(() => {
+          this.onDelete(this.tag);
+        })
     }
-    .width('100%')
-    .height(44)
-    .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-    .backgroundColor(themeSurfaceVariant())
-    .borderRadius(6)
+    .height(28)
+    .padding({ left: 9, right: 6 })
+    .backgroundColor(themePrimaryColor())
+    .borderRadius(14)
   }
 }
 
@@ -356,6 +372,11 @@ function cloneSuggestions(suggestions: SearchSuggestionItem[]): SearchSuggestion
     });
   }
   return result;
+}
+
+function myTagChipLabel(tag: string): string {
+  const colon = tag.indexOf(':');
+  return colon >= 0 && colon < tag.length - 1 ? tag.substring(colon + 1).trim() : tag;
 }
 
 function buildMyTagSuggestions(text: string, limit: number): SearchSuggestionItem[] {

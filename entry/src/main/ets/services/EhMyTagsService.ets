@@ -130,6 +130,26 @@ export class EhMyTagsService {
     return this.addTag(site, currentPage, normalizedTag, kind);
   }
 
+  async deleteTag(site: GallerySite, page: MyTagsPage | null, item: MyTagItem): Promise<MyTagsPage> {
+    const currentPage = page === null ? await this.load(site) : page;
+    const fields: FormField[] = [
+      { key: 'usertag_action', value: 'mass' },
+      { key: 'tagname_new', value: '' },
+      { key: 'tagcolor_new', value: '' },
+      { key: 'tagweight_new', value: item.weight.length > 0 ? item.weight : '10' },
+      { key: 'modify_usertags[]', value: item.id.toString() },
+      { key: 'usertag_target', value: '0' }
+    ];
+    const response = await this.client.postForm(currentPage.url, buildFormBody(fields), currentPage.url,
+      originFromUrl(currentPage.url, site));
+    logMyTagsResponse('deleteTag', currentPage.site, currentPage.url, response);
+    this.ensureOk(response, 'Delete My Tags failed');
+    const nextPage = parseMyTagsPage(response.body, currentPage.url, currentPage.site);
+    logMyTagsParse('deleteTag', nextPage);
+    this.ensureMyTagsPage(nextPage, response.body);
+    return nextPage;
+  }
+
   private async setExistingTagKind(site: GallerySite, page: MyTagsPage, item: MyTagItem,
     kind: MyTagKind): Promise<void> {
     if (page.apiUrl.length === 0 || page.apiUid <= 0 || page.apiKey.length === 0) {
