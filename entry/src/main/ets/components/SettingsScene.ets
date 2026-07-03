@@ -37,7 +37,7 @@ import { EhUrl } from '../services/EhUrl';
 import { ehUpdateChecker, ReleaseInfo, UpdateCheckResult } from '../services/EhUpdateChecker';
 import { galleryPageCache } from '../services/GalleryPageCache';
 import { CacheClearResult, CachePruneResult, readerImageCache } from '../services/ReaderImageCache';
-import { FilterRule, FILTER_MODE_TITLE, ehFilterStore } from '../services/EhFilterStore';
+import { FilterRule, FILTER_MODE_RATING, FILTER_MODE_TITLE, ehFilterStore } from '../services/EhFilterStore';
 import { applyAppChromeImmersiveMode } from '../services/EhWindowImmersive';
 import { applyWindowPrivacyMode } from '../services/EhWindowPrivacy';
 import { ehAppLog } from '../services/EhAppLog';
@@ -1342,6 +1342,23 @@ export struct SettingsScene {
     this.saveFilterRules();
   }
 
+  private setRatingFilterRule(level: number): void {
+    const rules = ehFilterStore.getRules();
+    for (let i = 0; i < rules.length; i++) {
+      if (rules[i].mode === FILTER_MODE_RATING) {
+        ehFilterStore.removeRule(rules[i].id);
+      }
+    }
+    if (level > 1) {
+      ehFilterStore.addRule(FILTER_MODE_RATING, level.toString());
+      this.statusText = 'Filter rule added: ' + level.toString();
+    } else {
+      this.statusText = 'Filter rule removed';
+    }
+    this.filterRules = ehFilterStore.getRules();
+    this.saveFilterRules();
+  }
+
   private saveFilterRules(): void {
     const context = getAbilityContext();
     if (context !== undefined) {
@@ -1411,6 +1428,9 @@ export struct SettingsScene {
           },
           onAdd: () => {
             this.addFilterRule();
+          },
+          onRatingSelect: (level: number) => {
+            this.setRatingFilterRule(level);
           },
           onRemove: (id: number) => {
             this.removeFilterRule(id);
