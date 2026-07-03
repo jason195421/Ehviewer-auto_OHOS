@@ -46,9 +46,9 @@
 请在 [GitHub Releases](https://github.com/suibianqwe/Ehviewer_OHOS/releases) 中下载最新的 `.hap` 安装包。  
 推荐使用 [小白调试助手](https://github.com/likuai2010/auto-installer) 安装。
 
-当前版本：`0.4.2`
+当前版本：`0.4.3`
 
-最新安装包：[`EhViewer_OHOS_0.4.2.hap`](https://github.com/suibianqwe/Ehviewer_OHOS/releases/download/v0.4.2/EhViewer_OHOS_0.4.2.hap)
+最新安装包：[`EhViewer_OHOS_0.4.3.hap`](https://github.com/suibianqwe/Ehviewer_OHOS/releases/download/v0.4.3/EhViewer_OHOS_0.4.3.hap)
 发布包类型：未签名 HAP  
 目标API：`6.1.1(24)`  
 兼容API：`6.1.0.31(23)`  
@@ -62,6 +62,15 @@
 - 阅读：支持内嵌/独立阅读器、连续阅读、缩放、方向适配、进度控制和本地下载优先读取。
 - 下载：支持任务暂停/继续/删除、多线程下载、本地阅读、恢复本地下载和导出压缩包。
 - 设置：支持主题、语言、启动页、过滤规则、代理/Hosts/域名前置、隐私防护和身份验证。
+
+## 0.4.3 重点变化
+
+- 重建 My Tags 原生管理页，支持订阅与屏蔽标签管理、标签联想、分类筛选和原网页入口。
+- 本地过滤仅作用于主页、订阅和热门页，页面过滤按钮关闭时同步关闭本地过滤。
+- 导入数据支持识别并导入原安卓应用导出的数据库。
+- 设置页新增历史记录数量上限，按原应用档位限制保存历史记录。
+- 完善缓存清理、缓存上限和清理冗余相关设置。
+- 简化关于页信息，并补充项目许可证链接。
 
 ## 0.4.2 重点变化
 
