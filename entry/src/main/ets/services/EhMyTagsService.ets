@@ -72,6 +72,7 @@ export class EhMyTagsService {
     logMyTagsResponse('load', site, url, response);
     this.ensureOk(response, 'Load My Tags failed');
     const page = parseMyTagsPage(response.body, url, site);
+    logMyTagsParse('load', page);
     this.ensureMyTagsPage(page, response.body);
     return page;
   }
@@ -110,6 +111,7 @@ export class EhMyTagsService {
     logMyTagsResponse('saveTagset', currentPage.site, currentPage.url, response);
     this.ensureOk(response, 'Save My Tags settings failed');
     const nextPage = parseMyTagsPage(response.body, currentPage.url, currentPage.site);
+    logMyTagsParse('saveTagset', nextPage);
     this.ensureMyTagsPage(nextPage, response.body);
     return nextPage;
   }
@@ -166,6 +168,7 @@ export class EhMyTagsService {
     logMyTagsResponse('addTag', page.site, url, response);
     this.ensureOk(response, 'Save My Tags failed');
     const nextPage = parseMyTagsPage(response.body, url, page.site);
+    logMyTagsParse('addTag', nextPage);
     this.ensureMyTagsPage(nextPage, response.body);
     return nextPage;
   }
@@ -294,7 +297,7 @@ function parseUserTags(html: string): MyTagItem[] {
     if (id <= 0 || Number.isNaN(id)) {
       continue;
     }
-    const tag = decodeHtml(matchAttribute(block, 'title'));
+    const tag = decodeHtml(matchTagPreviewTitle(block, id));
     if (tag.length === 0) {
       continue;
     }
@@ -365,6 +368,18 @@ function matchTagsetColor(html: string): string {
 function matchAttribute(block: string, name: string): string {
   const re = new RegExp(name + '="([^"]*)"', 'i');
   const matched = re.exec(block);
+  return matched === null ? '' : matched[1];
+}
+
+function matchTagPreviewTitle(block: string, id: number): string {
+  const idText = id.toString();
+  let re = new RegExp('id="tagpreview_' + escapeRegExp(idText) + '"[^>]*title="([^"]*)"', 'i');
+  let matched = re.exec(block);
+  if (matched !== null) {
+    return matched[1];
+  }
+  re = new RegExp('title="([^"]*)"[^>]*id="tagpreview_' + escapeRegExp(idText) + '"', 'i');
+  matched = re.exec(block);
   return matched === null ? '' : matched[1];
 }
 
@@ -482,6 +497,18 @@ function logMyTagsResponse(phase: string, site: GallerySite, url: string, respon
     ' cookieHasIgneous=' + boolText(cookie.hasIgneous) +
     ' cookieHasNw=' + boolText(cookie.hasContentWarning) +
     ' cookieHasUConfig=' + boolText(cookie.hasUConfig));
+}
+
+function logMyTagsParse(phase: string, page: MyTagsPage): void {
+  const first = page.all.length > 0 ? page.all[0].tag : '';
+  console.info('[MyTags] parse phase=' + phase +
+    ' site=' + siteName(page.site) +
+    ' tagset="' + page.tagsetName + '"' +
+    ' tagsets=' + page.tagsets.length.toString() +
+    ' all=' + page.all.length.toString() +
+    ' watched=' + page.watched.length.toString() +
+    ' hidden=' + page.hidden.length.toString() +
+    ' first="' + first + '"');
 }
 
 function siteName(site: GallerySite): string {
