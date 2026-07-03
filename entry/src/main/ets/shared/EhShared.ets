@@ -451,8 +451,19 @@ export function uiStatusText(text: string): string {
   if (text === 'Import failed: not a valid EhViewer backup file') {
     return '导入失败：不是有效的 EhViewer 备份文件';
   }
+  if (text === 'Importing Android data...') {
+    return '正在导入 Android 数据...';
+  }
   if (text === 'Import complete') {
     return '导入完成';
+  }
+  if (text.indexOf('Import complete: Android data ') === 0) {
+    return 'Android 数据导入完成：' + text.substring('Import complete: Android data '.length)
+      .replace('history ', '历史 ')
+      .replace('downloads ', '下载 ')
+      .replace('labels ', '标签 ')
+      .replace('filters ', '过滤 ')
+      .replace('searches ', '搜索 ');
   }
   if (text.indexOf('Import save failed: ') === 0) {
     return '导入保存失败：' + text.substring('Import save failed: '.length);
@@ -960,7 +971,7 @@ export function zhText(text: string): string {
     case 'Export data': return '导出数据';
     case 'Save settings, history, downloads and filter rules to a JSON file': return '将设置、历史记录、下载和过滤规则保存为 JSON 文件';
     case 'Import data': return '导入数据';
-    case 'Restore from a previously exported JSON backup': return '从之前导出的 JSON 备份恢复';
+    case 'Restore from a JSON backup or Android exported database': return '从 JSON 备份或原安卓导出数据库恢复';
     case 'Wi-Fi server/client': return 'Wi-Fi 服务器/客户端';
     case 'Original Wi-Fi transfer tools': return '原应用 Wi-Fi 传输工具';
     case 'Declaration': return '声明';
@@ -2118,7 +2129,7 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
     rows.push(optionSettingsRow('domain_fronting', 'Domain fronting', 'Bypass SNI blocking using built-in host fronting', entries, ON_OFF_OPTIONS));
     rows.push(optionSettingsRow('auto_direct_connection', 'Direct connection check', 'Use direct connection when the selected site responds within 3s', entries, ON_OFF_OPTIONS));
     rows.push(staticSettingsRow('export_data', 'Export data', 'Save settings, history, downloads and filter rules to a JSON file', 'Export', 'action'));
-    rows.push(staticSettingsRow('import_data', 'Import data', 'Restore from a previously exported JSON backup', 'Import', 'action'));
+    rows.push(staticSettingsRow('import_data', 'Import data', 'Restore from a JSON backup or Android exported database', 'Import', 'action'));
     rows.push(staticSettingsRow('wifi_transfer', 'Wi-Fi server/client', 'Original Wi-Fi transfer tools', 'Not migrated', 'activity'));
     return rows;
   }

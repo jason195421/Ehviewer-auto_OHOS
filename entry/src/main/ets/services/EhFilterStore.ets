@@ -32,7 +32,7 @@ export class EhFilterStore {
     return cloneRules(this.rules);
   }
 
-  addRule(mode: number, text: string): boolean {
+  addRule(mode: number, text: string, enabled: boolean = true): boolean {
     const normalized = text.trim();
     if (normalized.length === 0) {
       return false;
@@ -46,7 +46,7 @@ export class EhFilterStore {
       id: this.nextId++,
       mode: mode,
       text: normalized,
-      enabled: true
+      enabled: enabled
     });
     return true;
   }

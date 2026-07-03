@@ -30,6 +30,11 @@ import { applyAppChromeImmersiveMode } from '../services/EhWindowImmersive';
 import { applyWindowPrivacyMode } from '../services/EhWindowPrivacy';
 import { ehAppLog } from '../services/EhAppLog';
 import {
+  AndroidDataImportSummary,
+  importAndroidDatabaseBackup,
+  isAndroidDatabaseBackup
+} from '../services/AndroidDataImporter';
+import {
   EH_APP_VERSION_CODE,
   EH_APP_VERSION_NAME,
   EH_AUTHOR_NAME,
@@ -896,8 +901,21 @@ export struct SettingsScene {
         const buf = new ArrayBuffer(stat.size);
         fs.readSync(file.fd, buf);
         fs.closeSync(file.fd);
+        const bytes = new Uint8Array(buf);
+        if (isAndroidDatabaseBackup(bytes)) {
+          this.showFloatingStatus('Importing Android data...');
+          importAndroidDatabaseBackup(context, bytes).then((summary: AndroidDataImportSummary) => {
+            this.filterRules = ehFilterStore.getRules();
+            this.showFloatingStatus('Import complete: Android data (history ' + summary.history +
+              ', downloads ' + summary.downloads + ', labels ' + summary.labels + ', filters ' +
+              summary.filters + ', searches ' + summary.searches + ')');
+          }).catch((error: Error) => {
+            this.showFloatingStatus('Import failed: Android data ' + error.message);
+          });
+          return;
+        }
         const decoder = util.TextDecoder.create('utf-8');
-        const json = decoder.decodeToString(new Uint8Array(buf));
+        const json = decoder.decodeToString(bytes);
         const bundle = JSON.parse(json) as EhBackupBundle;
 
         if (typeof bundle.version !== 'number') {
@@ -973,7 +991,7 @@ export struct SettingsScene {
           for (let i = 0; i < bundle.downloadItems.length; i++) {
             const dl = bundle.downloadItems[i] as DownloadInfo;
             if (typeof dl.gid === 'number' && dl.gid > 0 && typeof dl.token === 'string') {
-              ehDownloadStore.addGallery(dl as GalleryInfo, typeof dl.label === 'string' ? dl.label : '');
+              ehDownloadStore.importDownload(dl);
               downloadsChanged = true;
             }
           }
@@ -986,7 +1004,7 @@ export struct SettingsScene {
           for (let i = 0; i < bundle.filterRules.length; i++) {
             const r = bundle.filterRules[i] as FilterRule;
             if (typeof r.text === 'string' && typeof r.mode === 'number') {
-              ehFilterStore.addRule(r.mode, r.text);
+              ehFilterStore.addRule(r.mode, r.text, typeof r.enabled === 'boolean' ? r.enabled : true);
             }
           }
           saves.push(ehFilterStore.save(context));

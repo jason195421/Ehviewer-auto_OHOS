@@ -141,6 +141,21 @@ export class EhDownloadStore {
     return cloneDownloadInfo(item);
   }
 
+  importDownload(item: DownloadInfo): boolean {
+    const normalized = storedToDownloadInfo(item as StoredDownloadInfo);
+    if (normalized.gid <= 0 || normalized.token.length === 0) {
+      return false;
+    }
+    const index = this.findIndex(normalized.gid);
+    if (index >= 0) {
+      this.items[index] = normalized;
+    } else {
+      this.items.unshift(normalized);
+    }
+    this.notifyChanged();
+    return true;
+  }
+
   removeGallery(gid: number): void {
     const next: DownloadInfo[] = [];
     for (let i = 0; i < this.items.length; i++) {
