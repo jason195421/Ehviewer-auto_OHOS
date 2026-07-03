@@ -14,7 +14,14 @@ import {
 } from '../services/EhDownloadFileStore';
 import { DownloadInfo, DownloadLabel, DownloadState, ehDownloadStore } from '../services/EhDownloadStore';
 import { ehHistoryStore } from '../services/EhHistoryStore';
-import { ehSettingsStore, SettingEntry, defaultSettingEntries } from '../services/EhSettingsStore';
+import {
+  HISTORY_INFO_SIZE_KEY,
+  ehSettingsStore,
+  historyInfoSizeLimitFromValue,
+  normalizeHistoryInfoSizeOption,
+  SettingEntry,
+  defaultSettingEntries
+} from '../services/EhSettingsStore';
 import { EhHttpClient, NetworkDiagnosticResult } from '../services/EhHttpClient';
 import {
   isEhDirectConnectionProbeEnabled,
@@ -360,6 +367,9 @@ export struct SettingsScene {
     }
     const context = getAbilityContext();
     if (context === undefined) {
+      if (key === HISTORY_INFO_SIZE_KEY) {
+        ehHistoryStore.trim(historyInfoSizeLimitFromValue(normalizedValue));
+      }
       this.statusText = isNetworkSettingKey(key) ? 'Saved network setting in memory: ' + key + ' = ' + normalizedValue +
         '. Refresh Homepage or run Network diagnostics.' : 'Saved in memory: ' + key + ' = ' + normalizedValue;
       return;
@@ -368,6 +378,12 @@ export struct SettingsScene {
     if (key === 'read_cache_size') {
       cachePrune = readerImageCache.prune(context);
       this.settingsRenderRevision++;
+    }
+    if (key === HISTORY_INFO_SIZE_KEY) {
+      ehHistoryStore.ensureLoaded(context).then(() => {
+        ehHistoryStore.trim(historyInfoSizeLimitFromValue(normalizedValue));
+        ehHistoryStore.save(context).catch(() => {});
+      }).catch(() => {});
     }
     ehSettingsStore.save(context).then(() => {
       this.statusText = isNetworkSettingKey(key) ? 'Saved network setting: ' + key + ' = ' + normalizedValue +
@@ -400,6 +416,9 @@ export struct SettingsScene {
     }
     if (key === 'read_cache_size') {
       return normalizeReaderCacheSizeOption(value);
+    }
+    if (key === HISTORY_INFO_SIZE_KEY) {
+      return normalizeHistoryInfoSizeOption(value);
     }
     if (key === 'theme' && ehSettingsStore.getValue('follow_system_dark_mode', 'Off') === 'On') {
       return value === 'Black' ? 'Black' : 'Dark';
@@ -970,8 +989,9 @@ export struct SettingsScene {
         }
 
         if (Array.isArray(bundle.history)) {
+          const historyLimit = historyInfoSizeLimitFromValue(ehSettingsStore.getValue(HISTORY_INFO_SIZE_KEY, '100'));
           for (let i = 0; i < bundle.history.length; i++) {
-            ehHistoryStore.addGallery(bundle.history[i] as GalleryInfo);
+            ehHistoryStore.addGallery(bundle.history[i] as GalleryInfo, historyLimit);
           }
           saves.push(ehHistoryStore.save(context));
         }
@@ -1028,6 +1048,9 @@ export struct SettingsScene {
   private normalizedImportedSettingValue(key: string, value: string): string {
     if (key === 'read_cache_size') {
       return normalizeReaderCacheSizeOption(value);
+    }
+    if (key === HISTORY_INFO_SIZE_KEY) {
+      return normalizeHistoryInfoSizeOption(value);
     }
     if (key === 'pattern_protection') {
       return normalizeIdentityAuthenticationOption(value);

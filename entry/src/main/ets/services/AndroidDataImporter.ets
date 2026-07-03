@@ -5,6 +5,7 @@ import { GalleryCategory, GalleryInfo } from '../model/GalleryModels';
 import { DownloadInfo, DownloadState, ehDownloadStore } from './EhDownloadStore';
 import { ehFilterStore } from './EhFilterStore';
 import { ehHistoryStore } from './EhHistoryStore';
+import { HISTORY_INFO_SIZE_KEY, ehSettingsStore, historyInfoSizeLimitFromValue } from './EhSettingsStore';
 import { ehSearchHistoryStore } from './EhSearchHistoryStore';
 
 const SQLITE_HEADER: string = 'SQLite format 3';
@@ -52,6 +53,7 @@ export async function importAndroidDatabaseBackup(context: common.UIAbilityConte
     await ehHistoryStore.load(context);
     await ehDownloadStore.load(context);
     await ehFilterStore.load(context);
+    await ehSettingsStore.load(context);
     await ehSearchHistoryStore.load(context);
 
     const summary: AndroidDataImportSummary = {
@@ -86,10 +88,11 @@ async function importHistory(store: relationalStore.RdbStore): Promise<number> {
     return 0;
   }
   let count = 0;
+  const historyLimit = historyInfoSizeLimitFromValue(ehSettingsStore.getValue(HISTORY_INFO_SIZE_KEY, '100'));
   await queryEach(store, 'SELECT * FROM "HISTORY" ORDER BY "TIME" ASC', (row: relationalStore.ResultSet) => {
     const gallery = readGalleryInfo(row);
     if (gallery.gid > 0 && gallery.token.length > 0) {
-      ehHistoryStore.addGallery(gallery);
+      ehHistoryStore.addGallery(gallery, historyLimit);
       count++;
     }
   });

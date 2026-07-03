@@ -5,7 +5,14 @@ import { GalleryCategory, GalleryComment, GalleryDetail, GalleryInfo, GalleryPag
 import { ehDownloadFileStore } from '../services/EhDownloadFileStore';
 import { DownloadInfo, DownloadLabel, DownloadState, ehDownloadStore } from '../services/EhDownloadStore';
 import { ehHistoryStore } from '../services/EhHistoryStore';
-import { ehSettingsStore, SettingEntry } from '../services/EhSettingsStore';
+import {
+  HISTORY_INFO_SIZE_KEY,
+  ehSettingsStore,
+  historyInfoSizeLimitFromValue,
+  historyInfoSizeOptions,
+  normalizeHistoryInfoSizeOption,
+  SettingEntry
+} from '../services/EhSettingsStore';
 import { GalleryListLoadResult, NetworkDiagnosticResult } from '../services/EhHttpClient';
 import { EhUrl, ListMode } from '../services/EhUrl';
 import { readerImageCache } from '../services/ReaderImageCache';
@@ -680,6 +687,7 @@ export function zhText(text: string): string {
     case 'Saved to album': return '已保存到相册';
     case 'Save failed': return '保存失败';
     case 'Export': return '导出';
+    case 'Import': return '导入';
     case 'Rate': return '评分';
     case 'Cancel': return '取消';
     case 'Delete history': return '删除历史';
@@ -1521,22 +1529,24 @@ export function getAbilityContext(): common.UIAbilityContext | undefined {
 }
 
 export function saveGalleryToHistory(gallery: GalleryInfo): void {
+  const limit = currentHistoryInfoSizeLimit();
   const context = getAbilityContext();
   if (context === undefined) {
-    ehHistoryStore.addGallery(gallery);
+    ehHistoryStore.addGallery(gallery, limit);
     return;
   }
   ehHistoryStore.ensureLoaded(context).then(() => {
-    ehHistoryStore.addGallery(gallery);
+    ehHistoryStore.addGallery(gallery, limit);
     ehHistoryStore.save(context).catch(() => {});
   }).catch(() => {});
 }
 
 export function saveGalleryReadPosition(gid: number, pageIndex: number, gallery?: GalleryInfo): void {
+  const limit = currentHistoryInfoSizeLimit();
   const context = getAbilityContext();
   if (context === undefined) {
     if (gallery !== undefined) {
-      ehHistoryStore.addGallery(gallery);
+      ehHistoryStore.addGallery(gallery, limit);
     }
     ehHistoryStore.setReadPage(gid, pageIndex);
     notifyHistoryReadChanged();
@@ -1544,12 +1554,16 @@ export function saveGalleryReadPosition(gid: number, pageIndex: number, gallery?
   }
   ehHistoryStore.ensureLoaded(context).then(() => {
     if (gallery !== undefined) {
-      ehHistoryStore.addGallery(gallery);
+      ehHistoryStore.addGallery(gallery, limit);
     }
     ehHistoryStore.setReadPage(gid, pageIndex);
     notifyHistoryReadChanged();
     ehHistoryStore.save(context).catch(() => {});
   }).catch(() => {});
+}
+
+export function currentHistoryInfoSizeLimit(): number {
+  return historyInfoSizeLimitFromValue(ehSettingsStore.getValue(HISTORY_INFO_SIZE_KEY, '100'));
 }
 
 export function readerStartIndex(detail: GalleryDetail): number {
@@ -2033,6 +2047,8 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
       optionSettingsRow('list_mode', 'List mode', 'Gallery list style from original Android preferences', entries, ['Detail', 'Thumb', 'Extended']),
       optionSettingsRow('detail_size', 'Detail size', 'Gallery detail image and metadata density', entries, ['Default', 'Compact', 'Large']),
       optionSettingsRow('thumb_size', 'Thumb size', 'Thumbnail size used in gallery rows', entries, ['Small', 'Large', 'XLarge']),
+      optionSettingsRow(HISTORY_INFO_SIZE_KEY, 'History size', 'Maximum stored gallery history records',
+        entries, historyInfoSizeOptions()),
       optionSettingsRow('show_jpn_title', 'Show Japanese title', 'Prefer original title when available', entries, ON_OFF_OPTIONS),
       optionSettingsRow('show_gallery_pages', 'Show gallery pages', 'Display page count in gallery list rows', entries, ON_OFF_OPTIONS),
       optionSettingsRow('show_tag_translations', 'Show tag translations', 'Use translated tag labels when data is available', entries, ON_OFF_OPTIONS),
@@ -2286,6 +2302,9 @@ function normalizeReaderSettingOption(key: string, value: string): string {
   }
   if (key === 'read_cache_size') {
     return normalizeReaderCacheSizeOption(value);
+  }
+  if (key === HISTORY_INFO_SIZE_KEY) {
+    return normalizeHistoryInfoSizeOption(value);
   }
   return value;
 }

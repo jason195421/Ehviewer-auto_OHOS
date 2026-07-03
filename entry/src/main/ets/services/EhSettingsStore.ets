@@ -3,6 +3,9 @@ import { preferences } from '@kit.ArkData';
 
 const PREFERENCES_NAME: string = 'ehviewer_settings';
 const VALUES_KEY: string = 'values';
+export const HISTORY_INFO_SIZE_KEY: string = 'history_info_size';
+export const DEFAULT_HISTORY_INFO_SIZE: string = '100';
+const HISTORY_INFO_SIZE_OPTIONS: string[] = ['100', '500', '1000', '5000', '10000', '20000'];
 
 export interface SettingEntry {
   key: string;
@@ -24,6 +27,7 @@ export function defaultSettingEntries(): SettingEntry[] {
     { key: 'list_mode', value: 'Detail' },
     { key: 'detail_size', value: 'Default' },
     { key: 'thumb_size', value: 'Medium' },
+    { key: HISTORY_INFO_SIZE_KEY, value: DEFAULT_HISTORY_INFO_SIZE },
     { key: 'show_jpn_title', value: 'Off' },
     { key: 'show_gallery_pages', value: 'Off' },
     { key: 'show_tag_translations', value: 'On' },
@@ -166,6 +170,37 @@ export class EhSettingsStore {
       throw new Error(String(error));
     }
   }
+}
+
+export function historyInfoSizeOptions(): string[] {
+  return HISTORY_INFO_SIZE_OPTIONS.slice();
+}
+
+export function normalizeHistoryInfoSizeOption(value: string): string {
+  const size = Number.parseInt(value);
+  if (Number.isNaN(size)) {
+    return DEFAULT_HISTORY_INFO_SIZE;
+  }
+  if (size <= 100) {
+    return '100';
+  }
+  if (size <= 500) {
+    return '500';
+  }
+  if (size <= 1000) {
+    return '1000';
+  }
+  if (size <= 5000) {
+    return '5000';
+  }
+  if (size <= 10000) {
+    return '10000';
+  }
+  return '20000';
+}
+
+export function historyInfoSizeLimitFromValue(value: string): number {
+  return Number.parseInt(normalizeHistoryInfoSizeOption(value));
 }
 
 function cloneEntries(entries: SettingEntry[]): SettingEntry[] {

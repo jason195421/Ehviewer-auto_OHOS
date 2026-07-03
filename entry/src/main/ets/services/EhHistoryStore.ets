@@ -11,7 +11,8 @@ const READ_POSITIONS_KEY: string = 'read_positions';
 const READ_POSITIONS_BACKUP_KEY: string = 'read_positions_backup';
 const FILE_NAME: string = 'ehviewer_history.json';
 const FILE_BACKUP_NAME: string = 'ehviewer_history.backup.json';
-const HISTORY_MAX_SIZE: number = 1000;
+const HISTORY_DEFAULT_MAX_SIZE: number = 100;
+const HISTORY_ABSOLUTE_MAX_SIZE: number = 20000;
 
 interface StoredGalleryInfo {
   galleryUrl?: string;
@@ -83,13 +84,13 @@ export class EhHistoryStore {
     return cloneGalleryInfos(this.items);
   }
 
-  addGallery(gallery: GalleryInfo, maxSize: number = HISTORY_MAX_SIZE): void {
+  addGallery(gallery: GalleryInfo, maxSize: number = HISTORY_DEFAULT_MAX_SIZE): void {
     if (gallery.gid <= 0 || gallery.token.length === 0) {
       return;
     }
 
     const next: GalleryInfo[] = [cloneGalleryInfo(gallery)];
-    const limit = Math.min(HISTORY_MAX_SIZE, Math.max(1, maxSize));
+    const limit = Math.min(HISTORY_ABSOLUTE_MAX_SIZE, Math.max(1, maxSize));
     for (let i = 0; i < this.items.length; i++) {
       if (this.items[i].gid !== gallery.gid) {
         next.push(cloneGalleryInfo(this.items[i]));
@@ -100,6 +101,15 @@ export class EhHistoryStore {
     }
     this.items = next;
     this.queueSave();
+  }
+
+  trim(maxSize: number = HISTORY_DEFAULT_MAX_SIZE): void {
+    const limit = Math.min(HISTORY_ABSOLUTE_MAX_SIZE, Math.max(1, maxSize));
+    if (this.items.length > limit) {
+      this.items.splice(limit);
+      this.pruneReadPositions();
+      this.queueSave();
+    }
   }
 
   removeGallery(gid: number): void {
@@ -253,7 +263,7 @@ export class EhHistoryStore {
 
   private serializeStoredItems(): StoredGalleryInfo[] {
     const stored: StoredGalleryInfo[] = [];
-    const count = Math.min(this.items.length, HISTORY_MAX_SIZE);
+    const count = Math.min(this.items.length, HISTORY_ABSOLUTE_MAX_SIZE);
     for (let i = 0; i < count; i++) {
       stored.push(galleryInfoToStored(this.items[i]));
     }
@@ -334,6 +344,20 @@ export class EhHistoryStore {
     const next: ReadPosition[] = [];
     for (let i = 0; i < this.readPositions.length; i++) {
       if (this.readPositions[i].gid !== gid) {
+        next.push(this.readPositions[i]);
+      }
+    }
+    this.readPositions = next;
+  }
+
+  private pruneReadPositions(): void {
+    const gids: number[] = [];
+    for (let i = 0; i < this.items.length; i++) {
+      gids.push(this.items[i].gid);
+    }
+    const next: ReadPosition[] = [];
+    for (let i = 0; i < this.readPositions.length; i++) {
+      if (gids.indexOf(this.readPositions[i].gid) >= 0) {
         next.push(this.readPositions[i]);
       }
     }
