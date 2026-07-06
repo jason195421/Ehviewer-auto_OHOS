@@ -39,30 +39,30 @@ export struct DetailHeader {
             .margin({ top: 8 })
           CategoryBadge({ category: this.detail.category })
             .margin({ top: 12 })
+
+          Row({ space: 12 }) {
+            HeaderActionButton({
+              symbolIcon: this.downloadIcon(),
+              text: uiText(this.downloadText),
+              onTap: this.onDownload
+            })
+              .layoutWeight(1)
+            HeaderActionButton({
+              symbolIcon: $r('sys.symbol.play_fill'),
+              text: uiText('Read'),
+              accent: true,
+              onTap: this.onRead
+            })
+              .layoutWeight(1)
+          }
+          .width('100%')
+          .margin({ top: 16 })
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
         .margin({ left: 14 })
       }
       .width('100%')
-
-      Row() {
-        HeaderActionButton({
-          symbolIcon: this.downloadIcon(),
-          text: uiText(this.downloadText),
-          onTap: this.onDownload
-        })
-          .layoutWeight(1)
-        HeaderActionButton({
-          symbolIcon: $r('sys.symbol.play_fill'),
-          text: uiText('Read'),
-          accent: true,
-          onTap: this.onRead
-        })
-          .layoutWeight(1)
-      }
-      .width('100%')
-      .margin({ top: 16 })
     }
     .width('100%')
     .padding(16)
@@ -89,7 +89,7 @@ export struct HeaderActionButton {
   @State pressed: boolean = false;
 
   private buttonBackground(): string {
-    return this.accent ? '#FFD34D' : '#FFFFFF';
+    return this.accent ? '#FFD34D' : '#D9EEF4';
   }
 
   private contentColor(): string {
@@ -109,13 +109,13 @@ export struct HeaderActionButton {
     }
     .justifyContent(FlexAlign.Center)
     .alignItems(VerticalAlign.Center)
-    .height(52)
+    .height(46)
     .width('100%')
     .backgroundColor(this.buttonBackground())
-    .borderRadius(26)
+    .borderRadius(23)
     .border({
       width: this.accent ? 0 : 1,
-      color: this.accent ? '#FFD34D' : '#FFFFFF'
+      color: this.accent ? '#FFD34D' : '#C2E0E8'
     })
     .shadow({
       radius: this.pressed ? 2 : 6,
