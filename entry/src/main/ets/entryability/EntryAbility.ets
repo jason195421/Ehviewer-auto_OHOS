@@ -11,6 +11,7 @@ import {
 import { applyWindowPrivacyMode, WINDOW_PRIVACY_STATUS_KEY } from '../services/EhWindowPrivacy';
 import { ehSettingsStore } from '../services/EhSettingsStore';
 import { ehAppLog } from '../services/EhAppLog';
+import { readerImageCache } from '../services/ReaderImageCache';
 import { EH_SYSTEM_COLOR_MODE_DARK, EH_SYSTEM_COLOR_MODE_KEY } from '../shared/EhTheme';
 import {
   isEhDirectConnectionProbeEnabled,
@@ -39,6 +40,7 @@ const STATUS_BAR_HEIGHT_KEY: string = 'statusBarHeight';
 const TOP_AVOID_HEIGHT_KEY: string = 'topAvoidHeight';
 const BOTTOM_AVOID_HEIGHT_KEY: string = 'bottomAvoidHeight';
 const LANGUAGE_REVISION_KEY: string = 'ehviewer_language_revision';
+const STARTUP_CACHE_PRUNE_DELAY_MS: number = 1500;
 
 interface SettingEntry {
   key: string;
@@ -125,7 +127,22 @@ export default class EntryAbility extends UIAbility {
       this.checkAndPromptBiometricLock();
       this.showStartupCellularNetworkWarning();
       this.showStartupDirectProbeToast();
+      this.pruneCacheOnStartup();
     });
+  }
+
+  private pruneCacheOnStartup(): void {
+    setTimeout(() => {
+      try {
+        const result = readerImageCache.prune(this.context);
+        if (result.files > 0) {
+          ehAppLog.info(this.context, 'EntryAbility', 'Startup cache prune removed files=' +
+            result.files.toString() + ', bytes=' + result.bytes.toString());
+        }
+      } catch (error) {
+        ehAppLog.warn(this.context, 'EntryAbility', 'Startup cache prune failed: ' + String(error));
+      }
+    }, STARTUP_CACHE_PRUNE_DELAY_MS);
   }
 
   private showStartupCellularNetworkWarning(): void {

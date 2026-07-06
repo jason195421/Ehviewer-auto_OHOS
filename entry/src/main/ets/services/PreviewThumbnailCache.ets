@@ -83,7 +83,6 @@ export class PreviewThumbnailCache {
       const packOptions: image.PackingOption = { format: 'image/png', quality: 100 };
       const data = await imagePacker.packToData(pixelMap, packOptions);
       writeArrayBuffer(outputPath, data);
-      readerImageCache.schedulePrune(context);
       return outputPath;
     } catch (error) {
       removeFileQuietly(outputPath);
