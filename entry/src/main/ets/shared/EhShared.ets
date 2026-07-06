@@ -2141,7 +2141,8 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
         entries, ['1', '2', '3', '4', '5', '8', '10']),
       optionSettingsRow('preload_image', 'Preload image', 'Reader/download prefetch count', entries, ['0', '3', '5', '10', '20']),
       optionSettingsRow('download_list_pagination', 'Download list pagination', 'Paginate large download lists', entries, ON_OFF_OPTIONS),
-      optionSettingsRow('image_size', 'Image resolution', 'Requested E-Hentai image size', entries, ['Auto', '780x', '980x', '1280x', 'Original']),
+      optionSettingsRow('image_size', 'Image resolution', 'Requested E-Hentai image size', entries,
+        ['Auto', '780x', '1280x', '1600x', '2400x', 'Original']),
       optionSettingsRow('download_origin_image', 'Download original image', 'Prefer original files when available', entries, ON_OFF_OPTIONS),
       optionSettingsRow('download_timeout', 'Download timeout', 'Network timeout for image tasks', entries, ['15s', '30s', '60s']),
       optionSettingsRow('download_order_asc', 'Download order ascending', 'Store pages in ascending page order', entries, ON_OFF_OPTIONS),
@@ -2761,7 +2762,7 @@ export function readerPreloadCount(): number {
   if (Number.isNaN(value) || value <= 0) {
     return 0;
   }
-  return Math.min(value, 3);
+  return Math.min(value, 20);
 }
 
 export function categoryName(category: number): string {

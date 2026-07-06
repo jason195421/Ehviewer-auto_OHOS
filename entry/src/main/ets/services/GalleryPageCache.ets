@@ -1,4 +1,5 @@
 import { GalleryPage } from '../model/GalleryModels';
+import { ehSettingsStore } from './EhSettingsStore';
 
 interface GalleryPageCacheEntry {
   url: string;
@@ -12,9 +13,10 @@ export class GalleryPageCache {
     if (url.length === 0) {
       return null;
     }
+    const key = cacheKeyForUrl(url);
 
     for (let i = 0; i < this.entries.length; i++) {
-      if (this.entries[i].url === url) {
+      if (this.entries[i].url === key) {
         const entry = this.entries[i];
         this.entries.splice(i, 1);
         this.entries.unshift(entry);
@@ -28,9 +30,10 @@ export class GalleryPageCache {
     if (url.length === 0) {
       return false;
     }
+    const key = cacheKeyForUrl(url);
 
     for (let i = 0; i < this.entries.length; i++) {
-      if (this.entries[i].url === url) {
+      if (this.entries[i].url === key) {
         return true;
       }
     }
@@ -41,14 +44,15 @@ export class GalleryPageCache {
     if (url.length === 0) {
       return;
     }
+    const key = cacheKeyForUrl(url);
 
     for (let i = 0; i < this.entries.length; i++) {
-      if (this.entries[i].url === url) {
+      if (this.entries[i].url === key) {
         this.entries.splice(i, 1);
         break;
       }
     }
-    this.entries.unshift({ url: url, page: cloneGalleryPage(page) });
+    this.entries.unshift({ url: key, page: cloneGalleryPage(page) });
 
     while (this.entries.length > maxSize) {
       this.entries.pop();
@@ -59,9 +63,10 @@ export class GalleryPageCache {
     if (url.length === 0) {
       return false;
     }
+    const key = cacheKeyForUrl(url);
 
     for (let i = 0; i < this.entries.length; i++) {
-      if (this.entries[i].url === url) {
+      if (this.entries[i].url === key) {
         this.entries.splice(i, 1);
         return true;
       }
@@ -74,6 +79,10 @@ export class GalleryPageCache {
     this.entries = [];
     return count;
   }
+}
+
+function cacheKeyForUrl(url: string): string {
+  return url + '#image_size=' + ehSettingsStore.getValue('image_size', 'Auto');
 }
 
 function cloneGalleryPage(page: GalleryPage): GalleryPage {

@@ -26,6 +26,7 @@ import {
   parseHathArchiveList
 } from './ArchiveParser';
 import { ehSpiderInfoStore } from './EhSpiderInfoStore';
+import { ehSettingsStore } from './EhSettingsStore';
 import {
   applyEhNetworkOptions,
   createEhRequestPlan,
@@ -44,6 +45,8 @@ export interface EhHttpResponse {
 
 export interface EhTextRequestOptions {
   includeUConfig?: boolean;
+  forceUConfig?: boolean;
+  imagePreferenceUConfig?: boolean;
   connectTimeoutMs?: number;
   readTimeoutMs?: number;
   deadlineTimeoutMs?: number;
@@ -219,7 +222,9 @@ export class EhHttpClient {
     const includeUConfig = options?.includeUConfig !== false;
     const cookieHeader = ehCookieStore.getCookieHeaderForUrl(url, {
       includeContentWarning: true,
-      includeUConfig: includeUConfig
+      includeUConfig: includeUConfig,
+      forceUConfig: options?.forceUConfig,
+      imagePreferenceUConfig: options?.imagePreferenceUConfig
     });
     const cacheKey = buildCacheKey('GET', url, referer, cookieHeader);
     if (cacheTtlMs > 0) {
@@ -415,21 +420,26 @@ export class EhHttpClient {
     }
   }
 
-  async postJson(url: string, body: string, referer: string = '', origin: string = ''): Promise<EhHttpResponse> {
+  async postJson(url: string, body: string, referer: string = '', origin: string = '',
+    options?: EhTextRequestOptions): Promise<EhHttpResponse> {
     return requestTextWithRetry((): Promise<EhHttpResponse> => {
-      return this.postJsonOnce(url, body, referer, origin);
+      return this.postJsonOnce(url, body, referer, origin, options);
     }, 3);
   }
 
   private async postJsonOnce(url: string, body: string, referer: string = '',
-    origin: string = ''): Promise<EhHttpResponse> {
+    origin: string = '', requestOptions?: EhTextRequestOptions): Promise<EhHttpResponse> {
     const request = http.createHttp();
     let plan: EhRequestPlan | null = null;
     const startedAt = Date.now();
     let outcomeRecorded = false;
     await acquireTextSlot();
     try {
-      const cookieHeader = ehCookieStore.getCookieHeaderForUrl(url);
+      const cookieHeader = ehCookieStore.getCookieHeaderForUrl(url, {
+        includeUConfig: requestOptions?.includeUConfig,
+        forceUConfig: requestOptions?.forceUConfig,
+        imagePreferenceUConfig: requestOptions?.imagePreferenceUConfig
+      });
       plan = createEhRequestPlan(url);
       const header = buildJsonRequestHeader(plan, referer, origin, cookieHeader);
       await ensureEhHostRules();
@@ -970,7 +980,10 @@ export class EhHttpClient {
     const origin = EhUrl.getReferer(site);
     const url = EhUrl.getApiUrl(site);
     try {
-      const response = await this.postJson(url, payload, requestReferer, origin);
+      const response = await this.postJson(url, payload, requestReferer, origin, {
+        forceUConfig: true,
+        imagePreferenceUConfig: true
+      });
       if (response.statusCode < 200 || response.statusCode >= 300) {
         return {
           ok: false,
@@ -1003,7 +1016,10 @@ export class EhHttpClient {
   private async loadGalleryPageHtml(pageUrl: string, site: GallerySite = GallerySite.E,
     referer: string = EhUrl.getReferer(site)): Promise<GalleryPageLoadResult> {
     try {
-      const response = await this.getText(pageUrl, referer, 600000);
+      const response = await this.getText(pageUrl, referer, 600000, {
+        forceUConfig: true,
+        imagePreferenceUConfig: true
+      });
       if (response.statusCode < 200 || response.statusCode >= 300) {
         return {
           ok: false,
@@ -1857,7 +1873,8 @@ function buildCacheKey(method: string, url: string, referer: string, cookieHeade
 }
 
 function buildGalleryPagePendingKey(pageUrl: string, site: GallerySite, referer: string, allowApi: boolean): string {
-  return Number(site).toString() + '\n' + pageUrl + '\n' + referer + '\n' + (allowApi ? '1' : '0');
+  return Number(site).toString() + '\n' + pageUrl + '\n' + referer + '\n' + (allowApi ? '1' : '0') +
+    '\n' + ehSettingsStore.getValue('image_size', 'Auto');
 }
 
 function cloneResponse(response: EhHttpResponse): EhHttpResponse {

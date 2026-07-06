@@ -260,7 +260,7 @@ export struct ReaderSessionScene {
   }
 
   private async preloadReaderPages(index: number): Promise<void> {
-    const count = Math.max(2, readerPreloadCount());
+    const count = readerPreloadCount();
     if (count <= 0) {
       return;
     }

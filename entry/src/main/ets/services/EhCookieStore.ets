@@ -1,5 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
+import { ehSettingsStore } from './EhSettingsStore';
 
 const PREFERENCES_NAME: string = 'ehviewer_session';
 const COOKIE_KEY: string = 'cookie_header';
@@ -7,6 +8,8 @@ const KEY_IPB_MEMBER_ID: string = 'ipb_member_id';
 const KEY_IPB_PASS_HASH: string = 'ipb_pass_hash';
 const KEY_CONTENT_WARNING: string = 'nw';
 const KEY_UCONFIG: string = 'uconfig';
+const UCONFIG_IMAGE_SIZE_KEY: string = 'xr';
+const UCONFIG_ALWAYS_ORIGINAL_KEY: string = 'oi';
 const CONTENT_WARNING_NOT_SHOW: string = '1';
 
 export interface CookieEntry {
@@ -17,6 +20,8 @@ export interface CookieEntry {
 export interface CookieHeaderOptions {
   includeContentWarning?: boolean;
   includeUConfig?: boolean;
+  forceUConfig?: boolean;
+  imagePreferenceUConfig?: boolean;
 }
 
 export interface CookieDebugSummary {
@@ -74,13 +79,15 @@ export class EhCookieStore {
     const eSite = isEHost(url);
     const uploadSite = isUploadHost(url);
     const includeContentWarning = eSite || uploadSite || options?.includeContentWarning !== false;
-    const includeUConfig = eSite && !uploadSite ? false : options?.includeUConfig !== false;
+    const includeUConfig = uploadSite ? false : (options?.forceUConfig === true ? true :
+      (eSite ? false : options?.includeUConfig !== false));
     if (!this.hasCookies()) {
       return includeContentWarning ? this.buildGuestCookieHeader() : '';
     }
     return this.buildCookieHeader({
       includeContentWarning: includeContentWarning,
-      includeUConfig: includeUConfig
+      includeUConfig: includeUConfig,
+      imagePreferenceUConfig: options?.imagePreferenceUConfig
     });
   }
 
@@ -120,17 +127,32 @@ export class EhCookieStore {
     const includeUConfig = options.includeUConfig !== false;
     const pairs: string[] = [];
     let hasContentWarning = false;
+    let existingUConfig = '';
     for (let i = 0; i < this.cookies.length; i++) {
       if (this.cookies[i].name === KEY_CONTENT_WARNING) {
         hasContentWarning = true;
       }
+      if (this.cookies[i].name === KEY_UCONFIG) {
+        existingUConfig = this.cookies[i].value;
+      }
       if (!includeContentWarning && this.cookies[i].name === KEY_CONTENT_WARNING) {
         continue;
       }
-      if (!includeUConfig && this.cookies[i].name === KEY_UCONFIG) {
-        continue;
+      if (this.cookies[i].name === KEY_UCONFIG) {
+        if (!includeUConfig) {
+          continue;
+        }
+        if (options.imagePreferenceUConfig === true) {
+          continue;
+        }
       }
       pairs.push(this.cookies[i].name + '=' + this.cookies[i].value);
+    }
+    if (includeUConfig && options.imagePreferenceUConfig === true) {
+      const uconfig = imagePreferenceUConfig(existingUConfig);
+      if (uconfig.length > 0) {
+        pairs.push(KEY_UCONFIG + '=' + uconfig);
+      }
     }
     if (includeContentWarning && !hasContentWarning) {
       pairs.push(KEY_CONTENT_WARNING + '=' + CONTENT_WARNING_NOT_SHOW);
@@ -198,6 +220,12 @@ export class EhCookieStore {
   }
 
   private upsert(name: string, value: string): void {
+    if (name.length === 0) {
+      return;
+    }
+    if (this.isInvalidNetworkIdentityCookie(name, value)) {
+      return;
+    }
     for (let i = 0; i < this.cookies.length; i++) {
       if (this.cookies[i].name === name) {
         this.cookies[i].value = value;
@@ -228,7 +256,64 @@ export class EhCookieStore {
   }
 }
 
-export const ehCookieStore: EhCookieStore = new EhCookieStore();
+function imagePreferenceUConfig(current: string): string {
+  const imageSize = normalizedImageSizeSetting(ehSettingsStore.getValue('image_size', 'Auto'));
+  const alwaysOriginal = imageSize === 'Original' ? 'y' : 'n';
+  const xres = imageSize === 'Original' ? 'a' : imageSizeValue(imageSize);
+  const segments = current.length > 0 ? current.split('-') : [];
+  upsertUConfigSegment(segments, UCONFIG_IMAGE_SIZE_KEY, xres);
+  upsertUConfigSegment(segments, UCONFIG_ALWAYS_ORIGINAL_KEY, alwaysOriginal);
+  return segments.join('-');
+}
+
+function normalizedImageSizeSetting(value: string): string {
+  if (value === '780x' || value === '780') {
+    return '780x';
+  }
+  if (value === '980x' || value === '980') {
+    return '780x';
+  }
+  if (value === '1280x' || value === '1280') {
+    return '1280x';
+  }
+  if (value === '1600x' || value === '1600') {
+    return '1600x';
+  }
+  if (value === '2400x' || value === '2400') {
+    return '2400x';
+  }
+  if (value === 'Original') {
+    return 'Original';
+  }
+  return 'Auto';
+}
+
+function imageSizeValue(value: string): string {
+  if (value === '780x') {
+    return '780';
+  }
+  if (value === '1280x') {
+    return '1280';
+  }
+  if (value === '1600x') {
+    return '1600';
+  }
+  if (value === '2400x') {
+    return '2400';
+  }
+  return 'a';
+}
+
+function upsertUConfigSegment(segments: string[], key: string, value: string): void {
+  const prefix = key + '_';
+  for (let i = 0; i < segments.length; i++) {
+    if (segments[i].indexOf(prefix) === 0) {
+      segments[i] = prefix + value;
+      return;
+    }
+  }
+  segments.push(prefix + value);
+}
 
 function isEHost(url: string): boolean {
   const host = requestHost(url);
@@ -244,3 +329,5 @@ function requestHost(url: string): string {
   const match = /^https?:\/\/([^\/?#]+)/i.exec(url);
   return match === null ? '' : match[1].toLowerCase();
 }
+
+export const ehCookieStore: EhCookieStore = new EhCookieStore();
