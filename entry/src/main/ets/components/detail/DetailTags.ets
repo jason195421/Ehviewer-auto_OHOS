@@ -20,9 +20,9 @@ import {
 
 @Component
 export struct DetailTags {
-  @Prop @Watch('onExternalDataChange') renderVersion: number = 0;
-  @Prop @Watch('onExternalDataChange') tags: GalleryTagGroup[] = [];
-  @Prop @Watch('onExternalDataChange') isDetailLoaded: boolean = false;
+  @Prop @Watch('syncExternalData') renderVersion: number = 0;
+  @Prop @Watch('syncExternalData') tags: GalleryTagGroup[] = [];
+  @Prop @Watch('syncExternalData') isDetailLoaded: boolean = false;
   onTagSearch: (namespace: string, tag: string) => void = (_namespace: string, _tag: string) => {};
   onAddTag: (fullTag: string) => void = (_fullTag: string) => {};
   onOpenTagVote: (info: GalleryTagInfo) => void = (_info: GalleryTagInfo) => {};
@@ -35,10 +35,6 @@ export struct DetailTags {
   @State suggestionRevision: number = 0;
 
   aboutToAppear(): void {
-    this.syncExternalData();
-  }
-
-  private onExternalDataChange(): void {
     this.syncExternalData();
   }
 

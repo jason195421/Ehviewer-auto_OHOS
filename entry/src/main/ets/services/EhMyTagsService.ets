@@ -385,12 +385,6 @@ function matchTagsetColor(html: string): string {
   return matched === null ? '' : decodeHtml(matched[1]);
 }
 
-function matchAttribute(block: string, name: string): string {
-  const re = new RegExp(name + '="([^"]*)"', 'i');
-  const matched = re.exec(block);
-  return matched === null ? '' : matched[1];
-}
-
 function matchTagPreviewTitle(block: string, id: number): string {
   const idText = id.toString();
   let re = new RegExp('id="tagpreview_' + escapeRegExp(idText) + '"[^>]*title="([^"]*)"', 'i');

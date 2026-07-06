@@ -2,7 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { relationalStore } from '@kit.ArkData';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import { GalleryCategory, GalleryInfo, GallerySite } from '../model/GalleryModels';
-import { DownloadMetadataRestoreResult, rebuildImportedHistoryMetadata } from './DownloadMetadataRestore';
+import { rebuildImportedHistoryMetadata } from './DownloadMetadataRestore';
 import { DownloadInfo, DownloadState, ehDownloadStore } from './EhDownloadStore';
 import { ehFilterStore } from './EhFilterStore';
 import { ehHistoryStore } from './EhHistoryStore';

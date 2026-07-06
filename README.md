@@ -35,9 +35,11 @@
   </tr>
   <tr>
     <td><img src="docs/images/reader-settings.jpg" alt="阅读器设置" width="220" /></td>
+    <td><img src="docs/images/gallery-detail-tag-vote.jpg" alt="标签编辑与投票" width="220" /></td>
   </tr>
   <tr>
     <td align="center">阅读器设置</td>
+    <td align="center">标签编辑与投票</td>
   </tr>
 </table>
 
@@ -58,7 +60,7 @@
 
 - 浏览：支持 E-Hentai/ExHentai、首页、订阅、热门、排行、收藏、历史和下载列表。
 - 搜索：支持关键词、多标签、上传者、高级筛选、搜索历史和图片相似/封面搜索。
-- 详情：统一详情页逻辑，支持预览图、评论、收藏、评分、Torrent、归档、H@H、相似画廊和封面搜索。
+- 详情：统一详情页逻辑，支持预览图、评论、收藏、评分、Torrent、归档、H@H、相似画廊、封面搜索、标签编辑和标签投票。
 - 阅读：支持内嵌/独立阅读器、连续阅读、缩放、方向适配、进度控制和本地下载优先读取。
 - 下载：支持任务暂停/继续/删除、多线程下载、本地阅读、恢复本地下载和导出压缩包。
 - 设置：支持主题、语言、启动页、过滤规则、代理/Hosts/域名前置、隐私防护和身份验证。
@@ -129,3 +131,7 @@
 感谢 [Ehviewer_CN_SXJ](https://github.com/xiaojieonly/Ehviewer_CN_SXJ) 和 [EhViewer](https://github.com/seven332/EhViewer) 项目的作者和贡献者。
 
 感谢 [EhTagTranslation/Database](https://github.com/EhTagTranslation/Database) 项目维护中文标签翻译数据。
+
+## 许可
+
+本项目继承原应用许可证，详见 [LICENSE](https://github.com/suibianqwe/Ehviewer_OHOS/blob/main/LICENSE)。

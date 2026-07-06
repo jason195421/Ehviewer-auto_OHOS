@@ -110,7 +110,7 @@ export struct CommentLinkedText {
 
   build() {
     Text() {
-      ForEach(commentTextSegments(commentPlainTextFromHtml(this.html)), (segment: CommentTextSegment, index: number) => {
+      ForEach(commentTextSegments(commentPlainTextFromHtml(this.html)), (segment: CommentTextSegment) => {
         Span(segment.text)
           .fontColor(segment.url.length > 0 ? themePrimaryColor() : themePrimaryText())
           .decoration({
