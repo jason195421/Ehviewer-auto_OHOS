@@ -975,7 +975,7 @@ export function zhText(text: string): string {
     case 'Privacy mode': return '隐私模式';
     case 'Prevent screenshots and insecure previews': return '禁止截图、录屏和不安全预览';
     case 'Save parse error body': return '保存解析错误正文';
-    case 'Persist parser failures for debugging': return '保存解析失败内容用于调试';
+    case 'Persist parser failures for debugging': return '保存解析失败的网页正文用于调试';
     case 'Save crash log': return '保存日志';
     case 'Persist crash logs locally': return '在本地保存崩溃日志';
     case 'Persist app errors and debug messages locally': return '在本地保存应用错误和调试信息';
@@ -984,7 +984,7 @@ export function zhText(text: string): string {
     case 'Export log': return '导出日志';
     case 'Save the local app log to a text file': return '将本地应用日志保存为文本文件';
     case 'Clear saved log': return '清空已保存日志';
-    case 'Delete the local app log file': return '删除本地应用日志文件';
+    case 'Delete the local app log file': return '删除本地应用日志和解析错误正文';
     case 'Clear download path cache': return '清除下载路径缓存';
     case 'Refresh cached file path and size lookups': return '刷新缓存的文件路径和大小查询';
     case 'Clear cache': return '清除缓存';

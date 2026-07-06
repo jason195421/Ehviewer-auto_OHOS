@@ -41,6 +41,7 @@ import { FilterRule, FILTER_MODE_RATING, FILTER_MODE_TITLE, ehFilterStore } from
 import { applyAppChromeImmersiveMode } from '../services/EhWindowImmersive';
 import { applyWindowPrivacyMode } from '../services/EhWindowPrivacy';
 import { ehAppLog } from '../services/EhAppLog';
+import { ehParseErrorBodyStore, ParseErrorBodyEntry } from '../services/EhParseErrorBodyStore';
 import {
   AndroidDataImportSummary,
   importAndroidDatabaseBackup,
@@ -856,11 +857,12 @@ export struct SettingsScene {
       padTwo(now.getMonth() + 1) + padTwo(now.getDate()) + '_' +
       padTwo(now.getHours()) + padTwo(now.getMinutes()) + padTwo(now.getSeconds());
     const fileName = 'ehviewer_log_' + stamp + '.txt';
-    if (ehAppLog.size(context) <= 0) {
+    const content = this.createAppLogExport(context);
+    if (content.trim().length === 0) {
       this.showFloatingStatus('No saved log yet');
       return;
     }
-    this.copyFileToDownloads(context, fileName, ehAppLog.logPath(context)).then((path: string) => {
+    this.writeTextToDownloads(context, fileName, content).then((path: string) => {
       this.statusText = 'Log exported: ' + path;
       this.showToast('Log exported');
     }).catch((error: Error) => {
@@ -875,15 +877,6 @@ export struct SettingsScene {
       throw new Error('Export cancelled');
     }
     await writeTextFileChunked(path, content);
-    return path;
-  }
-
-  private async copyFileToDownloads(context: common.UIAbilityContext, fileName: string, sourcePath: string): Promise<string> {
-    const path = await pickDownloadsOutputPath(context, fileName);
-    if (path.length === 0) {
-      throw new Error('Export cancelled');
-    }
-    await copyFileChunked(sourcePath, path);
     return path;
   }
 
@@ -916,6 +909,7 @@ export struct SettingsScene {
       return;
     }
     ehAppLog.clear(context);
+    ehParseErrorBodyStore.clear(context);
     this.statusText = 'Saved log cleared';
   }
 
@@ -1170,6 +1164,38 @@ export struct SettingsScene {
       this.hideBlockingBusy();
       this.showFloatingStatus('Restore downloads failed: ' + error.message);
     });
+  }
+
+  private createAppLogExport(context: common.UIAbilityContext): string {
+    const appLog = ehAppLog.read(context);
+    const parseBodies = ehParseErrorBodyStore.list(context);
+    if (appLog.trim().length === 0 && parseBodies.length === 0) {
+      return '';
+    }
+    const lines: string[] = [];
+    lines.push('EhViewer OHOS Diagnostic Log');
+    lines.push('ExportedAt: ' + new Date().toISOString());
+    lines.push('Version: ' + EH_APP_VERSION_NAME + ' (' + EH_APP_VERSION_CODE.toString() + ')');
+    lines.push('Target: ' + EH_TARGET_PLATFORM);
+    lines.push('SaveCrashLog: ' + ehSettingsStore.getValue('save_crash_log', 'Off'));
+    lines.push('SaveParseErrorBody: ' + ehSettingsStore.getValue('save_parse_error_body', 'Off'));
+    lines.push('');
+    lines.push('[App Log]');
+    lines.push(appLog.trim().length > 0 ? appLog : '(empty)');
+    lines.push('');
+    lines.push('[Parse Error Bodies]');
+    if (parseBodies.length === 0) {
+      lines.push('(none)');
+    } else {
+      for (let i = 0; i < parseBodies.length; i++) {
+        const entry: ParseErrorBodyEntry = parseBodies[i];
+        lines.push((i + 1).toString() + '. ' + entry.name);
+        lines.push('   Path: ' + entry.path);
+        lines.push('   Size: ' + downloadSizeText(entry.size));
+        lines.push('   Modified: ' + new Date(entry.modifiedTime).toISOString());
+      }
+    }
+    return lines.join('\n');
   }
 
   private cleanDownloadRedundancy(): void {
@@ -2212,46 +2238,6 @@ async function writeTextFileChunked(path: string, content: string): Promise<void
     if (fd >= 0) {
       try {
         fs.closeSync(fd);
-      } catch (error) {
-      }
-    }
-  }
-}
-
-async function copyFileChunked(sourcePath: string, targetPath: string): Promise<void> {
-  let sourceFd = -1;
-  let targetFd = -1;
-  try {
-    const source = fs.openSync(sourcePath, fs.OpenMode.READ_ONLY);
-    sourceFd = source.fd;
-    const target = fs.openSync(targetPath, fs.OpenMode.CREATE | fs.OpenMode.TRUNC | fs.OpenMode.READ_WRITE);
-    targetFd = target.fd;
-    const stat = fs.statSync(sourceFd);
-    let offset = 0;
-    while (offset < stat.size) {
-      const size = Math.min(LOG_EXPORT_CHUNK_BYTES, stat.size - offset);
-      const buffer = new ArrayBuffer(size);
-      const readSize = fs.readSync(sourceFd, buffer, { offset: offset, length: size });
-      if (readSize <= 0) {
-        break;
-      }
-      fs.writeSync(targetFd, buffer.slice(0, readSize));
-      offset += readSize;
-      await yieldToUi();
-    }
-  } catch (error) {
-    removeFileQuietly(targetPath);
-    throw new Error(String(error));
-  } finally {
-    if (sourceFd >= 0) {
-      try {
-        fs.closeSync(sourceFd);
-      } catch (error) {
-      }
-    }
-    if (targetFd >= 0) {
-      try {
-        fs.closeSync(targetFd);
       } catch (error) {
       }
     }

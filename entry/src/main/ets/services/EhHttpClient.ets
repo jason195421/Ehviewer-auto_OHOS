@@ -27,6 +27,7 @@ import {
 } from './ArchiveParser';
 import { ehSpiderInfoStore } from './EhSpiderInfoStore';
 import { ehSettingsStore } from './EhSettingsStore';
+import { ehParseErrorBodyStore } from './EhParseErrorBodyStore';
 import {
   applyEhNetworkOptions,
   createEhRequestPlan,
@@ -679,6 +680,8 @@ export class EhHttpClient {
       await this.fillGalleryListByApi(parsed.galleries, url, site);
       const parseMessage = parsed.warning.length > 0 ? parsed.warning + '; ' + galleryListBodyDiagnostic(response.body) :
         'Parsed ' + parsed.galleries.length.toString() + ' galleries';
+      this.saveParseErrorBodyIfNeeded('gallery_list', url, response.statusCode, parsed.warning, parsed.galleries.length === 0,
+        response.body);
       return {
         ok: parsed.galleries.length > 0,
         url: url,
@@ -703,6 +706,14 @@ export class EhHttpClient {
         galleries: []
       };
     }
+  }
+
+  private saveParseErrorBodyIfNeeded(source: string, url: string, statusCode: number, warning: string, failed: boolean,
+    body: string): void {
+    if (!failed || warning.length === 0 || isExpectedEmptyResultWarning(warning)) {
+      return;
+    }
+    ehParseErrorBodyStore.save(source, url, statusCode, warning, body);
   }
 
   private async fillGalleryListByApi(galleries: GalleryInfo[], referer: string, site: GallerySite): Promise<void> {
@@ -748,6 +759,8 @@ export class EhHttpClient {
       }
 
       const parsed: GalleryDetailParseResult = parseGalleryDetail(response.body);
+      this.saveParseErrorBodyIfNeeded('gallery_detail', url, response.statusCode, parsed.warning, parsed.detail === null,
+        response.body);
       return {
         ok: parsed.detail !== null,
         url: url,
@@ -995,6 +1008,8 @@ export class EhHttpClient {
       }
 
       const parsed: GalleryPageApiParseResult = parseGalleryPageApi(response.body, pageUrl, showKey);
+      this.saveParseErrorBodyIfNeeded('gallery_page_api', pageUrl, response.statusCode, parsed.warning, parsed.page === null,
+        response.body);
       return {
         ok: parsed.page !== null,
         url: pageUrl,
@@ -1031,6 +1046,8 @@ export class EhHttpClient {
       }
 
       const parsed: GalleryPageParseResult = parseGalleryPage(response.body, pageUrl);
+      this.saveParseErrorBodyIfNeeded('gallery_page_html', pageUrl, response.statusCode, parsed.warning, parsed.page === null,
+        response.body);
       return {
         ok: parsed.page !== null,
         url: pageUrl,
@@ -1064,6 +1081,8 @@ export class EhHttpClient {
       }
 
       const parsed: TopListParseResult = parseTopList(response.body);
+      this.saveParseErrorBodyIfNeeded('top_list', url, response.statusCode, parsed.warning, parsed.detail === null,
+        response.body);
       return {
         ok: parsed.detail !== null,
         url: url,
@@ -1106,6 +1125,8 @@ export class EhHttpClient {
       }
       const parsed: GalleryListParseResult = parseGalleryList(response.body);
       await this.fillGalleryListByApi(parsed.galleries, url, site);
+      this.saveParseErrorBodyIfNeeded('image_search', redirectUrl.length > 0 ? redirectUrl : url, response.statusCode,
+        parsed.warning, parsed.galleries.length === 0 && parsed.warning.length > 0, response.body);
       const ok = true;
       return {
         ok: ok,
@@ -1561,6 +1582,10 @@ function countPattern(text: string, pattern: RegExp): number {
     match = pattern.exec(text);
   }
   return count;
+}
+
+function isExpectedEmptyResultWarning(warning: string): boolean {
+  return warning === 'No hits found' || warning === 'No watched tags';
 }
 
 function parseHtmlTitle(body: string): string {
