@@ -65,6 +65,30 @@
 - 下载：支持任务暂停/继续/删除、多线程下载、本地阅读、恢复本地下载和导出压缩包。
 - 设置：支持主题、语言、启动页、过滤规则、代理/Hosts/域名前置、隐私防护和身份验证。
 
+## 应用数据迁移
+
+从原安卓 EhViewer 迁移下载数据时，推荐先把原应用的下载文件夹复制到鸿蒙设备的 `EhViewer` 目录，再在应用内重建下载项。当前迁移重点是已下载漫画数据；账号 Cookie、设置、历史等可优先使用应用内的导入/导出功能。
+
+<table>
+  <tr>
+    <td><img src="docs/images/migration-source-download-folder.png" alt="原安卓下载目录" width="260" /></td>
+    <td><img src="docs/images/migration-move-to-ehviewer.jpg" alt="移动到鸿蒙 EhViewer 目录" width="260" /></td>
+    <td><img src="docs/images/migration-restore-download-items.png" alt="恢复下载项入口" width="260" /></td>
+  </tr>
+  <tr>
+    <td align="center">选择原下载目录</td>
+    <td align="center">移动到 EhViewer 目录</td>
+    <td align="center">重建下载队列</td>
+  </tr>
+</table>
+
+1. 在文件管理器中找到原安卓应用下载目录，一般为 `我的手机 > 兼容应用数据 > EhViewer > download`，里面每个漫画是一个独立文件夹。
+2. 将需要迁移的漫画文件夹移动或复制到鸿蒙可访问的 `我的手机 > EhViewer` 文件夹中。
+3. 打开 EhViewer OHOS，进入 `设置` -> `下载`，点击 `恢复下载项`。
+4. 应用会扫描下载文件夹、迁移到应用文件目录，并重建下载队列和漫画元数据。重复漫画会尽量保留文件更完整、体积更大的版本。
+
+迁移前建议保留原文件备份；如果部分漫画缺少元数据，应用会尝试联网抓取详情信息。
+
 ## 0.4.5 重点变化
 
 - 详情页新增标签编辑模式，支持添加标签、标签联想、标签投票、查看含标签画廊和标签定义。
