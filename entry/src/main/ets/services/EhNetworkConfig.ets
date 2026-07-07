@@ -1,4 +1,5 @@
 import { common } from '@kit.AbilityKit';
+import { deviceInfo } from '@kit.BasicServicesKit';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import { http } from '@kit.NetworkKit';
 import { connection } from '@kit.NetworkKit';
@@ -150,8 +151,10 @@ export function applyEhNetworkOptions(options: http.HttpRequestOptions, plan: Eh
     options.remoteValidation = 'skip';
     options.usingProtocol = http.HttpProtocol.HTTP1_1;
   }
-  if (plan.sniHost.length > 0) {
-    options.sniHostName = plan.sniHost;
+  if (deviceInfo.apiAvailable(23)) {
+    if (plan.sniHost.length > 0) {
+      options.sniHostName = plan.sniHost;
+    }
   }
 }
 

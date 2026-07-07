@@ -3381,7 +3381,6 @@ export struct GalleryListContent {
         }
         .refreshOffset(this.REFRESH_OFFSET)
         .pullToRefresh(true)
-        .pullUpToCancelRefresh(true)
         .onRefreshing(() => {
           this.onRefreshPull(() => {
             this.refreshing = false;

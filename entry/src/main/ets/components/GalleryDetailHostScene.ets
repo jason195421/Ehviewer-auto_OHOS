@@ -182,9 +182,10 @@ struct AddFavoriteDialog {
             }
           }, (item: FavoriteSlotOption) => item.slot.toString())
         }
+        .width('100%')
+        .height(Math.max(220, this.panelMaxHeight - 112))
         .layoutWeight(1)
         .constraintSize({ maxHeight: Math.max(220, this.panelMaxHeight - 112) })
-        .width('100%')
 
         Divider().color(themeDividerColor()).strokeWidth(0.5)
 
