@@ -242,6 +242,7 @@ export struct EhNavBar {
   @Prop showClear: boolean = false;
   @Prop canClear: boolean = false;
   @Prop showFavoriteButton: boolean = false;
+  @Prop showBookmarkButton: boolean = false;
   @Prop showSearchButton: boolean = false;
   @Prop showRefreshButton: boolean = true;
   @Prop showBackButton: boolean = false;
@@ -254,6 +255,7 @@ export struct EhNavBar {
   onSearchFocus: () => void = () => {};
   onAdvanced: () => void = () => {};
   onFavoriteButton: () => void = () => {};
+  onBookmarkButton: () => void = () => {};
   onKeywordChange: (value: string) => void = () => {};
   onRefresh: () => void = () => {};
   onClear: () => void = () => {};
@@ -402,6 +404,20 @@ export struct EhNavBar {
             .flexShrink(0)
             .margin({ left: 6 })
             .onClick(() => { this.onFavoriteButton(); })
+          }
+
+          if (this.showBookmarkButton) {
+            Button({ type: ButtonType.Circle, stateEffect: true }) {
+              SymbolGlyph($r('sys.symbol.bookmark'))
+                .fontSize(20)
+                .fontColor([themeOnPrimaryText()])
+            }
+            .width(40)
+            .height(40)
+            .backgroundColor(themeOnPrimaryActionBackground())
+            .flexShrink(0)
+            .margin({ left: 6 })
+            .onClick(() => { this.onBookmarkButton(); })
           }
 
           if (this.showSearchButton) {

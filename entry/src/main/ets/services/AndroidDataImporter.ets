@@ -3,6 +3,7 @@ import { relationalStore } from '@kit.ArkData';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import { GalleryCategory, GalleryInfo, GallerySite } from '../model/GalleryModels';
 import { rebuildImportedHistoryMetadata } from './DownloadMetadataRestore';
+import { SearchBookmarkBackupInfo, ehBookmarkStore } from './EhBookmarkStore';
 import { DownloadInfo, DownloadState, ehDownloadStore } from './EhDownloadStore';
 import { ehFilterStore } from './EhFilterStore';
 import { ehHistoryStore } from './EhHistoryStore';
@@ -29,6 +30,7 @@ export interface AndroidDataImportSummary {
   labels: number;
   filters: number;
   searches: number;
+  bookmarks: number;
 }
 
 interface AndroidHistoryImportResult {
@@ -64,6 +66,7 @@ export async function importAndroidDatabaseBackup(context: common.UIAbilityConte
     await ehDownloadStore.load(context);
     await ehFilterStore.load(context);
     await ehLocalFavoritesStore.ensureLoaded(context);
+    await ehBookmarkStore.ensureLoaded(context);
     await ehSettingsStore.load(context);
     await ehSearchHistoryStore.load(context);
 
@@ -80,14 +83,17 @@ export async function importAndroidDatabaseBackup(context: common.UIAbilityConte
       downloads: downloads,
       localFavorites: localFavorites,
       filters: await importFilters(store),
-      searches: await importQuickSearch(store)
+      searches: 0,
+      bookmarks: await importQuickSearch(store)
     };
+    summary.searches = summary.bookmarks;
 
     await Promise.all([
       ehHistoryStore.save(context),
       ehDownloadStore.save(context),
       ehFilterStore.save(context),
-      ehLocalFavoritesStore.save(context)
+      ehLocalFavoritesStore.save(context),
+      ehBookmarkStore.save(context)
     ]);
     return summary;
   } catch (error) {
@@ -256,6 +262,19 @@ async function importQuickSearch(store: relationalStore.RdbStore): Promise<numbe
     const keyword = getStringColumn(row, 'KEYWORD', '').trim();
     if (keyword.length > 0) {
       ehSearchHistoryStore.record(keyword);
+    }
+    const bookmark: SearchBookmarkBackupInfo = {
+      name: getStringColumn(row, 'NAME', '').trim(),
+      mode: getNumberColumn(row, 'MODE', 0),
+      category: getNumberColumn(row, 'CATEGORY', GalleryCategory.None),
+      keyword: keyword,
+      advanceSearch: getNumberColumn(row, 'ADVANCE_SEARCH', -1),
+      minRating: getNumberColumn(row, 'MIN_RATING', -1),
+      pageFrom: getNumberColumn(row, 'PAGE_FROM', -1),
+      pageTo: getNumberColumn(row, 'PAGE_TO', -1),
+      time: getNumberColumn(row, 'TIME', Date.now())
+    };
+    if (ehBookmarkStore.importBookmark(bookmark)) {
       count++;
     }
   });

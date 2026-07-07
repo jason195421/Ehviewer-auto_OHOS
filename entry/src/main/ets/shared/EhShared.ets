@@ -19,6 +19,7 @@ import { readerImageCache } from '../services/ReaderImageCache';
 import { previewThumbnailCache } from '../services/PreviewThumbnailCache';
 import { FilterRule, ehFilterStore } from '../services/EhFilterStore';
 import { LocalFavoriteBackupInfo } from '../services/EhLocalFavoritesStore';
+import { SearchBookmarkBackupInfo } from '../services/EhBookmarkStore';
 import { EH_AUTHOR_NAME, EH_RELEASE_TAG } from '../services/EhBuildInfo';
 import {
   EH_THEME_PRIMARY_COLOR,
@@ -56,6 +57,7 @@ export interface EhBackupBundle {
   downloadLabels: DownloadLabel[];
   filterRules: FilterRule[];
   localFavorites?: LocalFavoriteBackupInfo[];
+  bookmarks?: SearchBookmarkBackupInfo[];
 }
 
 export const LANGUAGE_REVISION_KEY: string = 'ehviewer_language_revision';
@@ -508,9 +510,11 @@ export function uiStatusText(text: string): string {
     return 'Android 数据导入完成：' + text.substring('Import complete: Android data '.length)
       .replace('history ', '历史 ')
       .replace('downloads ', '下载 ')
+      .replace('local favorites ', '本地收藏 ')
       .replace('labels ', '标签 ')
       .replace('filters ', '过滤 ')
-      .replace('searches ', '搜索 ');
+      .replace('searches ', '搜索 ')
+      .replace('bookmarks ', '书签 ');
   }
   if (text.indexOf('Import save failed: ') === 0) {
     return '导入保存失败：' + text.substring('Import save failed: '.length);
@@ -559,6 +563,24 @@ export function uiStatusText(text: string): string {
   if (text.indexOf('Network diagnostics: ') === 0) {
     return '网络诊断：' + text.substring('Network diagnostics: '.length);
   }
+  if (text === 'Cannot bookmark image search') {
+    return '无法将图片搜索添加为书签';
+  }
+  if (text === 'Duplicate bookmark') {
+    return '已存在相同书签';
+  }
+  if (text === 'Duplicate bookmark name') {
+    return '书签名称已存在';
+  }
+  if (text === 'Bookmark name is empty') {
+    return '书签名称不能为空';
+  }
+  if (text === 'Bookmark added') {
+    return '已添加书签';
+  }
+  if (text === 'Bookmark removed') {
+    return '已删除书签';
+  }
   return uiText(text);
 }
 
@@ -583,6 +605,11 @@ export function zhText(text: string): string {
     case 'Favorites': return '收藏';
     case 'All favorites': return '全部收藏';
     case 'Favorite folders': return '收藏夹';
+    case 'Bookmarks': return '书签栏';
+    case 'Add bookmark': return '添加书签';
+    case 'Bookmark name': return '书签名称';
+    case 'No bookmarks': return '这里是书签栏';
+    case 'Tap plus to bookmark the current gallery list': return '点击“+”添加当前画廊列表状态';
     case 'Local Favorites': return '本地收藏';
     case 'Add to favorites': return '添加到收藏';
     case 'Remember favorite collection': return '记住收藏夹';

@@ -4,6 +4,7 @@ import { fileIo as fs } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
 import { webview } from '@kit.ArkWeb';
 import { GalleryInfo, GallerySite } from '../model/GalleryModels';
+import { ehBookmarkStore } from '../services/EhBookmarkStore';
 import { ehCookieStore } from '../services/EhCookieStore';
 import {
   DOWNLOAD_LOCATION_APP_FILES,
@@ -811,7 +812,8 @@ export struct SettingsScene {
       ehHistoryStore.load(context),
       ehDownloadStore.load(context),
       ehFilterStore.load(context),
-      ehLocalFavoritesStore.ensureLoaded(context)
+      ehLocalFavoritesStore.ensureLoaded(context),
+      ehBookmarkStore.ensureLoaded(context)
     ]).then(() => {
       const bundle: EhBackupBundle = {
         version: 1,
@@ -822,7 +824,8 @@ export struct SettingsScene {
         downloadItems: ehDownloadStore.getItems(),
         downloadLabels: ehDownloadStore.getLabels(),
         filterRules: ehFilterStore.getRules(),
-        localFavorites: ehLocalFavoritesStore.getBackupItems()
+        localFavorites: ehLocalFavoritesStore.getBackupItems(),
+        bookmarks: ehBookmarkStore.getBackupItems()
       };
       const json = JSON.stringify(bundle, null, 2);
 
@@ -967,7 +970,7 @@ export struct SettingsScene {
             this.showFloatingStatus('Import complete: Android data (history ' + summary.history +
               ', history metadata ' + summary.historyMetadata + ', fetched ' + summary.historyMetadataFetched +
               ', downloads ' + summary.downloads + ', local favorites ' + summary.localFavorites +
-              ', labels ' + summary.labels + ', filters ' + summary.filters + ', searches ' + summary.searches + ')');
+              ', labels ' + summary.labels + ', filters ' + summary.filters + ', bookmarks ' + summary.bookmarks + ')');
           }).catch((error: Error) => {
             this.hideBlockingBusy();
             this.showFloatingStatus('Import failed: Android data ' + error.message);
@@ -1101,6 +1104,14 @@ export struct SettingsScene {
           saves.push(ehLocalFavoritesStore.ensureLoaded(context).then(() => {
             ehLocalFavoritesStore.importBackupItems(localFavorites);
             return ehLocalFavoritesStore.save(context);
+          }));
+        }
+
+        if (Array.isArray(bundle.bookmarks)) {
+          const bookmarks = bundle.bookmarks;
+          saves.push(ehBookmarkStore.ensureLoaded(context).then(() => {
+            ehBookmarkStore.importBackupItems(bookmarks);
+            return ehBookmarkStore.save(context);
           }));
         }
 
