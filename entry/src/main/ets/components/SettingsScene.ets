@@ -29,6 +29,7 @@ import {
 } from '../services/EhSettingsStore';
 import { EhHttpClient, NetworkDiagnosticResult } from '../services/EhHttpClient';
 import {
+  currentDnsOverHttpsStatusText,
   isEhDirectConnectionProbeEnabled,
   startEhDirectConnectionProbe,
   startEhFrontingBenchmark
@@ -1320,7 +1321,7 @@ export struct SettingsScene {
     lines.push('Built-in hosts: ' + ehSettingsStore.getValue('built_in_hosts', 'Off'));
     lines.push('Built EX hosts: ' + ehSettingsStore.getValue('built_ex_hosts', 'Off'));
     lines.push('Domain fronting: ' + ehSettingsStore.getValue('domain_fronting', 'On'));
-    lines.push('DNS over HTTPS: ' + ehSettingsStore.getValue('dns_over_https', 'Off'));
+    lines.push('DNS over HTTPS: ' + currentDnsOverHttpsStatusText());
     lines.push('Direct connection check: ' + ehSettingsStore.getValue('auto_direct_connection', 'On'));
     lines.push('');
     lines.push(summary);

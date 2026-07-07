@@ -459,6 +459,28 @@ export function uiStatusText(text: string): string {
   if (text.indexOf('Invalid proxy port: ') === 0) {
     return '代理端口无效：' + text.substring('Invalid proxy port: '.length);
   }
+  if (text === 'Restore download items needs an ability context') {
+    return '恢复下载项需要 Ability 上下文';
+  }
+  if (text === 'Preparing public Downloads access...') {
+    return '正在准备访问系统下载目录...';
+  }
+  if (text === 'Scanning downloaded folders...') {
+    return '正在扫描已下载文件夹...';
+  }
+  if (text.indexOf('Restored downloads: ') === 0) {
+    return '恢复下载项：' + text.substring('Restored downloads: '.length)
+      .replace(' added, ', ' 个新增，')
+      .replace(' updated, ', ' 个更新，')
+      .replace(' migrated, ', ' 个迁移，')
+      .replace(' metadata rebuilt, ', ' 个元数据重建，')
+      .replace(' Fetched ', ' 已抓取 ')
+      .replace(' details.', ' 个详情。')
+      .replace(' Downloads access was not granted; scanned app files only.', ' 未授权访问下载目录，仅扫描应用文件。');
+  }
+  if (text.indexOf('Restore downloads failed: ') === 0) {
+    return '恢复下载项失败：' + text.substring('Restore downloads failed: '.length);
+  }
   if (text.indexOf('Export load failed: ') === 0) {
     return '导出读取数据失败：' + text.substring('Export load failed: '.length);
   }
@@ -852,6 +874,7 @@ export function zhText(text: string): string {
     case 'Built-in hosts': return '内置 hosts';
     case 'Built EX hosts': return '内置 EX hosts';
     case 'DNS over HTTPS': return 'DNS over HTTPS';
+    case 'Secure DNS (DoH)': return '安全 DNS（DoH）';
     case 'Domain fronting': return '域名前置';
     case 'Direct connection check': return '直连检测';
     case 'Direct connection available, domain fronting disabled': return '可直接访问，已关闭域名前置';
@@ -1013,6 +1036,7 @@ export function zhText(text: string): string {
     case 'Force bundled host overrides; leave Off for normal Cloudflare DNS': return '强制使用内置 host；正常 Cloudflare DNS 请保持关闭';
     case 'Force bundled ExHentai host overrides; leave Off unless your network needs them': return '强制使用内置 ExHentai host；仅在网络需要时开启';
     case 'Use DoH resolver': return '使用 DoH 解析器';
+    case 'Resolve DNS pollution in some regions': return '解决某些地区的 DNS 污染问题';
     case 'Original network compatibility switch': return '原应用网络兼容性开关';
     case 'Bypass SNI blocking using built-in host fronting': return '使用内置 hosts 绕过 SNI 封锁';
     case 'Use direct connection when the selected site responds within 3s': return '所选站点 3 秒内可直连时不使用 hosts 和域名前置';
@@ -2203,7 +2227,8 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
     }
     rows.push(optionSettingsRow('built_in_hosts', 'Built-in hosts', 'Force bundled host overrides; leave Off for normal Cloudflare DNS', entries, ON_OFF_OPTIONS));
     rows.push(optionSettingsRow('built_ex_hosts', 'Built EX hosts', 'Force bundled ExHentai host overrides; leave Off unless your network needs them', entries, ON_OFF_OPTIONS));
-    rows.push(optionSettingsRow('dns_over_https', 'DNS over HTTPS', 'Use DoH resolver', entries, ON_OFF_OPTIONS));
+    rows.push(optionSettingsRow('dns_over_https', 'Secure DNS (DoH)', 'Resolve DNS pollution in some regions',
+      entries, ON_OFF_OPTIONS));
     rows.push(optionSettingsRow('domain_fronting', 'Domain fronting', 'Bypass SNI blocking using built-in host fronting', entries, ON_OFF_OPTIONS));
     rows.push(optionSettingsRow('auto_direct_connection', 'Direct connection check', 'Use direct connection when the selected site responds within 3s', entries, ON_OFF_OPTIONS));
     rows.push(staticSettingsRow('export_data', 'Export data', 'Save settings, history, downloads and filter rules to a JSON file', 'Export', 'action'));

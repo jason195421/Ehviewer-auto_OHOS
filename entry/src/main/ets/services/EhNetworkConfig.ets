@@ -142,8 +142,9 @@ function ensureFrontingQualityCacheLoaded(): void {
 export function applyEhNetworkOptions(options: http.HttpRequestOptions, plan: EhRequestPlan): void {
   options.usingCache = false;
   options.usingProxy = proxyOption();
-  if (ehSettingsStore.getValue('dns_over_https', 'Off') === 'On') {
-    options.dnsOverHttps = DOH_URL;
+  const dohUrl = currentDnsOverHttpsUrl();
+  if (dohUrl.length > 0) {
+    options.dnsOverHttps = dohUrl;
   }
   if (plan.fronted) {
     options.remoteValidation = 'skip';
@@ -805,7 +806,8 @@ function directProbeKeyValue(): string {
   if (ehSettingsStore.getValue('auto_direct_connection', 'On') !== 'On') {
     return 'Off';
   }
-  return ehSettingsStore.getValue('gallery_site', 'E-Hentai') + ':' + proxySettingsKey();
+  return ehSettingsStore.getValue('gallery_site', 'E-Hentai') + ':' + proxySettingsKey() + ':' +
+    dohSettingsKey();
 }
 
 function selectedGalleryHost(): string {
@@ -831,6 +833,10 @@ async function probeDirectSelectedSite(): Promise<boolean> {
       connectTimeout: DIRECT_PROBE_TIMEOUT_MS,
       readTimeout: DIRECT_PROBE_TIMEOUT_MS
     };
+    const dohUrl = currentDnsOverHttpsUrl();
+    if (dohUrl.length > 0) {
+      options.dnsOverHttps = dohUrl;
+    }
     const response = await requestWithProbeDeadline(request, 'https://' + host + '/', options, DIRECT_PROBE_TIMEOUT_MS);
     const statusCode = Number(response.responseCode);
     return statusCode > 0 && statusCode < 500;
@@ -860,7 +866,8 @@ function frontingBenchmarkKey(): string {
   }
   return ehSettingsStore.getValue('built_in_hosts', 'Off') + ':' +
     ehSettingsStore.getValue('built_ex_hosts', 'Off') + ':' +
-    proxySettingsKey();
+    proxySettingsKey() + ':' +
+    dohSettingsKey();
 }
 
 function requestHost(url: string): string {
@@ -948,6 +955,19 @@ function proxySettingsKey(): string {
     ehSettingsStore.getValue('proxy_username', '') + ':' +
     hashText(ehSettingsStore.getValue('proxy_password', '')) + ':' +
     ehSettingsStore.getValue('proxy_exclusion_list', '');
+}
+
+export function currentDnsOverHttpsUrl(): string {
+  return ehSettingsStore.getValue('dns_over_https', 'Off') === 'On' ? DOH_URL : '';
+}
+
+export function currentDnsOverHttpsStatusText(): string {
+  const url = currentDnsOverHttpsUrl();
+  return url.length > 0 ? 'On ' + url : 'Off';
+}
+
+function dohSettingsKey(): string {
+  return ehSettingsStore.getValue('dns_over_https', 'Off');
 }
 
 function hashText(value: string): string {
