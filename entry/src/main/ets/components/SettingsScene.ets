@@ -14,6 +14,7 @@ import {
 } from '../services/EhDownloadFileStore';
 import { DownloadInfo, DownloadLabel, DownloadState, ehDownloadStore } from '../services/EhDownloadStore';
 import { ehHistoryStore } from '../services/EhHistoryStore';
+import { ehLocalFavoritesStore } from '../services/EhLocalFavoritesStore';
 import {
   DownloadMetadataRestoreResult,
   rebuildImportedHistoryMetadata,
@@ -809,7 +810,8 @@ export struct SettingsScene {
       ehSettingsStore.load(context),
       ehHistoryStore.load(context),
       ehDownloadStore.load(context),
-      ehFilterStore.load(context)
+      ehFilterStore.load(context),
+      ehLocalFavoritesStore.ensureLoaded(context)
     ]).then(() => {
       const bundle: EhBackupBundle = {
         version: 1,
@@ -819,7 +821,8 @@ export struct SettingsScene {
         history: ehHistoryStore.getItems(),
         downloadItems: ehDownloadStore.getItems(),
         downloadLabels: ehDownloadStore.getLabels(),
-        filterRules: ehFilterStore.getRules()
+        filterRules: ehFilterStore.getRules(),
+        localFavorites: ehLocalFavoritesStore.getBackupItems()
       };
       const json = JSON.stringify(bundle, null, 2);
 
@@ -1091,6 +1094,14 @@ export struct SettingsScene {
           }
           saves.push(ehFilterStore.save(context));
           this.filterRules = ehFilterStore.getRules();
+        }
+
+        if (Array.isArray(bundle.localFavorites)) {
+          const localFavorites = bundle.localFavorites;
+          saves.push(ehLocalFavoritesStore.ensureLoaded(context).then(() => {
+            ehLocalFavoritesStore.importBackupItems(localFavorites);
+            return ehLocalFavoritesStore.save(context);
+          }));
         }
 
         Promise.all(saves).then(() => {

@@ -5,7 +5,7 @@ import { GalleryCategory, GalleryInfo, GalleryTagGroup } from '../model/GalleryM
 const PREFERENCES_NAME: string = 'ehviewer_local_favorites';
 const VALUES_KEY: string = 'items';
 
-interface StoredLocalFavoriteInfo {
+export interface LocalFavoriteBackupInfo {
   gid?: number;
   token?: string;
   title?: string;
@@ -94,6 +94,22 @@ export class EhLocalFavoritesStore {
     return true;
   }
 
+  getBackupItems(): LocalFavoriteBackupInfo[] {
+    return this.snapshot();
+  }
+
+  importBackupItems(items: LocalFavoriteBackupInfo[]): number {
+    let changed = 0;
+    for (let i = 0; i < items.length; i++) {
+      const gallery = storedLocalFavoriteToGallery(items[i]);
+      if (gallery !== null) {
+        this.putGallery(gallery, typeof items[i].time === 'number' ? items[i].time as number : Date.now(), false);
+        changed++;
+      }
+    }
+    return changed;
+  }
+
   async save(context: common.UIAbilityContext): Promise<void> {
     this.context = context;
     await this.saveSnapshot(context, this.snapshot());
@@ -136,7 +152,7 @@ export class EhLocalFavoritesStore {
       const prefs = await preferences.getPreferences(context, { name: PREFERENCES_NAME });
       const raw = await prefs.get(VALUES_KEY, '[]');
       const text = typeof raw === 'string' ? raw : '[]';
-      const parsed = JSON.parse(text) as StoredLocalFavoriteInfo[];
+      const parsed = JSON.parse(text) as LocalFavoriteBackupInfo[];
       const next: LocalFavoriteEntry[] = [];
       for (let i = 0; i < parsed.length; i++) {
         const stored = parsed[i];
@@ -168,13 +184,13 @@ export class EhLocalFavoritesStore {
     }).catch(() => {});
   }
 
-  private snapshot(): StoredLocalFavoriteInfo[] {
-    return this.items.map((entry: LocalFavoriteEntry): StoredLocalFavoriteInfo => {
+  private snapshot(): LocalFavoriteBackupInfo[] {
+    return this.items.map((entry: LocalFavoriteEntry): LocalFavoriteBackupInfo => {
       return galleryToStoredLocalFavorite(entry.gallery, entry.time);
     });
   }
 
-  private async saveSnapshot(context: common.UIAbilityContext, snapshot: StoredLocalFavoriteInfo[]): Promise<void> {
+  private async saveSnapshot(context: common.UIAbilityContext, snapshot: LocalFavoriteBackupInfo[]): Promise<void> {
     try {
       const prefs = await preferences.getPreferences(context, { name: PREFERENCES_NAME });
       await prefs.put(VALUES_KEY, JSON.stringify(snapshot));
@@ -194,7 +210,7 @@ export class EhLocalFavoritesStore {
   }
 }
 
-function storedLocalFavoriteToGallery(stored: StoredLocalFavoriteInfo): GalleryInfo | null {
+function storedLocalFavoriteToGallery(stored: LocalFavoriteBackupInfo): GalleryInfo | null {
   if (typeof stored.gid !== 'number' || stored.gid <= 0 || typeof stored.token !== 'string' ||
     stored.token.length === 0) {
     return null;
@@ -223,7 +239,7 @@ function storedLocalFavoriteToGallery(stored: StoredLocalFavoriteInfo): GalleryI
   };
 }
 
-function galleryToStoredLocalFavorite(gallery: GalleryInfo, time: number): StoredLocalFavoriteInfo {
+function galleryToStoredLocalFavorite(gallery: GalleryInfo, time: number): LocalFavoriteBackupInfo {
   return {
     gid: gallery.gid,
     token: gallery.token,

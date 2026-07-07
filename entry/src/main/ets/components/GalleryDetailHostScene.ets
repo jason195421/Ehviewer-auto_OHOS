@@ -109,6 +109,7 @@ function parseDefaultFavoriteSlot(value: string): number | null {
 @Component
 struct AddFavoriteDialog {
   @Prop remember: boolean = false;
+  @Prop panelMaxHeight: number = 680;
   onRememberChange: (remember: boolean) => void = (_remember: boolean) => {};
   onSelect: (slot: number) => void = (_slot: number) => {};
   onClose: () => void = () => {};
@@ -181,7 +182,8 @@ struct AddFavoriteDialog {
             }
           }, (item: FavoriteSlotOption) => item.slot.toString())
         }
-        .height(52 * 11)
+        .layoutWeight(1)
+        .constraintSize({ maxHeight: Math.max(220, this.panelMaxHeight - 112) })
         .width('100%')
 
         Divider().color(themeDividerColor()).strokeWidth(0.5)
@@ -209,7 +211,7 @@ struct AddFavoriteDialog {
         })
       }
       .width('86%')
-      .constraintSize({ maxWidth: 420 })
+      .constraintSize({ maxWidth: 420, maxHeight: this.panelMaxHeight })
       .backgroundColor(themeSurface())
       .borderRadius(10)
       .shadow({ radius: 24, color: themeShadowColor(), offsetX: 0, offsetY: 8 })
@@ -309,6 +311,7 @@ export struct GalleryDetailHostScene {
   @State archiverInfo: ArchiverInfo = { funds: '', options: [] };
   @State hathArchiveList: HathArchiveList = { formParamOr: '', options: [] };
   @State commentGalleryLink: GalleryDetailLink = createEmptyGalleryDetailLink();
+  @State viewportHeight: number = 0;
 
   aboutToAppear(): void {
     this.loadDetailFromLink();
@@ -717,6 +720,13 @@ export struct GalleryDetailHostScene {
     this.rememberFavoriteSlot = false;
     this.addFavoriteDialogVisible = true;
     this.renderVersion++;
+  }
+
+  private addFavoriteDialogMaxHeight(): number {
+    if (this.viewportHeight <= 0) {
+      return 680;
+    }
+    return Math.max(320, this.viewportHeight - 48);
   }
 
   private selectFavoriteSlot(slot: number): void {
@@ -1305,6 +1315,7 @@ export struct GalleryDetailHostScene {
       if (this.addFavoriteDialogVisible) {
         AddFavoriteDialog({
           remember: this.rememberFavoriteSlot,
+          panelMaxHeight: this.addFavoriteDialogMaxHeight(),
           onRememberChange: (remember: boolean) => {
             this.rememberFavoriteSlot = remember;
             this.renderVersion++;
@@ -1323,5 +1334,11 @@ export struct GalleryDetailHostScene {
     }
     .width('100%')
     .height('100%')
+    .onAreaChange((_oldArea: Area, newArea: Area) => {
+      const h = newArea.height as number;
+      if (h > 0 && !Number.isNaN(h)) {
+        this.viewportHeight = h;
+      }
+    })
   }
 }

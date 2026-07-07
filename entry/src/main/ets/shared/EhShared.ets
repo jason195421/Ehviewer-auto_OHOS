@@ -18,6 +18,7 @@ import { EhUrl, ListMode } from '../services/EhUrl';
 import { readerImageCache } from '../services/ReaderImageCache';
 import { previewThumbnailCache } from '../services/PreviewThumbnailCache';
 import { FilterRule, ehFilterStore } from '../services/EhFilterStore';
+import { LocalFavoriteBackupInfo } from '../services/EhLocalFavoritesStore';
 import { EH_AUTHOR_NAME, EH_RELEASE_TAG } from '../services/EhBuildInfo';
 import {
   EH_THEME_PRIMARY_COLOR,
@@ -54,6 +55,7 @@ export interface EhBackupBundle {
   downloadItems: DownloadInfo[];
   downloadLabels: DownloadLabel[];
   filterRules: FilterRule[];
+  localFavorites?: LocalFavoriteBackupInfo[];
 }
 
 export const LANGUAGE_REVISION_KEY: string = 'ehviewer_language_revision';
