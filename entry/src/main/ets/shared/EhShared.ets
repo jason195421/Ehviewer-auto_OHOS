@@ -1056,7 +1056,7 @@ export function zhText(text: string): string {
     case 'Resolve DNS pollution in some regions': return '解决某些地区的 DNS 污染问题';
     case 'Original network compatibility switch': return '原应用网络兼容性开关';
     case 'Bypass SNI blocking using built-in host fronting': return '使用内置 hosts 绕过 SNI 封锁';
-    case 'Use direct connection when the selected site responds within 3s': return '所选站点 3 秒内可直连时不使用 hosts 和域名前置';
+    case 'Use direct connection when the selected site responds within 5s': return '所选站点 5 秒内可直连时不使用 hosts 和域名前置';
     case 'Export data': return '导出数据';
     case 'Save settings, history, downloads and filter rules to a JSON file': return '将设置、历史记录、下载和过滤规则保存为 JSON 文件';
     case 'Import data': return '导入数据';
@@ -2247,7 +2247,7 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
     rows.push(optionSettingsRow('dns_over_https', 'Secure DNS (DoH)', 'Resolve DNS pollution in some regions',
       entries, ON_OFF_OPTIONS));
     rows.push(optionSettingsRow('domain_fronting', 'Domain fronting', 'Bypass SNI blocking using built-in host fronting', entries, ON_OFF_OPTIONS));
-    rows.push(optionSettingsRow('auto_direct_connection', 'Direct connection check', 'Use direct connection when the selected site responds within 3s', entries, ON_OFF_OPTIONS));
+    rows.push(optionSettingsRow('auto_direct_connection', 'Direct connection check', 'Use direct connection when the selected site responds within 5s', entries, ON_OFF_OPTIONS));
     rows.push(staticSettingsRow('export_data', 'Export data', 'Save settings, history, downloads and filter rules to a JSON file', 'Export', 'action'));
     rows.push(staticSettingsRow('import_data', 'Import data', 'Restore from a JSON backup or Android exported database', 'Import', 'action'));
     rows.push(staticSettingsRow('wifi_transfer', 'Wi-Fi server/client', 'Original Wi-Fi transfer tools', 'Not migrated', 'activity'));
