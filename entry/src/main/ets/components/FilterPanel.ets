@@ -2,7 +2,6 @@ import {
   FilterRule,
   FILTER_MODE_RATING,
   FILTER_MODE_TAG,
-  FILTER_MODE_TAG_NAMESPACE,
   FILTER_MODE_TITLE,
   FILTER_MODE_UPLOADER
 } from '../services/EhFilterStore';
@@ -65,14 +64,14 @@ export struct FilterPanel {
   }
 
   onNewModeChanged(): void {
-    this.draftMode = this.newMode;
+    this.draftMode = supportedPanelMode(this.newMode);
     this.refreshTagSuggestions();
   }
 
   private syncAllProps(): void {
     this.displayRules = cloneFilterRules(this.rules);
     this.draftText = this.newText;
-    this.draftMode = this.newMode;
+    this.draftMode = supportedPanelMode(this.newMode);
     this.refreshTagSuggestions();
   }
 
@@ -82,9 +81,6 @@ export struct FilterPanel {
     }
     if (mode === FILTER_MODE_TAG) {
       return uiText('Tag');
-    }
-    if (mode === FILTER_MODE_TAG_NAMESPACE) {
-      return uiText('Namespaced tag');
     }
     if (mode === FILTER_MODE_RATING) {
       return uiText('Rating');
@@ -99,18 +95,15 @@ export struct FilterPanel {
     if (this.draftMode === FILTER_MODE_TAG) {
       return uiText('Tag');
     }
-    if (this.draftMode === FILTER_MODE_TAG_NAMESPACE) {
-      return 'female:yuri';
-    }
     return uiText('Title');
   }
 
   private modeValues(): number[] {
-    return [FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, FILTER_MODE_TAG_NAMESPACE, FILTER_MODE_RATING];
+    return [FILTER_MODE_TITLE, FILTER_MODE_UPLOADER, FILTER_MODE_TAG, FILTER_MODE_RATING];
   }
 
   private tagModeActive(): boolean {
-    return this.draftMode === FILTER_MODE_TAG || this.draftMode === FILTER_MODE_TAG_NAMESPACE;
+    return this.draftMode === FILTER_MODE_TAG;
   }
 
   private selectedTagNamespaceKey(): string {
@@ -151,7 +144,7 @@ export struct FilterPanel {
       }
       return rule.text;
     }
-    if (rule.mode === FILTER_MODE_TAG || rule.mode === FILTER_MODE_TAG_NAMESPACE) {
+    if (rule.mode === FILTER_MODE_TAG) {
       return formatTagRuleText(rule.text);
     }
     return rule.text;
@@ -163,8 +156,9 @@ export struct FilterPanel {
   }
 
   private updateDraftMode(mode: number): void {
-    this.draftMode = mode;
-    this.onNewModeChange(mode);
+    const normalizedMode = supportedPanelMode(mode);
+    this.draftMode = normalizedMode;
+    this.onNewModeChange(normalizedMode);
     this.refreshTagSuggestions();
   }
 
@@ -372,6 +366,8 @@ export struct FilterPanel {
           this.rulesContent()
         }
         .width('100%')
+        .height('100%')
+        .alignItems(HorizontalAlign.Start)
         .padding({ left: 14, right: 14, top: 4, bottom: 24 })
       }
       .layoutWeight(1)
@@ -528,6 +524,14 @@ function activeFilterTagText(text: string): string {
   const trimmed = text.trim();
   const colon = trimmed.indexOf(':');
   return colon < 0 ? trimmed : trimmed.substring(colon + 1).trim();
+}
+
+function supportedPanelMode(mode: number): number {
+  if (mode === FILTER_MODE_TITLE || mode === FILTER_MODE_UPLOADER || mode === FILTER_MODE_TAG ||
+    mode === FILTER_MODE_RATING) {
+    return mode;
+  }
+  return FILTER_MODE_TITLE;
 }
 
 function formatTagRuleText(text: string): string {

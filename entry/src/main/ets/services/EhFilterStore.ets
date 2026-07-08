@@ -8,7 +8,6 @@ const VALUES_KEY: string = 'filters';
 export const FILTER_MODE_TITLE: number = 0;
 export const FILTER_MODE_UPLOADER: number = 1;
 export const FILTER_MODE_TAG: number = 2;
-export const FILTER_MODE_TAG_NAMESPACE: number = 3;
 export const FILTER_MODE_RATING: number = 4;
 
 export interface FilterRule {
@@ -34,6 +33,9 @@ export class EhFilterStore {
   }
 
   addRule(mode: number, text: string, enabled: boolean = true): boolean {
+    if (!isSupportedRuleMode(mode)) {
+      return false;
+    }
     const normalized = normalizeRuleText(mode, text);
     if (normalized.length === 0) {
       return false;
@@ -101,6 +103,9 @@ export class EhFilterStore {
         const item = parsed[i];
         if (typeof item.text === 'string' && item.text.length > 0) {
           const mode = typeof item.mode === 'number' ? item.mode : FILTER_MODE_TITLE;
+          if (!isSupportedRuleMode(mode)) {
+            continue;
+          }
           const normalizedText = normalizeRuleText(mode, item.text);
           if (normalizedText.length === 0) {
             continue;
@@ -147,13 +152,15 @@ function matchesRule(rule: FilterRule, gallery: GalleryInfo): boolean {
   if (rule.mode === FILTER_MODE_TAG) {
     return galleryHasTag(gallery, text);
   }
-  if (rule.mode === FILTER_MODE_TAG_NAMESPACE) {
-    return galleryHasTagWithNamespace(gallery, text);
-  }
   if (rule.mode === FILTER_MODE_RATING) {
     return galleryMatchesRating(gallery, text);
   }
   return false;
+}
+
+function isSupportedRuleMode(mode: number): boolean {
+  return mode === FILTER_MODE_TITLE || mode === FILTER_MODE_UPLOADER || mode === FILTER_MODE_TAG ||
+    mode === FILTER_MODE_RATING;
 }
 
 function normalizeRuleText(mode: number, text: string): string {
@@ -165,7 +172,7 @@ function normalizeRuleText(mode: number, text: string): string {
     }
     return rating.toString();
   }
-  if (mode === FILTER_MODE_TAG || mode === FILTER_MODE_TAG_NAMESPACE) {
+  if (mode === FILTER_MODE_TAG) {
     return normalizeTagText(trimmed);
   }
   return trimmed;

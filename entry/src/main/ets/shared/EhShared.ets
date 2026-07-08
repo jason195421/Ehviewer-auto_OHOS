@@ -772,7 +772,6 @@ export function zhText(text: string): string {
     case 'Uploader': return '上传者';
     case 'Tag': return '标签';
     case 'Tag:Namespace': return '标签:命名空间';
-    case 'Namespaced tag': return '命名空间标签';
     case 'Title': return '标题';
     case 'Add': return '添加';
     case 'Remove': return '删除';
