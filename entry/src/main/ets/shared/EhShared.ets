@@ -2885,8 +2885,14 @@ export function readerLocalImageSource(path: string): string {
 
 function localImagePathExists(path: string): boolean {
   const localPath = path.startsWith('file://') ? path.substring('file://'.length) : path;
+  if (localPath.length === 0 || localPath.endsWith('.part')) {
+    return false;
+  }
   try {
-    return fs.accessSync(localPath);
+    if (!fs.accessSync(localPath)) {
+      return false;
+    }
+    return fs.statSync(localPath).size > 0;
   } catch (error) {
     return false;
   }

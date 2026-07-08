@@ -1660,7 +1660,7 @@ function buildRequestHeader(plan: EhRequestPlan, referer: string, cookieHeader: 
     'Accept-Language': CHROME_ACCEPT_LANGUAGE,
     'Referer': referer,
     'Cache-Control': maxAge > 0 ? 'max-age=' + maxAge.toString() : 'no-cache',
-    'Connection': plan.fronted ? 'close' : 'keep-alive'
+    'Connection': 'close'
   };
   if (cookieHeader.length > 0) {
     header.Cookie = cookieHeader;
@@ -1678,7 +1678,7 @@ function buildPostRequestHeader(plan: EhRequestPlan, referer: string, origin: st
     'Referer': referer,
     'Cache-Control': 'no-cache',
     'Pragma': 'no-cache',
-    'Connection': plan.fronted ? 'close' : 'keep-alive',
+    'Connection': 'close',
     'Content-Type': 'application/x-www-form-urlencoded',
     'Origin': origin
   };
@@ -1698,7 +1698,7 @@ function buildJsonRequestHeader(plan: EhRequestPlan, referer: string, origin: st
     'Referer': referer,
     'Cache-Control': 'no-cache',
     'Pragma': 'no-cache',
-    'Connection': plan.fronted ? 'close' : 'keep-alive',
+    'Connection': 'close',
     'Content-Type': 'application/json',
     'Origin': origin
   };
@@ -1718,7 +1718,7 @@ function buildMultipartRequestHeader(plan: EhRequestPlan, referer: string, origi
     'Referer': referer,
     'Cache-Control': 'no-cache',
     'Pragma': 'no-cache',
-    'Connection': plan.fronted ? 'close' : 'keep-alive',
+    'Connection': 'close',
     'Content-Type': contentType,
     'Origin': origin
   };

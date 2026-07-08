@@ -82,7 +82,7 @@ export class ReaderImageCache {
     }
 
     const path = this.pathFor(context, imageUrl, cacheKey);
-    if (exists(path)) {
+    if (isUsableCachedImage(path)) {
       return path;
     }
     const cached = this.migrateExistingCache(context, imageUrl, path);
@@ -121,7 +121,7 @@ export class ReaderImageCache {
     }
 
     const path = this.pathFor(context, imageUrl, cacheKey);
-    if (exists(path)) {
+    if (isUsableCachedImage(path)) {
       return path;
     }
     return this.migrateExistingCache(context, imageUrl, path);
@@ -284,7 +284,7 @@ export class ReaderImageCache {
     ];
     for (let i = 0; i < candidates.length; i++) {
       const candidate = candidates[i];
-      if (candidate === path || !exists(candidate)) {
+      if (candidate === path || !isUsableCachedImage(candidate)) {
         continue;
       }
       if (migrateLegacyImageCacheFile(candidate, path)) {
@@ -303,7 +303,7 @@ function buildImageRequestHeader(plan: EhRequestPlan, referer: string, cookieHea
     'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
     'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
     'Referer': referer,
-    'Connection': plan.fronted ? 'close' : 'keep-alive'
+    'Connection': 'close'
   };
   if (cookieHeader.length > 0) {
     header.Cookie = cookieHeader;
@@ -707,6 +707,13 @@ function clearImageCacheDirectory(directory: string): CacheClearResult {
   return { files: files, bytes: bytes };
 }
 
+function isUsableCachedImage(path: string): boolean {
+  if (path.length === 0 || path.endsWith('.part')) {
+    return false;
+  }
+  return statFileSize(path) > 0;
+}
+
 function statFileSize(path: string): number {
   try {
     return fs.statSync(path).size;
@@ -837,6 +844,10 @@ function scanImageCacheDirectory(directory: string): CachedImageFile[] {
       try {
         const stat = fs.statSync(path);
         if (stat.isDirectory()) {
+          continue;
+        }
+        if (path.endsWith('.part')) {
+          removeFileQuietly(path);
           continue;
         }
         files.push({

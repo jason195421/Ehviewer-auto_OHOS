@@ -143,13 +143,13 @@ function ensureFrontingQualityCacheLoaded(): void {
 export function applyEhNetworkOptions(options: http.HttpRequestOptions, plan: EhRequestPlan): void {
   options.usingCache = false;
   options.usingProxy = proxyOption();
+  options.usingProtocol = http.HttpProtocol.HTTP1_1;
   const dohUrl = currentDnsOverHttpsUrl();
   if (dohUrl.length > 0) {
     options.dnsOverHttps = dohUrl;
   }
   if (plan.fronted) {
     options.remoteValidation = 'skip';
-    options.usingProtocol = http.HttpProtocol.HTTP1_1;
   }
   if (deviceInfo.apiAvailable(23)) {
     if (plan.sniHost.length > 0) {

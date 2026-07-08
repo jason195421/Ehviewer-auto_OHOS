@@ -1,4 +1,5 @@
 import { image } from '@kit.ImageKit';
+import { fileIo as fs } from '@kit.CoreFileKit';
 import { GalleryPage } from '../../../model/GalleryModels';
 import { ehSettingsStore } from '../../../services/EhSettingsStore';
 import { readerImageCache } from '../../../services/ReaderImageCache';
@@ -73,16 +74,16 @@ export function stripFileScheme(path: string): string {
 
 export function readerLocalSourceImagePath(page: GalleryPage, preferOriginal: boolean): string {
   if (preferOriginal && page.cachedOriginImagePath !== undefined && page.cachedOriginImagePath.length > 0) {
-    return stripFileScheme(page.cachedOriginImagePath);
+    return usableReaderLocalPath(stripFileScheme(page.cachedOriginImagePath));
   }
   if (!preferOriginal && page.cachedImagePath !== undefined && page.cachedImagePath.length > 0) {
-    return stripFileScheme(page.cachedImagePath);
+    return usableReaderLocalPath(stripFileScheme(page.cachedImagePath));
   }
   if (page.cachedImagePath !== undefined && page.cachedImagePath.length > 0) {
-    return stripFileScheme(page.cachedImagePath);
+    return usableReaderLocalPath(stripFileScheme(page.cachedImagePath));
   }
   if (page.cachedOriginImagePath !== undefined && page.cachedOriginImagePath.length > 0) {
-    return stripFileScheme(page.cachedOriginImagePath);
+    return usableReaderLocalPath(stripFileScheme(page.cachedOriginImagePath));
   }
   const displayUrl = readerDisplayImageUrl(page, preferOriginal);
   if (displayUrl.indexOf('file://') === 0) {
@@ -95,6 +96,17 @@ export function readerLocalSourceImagePath(page: GalleryPage, preferOriginal: bo
   const sourceUrl = preferOriginal && page.originImageUrl.length > 0 ? page.originImageUrl : page.imageUrl;
   return readerImageCache.getCachedPath(context, sourceUrl,
     readerPageImageCacheKey(page, preferOriginal && page.originImageUrl.length > 0));
+}
+
+function usableReaderLocalPath(path: string): string {
+  if (path.length === 0 || path.endsWith('.part')) {
+    return '';
+  }
+  try {
+    return fs.statSync(path).size > 0 ? path : '';
+  } catch (error) {
+    return '';
+  }
 }
 
 export async function readReaderSourceImageSize(path: string): Promise<ReaderSourceImageSize> {

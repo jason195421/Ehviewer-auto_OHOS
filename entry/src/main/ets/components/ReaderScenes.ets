@@ -2,7 +2,7 @@ import { window } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import { uniformTypeDescriptor as utd } from '@kit.ArkData';
 import { batteryInfo } from '@kit.BasicServicesKit';
-import { fileUri, picker } from '@kit.CoreFileKit';
+import { fileIo as fs, fileUri, picker } from '@kit.CoreFileKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { systemShare } from '@kit.ShareKit';
 import inputConsumer from '@ohos.multimodalInput.inputConsumer';
@@ -976,16 +976,16 @@ export struct ReaderScene {
 
   private localImagePathForPage(page: GalleryPage): string {
     if (this.preferOriginal && page.cachedOriginImagePath !== undefined && page.cachedOriginImagePath.length > 0) {
-      return stripFileScheme(page.cachedOriginImagePath);
+      return usableReaderLocalPath(stripFileScheme(page.cachedOriginImagePath));
     }
     if (!this.preferOriginal && page.cachedImagePath !== undefined && page.cachedImagePath.length > 0) {
-      return stripFileScheme(page.cachedImagePath);
+      return usableReaderLocalPath(stripFileScheme(page.cachedImagePath));
     }
     if (page.cachedImagePath !== undefined && page.cachedImagePath.length > 0) {
-      return stripFileScheme(page.cachedImagePath);
+      return usableReaderLocalPath(stripFileScheme(page.cachedImagePath));
     }
     if (page.cachedOriginImagePath !== undefined && page.cachedOriginImagePath.length > 0) {
-      return stripFileScheme(page.cachedOriginImagePath);
+      return usableReaderLocalPath(stripFileScheme(page.cachedOriginImagePath));
     }
     return '';
   }
@@ -1599,5 +1599,16 @@ export struct ReaderScene {
     const visualIndex = this.visualIndexForPageIndex(this.currentIndex);
     const targetVisualIndex = visualIndex + (direction < 0 ? 1 : -1);
     this.jumpTo(this.pageIndexForVisualIndex(targetVisualIndex));
+  }
+}
+
+function usableReaderLocalPath(path: string): string {
+  if (path.length === 0 || path.endsWith('.part')) {
+    return '';
+  }
+  try {
+    return fs.statSync(path).size > 0 ? path : '';
+  } catch (error) {
+    return '';
   }
 }
