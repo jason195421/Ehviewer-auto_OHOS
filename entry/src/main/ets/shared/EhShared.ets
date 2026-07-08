@@ -584,6 +584,9 @@ export function uiStatusText(text: string): string {
   if (text === 'Bookmark updated') {
     return '书签已更新';
   }
+  if (text === 'Bookmark update failed') {
+    return '书签更新失败';
+  }
   return uiText(text);
 }
 

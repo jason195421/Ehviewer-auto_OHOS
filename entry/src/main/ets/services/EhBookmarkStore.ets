@@ -66,7 +66,7 @@ export class EhBookmarkStore {
 
   addBookmark(bookmark: SearchBookmarkInfo): boolean {
     const normalized = normalizeBookmark(bookmark);
-    if (normalized === null || this.hasEquivalent(normalized) || this.hasName(normalized.name)) {
+    if (normalized === null || this.hasEquivalent(normalized)) {
       return false;
     }
     const next = cloneBookmarks(this.items);
@@ -81,9 +81,6 @@ export class EhBookmarkStore {
     const normalized = backupToBookmark(bookmark);
     if (normalized === null || this.hasEquivalent(normalized)) {
       return false;
-    }
-    if (this.hasName(normalized.name)) {
-      normalized.name = uniqueBookmarkName(normalized.name, this.items);
     }
     const next = cloneBookmarks(this.items);
     next.push(normalized);
@@ -120,11 +117,6 @@ export class EhBookmarkStore {
       return false;
     }
     const next = cloneBookmarks(this.items);
-    for (let i = 0; i < next.length; i++) {
-      if (next[i].id !== id && next[i].name === trimmed) {
-        return false;
-      }
-    }
     let changed = false;
     for (let i = 0; i < next.length; i++) {
       if (next[i].id === id) {
@@ -183,16 +175,6 @@ export class EhBookmarkStore {
   hasEquivalent(bookmark: SearchBookmarkInfo): boolean {
     for (let i = 0; i < this.items.length; i++) {
       if (bookmarksEquivalent(this.items[i], bookmark)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  hasName(name: string): boolean {
-    const normalized = name.trim();
-    for (let i = 0; i < this.items.length; i++) {
-      if (this.items[i].name === normalized) {
         return true;
       }
     }
@@ -337,9 +319,6 @@ function normalizeBookmarkMode(mode: number): ListMode {
 }
 
 function normalizeBookmarkCategory(category: number): number {
-  if (category === ALL_CATEGORY || category === 0) {
-    return GalleryCategory.None;
-  }
   if (category < 0) {
     return GalleryCategory.None;
   }
@@ -422,25 +401,6 @@ function locationForMode(mode: number): GalleryRoute {
     return GalleryRoute.WhatsHot;
   }
   return GalleryRoute.Home;
-}
-
-function uniqueBookmarkName(name: string, existing: SearchBookmarkInfo[]): string {
-  let candidate = name;
-  let suffix = 2;
-  while (bookmarkNameExists(candidate, existing)) {
-    candidate = name + ' ' + suffix.toString();
-    suffix++;
-  }
-  return candidate;
-}
-
-function bookmarkNameExists(name: string, existing: SearchBookmarkInfo[]): boolean {
-  for (let i = 0; i < existing.length; i++) {
-    if (existing[i].name === name) {
-      return true;
-    }
-  }
-  return false;
 }
 
 export const ehBookmarkStore: EhBookmarkStore = new EhBookmarkStore();

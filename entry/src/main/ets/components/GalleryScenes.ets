@@ -1969,8 +1969,7 @@ export struct GalleryListScene {
   }
 
   private currentBookmarkCategory(mode: ListMode): number {
-    const category = this.requestCategoryForMode(mode);
-    return category === ALL_CATEGORY ? GalleryCategory.None : category;
+    return this.requestCategoryForMode(mode);
   }
 
   private currentBookmarkDefaultName(mode: ListMode, category: number): string {
@@ -2073,10 +2072,6 @@ export struct GalleryListScene {
       this.statusText = 'Bookmark name is empty';
       return;
     }
-    if (ehBookmarkStore.hasName(name)) {
-      this.statusText = 'Duplicate bookmark name';
-      return;
-    }
     const bookmark = ehBookmarkStore.createBookmark(name, this.addBookmarkDraft.mode, this.addBookmarkDraft.category,
       this.addBookmarkDraft.keyword, this.addBookmarkDraft.advanceSearch, this.addBookmarkDraft.minRating,
       this.addBookmarkDraft.pageFrom, this.addBookmarkDraft.pageTo, this.addBookmarkDraft.filterEnabled,
@@ -2108,7 +2103,7 @@ export struct GalleryListScene {
 
   private renameSearchBookmark(bookmark: SearchBookmarkInfo, name: string): void {
     if (!ehBookmarkStore.renameBookmark(bookmark.id, name)) {
-      this.statusText = name.trim().length === 0 ? 'Bookmark name is empty' : 'Duplicate bookmark name';
+      this.statusText = name.trim().length === 0 ? 'Bookmark name is empty' : 'Bookmark update failed';
       return;
     }
     this.refreshSearchBookmarks();
