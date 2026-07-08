@@ -1191,8 +1191,9 @@ export struct GalleryListScene {
     if (cache === undefined) {
       return;
     }
-    this.showSearchResultScene = cache.showSearchResultScene;
-    this.searchResultDraft = cloneSearchResultDraft(cache.searchResultDraft);
+    this.showSearchResultScene = this.isSearchResultScene ? false : cache.showSearchResultScene;
+    this.searchResultDraft = this.isSearchResultScene ? createEmptySearchResultDraft() :
+      cloneSearchResultDraft(cache.searchResultDraft);
     this.localSearchBarVisible = cache.localSearchBarVisible;
     this.showDetail = cache.showDetail;
     this.restoreDetailWithFade = cache.restoreDetailWithFade;
@@ -1244,8 +1245,9 @@ export struct GalleryListScene {
       return;
     }
     galleryListNavigationCache.set(this.navigationCacheKey(), {
-      showSearchResultScene: this.showSearchResultScene,
-      searchResultDraft: cloneSearchResultDraft(this.searchResultDraft),
+      showSearchResultScene: this.isSearchResultScene ? false : this.showSearchResultScene,
+      searchResultDraft: this.isSearchResultScene ? createEmptySearchResultDraft() :
+        cloneSearchResultDraft(this.searchResultDraft),
       localSearchBarVisible: this.localSearchBarVisible,
       showDetail: this.showDetail,
       restoreDetailWithFade: this.restoreDetailWithFade,
@@ -2569,7 +2571,7 @@ export struct GalleryListScene {
 
   build() {
     Column() {
-      if (this.showSearchResultScene) {
+      if (!this.isSearchResultScene && this.showSearchResultScene) {
         GalleryListScene({
           sceneTitle: this.searchResultDraft.keyword.length > 0 ? this.searchResultDraft.keyword : 'Search',
           listMode: 'Search',
