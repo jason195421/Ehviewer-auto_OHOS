@@ -197,6 +197,7 @@ const galleryListNavigationCache: Map<string, GalleryListNavigationCache> = new 
 let recentFavoriteCat: number = FavListUrlBuilder.FAV_CAT_ALL;
 const ACCOUNT_DEFAULT_FILTER_DISABLE_FLAGS: number = 0x100 | 0x200 | 0x400;
 const IMAGE_SEARCH_FILE_SUFFIXES: string[] = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+const SEARCH_BOOKMARK_DRAG_STEP: number = 84;
 
 function createEmptySearchResultDraft(): SearchResultDraft {
   return {
@@ -767,6 +768,7 @@ struct SearchBookmarkDrawerRow {
           .fontColor(themeSecondaryText())
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .wordBreak(WordBreak.BREAK_ALL)
           .margin({ top: 2 })
       }
       .layoutWeight(1)
@@ -790,7 +792,7 @@ struct SearchBookmarkDrawerRow {
       })
     }
     .width('100%')
-    .height(64)
+    .height(60)
     .padding({ left: 14, right: 12 })
     .alignItems(VerticalAlign.Center)
     .backgroundColor(themeTransparentColor())
@@ -855,7 +857,7 @@ struct SearchBookmarkManagerScene {
         .justifyContent(FlexAlign.Center)
         .alignItems(HorizontalAlign.Center)
       } else {
-        List() {
+        List({ space: 8 }) {
           ForEach(this.bookmarks, (item: SearchBookmarkInfo, index: number) => {
             ListItem() {
               SearchBookmarkManagerRow({
@@ -865,20 +867,21 @@ struct SearchBookmarkManagerScene {
                 onRename: (bookmark: SearchBookmarkInfo, name: string) => {
                   this.onRename(bookmark, name);
                 },
+                onMoveIndex: (from: number, to: number) => {
+                  this.onMoveIndex(from, to);
+                },
                 onDelete: (bookmark: SearchBookmarkInfo) => {
                   this.onDelete(bookmark);
                 }
               })
             }
             .reuseId('search-bookmark-manager-row')
-          }, (item: SearchBookmarkInfo, index: number) => item.id + ':' + item.name + ':' + index.toString())
-            .onMove((from: number, to: number) => {
-              this.onMoveIndex(from, to);
-            })
+          }, (item: SearchBookmarkInfo) => item.id)
         }
         .width('100%')
+        .height('100%')
         .layoutWeight(1)
-        .padding({ left: 10, right: 10, top: 8, bottom: 12 })
+        .padding({ left: 10, right: 10 })
       }
     }
     .width('100%')
@@ -906,9 +909,13 @@ struct SearchBookmarkManagerRow {
   @Prop index: number = 0;
   @Prop total: number = 0;
   onRename: (bookmark: SearchBookmarkInfo, name: string) => void = (_bookmark: SearchBookmarkInfo, _name: string) => {};
+  onMoveIndex: (from: number, to: number) => void = (_from: number, _to: number) => {};
   onDelete: (bookmark: SearchBookmarkInfo) => void = (_bookmark: SearchBookmarkInfo) => {};
   @State draftName: string = '';
+  @State dragOffsetY: number = 0;
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
+  private dragOriginIndex: number = -1;
+  private dragCurrentIndex: number = -1;
 
   aboutToAppear(): void {
     this.draftName = this.item.name;
@@ -916,6 +923,29 @@ struct SearchBookmarkManagerRow {
 
   onItemChanged(): void {
     this.draftName = this.item.name;
+  }
+
+  private clampDragIndex(index: number): number {
+    return Math.max(0, Math.min(this.total - 1, index));
+  }
+
+  private updateDragTarget(offsetY: number): void {
+    if (this.dragOriginIndex < 0 || this.total <= 1) {
+      return;
+    }
+    const steps = Math.round(offsetY / SEARCH_BOOKMARK_DRAG_STEP);
+    const target = this.clampDragIndex(this.dragOriginIndex + steps);
+    if (target === this.dragCurrentIndex) {
+      return;
+    }
+    this.onMoveIndex(this.dragCurrentIndex, target);
+    this.dragCurrentIndex = target;
+  }
+
+  private resetDragState(): void {
+    this.dragOffsetY = 0;
+    this.dragOriginIndex = -1;
+    this.dragCurrentIndex = -1;
   }
 
   build() {
@@ -926,12 +956,34 @@ struct SearchBookmarkManagerRow {
             .fontSize(22)
             .fontColor(themeSecondaryText())
         }
-        .width(36)
+        .width(38)
         .height(38)
         .justifyContent(FlexAlign.Center)
         .alignItems(HorizontalAlign.Center)
         .backgroundColor(themeSurfaceVariant())
         .borderRadius(19)
+        .translate({ y: this.dragOffsetY })
+        .gesture(
+          PanGesture({ fingers: 1, direction: PanDirection.Vertical, distance: 1 })
+            .onActionStart(() => {
+              this.dragOriginIndex = this.index;
+              this.dragCurrentIndex = this.index;
+              this.dragOffsetY = 0;
+            })
+            .onActionUpdate((event: GestureEvent | undefined) => {
+              if (event === undefined) {
+                return;
+              }
+              this.dragOffsetY = event.offsetY;
+              this.updateDragTarget(event.offsetY);
+            })
+            .onActionEnd(() => {
+              this.resetDragState();
+            })
+            .onActionCancel(() => {
+              this.resetDragState();
+            })
+        )
 
         TextInput({ text: this.draftName, placeholder: uiText('Bookmark name') })
           .height(38)
@@ -939,7 +991,7 @@ struct SearchBookmarkManagerRow {
           .fontSize(14)
           .fontColor(themePrimaryText())
           .backgroundColor(themeFieldBackground())
-          .borderRadius(6)
+          .borderRadius(8)
           .padding({ left: 10, right: 10 })
           .onChange((value: string) => {
             this.draftName = value;
@@ -973,7 +1025,6 @@ struct SearchBookmarkManagerRow {
     }
     .width('100%')
     .padding(12)
-    .margin({ bottom: 8 })
     .backgroundColor(themeSurface())
     .borderRadius(8)
   }
@@ -994,6 +1045,7 @@ export struct GalleryListScene {
   initialMinRating: number = -1;
   initialPageFrom: number = -1;
   initialPageTo: number = -1;
+  initialSearchFilterEnabled: boolean = true;
   initialSearchSubmitted: boolean = false;
   initialSearchAdvancedPanelOpened: boolean = false;
   initialImagePath: string = '';
@@ -1293,7 +1345,7 @@ export struct GalleryListScene {
       this.imageSearchOnlyCovers = this.initialImageOnlySearchCovers;
       this.imageSearchShowExpunged = this.initialImageShowExpunged;
       this.filterActive = this.isSearchResultScene ? false : this.searchResultDraft.filterActive;
-      this.searchFilterEnabled = this.isSearchResultScene ? this.searchResultDraft.searchFilterEnabled : true;
+      this.searchFilterEnabled = this.isSearchResultScene ? this.initialSearchFilterEnabled : true;
       this.searchAdvancedPanelOpened = this.isSearchResultScene ?
         (this.searchResultDraft.searchAdvancedPanelOpened || this.initialSearchAdvancedPanelOpened) : false;
       this.searchSubmitted = !this.isSearchResultScene || this.initialSearchSubmitted;
@@ -1956,7 +2008,8 @@ export struct GalleryListScene {
   }
 
   private currentBookmarkCategory(mode: ListMode): number {
-    return this.requestCategoryForMode(mode);
+    const category = this.requestCategoryForMode(mode);
+    return category === ALL_CATEGORY ? GalleryCategory.None : category;
   }
 
   private currentBookmarkDefaultName(mode: ListMode, category: number): string {
@@ -2015,6 +2068,11 @@ export struct GalleryListScene {
       return translated;
     }
     return searchTagTokenLabel(token).replace(/_/g, ' ').replace(/\$/g, ' ').trim();
+  }
+
+  private bookmarkHasAdvancedParams(bookmark: SearchBookmarkInfo): boolean {
+    return bookmark.advanceSearch !== -1 || bookmark.minRating !== -1 || bookmark.pageFrom !== -1 ||
+      bookmark.pageTo !== -1;
   }
 
   private openAddBookmarkDialog(): void {
@@ -2095,19 +2153,20 @@ export struct GalleryListScene {
   }
 
   private openSearchBookmark(bookmark: SearchBookmarkInfo): void {
+    const hasAdvancedParams = this.bookmarkHasAdvancedParams(bookmark);
+    const showSearchOptions = hasAdvancedParams || bookmark.category !== GalleryCategory.None;
     const draft: SearchResultDraft = {
       keyword: bookmark.keyword,
       mode: bookmark.mode,
       category: bookmark.category,
-      advancedEnabled: bookmark.advanceSearch !== -1 || bookmark.minRating !== -1 || bookmark.pageFrom !== -1 ||
-        bookmark.pageTo !== -1,
+      advancedEnabled: hasAdvancedParams,
       advanceSearch: bookmark.advanceSearch === -1 ? DEFAULT_ADVANCE_SEARCH : bookmark.advanceSearch,
       minRating: bookmark.minRating,
       pageFrom: bookmark.pageFrom,
       pageTo: bookmark.pageTo,
       filterActive: false,
       searchFilterEnabled: bookmark.filterEnabled,
-      searchAdvancedPanelOpened: bookmark.advanceSearch !== -1 || bookmark.minRating !== -1,
+      searchAdvancedPanelOpened: showSearchOptions,
       submitted: true,
       sourceRoute: bookmark.location,
       imagePath: '',
@@ -2558,6 +2617,7 @@ export struct GalleryListScene {
           initialMinRating: this.searchResultDraft.minRating,
           initialPageFrom: this.searchResultDraft.pageFrom,
           initialPageTo: this.searchResultDraft.pageTo,
+          initialSearchFilterEnabled: this.searchResultDraft.searchFilterEnabled,
           initialSearchSubmitted: this.searchResultDraft.submitted,
           initialSearchAdvancedPanelOpened: this.searchResultDraft.searchAdvancedPanelOpened,
           initialImagePath: this.searchResultDraft.imagePath,

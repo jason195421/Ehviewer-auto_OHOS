@@ -1,6 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
-import { GalleryCategory, GalleryRoute } from '../model/GalleryModels';
+import { ALL_CATEGORY, GalleryCategory, GalleryRoute } from '../model/GalleryModels';
 import { DEFAULT_ADVANCE_SEARCH, ListMode } from './EhUrl';
 
 const PREFERENCES_NAME: string = 'ehviewer_bookmarks';
@@ -277,7 +277,8 @@ function isPlainSearch(category: number, advanceSearch: number, minRating: numbe
 
 function backupToBookmark(stored: SearchBookmarkBackupInfo): SearchBookmarkInfo | null {
   const mode = typeof stored.mode === 'number' ? stored.mode as number : ListMode.Normal;
-  const category = typeof stored.category === 'number' ? stored.category as number : GalleryCategory.None;
+  const category = normalizeBookmarkCategory(typeof stored.category === 'number' ? stored.category as number :
+    GalleryCategory.None);
   const keyword = typeof stored.keyword === 'string' ? stored.keyword as string : '';
   const advanceSearch = typeof stored.advanceSearch === 'number' ? stored.advanceSearch as number : -1;
   const minRating = typeof stored.minRating === 'number' ? stored.minRating as number : -1;
@@ -314,7 +315,8 @@ function normalizeBookmark(bookmark: SearchBookmarkInfo): SearchBookmarkInfo | n
     id: bookmark.id.length > 0 ? bookmark.id : 'bookmark_' + Date.now().toString(),
     name: bookmark.name.trim(),
     mode: normalizeBookmarkMode(bookmark.mode),
-    category: typeof bookmark.category === 'number' ? bookmark.category : GalleryCategory.None,
+    category: normalizeBookmarkCategory(typeof bookmark.category === 'number' ? bookmark.category :
+      GalleryCategory.None),
     keyword: bookmark.keyword.trim(),
     advanceSearch: typeof bookmark.advanceSearch === 'number' ? bookmark.advanceSearch : DEFAULT_ADVANCE_SEARCH,
     minRating: typeof bookmark.minRating === 'number' ? bookmark.minRating : -1,
@@ -332,6 +334,16 @@ function normalizeBookmarkMode(mode: number): ListMode {
     return mode;
   }
   return ListMode.Normal;
+}
+
+function normalizeBookmarkCategory(category: number): number {
+  if (category === ALL_CATEGORY || category === 0) {
+    return GalleryCategory.None;
+  }
+  if (category < 0) {
+    return GalleryCategory.None;
+  }
+  return category & ALL_CATEGORY;
 }
 
 function bookmarkToBackup(item: SearchBookmarkInfo): SearchBookmarkBackupInfo {

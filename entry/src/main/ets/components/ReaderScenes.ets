@@ -949,6 +949,7 @@ export struct ReaderScene {
       const helper = photoAccessHelper.getPhotoAccessHelper(context);
       const fileName = readerImageFileName(index, sourcePath, this.currentImageShareTarget());
       const title = mediaAssetTitle(fileName);
+      // @SuppressWarnings permission
       const uri = await helper.createAsset(photoAccessHelper.PhotoType.IMAGE, albumImageFileType(sourcePath), { title: title });
       if (copyFileContent(sourcePath, uri)) {
         this.showToast(uiText('Saved to album') + ': ' + fileName);
