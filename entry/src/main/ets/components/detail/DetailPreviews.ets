@@ -56,15 +56,6 @@ export struct DetailPreviews {
     return Math.round(this.previewTileWidth() * 4 / 3);
   }
 
-  private previewColumnsTemplate(): string {
-    const columns = this.previewColumns();
-    let value = '1fr';
-    for (let i = 1; i < columns; i++) {
-      value += ' 1fr';
-    }
-    return value;
-  }
-
   private previewTotalPages(): number {
     if (this.totalPages > 0) {
       return this.totalPages;
@@ -120,25 +111,24 @@ export struct DetailPreviews {
         .height(52)
         .justifyContent(FlexAlign.Center)
       } else {
-        Grid() {
-          ForEach(this.previews, (preview: GalleryPreview) => {
-            GridItem() {
-              PreviewTile({
-                preview: preview,
-                tileWidth: this.previewTileWidth(),
-                imageHeight: this.previewTileHeight(),
-                onSelectPreview: (selected: GalleryPreview) => {
-                  this.onSelectPreview(selected);
-                }
+        Flex({ wrap: FlexWrap.Wrap }) {
+          ForEach(this.previews, (preview: GalleryPreview, index: number) => {
+            PreviewTile({
+              preview: preview,
+              tileWidth: this.previewTileWidth(),
+              imageHeight: this.previewTileHeight(),
+              onSelectPreview: (selected: GalleryPreview) => {
+                this.onSelectPreview(selected);
+              }
+            })
+              .margin({
+                right: (index + 1) % this.previewColumns() === 0 ? 0 : this.previewGap(),
+                bottom: 12
               })
-            }
-          }, (preview: GalleryPreview) => preview.index.toString())
+          }, (preview: GalleryPreview, index: number) => index.toString() + ':' + preview.index.toString() + ':' +
+            preview.imageUrl)
         }
-        .columnsTemplate(this.previewColumnsTemplate())
-        .columnsGap(this.previewGap())
-        .rowsGap(12)
         .width('100%')
-        .animation({ duration: 220, curve: Curve.EaseOut })
       }
     }
     .alignItems(HorizontalAlign.Start)
