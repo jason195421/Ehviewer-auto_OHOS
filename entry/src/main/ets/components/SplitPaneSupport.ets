@@ -140,6 +140,9 @@ export struct SplitPaneDivider {
     .height('100%')
     .position({ x: this.x - 12, y: 0 })
     .zIndex(80)
+    .transition(TransitionEffect.asymmetric(
+      TransitionEffect.move(TransitionEdge.END).animation({ duration: 300, curve: Curve.EaseOut }),
+      TransitionEffect.move(TransitionEdge.END).animation({ duration: 240, curve: Curve.EaseIn })))
     .gesture(
       PanGesture({ fingers: 1, direction: PanDirection.Horizontal, distance: 1 })
         .onActionStart(() => {

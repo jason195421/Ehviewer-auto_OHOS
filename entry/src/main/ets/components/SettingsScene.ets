@@ -1999,7 +1999,7 @@ export struct SettingsTextBlock {
 
 @Component
 export struct SettingsDetailPanel {
-  panel: SettingsPanel = SettingsPanel.Eh;
+  @Prop panel: SettingsPanel = SettingsPanel.Eh;
   @Prop signedIn: boolean = false;
   @Prop themeName: string = 'Light';
   @Prop renderRevision: number = 0;
