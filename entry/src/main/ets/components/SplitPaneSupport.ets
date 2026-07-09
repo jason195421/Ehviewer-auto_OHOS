@@ -1,6 +1,12 @@
 import { ehSettingsStore } from '../services/EhSettingsStore';
 import { getAbilityContext } from '../shared/EhShared';
-import { themePrimaryColor, themeSurfaceVariant } from '../shared/EhTheme';
+import {
+  themeDividerColor,
+  themePrimaryColor,
+  themeSecondaryText,
+  themeSurface,
+  themeSurfaceVariant
+} from '../shared/EhTheme';
 
 export const SPLIT_PANE_RATIO_REVISION_KEY: string = 'ehviewer_split_pane_ratio_revision';
 export const SPLIT_PANE_BREAKPOINT: number = 840;
@@ -87,8 +93,8 @@ function clampSplitPaneRatio(value: number): number {
 
 @Component
 export struct SplitPaneDivider {
-  x: number = 0;
-  dragging: boolean = false;
+  @Prop x: number = 0;
+  @Prop dragging: boolean = false;
   onSplitDragStart: () => void = () => {
   };
   onSplitDragUpdate: (offsetX: number) => void = (_offsetX: number) => {
@@ -98,15 +104,42 @@ export struct SplitPaneDivider {
 
   build() {
     Stack({ alignContent: Alignment.Center }) {
-      Column()
+      Divider()
+        .vertical(true)
+        .strokeWidth(1)
+        .color(this.dragging ? themePrimaryColor() : themeDividerColor())
         .width(1)
         .height('100%')
-        .backgroundColor(this.dragging ? themePrimaryColor() : themeSurfaceVariant())
-        .borderRadius(1)
+
+      Column({ space: 3 }) {
+        Column()
+          .width(3)
+          .height(3)
+          .borderRadius(2)
+          .backgroundColor(this.dragging ? themePrimaryColor() : themeSecondaryText())
+        Column()
+          .width(3)
+          .height(3)
+          .borderRadius(2)
+          .backgroundColor(this.dragging ? themePrimaryColor() : themeSecondaryText())
+        Column()
+          .width(3)
+          .height(3)
+          .borderRadius(2)
+          .backgroundColor(this.dragging ? themePrimaryColor() : themeSecondaryText())
+      }
+      .width(18)
+      .height(38)
+      .justifyContent(FlexAlign.Center)
+      .alignItems(HorizontalAlign.Center)
+      .backgroundColor(themeSurface())
+      .border({ width: 1, color: this.dragging ? themePrimaryColor() : themeSurfaceVariant() })
+      .borderRadius(9)
+      .shadow({ radius: this.dragging ? 8 : 3, color: '#33000000', offsetY: 1 })
     }
-    .width(18)
+    .width(24)
     .height('100%')
-    .translate({ x: this.x - 9 })
+    .translate({ x: this.x - 12 })
     .zIndex(6)
     .gesture(
       PanGesture({ fingers: 1, direction: PanDirection.Horizontal, distance: 1 })
