@@ -2538,7 +2538,6 @@ export struct GalleryListScene {
 
   private openSearchResult(request: DetailSearchRequest): void {
     this.showReader = false;
-    this.showSearchResultScene = false;
     this.searchResultDraft = {
       keyword: request.keyword,
       mode: request.mode,
@@ -2560,12 +2559,10 @@ export struct GalleryListScene {
     };
     this.detailStatus = request.title;
     this.fabExpanded = false;
+    this.showSearchResultScene = true;
+    this.saveNavigationCache();
     setTimeout(() => {
-      this.showSearchResultScene = true;
-      this.saveNavigationCache();
-      setTimeout(() => {
-        this.refreshSearchResultNavigationCache();
-      }, 0);
+      this.refreshSearchResultNavigationCache();
     }, 0);
   }
 
@@ -4197,7 +4194,7 @@ export struct GalleryListContent {
                 this.onSelectGallery(gallery);
               })
           }
-        }, (gallery: GalleryInfo) => gallery.gid.toString())
+        }, (gallery: GalleryInfo, colIndex: number) => this.galleryCardKey(gallery, colIndex))
       }
       .width('100%')
       .padding({ left: this.galleryContentPadding(), right: this.galleryContentPadding() })
@@ -4773,7 +4770,11 @@ export struct GalleryListContent {
   }
 
   private galleryRowKey(row: GalleryInfo[]): string {
-    return row.map((gallery: GalleryInfo) => gallery.gid.toString()).join('-');
+    return row.map((gallery: GalleryInfo, index: number) => this.galleryCardKey(gallery, index)).join('-');
+  }
+
+  private galleryCardKey(gallery: GalleryInfo, index: number): string {
+    return index.toString() + ':' + gallery.gid.toString() + ':' + gallery.token + ':' + gallery.title;
   }
 }
 

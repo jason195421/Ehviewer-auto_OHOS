@@ -380,8 +380,8 @@ export struct SearchSuggestionList {
             }
           })
         }
-      }, (suggestion: SearchSuggestionItem) => this.revision.toString() + ':' + suggestion.kind + ':' +
-        suggestion.query + ':' + suggestion.subtitle)
+      }, (suggestion: SearchSuggestionItem, index: number) => this.revision.toString() + ':' +
+        index.toString() + ':' + suggestion.kind + ':' + suggestion.query + ':' + suggestion.subtitle)
     }
     .columnsTemplate(this.columnsTemplate())
     .columnsGap(6)
