@@ -1,8 +1,8 @@
 import { ehSettingsStore } from '../services/EhSettingsStore';
 import { getAbilityContext } from '../shared/EhShared';
 import {
+  themeDividerColor,
   themePrimaryColor,
-  themeSecondaryText,
   themeSurface,
   themeSurfaceVariant
 } from '../shared/EhTheme';
@@ -106,7 +106,7 @@ export struct SplitPaneDivider {
       Divider()
         .vertical(true)
         .strokeWidth(2)
-        .color(this.dragging ? themePrimaryColor() : themeSecondaryText())
+        .color(this.dragging ? themePrimaryColor() : themeDividerColor())
         .width(2)
         .height('100%')
 
@@ -115,24 +115,24 @@ export struct SplitPaneDivider {
           .width(3)
           .height(3)
           .borderRadius(2)
-          .backgroundColor(this.dragging ? themePrimaryColor() : themeSecondaryText())
+          .backgroundColor(this.dragging ? themePrimaryColor() : themeDividerColor())
         Column()
           .width(3)
           .height(3)
           .borderRadius(2)
-          .backgroundColor(this.dragging ? themePrimaryColor() : themeSecondaryText())
+          .backgroundColor(this.dragging ? themePrimaryColor() : themeDividerColor())
         Column()
           .width(3)
           .height(3)
           .borderRadius(2)
-          .backgroundColor(this.dragging ? themePrimaryColor() : themeSecondaryText())
+          .backgroundColor(this.dragging ? themePrimaryColor() : themeDividerColor())
       }
       .width(18)
       .height(38)
       .justifyContent(FlexAlign.Center)
       .alignItems(HorizontalAlign.Center)
-      .backgroundColor(themeSurface())
-      .border({ width: 1, color: this.dragging ? themePrimaryColor() : themeSurfaceVariant() })
+      .backgroundColor(themeSurfaceVariant())
+      .border({ width: 1, color: this.dragging ? themePrimaryColor() : themeDividerColor() })
       .borderRadius(9)
       .shadow({ radius: this.dragging ? 8 : 3, color: '#33000000', offsetY: 1 })
     }

@@ -242,6 +242,18 @@ export struct SettingsScene {
     this.restoreBackHandler();
   }
 
+  private openPrimaryPanel(panel: SettingsPanel): void {
+    this.optionPickerOpen = false;
+    if (splitPaneModeEnabled() && this.sceneContentWidth >= SPLIT_PANE_BREAKPOINT) {
+      this.panelStack = [SettingsPanel.Main, panel];
+      this.panel = panel;
+      this.saveNavigationCache();
+      this.restoreBackHandler();
+      return;
+    }
+    this.openPanel(panel);
+  }
+
   private closePanel(): void {
     this.optionPickerOpen = false;
     if (this.panelStack.length <= 1) {
@@ -1525,7 +1537,7 @@ export struct SettingsScene {
       SettingsHomePanel({
         onMenu: this.onMenu,
         onOpen: (panel: SettingsPanel) => {
-          this.openPanel(panel);
+          this.openPrimaryPanel(panel);
         }
       })
         .width(this.useSplitLayout() ? this.splitListPaneWidth() : '100%')
