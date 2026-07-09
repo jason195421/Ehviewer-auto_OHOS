@@ -807,6 +807,7 @@ export struct SearchBookmarkManagerScene {
   onMoveIndex: (from: number, to: number) => void = (_from: number, _to: number) => {};
   onDelete: (bookmark: SearchBookmarkInfo) => void = (_bookmark: SearchBookmarkInfo) => {};
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
+  @State editingBookmarkId: string = '';
 
   build() {
     Column() {
@@ -868,6 +869,15 @@ export struct SearchBookmarkManagerScene {
                 item: item,
                 index: index,
                 total: this.bookmarks.length,
+                editing: this.editingBookmarkId === item.id,
+                onStartEdit: (bookmark: SearchBookmarkInfo) => {
+                  this.editingBookmarkId = bookmark.id;
+                },
+                onFinishEdit: (bookmark: SearchBookmarkInfo) => {
+                  if (this.editingBookmarkId === bookmark.id) {
+                    this.editingBookmarkId = '';
+                  }
+                },
                 onRename: (bookmark: SearchBookmarkInfo, name: string) => {
                   this.onRename(bookmark, name);
                 },
@@ -918,6 +928,9 @@ export struct SearchBookmarkManagerRow {
   };
   @Prop index: number = 0;
   @Prop total: number = 0;
+  @Prop editing: boolean = false;
+  onStartEdit: (bookmark: SearchBookmarkInfo) => void = (_bookmark: SearchBookmarkInfo) => {};
+  onFinishEdit: (bookmark: SearchBookmarkInfo) => void = (_bookmark: SearchBookmarkInfo) => {};
   onRename: (bookmark: SearchBookmarkInfo, name: string) => void = (_bookmark: SearchBookmarkInfo, _name: string) => {};
   onDelete: (bookmark: SearchBookmarkInfo) => void = (_bookmark: SearchBookmarkInfo) => {};
   @State draftName: string = '';
@@ -946,21 +959,45 @@ export struct SearchBookmarkManagerRow {
         .backgroundColor(themeSurfaceVariant())
         .borderRadius(19)
 
-        TextInput({ text: this.draftName, placeholder: uiText('Bookmark name') })
+        if (this.editing) {
+          TextInput({ text: this.draftName, placeholder: uiText('Bookmark name') })
+            .height(38)
+            .layoutWeight(1)
+            .fontSize(14)
+            .fontColor(themePrimaryText())
+            .backgroundColor(themeFieldBackground())
+            .borderRadius(8)
+            .padding({ left: 10, right: 10 })
+            .onChange((value: string) => {
+              this.draftName = value;
+              this.onRename(this.item, value);
+            })
+            .onSubmit(() => {
+              this.onRename(this.item, this.draftName);
+              this.onFinishEdit(this.item);
+            })
+            .onBlur(() => {
+              this.onRename(this.item, this.draftName);
+              this.onFinishEdit(this.item);
+            })
+        } else {
+          Row() {
+            Text(this.draftName.length > 0 ? this.draftName : uiText('Bookmark name'))
+              .fontSize(14)
+              .fontColor(this.draftName.length > 0 ? themePrimaryText() : themeSecondaryText())
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
           .height(38)
           .layoutWeight(1)
-          .fontSize(14)
-          .fontColor(themePrimaryText())
+          .padding({ left: 10, right: 10 })
           .backgroundColor(themeFieldBackground())
           .borderRadius(8)
-          .padding({ left: 10, right: 10 })
-          .onChange((value: string) => {
-            this.draftName = value;
-            this.onRename(this.item, value);
+          .alignItems(VerticalAlign.Center)
+          .onClick(() => {
+            this.onStartEdit(this.item);
           })
-          .onSubmit(() => {
-            this.onRename(this.item, this.draftName);
-          })
+        }
 
         Button({ type: ButtonType.Circle, stateEffect: true }) {
           SymbolGlyph($r('sys.symbol.trash'))
