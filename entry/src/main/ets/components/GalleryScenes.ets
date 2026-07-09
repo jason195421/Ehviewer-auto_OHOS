@@ -158,6 +158,12 @@ interface GalleryListSceneCache {
   appendExhausted?: boolean;
 }
 
+interface GalleryRowData {
+  index: number;
+  key: string;
+  items: GalleryInfo[];
+}
+
 interface SearchResultDraft {
   keyword: string;
   mode: ListMode;
@@ -3505,7 +3511,7 @@ export struct GalleryListContent {
   @State bookmarkDrawerOffsetX: number = 288;
   @State bookmarkDrawerOverlayOpacity: number = 0;
   private toolbarRestoring: boolean = false;
-  private galleryRowsDataSource: ArrayDataSource<GalleryInfo[]> = new ArrayDataSource<GalleryInfo[]>([]);
+  private galleryRowsDataSource: ArrayDataSource<GalleryRowData> = new ArrayDataSource<GalleryRowData>([]);
   private galleryRowStructureKeys: string[] = [];
   private barHeight: number = 56; // matches EhNavBar body height
   private readonly FAVORITE_DRAWER_WIDTH: number = 288;
@@ -3597,9 +3603,9 @@ export struct GalleryListContent {
 
   aboutToAppear(): void {
     setActiveBackHandler(() => this.handleContentBack());
-    this.galleryRowsDataSource.setPrefetchCallback((row: GalleryInfo[]) => {
-      for (let i = 0; i < row.length; i++) {
-        const thumb = row[i].thumb;
+    this.galleryRowsDataSource.setPrefetchCallback((row: GalleryRowData) => {
+      for (let i = 0; i < row.items.length; i++) {
+        const thumb = row.items[i].thumb;
         if (thumb !== undefined && thumb.length > 0) {
           cacheThumbnailImage(thumb, () => {}, () => {});
         }
@@ -4209,10 +4215,10 @@ export struct GalleryListContent {
   }
 
   @Builder
-  private galleryRow(row: GalleryInfo[]) {
+  private galleryRow(row: GalleryRowData) {
     ListItem() {
       Row() {
-        ForEach(row, (gallery: GalleryInfo, colIndex: number) => {
+        ForEach(row.items, (gallery: GalleryInfo, colIndex: number) => {
           if (galleryListMode() === 'Thumb') {
             GalleryThumbCard({
               gallery: gallery,
@@ -4222,7 +4228,7 @@ export struct GalleryListContent {
             })
               .width(this.galleryCardWidth())
               .margin({
-                right: colIndex < row.length - 1 ? this.galleryCardGap() : 0
+                right: colIndex < row.items.length - 1 ? this.galleryCardGap() : 0
               })
               .animation({ duration: 220, curve: Curve.EaseOut })
               .onClick(() => {
@@ -4237,14 +4243,14 @@ export struct GalleryListContent {
             })
               .width(this.galleryCardWidth())
               .margin({
-                right: colIndex < row.length - 1 ? this.galleryCardGap() : 0
+                right: colIndex < row.items.length - 1 ? this.galleryCardGap() : 0
               })
               .animation({ duration: 220, curve: Curve.EaseOut })
               .onClick(() => {
                 this.onSelectGallery(gallery);
               })
           }
-        }, (gallery: GalleryInfo, colIndex: number) => this.galleryCardKey(gallery, colIndex))
+        }, (gallery: GalleryInfo, colIndex: number) => this.galleryCardKey(row.index, gallery, colIndex))
       }
       .width('100%')
       .padding({ left: this.galleryContentPadding(), right: this.galleryContentPadding() })
@@ -4280,12 +4286,9 @@ export struct GalleryListContent {
               ListItem()
                 .margin({ bottom: this.galleryCardGap() })
               // Group gallery cards into rows with galleryColumnCount() items per row.
-              LazyForEach(this.galleryRowsSource(), (row: GalleryInfo[]) => {
+              LazyForEach(this.galleryRowsSource(), (row: GalleryRowData) => {
                 this.galleryRow(row)
-              }, (_row: GalleryInfo[], rowIndex: number) => {
-                return this.galleryColumnCount().toString() + ':' + rowIndex.toString() + ':' +
-                  this.galleryRowKey(_row);
-              })
+              }, (row: GalleryRowData) => row.key)
 
               // Load-more indicator.
               if (this.isLoadingMore) {
@@ -4763,25 +4766,30 @@ export struct GalleryListContent {
   }
 
   // 把 galleries 按列数分组成行数组
-  private buildRows(): GalleryInfo[][] {
+  private buildRows(): GalleryRowData[] {
     const cols = this.galleryColumnCount();
-    const rows: GalleryInfo[][] = [];
+    const rows: GalleryRowData[] = [];
     for (let i = 0; i < this.galleries.length; i += cols) {
-      rows.push(this.galleries.slice(i, i + cols));
+      const items = this.galleries.slice(i, i + cols);
+      const rowIndex = Math.floor(i / cols);
+      rows.push({
+        index: rowIndex,
+        key: cols.toString() + ':' + rowIndex.toString() + ':' + this.galleryRowKey(rowIndex, items),
+        items: items
+      });
     }
     return rows;
   }
 
-  private galleryRowsSource(): ArrayDataSource<GalleryInfo[]> {
+  private galleryRowsSource(): ArrayDataSource<GalleryRowData> {
     return this.galleryRowsDataSource;
   }
 
   private refreshGalleryRows(): void {
     const rows = this.buildRows();
-    const cols = this.galleryColumnCount();
     const newKeys: string[] = [];
     for (let i = 0; i < rows.length; i++) {
-      newKeys.push(cols.toString() + ':' + this.galleryRowKey(rows[i]));
+      newKeys.push(rows[i].key);
     }
 
     const prevCount = this.galleryRowStructureKeys.length;
@@ -4819,12 +4827,13 @@ export struct GalleryListContent {
     }
   }
 
-  private galleryRowKey(row: GalleryInfo[]): string {
-    return row.map((gallery: GalleryInfo, index: number) => this.galleryCardKey(gallery, index)).join('-');
+  private galleryRowKey(rowIndex: number, row: GalleryInfo[]): string {
+    return row.map((gallery: GalleryInfo, index: number) => this.galleryCardKey(rowIndex, gallery, index)).join('-');
   }
 
-  private galleryCardKey(gallery: GalleryInfo, index: number): string {
-    return index.toString() + ':' + gallery.gid.toString() + ':' + gallery.token + ':' + gallery.title;
+  private galleryCardKey(rowIndex: number, gallery: GalleryInfo, index: number): string {
+    return rowIndex.toString() + ':' + index.toString() + ':' + gallery.gid.toString() + ':' + gallery.token + ':' +
+      gallery.title;
   }
 }
 
