@@ -337,6 +337,14 @@ export struct SettingsScene {
     return splitPaneSideWidth(this.sceneContentWidth, this.splitListPaneWidth());
   }
 
+  private settingsLayerWidth(): number | string {
+    return this.useSplitLayout() ? this.splitSidePaneWidth() : '100%';
+  }
+
+  private settingsLayerTranslateX(): number {
+    return this.useSplitLayout() ? this.splitListPaneWidth() + 1 : 0;
+  }
+
   private updateSplitPaneByOffset(offsetX: number): void {
     const targetWidth = splitPaneWidthFromDrag(this.sceneContentWidth, this.splitDragStartWidth, offsetX);
     this.splitListRatio = splitPaneRatioForWidth(this.sceneContentWidth, targetWidth);
@@ -1583,6 +1591,11 @@ export struct SettingsScene {
             this.toggleFilterRule(id);
           }
         })
+          .width(this.settingsLayerWidth())
+          .height('100%')
+          .translate({ x: this.settingsLayerTranslateX() })
+          .zIndex(10)
+          .animation({ duration: this.splitDragging ? 0 : 220, curve: Curve.EaseOut })
           .transition(TransitionEffect.move(TransitionEdge.END)
             .animation({ duration: 300, curve: Curve.EaseOut }))
       } else if (this.panel === SettingsPanel.WebView) {
@@ -1596,6 +1609,11 @@ export struct SettingsScene {
             this.captureAccountWebCookies(url);
           }
         })
+          .width(this.settingsLayerWidth())
+          .height('100%')
+          .translate({ x: this.settingsLayerTranslateX() })
+          .zIndex(10)
+          .animation({ duration: this.splitDragging ? 0 : 220, curve: Curve.EaseOut })
           .transition(TransitionEffect.move(TransitionEdge.END)
             .animation({ duration: 300, curve: Curve.EaseOut }))
       } else if (this.panel === SettingsPanel.MyTags) {
@@ -1618,6 +1636,10 @@ export struct SettingsScene {
         .width('100%')
         .height('100%')
         .backgroundColor(themePageBackground())
+        .width(this.settingsLayerWidth())
+        .translate({ x: this.settingsLayerTranslateX() })
+        .zIndex(10)
+        .animation({ duration: this.splitDragging ? 0 : 220, curve: Curve.EaseOut })
         .transition(TransitionEffect.move(TransitionEdge.END)
           .animation({ duration: 300, curve: Curve.EaseOut }))
       } else if (this.panel === SettingsPanel.Session) {
@@ -1638,8 +1660,11 @@ export struct SettingsScene {
           })
             .layoutWeight(1)
         }
-        .width('100%')
+        .width(this.settingsLayerWidth())
         .height('100%')
+        .translate({ x: this.settingsLayerTranslateX() })
+        .zIndex(10)
+        .animation({ duration: this.splitDragging ? 0 : 220, curve: Curve.EaseOut })
         .transition(TransitionEffect.move(TransitionEdge.END)
           .animation({ duration: 300, curve: Curve.EaseOut }))
       }

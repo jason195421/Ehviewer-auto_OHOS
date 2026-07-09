@@ -4339,6 +4339,9 @@ export struct GalleryListContent {
     }
     .margin({ bottom: this.galleryCardGap() })
     .reuseId('gallery-row-' + this.galleryColumnCount().toString())
+    .transition(TransitionEffect.OPACITY
+      .combine(TransitionEffect.translate({ y: 8 }))
+      .animation({ duration: 180, curve: Curve.EaseOut }))
   }
 
   build() {

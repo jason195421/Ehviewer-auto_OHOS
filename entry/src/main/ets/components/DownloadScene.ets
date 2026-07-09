@@ -31,6 +31,7 @@ import {
 } from '../services/GalleryDetailModule';
 import {
   applyAppChromeImmersiveMode,
+  getMainWindow,
   isEmbeddedReaderActive,
   leaveEmbeddedReaderFullscreen,
   mainContentWidthFallbackVp,
@@ -260,6 +261,7 @@ export struct DownloadScene {
   aboutToAppear(): void {
     applyAppChromeImmersiveMode();
     this.restoreNavigationCache();
+    this.syncSceneContentWidthFromWindow();
     this.syncDownloadContentWidthFromWindow();
     setActiveBackHandler(() => this.handleSystemBack());
     this.unsubscribeStore = ehDownloadStore.subscribe((items: DownloadInfo[]) => {
@@ -272,6 +274,7 @@ export struct DownloadScene {
     this.refreshSearchSuggestions();
     this.loadDownloads();
     setTimeout(() => {
+      this.syncSceneContentWidthFromWindow();
       this.syncDownloadContentWidthFromWindow();
     }, 0);
   }
@@ -845,8 +848,37 @@ export struct DownloadScene {
   }
 
   private availableSceneWidth(): number {
-    return this.sceneContentWidth > 0 ? this.sceneContentWidth :
-      mainContentWidthFallbackVp((value: number) => this.getUIContext().px2vp(value));
+    return this.sceneContentWidth > 0 ? this.sceneContentWidth : this.windowContentWidthVp();
+  }
+
+  private syncSceneContentWidthFromWindow(): void {
+    if (this.sceneContentWidth >= 240) {
+      return;
+    }
+    const width = this.windowContentWidthVp();
+    if (width > 0) {
+      this.updateSceneContentWidth(width);
+    }
+  }
+
+  private windowContentWidthVp(): number {
+    const win = getMainWindow();
+    if (win === undefined) {
+      return 0;
+    }
+    try {
+      const rawWidth = Math.floor(win.getWindowProperties().windowRect.width);
+      if (rawWidth <= 0 || Number.isNaN(rawWidth)) {
+        return 0;
+      }
+      const converted = Math.floor(this.getUIContext().px2vp(rawWidth));
+      if (converted >= 240) {
+        return converted;
+      }
+      return rawWidth >= 240 && rawWidth <= 1200 ? rawWidth : 0;
+    } catch (_error) {
+      return 0;
+    }
   }
 
   private splitListPaneWidth(): number {

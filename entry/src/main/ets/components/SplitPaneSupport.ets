@@ -1,7 +1,6 @@
 import { ehSettingsStore } from '../services/EhSettingsStore';
 import { getAbilityContext } from '../shared/EhShared';
 import {
-  themeDividerColor,
   themePrimaryColor,
   themeSecondaryText,
   themeSurface,
@@ -106,9 +105,9 @@ export struct SplitPaneDivider {
     Stack({ alignContent: Alignment.Center }) {
       Divider()
         .vertical(true)
-        .strokeWidth(1)
-        .color(this.dragging ? themePrimaryColor() : themeDividerColor())
-        .width(1)
+        .strokeWidth(2)
+        .color(this.dragging ? themePrimaryColor() : themeSecondaryText())
+        .width(2)
         .height('100%')
 
       Column({ space: 3 }) {
@@ -140,7 +139,7 @@ export struct SplitPaneDivider {
     .width(24)
     .height('100%')
     .translate({ x: this.x - 12 })
-    .zIndex(6)
+    .zIndex(40)
     .gesture(
       PanGesture({ fingers: 1, direction: PanDirection.Horizontal, distance: 1 })
         .onActionStart(() => {
