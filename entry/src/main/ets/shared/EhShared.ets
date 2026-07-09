@@ -1026,6 +1026,8 @@ export function zhText(text: string): string {
     case 'Display page count in gallery list rows': return '在画廊列表中显示页数';
     case 'Show tag translations': return '显示标签翻译';
     case 'Use translated tag labels when data is available': return '有数据时使用翻译后的标签名称';
+    case 'Split screen mode': return '分屏模式';
+    case 'Use left-right panes on wide screens': return '在宽屏设备上使用左右分栏';
     case 'Follow system dark mode': return '跟随系统深色模式';
     case 'Use Light in system light mode and the selected dark theme in system dark mode': return '系统浅色时使用亮色，系统深色时使用选定的深色主题';
     case 'Dark mode theme': return '深色模式主题';
@@ -2245,6 +2247,7 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
       optionSettingsRow('show_jpn_title', 'Show Japanese title', 'Prefer original title when available', entries, ON_OFF_OPTIONS),
       optionSettingsRow('show_gallery_pages', 'Show gallery pages', 'Display page count in gallery list rows', entries, ON_OFF_OPTIONS),
       optionSettingsRow('show_tag_translations', 'Show tag translations', 'Use translated tag labels when data is available', entries, ON_OFF_OPTIONS),
+      optionSettingsRow('split_screen_mode', 'Split screen mode', 'Use left-right panes on wide screens', entries, ON_OFF_OPTIONS),
       optionSettingsRow('follow_system_dark_mode', 'Follow system dark mode', 'Use Light in system light mode and the selected dark theme in system dark mode', entries, ON_OFF_OPTIONS),
       optionSettingsRow('theme',
         followSystemDarkMode ? 'Dark mode theme' : 'Theme',

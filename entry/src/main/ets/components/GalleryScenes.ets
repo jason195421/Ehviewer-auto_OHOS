@@ -1132,6 +1132,7 @@ export struct GalleryListScene {
   @State searchSubmitted: boolean = false;
   @State showDetail: boolean = false;
   @State showReader: boolean = false;
+  @State sceneContentWidth: number = 0;
   private readerClosing: boolean = false;
   @State restoreDetailWithFade: boolean = false;
   @State detailLink: GalleryDetailLink = createEmptyGalleryDetailLink();
@@ -2624,6 +2625,37 @@ export struct GalleryListScene {
     }, 0);
   }
 
+  private updateSceneContentWidth(width: number): void {
+    const normalized = Math.floor(width);
+    if (normalized <= 0 || Number.isNaN(normalized) || Math.abs(this.sceneContentWidth - normalized) < 1) {
+      return;
+    }
+    this.sceneContentWidth = normalized;
+  }
+
+  private splitScreenSettingEnabled(): boolean {
+    return ehSettingsStore.getValue('split_screen_mode', 'On') === 'On';
+  }
+
+  private useSplitLayout(): boolean {
+    return !this.isSearchResultScene && this.splitScreenSettingEnabled() && this.sceneContentWidth >= 840 &&
+      this.showDetail && !this.showReader;
+  }
+
+  private splitListPaneWidth(): number {
+    if (this.sceneContentWidth <= 0) {
+      return 420;
+    }
+    return Math.max(380, Math.min(620, Math.floor(this.sceneContentWidth * 0.42)));
+  }
+
+  private splitSidePaneWidth(): number {
+    if (!this.useSplitLayout()) {
+      return this.sceneContentWidth > 0 ? this.sceneContentWidth : 0;
+    }
+    return Math.max(360, this.sceneContentWidth - this.splitListPaneWidth() - 1);
+  }
+
   build() {
     Column() {
       if (!this.isSearchResultScene && this.showSearchResultScene) {
@@ -2873,6 +2905,8 @@ export struct GalleryListScene {
               updateGalleryListScrollCache(this.cacheKey(), this.listScrollOffset);
             }
           })
+            .width(this.useSplitLayout() ? this.splitListPaneWidth() : '100%')
+            .height('100%')
 
           if (this.showBookmarkManager) {
             SearchBookmarkManagerScene({
@@ -2990,6 +3024,15 @@ export struct GalleryListScene {
               .zIndex(30)
           }
 
+          if (this.useSplitLayout()) {
+            Column()
+              .width(1)
+              .height('100%')
+              .backgroundColor(themeSurfaceVariant())
+              .translate({ x: this.splitListPaneWidth() })
+              .zIndex(4)
+          }
+
           if (this.showDetail) {
             GalleryDetailHostScene({
               detailLink: this.detailLink,
@@ -3011,8 +3054,10 @@ export struct GalleryListScene {
                 this.detailScrollOffset = offset;
               }
             })
-              .width('100%')
+              .width(this.useSplitLayout() ? this.splitSidePaneWidth() : '100%')
               .height('100%')
+              .translate({ x: this.useSplitLayout() ? this.splitListPaneWidth() + 1 : 0 })
+              .zIndex(5)
               .transition(this.restoreDetailWithFade ?
                 TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }) :
                 TransitionEffect.move(TransitionEdge.END).animation({ duration: 300, curve: Curve.EaseOut }))
@@ -3044,7 +3089,22 @@ export struct GalleryListScene {
     }
     .width('100%')
     .height('100%')
+    .onAreaChange((_oldArea: Area, newArea: Area) => {
+      this.updateSceneContentWidth(areaDimensionToVp(newArea.width, (value: number) => this.getUIContext().px2vp(value)));
+    })
   }
+}
+
+function areaDimensionToVp(value: Length, px2vp: (value: number) => number): number {
+  const text = value.toString();
+  const parsed = Number.parseFloat(text);
+  if (Number.isNaN(parsed)) {
+    return 0;
+  }
+  if (text.indexOf('px') > 0) {
+    return px2vp(parsed);
+  }
+  return parsed;
 }
 
 
