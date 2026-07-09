@@ -80,17 +80,6 @@ import {
   themeSurfaceVariant,
   themeTertiaryText
 } from '../shared/EhTheme';
-import {
-  selectArrowModifier,
-  themedSelectButtonBackground,
-  themedSelectButtonText,
-  themedSelectMenuBackground,
-  themedSelectOptionBackground,
-  themedSelectOptionText,
-  themedSelectOutlineColor,
-  themedSelectSelectedOptionBackground,
-  themedSelectSelectedOptionText
-} from '../shared/EhSelectStyle';
 import { EhBackupBundle, SettingsHeaderItem, SettingsRowItem, SettingsPanel, SETTINGS_HEADERS, uiText, uiValue, uiStatusText, setActiveBackHandler, padTwo, getAbilityContext, downloadSizeText, settingsPanelTitle, settingsRowsForPanel, settingEntryValue, cloneStringOptions, settingMigrationMessage, isValidProxyHostText, isValidProxyPortText, normalizeProxyOption, formatNetworkDiagnostics, normalizeAutoTransferTimeOption, normalizeBrightnessLevelOption, normalizeIdentityAuthenticationOption, normalizeReaderCacheSizeOption } from '../shared/EhShared';
 import { FilterPanel } from './DownloadMigrationScenes';
 import { BlockingBusyOverlay } from './BlockingBusyOverlay';
@@ -1752,7 +1741,7 @@ export struct SettingsHomePanel {
       .layoutWeight(1)
       .cachedCount(3)
       .padding({ left: 12, right: 12, top: 0, bottom: 0 })
-      .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true, effectEdge: EffectEdge.START | EffectEdge.END })
+      .edgeEffect(EdgeEffect.None)
     }
     .width('100%')
     .height('100%')
@@ -1954,7 +1943,7 @@ export struct SettingsDetailPanel {
             .height(0)
         }
       }
-      .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true, effectEdge: EffectEdge.START | EffectEdge.END })
+      .edgeEffect(EdgeEffect.None)
       .width('100%')
       .height('100%')
       .layoutWeight(1)
@@ -2132,27 +2121,26 @@ export struct SettingsStaticRow {
           })
             .margin({ left: 12 })
         } else if (this.row.type === 'list' && this.row.options !== undefined && this.row.options.length > 0) {
-          Select(buildSelectOptions(this.row.options))
-            .id('settings-select-' + this.renderRevision.toString() + '-' + this.row.key + '-' + this.row.value)
-            .selected(optionIndex(this.row.options, this.row.value))
-            .value(uiValue(this.row.value))
-            .font({ size: 13 })
-            .fontColor(themedSelectButtonText())
-            .backgroundColor(themedSelectButtonBackground())
-            .menuBackgroundColor(themedSelectMenuBackground())
-            .menuBackgroundBlurStyle(BlurStyle.NONE)
-            .optionBgColor(themedSelectOptionBackground())
-            .optionFontColor(themedSelectOptionText())
-            .optionFont({ size: 13 })
-            .selectedOptionBgColor(themedSelectSelectedOptionBackground())
-            .selectedOptionFontColor(themedSelectSelectedOptionText())
-            .menuOutline({ width: 1, color: themedSelectOutlineColor() })
-            .arrowModifier(selectArrowModifier())
+          Button({ type: ButtonType.Normal, stateEffect: true }) {
+            Row({ space: 6 }) {
+              Text(uiValue(this.row.value))
+                .fontSize(13)
+                .fontColor(themeSecondaryText())
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+              SymbolGlyph($r('sys.symbol.chevron_down'))
+                .fontSize(14)
+                .fontColor([themeSecondaryText()])
+            }
+          }
+            .height(34)
+            .constraintSize({ maxWidth: 190 })
+            .padding({ left: 12, right: 10 })
+            .backgroundColor(themeSurfaceVariant())
+            .borderRadius(17)
             .margin({ left: 8 })
-            .onSelect((index: number) => {
-              if (this.row.key !== undefined && this.row.options !== undefined) {
-                this.onOptionSelect(this.row.key, this.row.options[index]);
-              }
+            .onClick(() => {
+              this.onTap();
             })
         } else {
           Button(settingsRowActionText(this.row), { type: ButtonType.Normal, stateEffect: true })
@@ -2174,7 +2162,7 @@ export struct SettingsStaticRow {
     .backgroundColor(themeSurface())
     .borderRadius(6)
     .onClick(() => {
-      if (this.row.type !== 'input' && this.row.type !== 'switch' && this.row.type !== 'list' &&
+      if (this.row.type !== 'input' && this.row.type !== 'switch' &&
         this.row.type !== 'slider' && this.row.key !== 'theme') {
         this.onTap();
       }
@@ -2253,14 +2241,6 @@ function settingsSliderDisplayText(row: SettingsRowItem, value: number): string 
   return uiValue(settingsSliderTextValue(row, value));
 }
 
-function buildSelectOptions(options: string[]): SelectOption[] {
-  const result: SelectOption[] = [];
-  for (let i = 0; i < options.length; i++) {
-    result.push({ value: uiValue(options[i]) });
-  }
-  return result;
-}
-
 function normalizeSettingsDownloadLocation(value: string): string {
   return value === DOWNLOAD_LOCATION_DOWNLOADS ? DOWNLOAD_LOCATION_DOWNLOADS : DOWNLOAD_LOCATION_APP_FILES;
 }
@@ -2320,15 +2300,6 @@ function yieldToUi(): Promise<void> {
       resolve();
     }, 0);
   });
-}
-
-function optionIndex(options: string[], value: string): number {
-  for (let i = 0; i < options.length; i++) {
-    if (options[i] === value) {
-      return i;
-    }
-  }
-  return 0;
 }
 
 function settingsRowRenderKey(row: SettingsRowItem): string {
