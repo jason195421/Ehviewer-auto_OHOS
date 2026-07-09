@@ -423,7 +423,7 @@ function favoriteCategoryCountText(count: number): string {
 }
 
 @Component
-struct FavoriteCategoryDrawer {
+export struct FavoriteCategoryDrawer {
   @Prop statusBarHeight: number = 0;
   @Prop selectedFavCat: number = FavListUrlBuilder.FAV_CAT_ALL;
   @Prop categories: FavoriteCategoryInfo[] = [];
@@ -496,7 +496,7 @@ struct FavoriteCategoryDrawer {
 }
 
 @Component
-struct FavoriteCategoryDrawerRow {
+export struct FavoriteCategoryDrawerRow {
   item: FavoriteCategoryOption = { favCat: FavListUrlBuilder.FAV_CAT_ALL, name: 'All favorites', count: -1 };
   selected: boolean = false;
   onTap: () => void = () => {};
@@ -602,7 +602,7 @@ function bookmarkSummary(item: SearchBookmarkInfo): string {
 }
 
 @Component
-struct SearchBookmarkDrawer {
+export struct SearchBookmarkDrawer {
   @Prop statusBarHeight: number = 0;
   @Prop bookmarks: SearchBookmarkInfo[] = [];
   onSelect: (bookmark: SearchBookmarkInfo) => void = (_bookmark: SearchBookmarkInfo) => {};
@@ -721,7 +721,7 @@ struct SearchBookmarkDrawer {
 }
 
 @Component
-struct SearchBookmarkDrawerRow {
+export struct SearchBookmarkDrawerRow {
   item: SearchBookmarkInfo = {
     id: '',
     name: '',
@@ -799,7 +799,7 @@ struct SearchBookmarkDrawerRow {
 }
 
 @Component
-struct SearchBookmarkManagerScene {
+export struct SearchBookmarkManagerScene {
   @Prop bookmarks: SearchBookmarkInfo[] = [];
   @Prop statusBarHeight: number = 0;
   onBack: () => void = () => {};
@@ -901,7 +901,7 @@ struct SearchBookmarkManagerScene {
 }
 
 @Component
-struct SearchBookmarkManagerRow {
+export struct SearchBookmarkManagerRow {
   @Prop @Watch('onItemChanged') item: SearchBookmarkInfo = {
     id: '',
     name: '',
@@ -3231,7 +3231,7 @@ struct ImageSearchPanel {
 }
 
 @Component
-struct GalleryCardActionOverlay {
+export struct GalleryCardActionOverlay {
   @Prop gallery: GalleryInfo = createEmptyGallery();
   @Prop isHistory: boolean = false;
   onDismiss: () => void = () => {
@@ -3465,7 +3465,7 @@ export struct GalleryListContent {
   @StorageProp('statusBarHeight') statusBarHeightPx: number = 0;
 
   onScrollReset(): void {
-    // scrollResetVersion 变化时滚回顶部
+    // Scroll back to the top when scrollResetVersion changes.
     this.snapListToTop();
   }
 
@@ -4161,6 +4161,54 @@ export struct GalleryListContent {
     }, 220);
   }
 
+  @Builder
+  private galleryRow(row: GalleryInfo[]) {
+    ListItem() {
+      Row() {
+        ForEach(row, (gallery: GalleryInfo, colIndex: number) => {
+          if (galleryListMode() === 'Thumb') {
+            GalleryThumbCard({
+              gallery: gallery,
+              onLongPress: (pressed: GalleryInfo) => {
+                this.onLongPressGallery(pressed);
+              }
+            })
+              .width(this.galleryCardWidth())
+              .margin({
+                right: colIndex < row.length - 1 ? this.galleryCardGap() : 0
+              })
+              .animation({ duration: 220, curve: Curve.EaseOut })
+              .onClick(() => {
+                this.onSelectGallery(gallery);
+              })
+          } else {
+            GalleryListRow({
+              gallery: gallery,
+              onLongPress: (pressed: GalleryInfo) => {
+                this.onLongPressGallery(pressed);
+              }
+            })
+              .width(this.galleryCardWidth())
+              .margin({
+                right: colIndex < row.length - 1 ? this.galleryCardGap() : 0
+              })
+              .animation({ duration: 220, curve: Curve.EaseOut })
+              .onClick(() => {
+                this.onSelectGallery(gallery);
+              })
+          }
+        }, (gallery: GalleryInfo) => gallery.gid.toString())
+      }
+      .width('100%')
+      .padding({ left: this.galleryContentPadding(), right: this.galleryContentPadding() })
+      .justifyContent(FlexAlign.Start)
+      .animation({ duration: 220, curve: Curve.EaseOut })
+    }
+    .margin({ bottom: this.galleryCardGap() })
+    .reuseId('gallery-row-' + this.galleryColumnCount().toString())
+    .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
+  }
+
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       Column() {
@@ -4186,50 +4234,7 @@ export struct GalleryListContent {
                 .margin({ bottom: this.galleryCardGap() })
               // Group gallery cards into rows with galleryColumnCount() items per row.
               LazyForEach(this.galleryRowsSource(), (row: GalleryInfo[]) => {
-                ListItem() {
-                  Row() {
-                    ForEach(row, (gallery: GalleryInfo, colIndex: number) => {
-                      if (galleryListMode() === 'Thumb') {
-                        GalleryThumbCard({
-                          gallery: gallery,
-                          onLongPress: (pressed: GalleryInfo) => {
-                            this.onLongPressGallery(pressed);
-                          }
-                        })
-                          .width(this.galleryCardWidth())
-                          .margin({
-                            right: colIndex < row.length - 1 ? this.galleryCardGap() : 0
-                          })
-                          .animation({ duration: 220, curve: Curve.EaseOut })
-                          .onClick(() => {
-                            this.onSelectGallery(gallery);
-                          })
-                      } else {
-                        GalleryListRow({
-                          gallery: gallery,
-                          onLongPress: (pressed: GalleryInfo) => {
-                            this.onLongPressGallery(pressed);
-                          }
-                        })
-                          .width(this.galleryCardWidth())
-                          .margin({
-                            right: colIndex < row.length - 1 ? this.galleryCardGap() : 0
-                          })
-                          .animation({ duration: 220, curve: Curve.EaseOut })
-                          .onClick(() => {
-                            this.onSelectGallery(gallery);
-                          })
-                      }
-                    }, (gallery: GalleryInfo) => gallery.gid.toString())
-                  }
-                  .width('100%')
-                  .padding({ left: this.galleryContentPadding(), right: this.galleryContentPadding() })
-                  .justifyContent(FlexAlign.Start)
-                  .animation({ duration: 220, curve: Curve.EaseOut })
-                }
-                .margin({ bottom: this.galleryCardGap() })
-                .reuseId('gallery-row-' + this.galleryColumnCount().toString())
-                .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
+                this.galleryRow(row)
               }, (_row: GalleryInfo[], rowIndex: number) => {
                 return this.galleryColumnCount().toString() + ':' + rowIndex.toString() + ':' +
                   this.galleryRowKey(_row);
