@@ -73,6 +73,7 @@ import {
   splitPaneWidthFromDrag
 } from './SplitPaneSupport';
 import {
+  ActionBubble,
   addSearchTagToken,
   buildSearchSuggestions,
   composeSearchKeywordWithInput,
@@ -4196,6 +4197,10 @@ export struct GalleryListContent {
     return (this.isSearchResultScene || this.useLocalSearchBar) && !this.searchSubmitted;
   }
 
+  private shouldShowSearchOnlyFab(): boolean {
+    return (this.isSearchResultScene || this.useLocalSearchBar) && !this.searchSubmitted;
+  }
+
   private refreshSearchSuggestions(namespaces: string[] = this.selectedTagNamespaces): void {
     this.searchSuggestionItems = buildSearchSuggestions(this.keyword, 0, namespaces);
     this.searchSuggestionRevision++;
@@ -4540,28 +4545,41 @@ export struct GalleryListContent {
 
       // FAB 悬浮按钮
       Column() {
-        QuickActionColumn({
-          expanded: this.actionsExpanded,
-          filterActive: this.filterActive,
-          accountFilterEnabled: this.isSearchResultScene ? this.searchFilterEnabled : this.accountFilterEnabled,
-          canJump: this.canJump,
-          canRandom: this.canRandom,
-          canImageSearch: !this.useLocalSearchBar,
-          canBookmark: this.showBookmarkButton,
-          onToggle: this.onToggleActions,
-          onFilter: this.onFilter,
-          onJump: () => {
-            this.openJumpPanel();
-          },
-          onRefresh: this.onRefresh,
-          onRandom: this.onRandom,
-          onImageSearch: () => {
-            this.openImageSearchPanel();
-          },
-          onBookmark: () => {
-            this.onAddBookmark();
-          }
-        })
+        if (this.shouldShowSearchOnlyFab()) {
+          ActionBubble({
+            label: uiText('Search'),
+            symbolIcon: $r('sys.symbol.magnifyingglass'),
+            isEnabled: true,
+            primary: true,
+            directTap: true,
+            onTapAction: () => {
+              this.onSearch();
+            }
+          })
+        } else {
+          QuickActionColumn({
+            expanded: this.actionsExpanded,
+            filterActive: this.filterActive,
+            accountFilterEnabled: this.isSearchResultScene ? this.searchFilterEnabled : this.accountFilterEnabled,
+            canJump: this.canJump,
+            canRandom: this.canRandom,
+            canImageSearch: !this.useLocalSearchBar,
+            canBookmark: this.showBookmarkButton,
+            onToggle: this.onToggleActions,
+            onFilter: this.onFilter,
+            onJump: () => {
+              this.openJumpPanel();
+            },
+            onRefresh: this.onRefresh,
+            onRandom: this.onRandom,
+            onImageSearch: () => {
+              this.openImageSearchPanel();
+            },
+            onBookmark: () => {
+              this.onAddBookmark();
+            }
+          })
+        }
       }
       .width('100%')
       .height('100%')
