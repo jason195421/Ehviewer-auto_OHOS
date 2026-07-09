@@ -176,6 +176,10 @@ export function shouldUseChineseUi(): boolean {
   return isSystemChineseLanguage();
 }
 
+export function shouldShowTagTranslations(): boolean {
+  return shouldUseChineseUi() && ehSettingsStore.getValue('show_tag_translations', 'On') === 'On';
+}
+
 function isSystemChineseLanguage(): boolean {
   try {
     const systemLanguage = i18n.System.getSimplifiedLanguage();

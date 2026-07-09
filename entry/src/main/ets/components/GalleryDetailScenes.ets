@@ -3,7 +3,14 @@ import { GalleryComment } from '../model/GalleryModels';
 import { GalleryTagInfo } from '../model/GalleryModels';
 import { ArchiveOption, ArchiverInfo, ArchiverOption, HathArchiveList } from '../model/GalleryModels';
 import { ehTagTranslationStore } from '../services/EhTagTranslationStore';
-import { STATUS_BAR_HEIGHT_KEY, createEmptyDetail, galleryDisplayTitle, shouldUseChineseUi, uiText } from '../shared/EhShared';
+import {
+  LANGUAGE_REVISION_KEY,
+  STATUS_BAR_HEIGHT_KEY,
+  createEmptyDetail,
+  galleryDisplayTitle,
+  shouldShowTagTranslations,
+  uiText
+} from '../shared/EhShared';
 import { themePageBackground, themeScrimColor } from '../shared/EhTheme';
 import {
   themeDividerColor,
@@ -489,8 +496,10 @@ struct TagVoteOverlay {
     return translatedTagLabel(this.tag);
   }
 
+  @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
+
   private showTranslatedTitle(): boolean {
-    return shouldUseChineseUi() && this.translatedTitle().length > 0 && this.translatedTitle() !== this.tag.tag;
+    return shouldShowTagTranslations() && this.translatedTitle().length > 0 && this.translatedTitle() !== this.tag.tag;
   }
 
   build() {
@@ -685,7 +694,7 @@ function cloneTagInfo(info: GalleryTagInfo): GalleryTagInfo {
 }
 
 function translatedTagLabel(info: GalleryTagInfo): string {
-  if (!shouldUseChineseUi()) {
+  if (!shouldShowTagTranslations()) {
     return '';
   }
   const translated = ehTagTranslationStore.translate(info.namespace, info.tag);

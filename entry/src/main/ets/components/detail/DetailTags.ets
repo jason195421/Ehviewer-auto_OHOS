@@ -1,6 +1,6 @@
 import { GalleryTagGroup, GalleryTagInfo } from '../../model/GalleryModels';
 import { ehTagTranslationStore, EhTagSuggestion } from '../../services/EhTagTranslationStore';
-import { shouldUseChineseUi, uiText } from '../../shared/EhShared';
+import { LANGUAGE_REVISION_KEY, shouldShowTagTranslations, uiText } from '../../shared/EhShared';
 import {
   themeFieldBackground,
   themeOnPrimaryText,
@@ -254,10 +254,11 @@ export struct TagGroupRow {
   @Prop tagRevision: number = 0;
   @Prop group: GalleryTagGroup = { namespace: '', tags: [] };
   @Prop editMode: boolean = false;
+  @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
   onSelectTag: (info: GalleryTagInfo) => void = (_info: GalleryTagInfo) => {};
 
   private tagLabel(tag: string): string {
-    if (!shouldUseChineseUi()) {
+    if (!shouldShowTagTranslations()) {
       return tag;
     }
     const translated = ehTagTranslationStore.translate(this.group.namespace, tag);

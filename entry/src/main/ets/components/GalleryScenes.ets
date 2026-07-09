@@ -103,7 +103,8 @@ import {
   galleryThumbWidth,
   galleryThumbHeight,
   toggleGalleryDownload,
-  downloadButtonText
+  downloadButtonText,
+  shouldShowTagTranslations
 } from '../shared/EhShared';
 
 export { CategoryBadge, GalleryListRow, GalleryTagChip, GalleryThumb, GalleryThumbCard } from './GalleryCards';
@@ -2080,9 +2081,11 @@ export struct GalleryListScene {
       namespace = value.substring(0, colon).trim();
       tag = value.substring(colon + 1).trim();
     }
-    const translated = ehTagTranslationStore.translate(namespace, tag);
-    if (translated.length > 0) {
-      return translated;
+    if (shouldShowTagTranslations()) {
+      const translated = ehTagTranslationStore.translate(namespace, tag);
+      if (translated.length > 0) {
+        return translated;
+      }
     }
     return searchTagTokenLabel(token).replace(/_/g, ' ').replace(/\$/g, ' ').trim();
   }

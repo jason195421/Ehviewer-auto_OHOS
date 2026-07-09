@@ -342,7 +342,7 @@ export struct SettingsScene {
     if (key === this.optionKey) {
       this.optionValue = normalizedValue;
     }
-    if (key === 'app_language') {
+    if (key === 'app_language' || key === 'show_tag_translations') {
       notifyLanguageChanged();
     }
     if (key === 'show_jpn_title') {

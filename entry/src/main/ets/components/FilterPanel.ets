@@ -6,7 +6,7 @@ import {
   FILTER_MODE_UPLOADER
 } from '../services/EhFilterStore';
 import { ehTagTranslationStore } from '../services/EhTagTranslationStore';
-import { shouldUseChineseUi, uiText } from '../shared/EhShared';
+import { shouldShowTagTranslations, shouldUseChineseUi, uiText } from '../shared/EhShared';
 import {
   themeDangerText,
   themeDividerColor,
@@ -536,7 +536,7 @@ function supportedPanelMode(mode: number): number {
 
 function formatTagRuleText(text: string): string {
   const original = text.trim();
-  if (original.length === 0 || !shouldUseChineseUi()) {
+  if (original.length === 0 || !shouldShowTagTranslations()) {
     return original;
   }
   const parts = splitFilterTagText(original);
