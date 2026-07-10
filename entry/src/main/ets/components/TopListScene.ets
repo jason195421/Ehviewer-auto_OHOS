@@ -10,6 +10,7 @@ import {
 } from '../services/GalleryDetailModule';
 import {
   applyAppChromeImmersiveMode,
+  getMainWindow,
   isEmbeddedReaderActive,
   leaveEmbeddedReaderFullscreen
 } from '../services/EhWindowImmersive';
@@ -133,6 +134,7 @@ export struct TopListScene {
   @State sceneContentWidth: number = 0;
   @State splitListRatio: number = splitPaneCurrentRatio();
   @State splitDragging: boolean = false;
+  @State activeSplitPane: string = 'left';
   @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeightPx: number = 0;
   @StorageProp(SPLIT_PANE_RATIO_REVISION_KEY) @Watch('onSplitPaneRatioRevisionChange') splitPaneRatioRevision: number = 0;
   private topListScrollOffset: number = 0;
@@ -143,8 +145,12 @@ export struct TopListScene {
   aboutToAppear(): void {
     applyAppChromeImmersiveMode();
     this.restoreNavigationCache();
+    this.syncSceneContentWidthFromWindow();
     setActiveBackHandler(() => this.handleSystemBack());
     this.loadTopList();
+    setTimeout(() => {
+      this.syncSceneContentWidthFromWindow();
+    }, 0);
   }
 
   aboutToDisappear(): void {
@@ -156,6 +162,10 @@ export struct TopListScene {
   }
 
   private handleSystemBack(): boolean {
+    if (this.useSplitLayout() && this.activeSplitPane === 'left') {
+      if (this.showGalleryList) { this.closeGalleryList(); return true; }
+      if (this.showTagSearch) { this.closeTagSearch(); return true; }
+    }
     if (this.showTagSearch) { this.closeTagSearch(); return true; }
     if (this.showReader) { this.closeReader(); return true; }
     if (this.showDetail) {
@@ -520,7 +530,41 @@ export struct TopListScene {
   }
 
   private availableSceneWidth(): number {
-    return this.sceneContentWidth > 0 ? this.sceneContentWidth : 0;
+    const windowWidth = this.windowContentWidthVp();
+    if (this.sceneContentWidth > 0) {
+      return Math.max(this.sceneContentWidth, windowWidth);
+    }
+    return windowWidth;
+  }
+
+  private syncSceneContentWidthFromWindow(): void {
+    if (this.sceneContentWidth >= SPLIT_PANE_BREAKPOINT) {
+      return;
+    }
+    const width = this.windowContentWidthVp();
+    if (width > this.sceneContentWidth) {
+      this.updateSceneContentWidth(width);
+    }
+  }
+
+  private windowContentWidthVp(): number {
+    const win = getMainWindow();
+    if (win === undefined) {
+      return 0;
+    }
+    try {
+      const rawWidth = Math.floor(win.getWindowProperties().windowRect.width);
+      if (rawWidth <= 0 || Number.isNaN(rawWidth)) {
+        return 0;
+      }
+      const converted = Math.floor(this.getUIContext().px2vp(rawWidth));
+      if (converted >= 240) {
+        return converted;
+      }
+      return rawWidth >= 240 && rawWidth <= 1200 ? rawWidth : 0;
+    } catch (_error) {
+      return 0;
+    }
   }
 
   private useSplitLayout(): boolean {
@@ -664,6 +708,12 @@ export struct TopListScene {
           this.detailScrollOffset = offset;
         }
       })
+        .onAppear(() => {
+          this.syncSceneContentWidthFromWindow();
+        })
+        .onAreaChange((_oldArea: Area, newArea: Area) => {
+          this.updateSceneContentWidth(areaDimensionToVp(newArea.width, (value: number) => this.getUIContext().px2vp(value)));
+        })
         .transition(TransitionEffect.move(TransitionEdge.END)
           .animation({ duration: 300, curve: Curve.EaseOut }))
     } else if (this.showGalleryList) {
@@ -707,6 +757,9 @@ export struct TopListScene {
         }
         .width(this.useSplitLayout() ? this.splitListPaneWidth() : '100%')
         .height('100%')
+        .onTouch(() => {
+          this.activeSplitPane = 'left';
+        })
         .animation({ duration: this.splitDragging ? 0 : 220, curve: Curve.EaseOut })
         .transition(TransitionEffect.asymmetric(
           TransitionEffect.OPACITY.animation({ duration: 160, curve: Curve.EaseOut }),
@@ -751,6 +804,9 @@ export struct TopListScene {
             .width(this.splitSidePaneWidth())
             .height('100%')
             .position({ x: this.splitListPaneWidth() + 1, y: 0 })
+            .onTouch(() => {
+              this.activeSplitPane = 'right';
+            })
             .zIndex(5)
             .animation({ duration: this.splitDragging ? 0 : 220, curve: Curve.EaseOut })
             .transition(this.restoreDetailWithFade ?

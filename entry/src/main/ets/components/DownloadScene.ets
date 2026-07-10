@@ -237,6 +237,7 @@ export struct DownloadScene {
   @State sceneContentWidth: number = 0;
   @State splitListRatio: number = splitPaneCurrentRatio();
   @State splitDragging: boolean = false;
+  @State activeSplitPane: string = 'left';
   @State selectedDownloadGids: string = '';
   @State toolbarOffsetY: number = 0;
   @State downloadActionsExpanded: boolean = false;
@@ -290,6 +291,13 @@ export struct DownloadScene {
   }
 
   private handleSystemBack(): boolean {
+    if (this.useSplitLayout() && this.activeSplitPane === 'right' && this.showDetail) {
+      if (runDetailBackHandler()) {
+        return true;
+      }
+      this.closeDetail();
+      return true;
+    }
     if (this.advancedPanelVisible) {
       this.closeAdvancedPanel();
       return true;
@@ -1659,42 +1667,55 @@ export struct DownloadScene {
         }
 
         Column() {
-          DownloadToolColumn({
-            expanded: this.downloadActionsExpanded,
-            hasSelection: this.downloadSelectionCount() > 0,
-            canOperate: this.items.length > 0,
-            canJump: this.downloadJumpTotalPages() > 1,
-            onToggle: () => {
-              this.downloadActionsExpanded = !this.downloadActionsExpanded;
-            },
-            onStatus: () => {
-              this.statusFilter = nextDownloadStatusFilter(this.statusFilter);
-              this.downloadJumpPageIndex = 0;
-              this.refreshDownloadRows();
-              this.showDownloadStatusHint();
-            },
-            onJump: () => {
-              this.openDownloadJumpPanel();
-            },
-            onStart: () => {
-              this.startSelectedOrAll();
-            },
-            onStop: () => {
-              this.stopSelectedOrAll();
-            },
-            onRestore: () => {
-              this.restoreDownloadedItems();
-            },
-            onSelectAll: () => {
-              this.selectAllFinishedDownloads();
-            },
-            onDelete: () => {
-              this.deleteSelectedDownloads();
-            },
-            onExportZip: () => {
-              this.exportSelectedDownloadsZip();
-            }
-          })
+          if (this.searchBarVisible && !this.searchSubmitted) {
+            ActionBubble({
+              label: uiText('Search'),
+              symbolIcon: $r('sys.symbol.magnifyingglass'),
+              isEnabled: true,
+              primary: true,
+              directTap: true,
+              onTapAction: () => {
+                this.applyDownloadSearch();
+              }
+            })
+          } else {
+            DownloadToolColumn({
+              expanded: this.downloadActionsExpanded,
+              hasSelection: this.downloadSelectionCount() > 0,
+              canOperate: this.items.length > 0,
+              canJump: this.downloadJumpTotalPages() > 1,
+              onToggle: () => {
+                this.downloadActionsExpanded = !this.downloadActionsExpanded;
+              },
+              onStatus: () => {
+                this.statusFilter = nextDownloadStatusFilter(this.statusFilter);
+                this.downloadJumpPageIndex = 0;
+                this.refreshDownloadRows();
+                this.showDownloadStatusHint();
+              },
+              onJump: () => {
+                this.openDownloadJumpPanel();
+              },
+              onStart: () => {
+                this.startSelectedOrAll();
+              },
+              onStop: () => {
+                this.stopSelectedOrAll();
+              },
+              onRestore: () => {
+                this.restoreDownloadedItems();
+              },
+              onSelectAll: () => {
+                this.selectAllFinishedDownloads();
+              },
+              onDelete: () => {
+                this.deleteSelectedDownloads();
+              },
+              onExportZip: () => {
+                this.exportSelectedDownloadsZip();
+              }
+            })
+          }
         }
         .width('100%')
         .height('100%')
@@ -1805,6 +1826,9 @@ export struct DownloadScene {
       }
       .width(this.useSplitLayout() ? this.splitListPaneWidth() : '100%')
       .height('100%')
+      .onTouch(() => {
+        this.activeSplitPane = 'left';
+      })
       .animation({ duration: this.splitDragging ? 0 : 220, curve: Curve.EaseOut })
 
       if (this.useSplitLayout()) {
@@ -1844,6 +1868,9 @@ export struct DownloadScene {
           .width(this.splitSidePaneWidth())
           .height('100%')
           .position({ x: this.splitListPaneWidth() + 1, y: 0 })
+          .onTouch(() => {
+            this.activeSplitPane = 'right';
+          })
           .zIndex(5)
           .animation({ duration: this.splitDragging ? 0 : 220, curve: Curve.EaseOut })
           .transition(this.restoreDetailWithFade ?

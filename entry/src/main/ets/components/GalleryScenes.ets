@@ -1148,6 +1148,7 @@ export struct GalleryListScene {
   @State sceneContentWidth: number = 0;
   @State splitListRatio: number = splitPaneCurrentRatio();
   @State splitDragging: boolean = false;
+  @State activeSplitPane: string = 'left';
   private splitDragStartWidth: number = 0;
   private readerClosing: boolean = false;
   @State restoreDetailWithFade: boolean = false;
@@ -1440,6 +1441,20 @@ export struct GalleryListScene {
   }
 
   private handleSystemBack(): boolean {
+    if (this.useSplitLayout() && this.activeSplitPane === 'left') {
+      if (this.showBookmarkManager) {
+        this.closeBookmarkManager();
+        return true;
+      }
+      if (this.showSearchResultScene) {
+        this.closeSearchResultScene();
+        return true;
+      }
+      if (this.useLocalProvider && this.localSearchBarVisible) {
+        this.closeLocalSearchBar();
+        return true;
+      }
+    }
     if (this.cardActionVisible) {
       this.closeCardActions();
       return true;
@@ -2685,33 +2700,46 @@ export struct GalleryListScene {
     saveSplitPaneRatio(this.splitListRatio);
   }
 
+  private shouldShowSearchResultInLeftPane(): boolean {
+    return !this.isSearchResultScene && this.showSearchResultScene && this.useSplitLayout();
+  }
+
+  @Builder
+  private searchResultSceneContent() {
+    GalleryListScene({
+      sceneTitle: this.searchResultDraft.keyword.length > 0 ? this.searchResultDraft.keyword : 'Search',
+      listMode: 'Search',
+      sourceRoute: this.searchResultDraft.sourceRoute,
+      initialKeyword: this.searchResultDraft.keyword,
+      initialSearchMode: this.searchResultDraft.mode,
+      initialSearchCategory: this.searchResultDraft.category,
+      initialAdvancedSearchEnabled: this.searchResultDraft.advancedEnabled,
+      initialAdvanceSearch: this.searchResultDraft.advanceSearch,
+      initialMinRating: this.searchResultDraft.minRating,
+      initialPageFrom: this.searchResultDraft.pageFrom,
+      initialPageTo: this.searchResultDraft.pageTo,
+      initialSearchFilterEnabled: this.searchResultDraft.searchFilterEnabled,
+      initialSearchSubmitted: this.searchResultDraft.submitted,
+      initialSearchAdvancedPanelOpened: this.searchResultDraft.searchAdvancedPanelOpened,
+      initialImagePath: this.searchResultDraft.imagePath,
+      initialImageUseSimilarityScan: this.searchResultDraft.imageUseSimilarityScan,
+      initialImageOnlySearchCovers: this.searchResultDraft.imageOnlySearchCovers,
+      initialImageShowExpunged: this.searchResultDraft.imageShowExpunged,
+      isSearchResultScene: true,
+      onBack: () => {
+        this.closeSearchResultScene();
+      }
+    })
+  }
+
   build() {
     Column() {
-      if (!this.isSearchResultScene && this.showSearchResultScene) {
-        GalleryListScene({
-          sceneTitle: this.searchResultDraft.keyword.length > 0 ? this.searchResultDraft.keyword : 'Search',
-          listMode: 'Search',
-          sourceRoute: this.searchResultDraft.sourceRoute,
-          initialKeyword: this.searchResultDraft.keyword,
-          initialSearchMode: this.searchResultDraft.mode,
-          initialSearchCategory: this.searchResultDraft.category,
-          initialAdvancedSearchEnabled: this.searchResultDraft.advancedEnabled,
-          initialAdvanceSearch: this.searchResultDraft.advanceSearch,
-          initialMinRating: this.searchResultDraft.minRating,
-          initialPageFrom: this.searchResultDraft.pageFrom,
-          initialPageTo: this.searchResultDraft.pageTo,
-          initialSearchFilterEnabled: this.searchResultDraft.searchFilterEnabled,
-          initialSearchSubmitted: this.searchResultDraft.submitted,
-          initialSearchAdvancedPanelOpened: this.searchResultDraft.searchAdvancedPanelOpened,
-          initialImagePath: this.searchResultDraft.imagePath,
-          initialImageUseSimilarityScan: this.searchResultDraft.imageUseSimilarityScan,
-          initialImageOnlySearchCovers: this.searchResultDraft.imageOnlySearchCovers,
-          initialImageShowExpunged: this.searchResultDraft.imageShowExpunged,
-          isSearchResultScene: true,
-          onBack: () => {
-            this.closeSearchResultScene();
-          }
-        })
+      if (!this.isSearchResultScene && this.showSearchResultScene && !this.shouldShowSearchResultInLeftPane()) {
+        Column() {
+          this.searchResultSceneContent()
+        }
+          .width('100%')
+          .height('100%')
           .transition(TransitionEffect.asymmetric(
             TransitionEffect.move(TransitionEdge.END).animation({ duration: 260, curve: Curve.EaseOut }),
             TransitionEffect.move(TransitionEdge.END).animation({ duration: 220, curve: Curve.EaseIn })))
@@ -2726,7 +2754,21 @@ export struct GalleryListScene {
           .height('100%')
       } else {
         Stack({ alignContent: Alignment.TopStart }) {
-          GalleryListContent({
+          if (this.shouldShowSearchResultInLeftPane()) {
+            Column() {
+              this.searchResultSceneContent()
+            }
+              .width(this.splitListPaneWidth())
+              .height('100%')
+              .onTouch(() => {
+                this.activeSplitPane = 'left';
+              })
+              .animation({
+                duration: this.splitDragging ? 0 : 220,
+                curve: Curve.EaseOut
+              })
+          } else {
+            GalleryListContent({
             sceneTitle: this.sceneTitle,
             listMode: this.listMode,
             keyword: this.keyword,
@@ -2936,10 +2978,14 @@ export struct GalleryListScene {
           })
             .width(this.useSplitLayout() ? this.splitListPaneWidth() : '100%')
             .height('100%')
+            .onTouch(() => {
+              this.activeSplitPane = 'left';
+            })
             .animation({
               duration: this.splitDragging ? 0 : 220,
               curve: Curve.EaseOut
             })
+          }
 
           if (this.showBookmarkManager) {
             SearchBookmarkManagerScene({
@@ -3098,6 +3144,9 @@ export struct GalleryListScene {
               .width(this.useSplitLayout() ? this.splitSidePaneWidth() : '100%')
               .height('100%')
               .position({ x: this.useSplitLayout() ? this.splitListPaneWidth() + 1 : 0, y: 0 })
+              .onTouch(() => {
+                this.activeSplitPane = 'right';
+              })
               .zIndex(5)
               .animation({
                 duration: this.splitDragging ? 0 : 220,
