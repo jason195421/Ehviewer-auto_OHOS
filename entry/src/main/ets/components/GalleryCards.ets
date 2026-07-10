@@ -418,6 +418,8 @@ export struct GalleryThumb {
           .height('100%')
           .objectFit(ImageFit.Cover)
           .syncLoad(false)
+          .dynamicRangeMode(DynamicRangeMode.STANDARD)
+          .orientation(ImageRotateOrientation.UP)
           .borderRadius(this.radiusValue)
           .onError(() => {
             this.loadFailed = true;
