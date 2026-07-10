@@ -3152,7 +3152,7 @@ export struct GalleryListScene {
                 duration: this.splitDragging ? 0 : 220,
                 curve: Curve.EaseOut
               })
-              .transition(this.restoreDetailWithFade ?
+              .transition(this.useSplitLayout() || this.restoreDetailWithFade ?
                 TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }) :
                 TransitionEffect.move(TransitionEdge.END).animation({ duration: 300, curve: Curve.EaseOut }))
           }
@@ -4388,6 +4388,7 @@ export struct GalleryListContent {
                 right: colIndex < row.items.length - 1 ? this.galleryCardGap() : 0
               })
               .animation({ duration: 220, curve: Curve.EaseOut })
+              .transition(TransitionEffect.OPACITY.animation({ duration: 160, curve: Curve.EaseInOut }))
               .onClick(() => {
                 this.onSelectGallery(gallery);
               })
@@ -4403,6 +4404,7 @@ export struct GalleryListContent {
                 right: colIndex < row.items.length - 1 ? this.galleryCardGap() : 0
               })
               .animation({ duration: 220, curve: Curve.EaseOut })
+              .transition(TransitionEffect.OPACITY.animation({ duration: 160, curve: Curve.EaseInOut }))
               .onClick(() => {
                 this.onSelectGallery(gallery);
               })
@@ -4415,10 +4417,8 @@ export struct GalleryListContent {
       .animation({ duration: 220, curve: Curve.EaseOut })
     }
     .margin({ bottom: this.galleryCardGap() })
-    .reuseId('gallery-row-' + this.galleryColumnCount().toString())
-    .transition(TransitionEffect.OPACITY
-      .combine(TransitionEffect.translate({ y: 8 }))
-      .animation({ duration: 180, curve: Curve.EaseOut }))
+    .reuseId('gallery-row')
+    .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
   }
 
   build() {
@@ -4944,15 +4944,11 @@ export struct GalleryListContent {
       const rowIndex = Math.floor(i / cols);
       rows.push({
         index: rowIndex,
-        key: cols.toString() + ':' + rowIndex.toString() + ':' + this.galleryRowKey(items),
+        key: rowIndex.toString(),
         items: items
       });
     }
     return rows;
-  }
-
-  private galleryRowKey(row: GalleryInfo[]): string {
-    return row.map((gallery: GalleryInfo) => this.galleryCardKey(gallery)).join('-');
   }
 
   private galleryCardKey(gallery: GalleryInfo): string {

@@ -924,7 +924,7 @@ export struct DownloadScene {
       const rowIndex = Math.floor(i / columns);
       rows.push({
         index: rowIndex,
-        key: columns.toString() + ':' + rowIndex.toString() + ':' + this.downloadRowKey(rowIndex, items),
+        key: rowIndex.toString(),
         items: items
       });
     }
@@ -933,11 +933,6 @@ export struct DownloadScene {
 
   private refreshDownloadRows(): void {
     this.syncDownloadCardStates();
-  }
-
-  private downloadRowKey(rowIndex: number, row: DownloadInfo[]): string {
-    return row.map((item: DownloadInfo, index: number) => rowIndex.toString() + ':' + index.toString() + ':' +
-      item.gid.toString() + '@' + item.state).join('-');
   }
 
   private syncDownloadCardStates(): void {
@@ -1524,6 +1519,7 @@ export struct DownloadScene {
                       .width(this.downloadCardWidth())
                       .margin({ right: colIndex < row.items.length - 1 ? this.downloadCardGap() : 0 })
                       .animation({ duration: 220, curve: Curve.EaseOut })
+                      .transition(TransitionEffect.OPACITY.animation({ duration: 160, curve: Curve.EaseInOut }))
                     }, (item: DownloadInfo, _colIndex: number) => item.gid.toString())
                   }
                   .width('100%')
@@ -1849,7 +1845,7 @@ export struct DownloadScene {
           })
           .zIndex(5)
           .animation({ duration: this.splitDragging ? 0 : 220, curve: Curve.EaseOut })
-          .transition(this.restoreDetailWithFade ?
+          .transition(this.useSplitLayout() || this.restoreDetailWithFade ?
             TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }) :
             TransitionEffect.move(TransitionEdge.END).animation({ duration: 300, curve: Curve.EaseOut }))
       }

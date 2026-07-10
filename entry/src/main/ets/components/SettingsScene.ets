@@ -1591,9 +1591,11 @@ export struct SettingsScene {
           .position({ x: this.useSplitLayout() ? this.splitListPaneWidth() + 1 : 0, y: 0 })
           .zIndex(5)
           .animation({ duration: this.splitDragging ? 0 : 220, curve: Curve.EaseOut })
-          .transition(TransitionEffect.asymmetric(
-            TransitionEffect.move(TransitionEdge.END).animation({ duration: 300, curve: Curve.EaseOut }),
-            TransitionEffect.move(TransitionEdge.END).animation({ duration: 240, curve: Curve.EaseIn })))
+          .transition(this.useSplitLayout() ?
+            TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }) :
+            TransitionEffect.asymmetric(
+              TransitionEffect.move(TransitionEdge.END).animation({ duration: 300, curve: Curve.EaseOut }),
+              TransitionEffect.move(TransitionEdge.END).animation({ duration: 240, curve: Curve.EaseIn })))
       }
 
       // Deeper panels slide over the ordinary settings panel instead of replacing it.

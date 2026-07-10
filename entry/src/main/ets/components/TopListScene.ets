@@ -783,7 +783,7 @@ export struct TopListScene {
             })
             .zIndex(5)
             .animation({ duration: this.splitDragging ? 0 : 220, curve: Curve.EaseOut })
-            .transition(this.restoreDetailWithFade ?
+            .transition(this.useSplitLayout() || this.restoreDetailWithFade ?
               TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }) :
               TransitionEffect.move(TransitionEdge.END).animation({ duration: 300, curve: Curve.EaseOut }))
         }
