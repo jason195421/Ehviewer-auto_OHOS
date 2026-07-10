@@ -4387,6 +4387,7 @@ export struct GalleryListContent {
               .margin({
                 right: colIndex < row.items.length - 1 ? this.galleryCardGap() : 0
               })
+              .animation({ duration: 220, curve: Curve.EaseOut })
               .onClick(() => {
                 this.onSelectGallery(gallery);
               })
@@ -4401,6 +4402,7 @@ export struct GalleryListContent {
               .margin({
                 right: colIndex < row.items.length - 1 ? this.galleryCardGap() : 0
               })
+              .animation({ duration: 220, curve: Curve.EaseOut })
               .onClick(() => {
                 this.onSelectGallery(gallery);
               })
@@ -4410,9 +4412,13 @@ export struct GalleryListContent {
       .width('100%')
       .padding({ left: this.galleryContentPadding(), right: this.galleryContentPadding() })
       .justifyContent(FlexAlign.Start)
+      .animation({ duration: 220, curve: Curve.EaseOut })
     }
     .margin({ bottom: this.galleryCardGap() })
     .reuseId('gallery-row-' + this.galleryColumnCount().toString())
+    .transition(TransitionEffect.OPACITY
+      .combine(TransitionEffect.translate({ y: 8 }))
+      .animation({ duration: 180, curve: Curve.EaseOut }))
   }
 
   build() {
@@ -4459,7 +4465,7 @@ export struct GalleryListContent {
           }
           .scrollBar(BarState.Auto)
           .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true, effectEdge: EffectEdge.START | EffectEdge.END })
-          .cachedCount(4)
+          .cachedCount(10)
           .width('100%')
           .height(this.listViewportHeight())
           .onAppear(() => {
