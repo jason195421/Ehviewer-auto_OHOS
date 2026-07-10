@@ -41,7 +41,7 @@ import { ehUpdateChecker, ReleaseInfo, UpdateCheckResult } from '../services/EhU
 import { galleryPageCache } from '../services/GalleryPageCache';
 import { CacheClearResult, CachePruneResult, readerImageCache } from '../services/ReaderImageCache';
 import { FilterRule, FILTER_MODE_RATING, FILTER_MODE_TITLE, ehFilterStore } from '../services/EhFilterStore';
-import { applyAppChromeImmersiveMode } from '../services/EhWindowImmersive';
+import { applyAppChromeImmersiveMode, mainContentWidthFallbackVp } from '../services/EhWindowImmersive';
 import { applyWindowPrivacyMode } from '../services/EhWindowPrivacy';
 import { ehAppLog } from '../services/EhAppLog';
 import { ehParseErrorBodyStore, ParseErrorBodyEntry } from '../services/EhParseErrorBodyStore';
@@ -169,6 +169,7 @@ export struct SettingsScene {
 
   aboutToAppear(): void {
     applyAppChromeImmersiveMode();
+    this.syncSceneContentWidthFromWindow();
     this.restoreNavigationCache();
     setActiveBackHandler(() => this.handleSystemBack());
     const context = getAbilityContext();
@@ -334,6 +335,13 @@ export struct SettingsScene {
       return;
     }
     this.sceneContentWidth = normalized;
+  }
+
+  private syncSceneContentWidthFromWindow(): void {
+    const width = mainContentWidthFallbackVp((value: number) => this.getUIContext().px2vp(value));
+    if (width > this.sceneContentWidth) {
+      this.updateSceneContentWidth(width);
+    }
   }
 
   onSplitPaneRatioRevisionChange(): void {

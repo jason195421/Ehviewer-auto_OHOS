@@ -1368,6 +1368,7 @@ export struct GalleryListScene {
 
   aboutToAppear(): void {
     applyAppChromeImmersiveMode();
+    this.syncSceneContentWidthFromWindow();
     if (this.sourceRoute === GalleryRoute.Favorites) {
       this.favoriteCat = recentFavoriteCat;
     }
@@ -2667,6 +2668,13 @@ export struct GalleryListScene {
       return;
     }
     this.sceneContentWidth = normalized;
+  }
+
+  private syncSceneContentWidthFromWindow(): void {
+    const width = mainContentWidthFallbackVp((value: number) => this.getUIContext().px2vp(value));
+    if (width > this.sceneContentWidth) {
+      this.updateSceneContentWidth(width);
+    }
   }
 
   onSplitPaneRatioRevisionChange(): void {
