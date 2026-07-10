@@ -2973,6 +2973,7 @@ export struct GalleryListScene {
             onSystemBack: () => {
               return this.handleSystemBack();
             },
+            layoutWidthHint: this.useSplitLayout() ? this.splitListPaneWidth() : this.sceneContentWidth,
             scrollResetVersion: this.scrollResetVersion,
             initialScrollOffset: this.listScrollOffset,
             onScrollUpdate: (offset: number) => {
@@ -3566,6 +3567,7 @@ export struct GalleryListContent {
   @Prop requestUrl: string = '';
   @Prop isLoadingMore: boolean = false;
   @Prop @Watch('onGalleriesChanged') galleries: GalleryInfo[] = [];
+  @Prop @Watch('onLayoutWidthHintChanged') layoutWidthHint: number = 0;
   @Prop @Watch('onScrollReset') scrollResetVersion: number = 0;
   onKeywordChange: (value: string) => void = () => {
   };
@@ -3679,6 +3681,12 @@ export struct GalleryListContent {
   onGalleriesChanged(): void {
   }
 
+  onLayoutWidthHintChanged(): void {
+    if (this.layoutWidthHint >= 240) {
+      this.updateContentWidth(this.layoutWidthHint);
+    }
+  }
+
   private statusBarVp(): number {
     return this.getUIContext().px2vp(this.statusBarHeightPx);
   }
@@ -3748,6 +3756,7 @@ export struct GalleryListContent {
 
   aboutToAppear(): void {
     setActiveBackHandler(() => this.handleContentBack());
+    this.onLayoutWidthHintChanged();
     this.syncContentWidthFromWindow();
     this.syncPageJumpDraft();
     this.refreshSearchSuggestions();
@@ -4187,9 +4196,6 @@ export struct GalleryListContent {
   }
 
   private syncContentWidthFromWindow(): void {
-    if (this.contentWidth >= 240) {
-      return;
-    }
     this.updateContentWidth(mainContentWidthFallbackVp((value: number) => this.getUIContext().px2vp(value)));
   }
 

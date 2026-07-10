@@ -348,6 +348,7 @@ export struct DownloadScene {
     this.showReader = false;
     this.showDetail = false;
     this.restoreDetailWithFade = false;
+    this.syncDownloadContentWidthForCurrentLayout();
     this.detailLink = createEmptyGalleryDetailLink();
     this.detail = createEmptyDetail();
     this.detailRequestUrl = '';
@@ -833,10 +834,14 @@ export struct DownloadScene {
   }
 
   private syncDownloadContentWidthFromWindow(): void {
-    if (this.downloadContentWidth >= 240) {
-      return;
-    }
     this.updateDownloadContentWidth(mainContentWidthFallbackVp((value: number) => this.getUIContext().px2vp(value)));
+  }
+
+  private syncDownloadContentWidthForCurrentLayout(): void {
+    const width = this.useSplitLayout() ? this.splitListPaneWidth() : this.availableSceneWidth();
+    if (width >= 240) {
+      this.updateDownloadContentWidth(width);
+    }
   }
 
   private updateSceneContentWidth(width: number): void {
@@ -845,6 +850,7 @@ export struct DownloadScene {
       return;
     }
     this.sceneContentWidth = normalized;
+    this.syncDownloadContentWidthForCurrentLayout();
   }
 
   onSplitPaneRatioRevisionChange(): void {

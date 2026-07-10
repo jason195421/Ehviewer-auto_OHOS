@@ -360,9 +360,6 @@ export struct SearchSuggestionList {
   }
 
   private syncContentWidthFromWindow(): void {
-    if (this.contentWidth >= 240) {
-      return;
-    }
     const width = mainContentWidthFallbackVp((value: number) => this.getUIContext().px2vp(value));
     if (width >= 240) {
       this.contentWidth = width;
