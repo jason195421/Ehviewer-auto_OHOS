@@ -802,7 +802,16 @@ function shouldUseDirectConnection(host: string): boolean {
     return true;
   }
   const selectedHost = selectedGalleryHost();
-  return normalizedHost === selectedHost;
+  if (normalizedHost === selectedHost) {
+    return true;
+  }
+  if (selectedHost === 'exhentai.org') {
+    return normalizedHost.endsWith('.exhentai.org');
+  }
+  if (selectedHost === 'e-hentai.org') {
+    return normalizedHost.endsWith('.e-hentai.org') || normalizedHost === 'ehgt.org';
+  }
+  return false;
 }
 
 function directProbeKeyValue(): string {

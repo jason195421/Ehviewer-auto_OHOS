@@ -422,11 +422,19 @@ function extractStyleUrl(style: string): string {
 }
 
 function parseStyleOffset(style: string): StyleOffset {
-  const position = /background-position\s*:\s*(-?\d+)px\s+(-?\d+)px/i.exec(style);
+  const position = /background-position\s*:\s*(-?\d+)(?:px)?\s+(-?\d+)(?:px)?/i.exec(style);
   if (position !== null) {
     return {
       x: Math.abs(parseIntSafe(position[1], 0)),
       y: Math.abs(parseIntSafe(position[2], 0))
+    };
+  }
+
+  const shorthand = /url\([^)]+\)\s+(-?\d+)(?:px)?\s+(-?\d+)(?:px)?/i.exec(style);
+  if (shorthand !== null) {
+    return {
+      x: Math.abs(parseIntSafe(shorthand[1], 0)),
+      y: Math.abs(parseIntSafe(shorthand[2], 0))
     };
   }
 
