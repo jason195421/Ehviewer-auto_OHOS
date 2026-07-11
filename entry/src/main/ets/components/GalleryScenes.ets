@@ -3124,6 +3124,7 @@ export struct GalleryListScene {
             SplitPaneDivider({
               x: this.splitListPaneWidth(),
               dragging: this.splitDragging,
+              fadeTransition: this.restoreDetailWithFade,
               onSplitDragStart: () => {
                 this.splitDragging = true;
                 this.splitDragStartWidth = this.splitListPaneWidth();
@@ -3703,14 +3704,20 @@ export struct GalleryListContent {
     return this.getUIContext().px2vp(this.statusBarHeightPx);
   }
 
+  private effectiveContentWidth(): number {
+    return this.layoutWidthHint >= 240 ? this.layoutWidthHint : this.contentWidth;
+  }
+
   private favoriteDrawerLeft(): number {
-    const width = this.contentWidth > 0 ? this.contentWidth :
+    const effectiveWidth = this.effectiveContentWidth();
+    const width = effectiveWidth > 0 ? effectiveWidth :
       mainContentWidthFallbackVp((value: number) => this.getUIContext().px2vp(value));
     return Math.max(0, width - this.FAVORITE_DRAWER_WIDTH);
   }
 
   private bookmarkDrawerLeft(): number {
-    const width = this.contentWidth > 0 ? this.contentWidth :
+    const effectiveWidth = this.effectiveContentWidth();
+    const width = effectiveWidth > 0 ? effectiveWidth :
       mainContentWidthFallbackVp((value: number) => this.getUIContext().px2vp(value));
     return Math.max(0, width - this.FAVORITE_DRAWER_WIDTH);
   }
@@ -3894,10 +3901,11 @@ export struct GalleryListContent {
   }
 
   private imageSearchPanelWidth(): number {
-    if (this.contentWidth <= 0) {
+    const width = this.effectiveContentWidth();
+    if (width <= 0) {
       return 320;
     }
-    return Math.min(320, Math.max(260, this.contentWidth - 24));
+    return Math.min(320, Math.max(260, width - 24));
   }
 
   private imageSearchPanelMaxHeight(): number {
@@ -4044,7 +4052,7 @@ export struct GalleryListContent {
   }
 
   private galleryCardWidth(): number {
-    const availableWidth = Math.max(0, this.contentWidth - this.galleryContentPadding() * 2);
+    const availableWidth = Math.max(0, this.effectiveContentWidth() - this.galleryContentPadding() * 2);
     if (availableWidth <= 0 || Number.isNaN(availableWidth)) {
       return this.galleryCardPreferredWidth();
     }
@@ -4054,7 +4062,7 @@ export struct GalleryListContent {
   }
 
   private galleryColumnCount(): number {
-    return this.galleryColumnCountForWidth(this.contentWidth);
+    return this.galleryColumnCountForWidth(this.effectiveContentWidth());
   }
 
   private galleryColumnCountForWidth(width: number): number {
@@ -4103,10 +4111,11 @@ export struct GalleryListContent {
   }
 
   private searchTagStripMaxWidth(): number {
-    if (this.contentWidth <= 0) {
+    const width = this.effectiveContentWidth();
+    if (width <= 0) {
       return 160;
     }
-    return Math.max(80, this.contentWidth - 240);
+    return Math.max(80, width - 240);
   }
 
   private removeLastSearchTagFromEmptyInput(): boolean {
@@ -4538,7 +4547,7 @@ export struct GalleryListContent {
       .opacity(this.contentOpacity)
       .animation({ duration: 100, curve: Curve.EaseOut })
       .onAreaChange((_oldArea: Area, newArea: Area) => {
-        this.updateContentWidth(newArea.width as number);
+        this.updateContentWidth(this.layoutWidthHint >= 240 ? this.layoutWidthHint : newArea.width as number);
         const h = newArea.height as number;
         if (h > 0 && !Number.isNaN(h)) {
           this.viewportHeight = h;
@@ -4899,7 +4908,8 @@ export struct GalleryListContent {
           offsetY: 4
         })
         .position({
-          x: this.contentWidth > 0 ? Math.max(12, this.contentWidth - (this.useSeekJumpPanel() ? 304 : 244)) : 100,
+          x: this.effectiveContentWidth() > 0 ? Math.max(12,
+            this.effectiveContentWidth() - (this.useSeekJumpPanel() ? 304 : 244)) : 100,
           y: this.viewportHeight > 0 ? Math.max(96, this.viewportHeight - (this.useSeekJumpPanel() ? 310 : 210)) : 360
         })
         .zIndex(14)

@@ -1575,6 +1575,7 @@ export struct SettingsScene {
         SplitPaneDivider({
           x: this.splitListPaneWidth(),
           dragging: this.splitDragging,
+          fadeTransition: this.restorePanelWithFade,
           onSplitDragStart: () => {
             this.splitDragging = true;
             this.splitDragStartWidth = this.splitListPaneWidth();

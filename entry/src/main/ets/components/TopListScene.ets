@@ -729,6 +729,7 @@ export struct TopListScene {
           SplitPaneDivider({
             x: this.splitListPaneWidth(),
             dragging: this.splitDragging,
+            fadeTransition: this.restoreDetailWithFade,
             onSplitDragStart: () => {
               this.splitDragging = true;
               this.splitDragStartWidth = this.splitListPaneWidth();

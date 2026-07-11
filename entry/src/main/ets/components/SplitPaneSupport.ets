@@ -110,6 +110,7 @@ function clampSplitPaneRatio(value: number): number {
 export struct SplitPaneDivider {
   @Prop x: number = 0;
   @Prop dragging: boolean = false;
+  @Prop fadeTransition: boolean = false;
   onSplitDragStart: () => void = () => {
   };
   onSplitDragUpdate: (offsetX: number) => void = (_offsetX: number) => {
@@ -156,9 +157,11 @@ export struct SplitPaneDivider {
     .height('100%')
     .position({ x: this.x - 12, y: 0 })
     .zIndex(80)
-    .transition(TransitionEffect.asymmetric(
-      TransitionEffect.move(TransitionEdge.END).animation({ duration: 300, curve: Curve.EaseOut }),
-      TransitionEffect.move(TransitionEdge.END).animation({ duration: 240, curve: Curve.EaseIn })))
+    .transition(this.fadeTransition ?
+      TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }) :
+      TransitionEffect.asymmetric(
+        TransitionEffect.move(TransitionEdge.END).animation({ duration: 300, curve: Curve.EaseOut }),
+        TransitionEffect.move(TransitionEdge.END).animation({ duration: 240, curve: Curve.EaseIn })))
     .gesture(
       PanGesture({ fingers: 1, direction: PanDirection.Horizontal, distance: 1 })
         .onActionStart(() => {

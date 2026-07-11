@@ -846,6 +846,11 @@ export struct DownloadScene {
     }
   }
 
+  private updateDownloadContentWidthFromArea(width: number): void {
+    const targetWidth = this.useSplitLayout() ? this.splitListPaneWidth() : this.availableSceneWidth();
+    this.updateDownloadContentWidth(targetWidth >= 240 ? targetWidth : width);
+  }
+
   private updateSceneContentWidth(width: number): void {
     const normalized = Math.floor(width);
     if (normalized <= 0 || Number.isNaN(normalized) || Math.abs(this.sceneContentWidth - normalized) < 1) {
@@ -860,6 +865,7 @@ export struct DownloadScene {
   onSplitPaneRatioRevisionChange(): void {
     if (!this.splitDragging) {
       this.splitListRatio = splitPaneCurrentRatio();
+      this.syncDownloadContentWidthForCurrentLayout();
     }
   }
 
@@ -902,6 +908,7 @@ export struct DownloadScene {
     const sceneWidth = this.availableSceneWidth();
     const targetWidth = splitPaneWidthFromDrag(sceneWidth, this.splitDragStartWidth, offsetX);
     this.splitListRatio = splitPaneRatioForWidth(sceneWidth, targetWidth);
+    this.syncDownloadContentWidthForCurrentLayout();
   }
 
   private finishSplitPaneDrag(): void {
@@ -1225,6 +1232,7 @@ export struct DownloadScene {
   private openDetail(item: DownloadInfo): void {
     this.restoreDetailWithFade = false;
     this.showDetail = true;
+    this.syncDownloadContentWidthForCurrentLayout();
     markCurrentRouteRightPane(this.useSplitLayout());
     const detailLink = createGalleryDetailLinkFromGallery(item, currentGallerySite(),
       EhUrl.getReferer(currentGallerySite()));
@@ -1237,6 +1245,7 @@ export struct DownloadScene {
   private closeDetail(): void {
     this.restoreDetailWithFade = false;
     this.showDetail = false;
+    this.syncDownloadContentWidthForCurrentLayout();
     markCurrentRouteRightPane(false);
     this.detailLink = createEmptyGalleryDetailLink();
     this.detail = createEmptyDetail();
@@ -1534,7 +1543,7 @@ export struct DownloadScene {
             })
             .translate({ y: this.downloadContentStartOffset() })
         .onAreaChange((_oldArea: Area, newArea: Area) => {
-          this.updateDownloadContentWidth(newArea.width as number);
+          this.updateDownloadContentWidthFromArea(newArea.width as number);
         })
             .onAppear(() => {
               this.syncDownloadContentWidthFromWindow();
@@ -1559,7 +1568,7 @@ export struct DownloadScene {
         .height('100%')
         .animation({ duration: this.splitDragging ? 0 : 220, curve: Curve.EaseOut })
         .onAreaChange((_oldArea: Area, newArea: Area) => {
-          this.updateDownloadContentWidth(newArea.width as number);
+          this.updateDownloadContentWidthFromArea(newArea.width as number);
           const height = newArea.height as number;
           if (height > 0 && !Number.isNaN(height)) {
             this.viewportHeight = height;
@@ -1800,6 +1809,7 @@ export struct DownloadScene {
         SplitPaneDivider({
           x: this.splitListPaneWidth(),
           dragging: this.splitDragging,
+          fadeTransition: this.restoreDetailWithFade,
           onSplitDragStart: () => {
             this.splitDragging = true;
             this.splitDragStartWidth = this.splitListPaneWidth();
