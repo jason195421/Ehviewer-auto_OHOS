@@ -31,7 +31,7 @@ export struct SessionScene {
     this.cookieInput = ehCookieStore.getEditableCookieHeader();
     const context = getAbilityContext();
     if (context !== undefined) {
-      ehCookieStore.load(context).then(() => {
+      ehCookieStore.ensureLoaded(context).then(() => {
         this.cookieInput = ehCookieStore.getEditableCookieHeader();
         this.syncCookieFieldsFromInput(this.cookieInput, false);
         this.statusText = ehCookieStore.hasCookies() ? 'Persisted Cookie loaded' : 'No Cookie saved';

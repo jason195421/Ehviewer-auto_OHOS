@@ -3,7 +3,7 @@ import { GalleryListLoadResult } from '../services/EhHttpClient';
 import { DEFAULT_ADVANCE_SEARCH, ListMode } from '../services/EhUrl';
 import { ehHistoryStore } from '../services/EhHistoryStore';
 import { galleryMatchesLocalSearch, LocalGallerySearchOptions } from '../services/LocalGallerySearch';
-import { cloneGalleryInfos, getAbilityContext } from '../shared/EhShared';
+import { getAbilityContext } from '../shared/EhShared';
 import { GalleryListScene } from './GalleryScenes';
 
 const HISTORY_PAGE_SIZE: number = 25;
@@ -18,10 +18,10 @@ export struct HistoryScene {
     pageSize: number, options: LocalGallerySearchOptions): Promise<GalleryListLoadResult> {
     const context = getAbilityContext();
     if (context !== undefined) {
-      await ehHistoryStore.load(context);
+      await ehHistoryStore.ensureLoaded(context);
     }
 
-    const allItems = cloneGalleryInfos(ehHistoryStore.getItems());
+    const allItems = ehHistoryStore.getItems();
     const filtered = this.filterHistoryItems(allItems, keyword, options);
     const safePageSize = Math.max(1, pageSize);
     const safePageIndex = Math.max(0, pageIndex);

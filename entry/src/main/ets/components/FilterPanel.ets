@@ -7,6 +7,7 @@ import {
 } from '../services/EhFilterStore';
 import { ehTagTranslationStore } from '../services/EhTagTranslationStore';
 import { shouldShowTagTranslations, shouldUseChineseUi, uiText } from '../shared/EhShared';
+import { sortedStringKey, toggleStringValue } from '../shared/StringCollectionSupport';
 import {
   themeDangerText,
   themeDividerColor,
@@ -107,7 +108,7 @@ export struct FilterPanel {
   }
 
   private selectedTagNamespaceKey(): string {
-    return this.selectedTagNamespaces.slice().sort().join('|');
+    return sortedStringKey(this.selectedTagNamespaces);
   }
 
   private suggestionListHeight(): number {
@@ -163,14 +164,7 @@ export struct FilterPanel {
   }
 
   private toggleTagNamespace(namespace: string): void {
-    const next = this.selectedTagNamespaces.slice();
-    const index = next.indexOf(namespace);
-    if (index >= 0) {
-      next.splice(index, 1);
-    } else {
-      next.push(namespace);
-    }
-    this.selectedTagNamespaces = next;
+    this.selectedTagNamespaces = toggleStringValue(this.selectedTagNamespaces, namespace);
     this.refreshTagSuggestions();
   }
 

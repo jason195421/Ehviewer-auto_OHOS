@@ -88,6 +88,8 @@ export function defaultSettingEntries(): SettingEntry[] {
 
 export class EhSettingsStore {
   private entries: SettingEntry[] = defaultSettingEntries();
+  private loaded: boolean = false;
+  private ensurePromise: Promise<void> | null = null;
 
   getEntries(): SettingEntry[] {
     return cloneEntries(this.entries);
@@ -110,6 +112,23 @@ export class EhSettingsStore {
       }
     }
     this.entries.push({ key: key, value: value });
+  }
+
+  async ensureLoaded(context: common.UIAbilityContext): Promise<void> {
+    if (this.loaded) {
+      return;
+    }
+    if (this.ensurePromise !== null) {
+      await this.ensurePromise;
+      return;
+    }
+    this.ensurePromise = this.load(context);
+    try {
+      await this.ensurePromise;
+      this.loaded = true;
+    } finally {
+      this.ensurePromise = null;
+    }
   }
 
   async load(context: common.UIAbilityContext): Promise<void> {

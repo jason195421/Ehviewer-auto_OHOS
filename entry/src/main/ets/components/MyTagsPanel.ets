@@ -14,6 +14,7 @@ import {
   SearchSummaryStrip
 } from './GallerySearchScenes';
 import { uiText } from '../shared/EhShared';
+import { sortedStringKey, toggleStringValue } from '../shared/StringCollectionSupport';
 import {
   themeFieldBackground,
   themeOnPrimaryText,
@@ -170,8 +171,6 @@ export struct MyTagsPanel {
     }
     const namespaces = kind === MyTagKind.Watched ? this.watchedTagNamespaces : this.hiddenTagNamespaces;
     const suggestions = buildMyTagSuggestions(text, 0, namespaces);
-    console.info('[MyTags] suggestions input="' + text + '" active="' + activeMyTagText(text) +
-      '" count=' + suggestions.length.toString());
     if (kind === MyTagKind.Watched) {
       this.watchedSuggestions = cloneSuggestions(suggestions);
     } else {
@@ -181,20 +180,20 @@ export struct MyTagsPanel {
   }
 
   private selectedWatchedTagNamespaceKey(): string {
-    return this.watchedTagNamespaces.slice().sort().join('|');
+    return sortedStringKey(this.watchedTagNamespaces);
   }
 
   private selectedHiddenTagNamespaceKey(): string {
-    return this.hiddenTagNamespaces.slice().sort().join('|');
+    return sortedStringKey(this.hiddenTagNamespaces);
   }
 
   private toggleWatchedTagNamespace(namespace: string): void {
-    this.watchedTagNamespaces = toggleNamespace(this.watchedTagNamespaces, namespace);
+    this.watchedTagNamespaces = toggleStringValue(this.watchedTagNamespaces, namespace);
     this.refreshSuggestions(this.watchedText, MyTagKind.Watched);
   }
 
   private toggleHiddenTagNamespace(namespace: string): void {
-    this.hiddenTagNamespaces = toggleNamespace(this.hiddenTagNamespaces, namespace);
+    this.hiddenTagNamespaces = toggleStringValue(this.hiddenTagNamespaces, namespace);
     this.refreshSuggestions(this.hiddenText, MyTagKind.Hidden);
   }
 
@@ -481,17 +480,6 @@ function buildMyTagSuggestions(text: string, limit: number, namespaces: string[]
     });
   }
   return result;
-}
-
-function toggleNamespace(values: string[], namespace: string): string[] {
-  const next = values.slice();
-  const index = next.indexOf(namespace);
-  if (index >= 0) {
-    next.splice(index, 1);
-  } else {
-    next.push(namespace);
-  }
-  return next;
 }
 
 function activeMyTagText(text: string): string {

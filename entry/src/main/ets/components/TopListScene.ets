@@ -1,5 +1,6 @@
 import { GalleryCategory, GalleryDetail, GalleryRoute, GallerySite, TopListBucket, TopListDetail, TopListInfo, TopListItem, TopListKind } from '../model/GalleryModels';
 import { EhHttpClient, TopListLoadResult } from '../services/EhHttpClient';
+import { AsyncRequestGate } from '../services/AsyncRequestGate';
 import { DEFAULT_ADVANCE_SEARCH, ListMode } from '../services/EhUrl';
 import { DetailSearchRequest } from '../services/GalleryDetailActionSupport';
 import {
@@ -98,6 +99,7 @@ function cloneTopListDetailLink(link: GalleryDetailLink): GalleryDetailLink {
 @Component
 export struct TopListScene {
   private client: EhHttpClient = new EhHttpClient();
+  private loadRequestGate: AsyncRequestGate = new AsyncRequestGate();
   @Prop @Watch('onResetVersionChanged') resetVersion: number = 0;
   onMenu: () => void = () => {};
 
@@ -317,9 +319,13 @@ export struct TopListScene {
   }
 
   private loadTopList(): void {
+    const generation = this.loadRequestGate.begin();
     this.statusText = 'Loading top lists...';
     this.renderVersion++;
     this.client.loadTopList(GallerySite.E).then((result: TopListLoadResult) => {
+      if (!this.loadRequestGate.isCurrent(generation)) {
+        return;
+      }
       this.requestUrl = result.url;
       if (!result.ok || result.detail === null) {
         this.statusText = 'Load failed: ' + result.message;
@@ -333,6 +339,9 @@ export struct TopListScene {
       }
       this.renderVersion++;
     }).catch((error: Error) => {
+      if (!this.loadRequestGate.isCurrent(generation)) {
+        return;
+      }
       this.statusText = 'Load failed: ' + error.message;
       this.renderVersion++;
     });

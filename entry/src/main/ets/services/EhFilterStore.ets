@@ -27,6 +27,8 @@ interface StoredFilterRule {
 export class EhFilterStore {
   private rules: FilterRule[] = [];
   private nextId: number = 1;
+  private loaded: boolean = false;
+  private ensurePromise: Promise<void> | null = null;
 
   getRules(): FilterRule[] {
     return cloneRules(this.rules);
@@ -84,6 +86,23 @@ export class EhFilterStore {
       }
     }
     return false;
+  }
+
+  async ensureLoaded(context: common.UIAbilityContext): Promise<void> {
+    if (this.loaded) {
+      return;
+    }
+    if (this.ensurePromise !== null) {
+      await this.ensurePromise;
+      return;
+    }
+    this.ensurePromise = this.load(context);
+    try {
+      await this.ensurePromise;
+      this.loaded = true;
+    } finally {
+      this.ensurePromise = null;
+    }
   }
 
   async load(context: common.UIAbilityContext): Promise<void> {

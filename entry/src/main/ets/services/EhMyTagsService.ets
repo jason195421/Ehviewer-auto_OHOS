@@ -1,6 +1,5 @@
 import { GallerySite } from '../model/GalleryModels';
 import { EhHttpClient, EhHttpResponse } from './EhHttpClient';
-import { CookieDebugSummary, ehCookieStore } from './EhCookieStore';
 import { EhUrl } from './EhUrl';
 
 export enum MyTagKind {
@@ -22,11 +21,6 @@ export interface MyTagSetOption {
   name: string;
   count: number;
   selected: boolean;
-}
-
-export interface MyTagSuggestion {
-  tag: string;
-  display: string;
 }
 
 export interface MyTagsPage {
@@ -69,30 +63,10 @@ export class EhMyTagsService {
   private async loadSite(site: GallerySite): Promise<MyTagsPage> {
     const url = this.myTagsUrl(site);
     const response = await this.client.getText(url, url, 0);
-    logMyTagsResponse('load', site, url, response);
     this.ensureOk(response, 'Load My Tags failed');
     const page = parseMyTagsPage(response.body, url, site);
-    logMyTagsParse('load', page);
     this.ensureMyTagsPage(page, response.body);
     return page;
-  }
-
-  async suggestTags(site: GallerySite, page: MyTagsPage | null, text: string): Promise<MyTagSuggestion[]> {
-    const query = normalizeSuggestText(text);
-    if (query.replace(/^.*:/, '').length < 2) {
-      return [];
-    }
-    const currentPage = page === null ? await this.load(site) : page;
-    if (currentPage.apiUrl.length === 0) {
-      return [];
-    }
-    const response = await this.client.postJson(currentPage.apiUrl, JSON.stringify({
-      method: 'tagsuggest',
-      text: query
-    }), currentPage.url, originFromUrl(currentPage.url, site));
-    logMyTagsResponse('suggest', currentPage.site, currentPage.apiUrl, response);
-    this.ensureOk(response, 'Load tag suggestions failed');
-    return parseTagSuggestions(response.body, query);
   }
 
   async saveTagsetSettings(site: GallerySite, page: MyTagsPage | null, enabled: boolean,
@@ -108,10 +82,8 @@ export class EhMyTagsService {
     }
     const response = await this.client.postForm(currentPage.url, buildFormBody(fields), currentPage.url,
       originFromUrl(currentPage.url, site));
-    logMyTagsResponse('saveTagset', currentPage.site, currentPage.url, response);
     this.ensureOk(response, 'Save My Tags settings failed');
     const nextPage = parseMyTagsPage(response.body, currentPage.url, currentPage.site);
-    logMyTagsParse('saveTagset', nextPage);
     this.ensureMyTagsPage(nextPage, response.body);
     return nextPage;
   }
@@ -142,10 +114,8 @@ export class EhMyTagsService {
     ];
     const response = await this.client.postForm(currentPage.url, buildFormBody(fields), currentPage.url,
       originFromUrl(currentPage.url, site));
-    logMyTagsResponse('deleteTag', currentPage.site, currentPage.url, response);
     this.ensureOk(response, 'Delete My Tags failed');
     const nextPage = parseMyTagsPage(response.body, currentPage.url, currentPage.site);
-    logMyTagsParse('deleteTag', nextPage);
     this.ensureMyTagsPage(nextPage, response.body);
     return nextPage;
   }
@@ -166,7 +136,6 @@ export class EhMyTagsService {
       tagweight: parseTagWeight(item.weight)
     });
     const response = await this.client.postJson(page.apiUrl, payload, page.url, originFromUrl(page.url, site));
-    logMyTagsResponse('setTag', page.site, page.apiUrl, response);
     this.ensureOk(response, 'Save My Tags failed');
   }
 
@@ -185,10 +154,8 @@ export class EhMyTagsService {
     }
     fields.push({ key: 'usertag_target', value: '0' });
     const response = await this.client.postForm(url, buildFormBody(fields), url, originFromUrl(url, site));
-    logMyTagsResponse('addTag', page.site, url, response);
     this.ensureOk(response, 'Save My Tags failed');
     const nextPage = parseMyTagsPage(response.body, url, page.site);
-    logMyTagsParse('addTag', nextPage);
     this.ensureMyTagsPage(nextPage, response.body);
     return nextPage;
   }
@@ -249,50 +216,6 @@ export function parseMyTagsPage(html: string, url: string, site: GallerySite = G
     hidden: hidden,
     all: all
   };
-}
-
-function parseTagSuggestions(body: string, query: string): MyTagSuggestion[] {
-  try {
-    const obj = JSON.parse(body) as Record<string, Object>;
-    const rawError = obj['error'];
-    if (typeof rawError === 'string' && rawError.length > 0) {
-      throw new Error(rawError);
-    }
-    const rawTags = obj['tags'];
-    if (rawTags === undefined) {
-      return [];
-    }
-    const tags = rawTags as Record<string, Object>;
-    const keys = Object.keys(tags);
-    const suggestions: MyTagSuggestion[] = [];
-    const lowerQuery = query.toLowerCase();
-    for (let i = 0; i < keys.length; i++) {
-      const item = tags[keys[i]] as Record<string, Object>;
-      const ns = stringValue(item['ns']);
-      const tn = stringValue(item['tn']);
-      if (ns.length === 0 || tn.length === 0) {
-        continue;
-      }
-      const tag = ns + ':' + tn;
-      const mappedNs = stringValue(item['mns']);
-      const mappedTn = stringValue(item['mtn']);
-      const mapped = mappedNs.length > 0 && mappedTn.length > 0 ? mappedNs + ':' + mappedTn : '';
-      const value = mapped.length > 0 ? mapped : tag;
-      if (value.toLowerCase().indexOf(lowerQuery) < 0 && tag.toLowerCase().indexOf(lowerQuery) < 0) {
-        continue;
-      }
-      suggestions.push({
-        tag: value,
-        display: mapped.length > 0 ? tag + ' => ' + mapped : tag
-      });
-      if (suggestions.length >= 8) {
-        break;
-      }
-    }
-    return suggestions;
-  } catch (error) {
-    throw new Error(error instanceof Error ? error.message : 'Invalid tag suggestion response');
-  }
 }
 
 function parseUserTags(html: string): MyTagItem[] {
@@ -436,32 +359,6 @@ function parseTagWeight(weight: string): number {
   return Math.max(-99, Math.min(999, value));
 }
 
-function normalizeSuggestText(text: string): string {
-  let value = normalizeTag(text).replace(/["']/g, '').toLowerCase();
-  if (/^(x|mix).*:/.test(value)) {
-    value = value.replace(/^(x|mix).*:/, 'mixed:');
-  } else if (/^(mis).*:/.test(value)) {
-    value = value.replace(/^(mis).*:/, 'temp:');
-  } else if (/^(co).*:/.test(value)) {
-    value = value.replace(/^(co).*:/, 'cosplayer:');
-  } else if (/^(lo).*:/.test(value)) {
-    value = value.replace(/^(lo).*:/, 'location:');
-  } else {
-    value = value
-      .replace(/^t.*:/, 'temp:')
-      .replace(/^f.*:/, 'female:')
-      .replace(/^m.*:/, 'male:')
-      .replace(/^r.*:/, 'reclass:')
-      .replace(/^l.*:/, 'language:')
-      .replace(/^p.*:/, 'parody:')
-      .replace(/^c.*:/, 'character:')
-      .replace(/^g.*:/, 'group:')
-      .replace(/^a.*:/, 'artist:')
-      .replace(/^o.*:/, 'other:');
-  }
-  return value;
-}
-
 function normalizeColor(color: string): string {
   const value = color.trim().replace(/^#/, '').toUpperCase();
   if (value.length === 0) {
@@ -495,56 +392,6 @@ function stringValue(value: Object | undefined): string {
 function originFromUrl(url: string, fallbackSite: GallerySite): string {
   const matched = /^(https?:\/\/[^\/?#]+)/i.exec(url);
   return matched === null ? EhUrl.getReferer(fallbackSite) : matched[1];
-}
-
-function logMyTagsResponse(phase: string, site: GallerySite, url: string, response: EhHttpResponse): void {
-  const body = response.body;
-  const cookie: CookieDebugSummary = ehCookieStore.getCookieDebugSummaryForUrl(url);
-  console.info('[MyTags] phase=' + phase +
-    ' site=' + siteName(site) +
-    ' url=' + url +
-    ' status=' + response.statusCode.toString() +
-    ' bodyLength=' + body.length.toString() +
-    ' title="' + pageTitle(body) + '"' +
-    ' hasForm=' + boolText(body.indexOf('id="usertag_form"') >= 0) +
-    ' hasApiUrl=' + boolText(body.indexOf('var api_url') >= 0) +
-    ' hasApiUid=' + boolText(body.indexOf('var apiuid') >= 0) +
-    ' hasApiKey=' + boolText(body.indexOf('var apikey') >= 0) +
-    ' hasBounceLogin=' + boolText(body.indexOf('bounce_login') >= 0 || body.indexOf('act=Login') >= 0) +
-    ' cookieNames=' + cookie.names.join('|') +
-    ' cookieLength=' + cookie.headerLength.toString() +
-    ' cookieHasLogin=' + boolText(cookie.hasLogin) +
-    ' cookieHasIgneous=' + boolText(cookie.hasIgneous) +
-    ' cookieHasNw=' + boolText(cookie.hasContentWarning) +
-    ' cookieHasUConfig=' + boolText(cookie.hasUConfig));
-}
-
-function logMyTagsParse(phase: string, page: MyTagsPage): void {
-  const first = page.all.length > 0 ? page.all[0].tag : '';
-  console.info('[MyTags] parse phase=' + phase +
-    ' site=' + siteName(page.site) +
-    ' tagset="' + page.tagsetName + '"' +
-    ' tagsets=' + page.tagsets.length.toString() +
-    ' all=' + page.all.length.toString() +
-    ' watched=' + page.watched.length.toString() +
-    ' hidden=' + page.hidden.length.toString() +
-    ' first="' + first + '"');
-}
-
-function siteName(site: GallerySite): string {
-  return site === GallerySite.Ex ? 'ExHentai' : 'E-Hentai';
-}
-
-function boolText(value: boolean): string {
-  return value ? '1' : '0';
-}
-
-function pageTitle(html: string): string {
-  const matched = /<title>([\s\S]*?)<\/title>/i.exec(html);
-  if (matched === null) {
-    return '';
-  }
-  return decodeHtml(stripTags(matched[1])).replace(/\s+/g, ' ').trim();
 }
 
 function buildFormBody(fields: FormField[]): string {

@@ -37,6 +37,7 @@ import {
   rememberMainContentWidthVp
 } from '../services/EhWindowImmersive';
 import { LANGUAGE_REVISION_KEY, STATUS_BAR_HEIGHT_KEY, nextFloatingToolbarOffset, runDetailBackHandler, setActiveBackHandler } from '../shared/EhShared';
+import { sortedStringKey, toggleStringValue } from '../shared/StringCollectionSupport';
 import {
   cloneGalleryDetail,
   cloneGalleryInfo,
@@ -196,6 +197,7 @@ export struct DownloadScene {
   onMenu: () => void = () => {};
 
   @State items: DownloadInfo[] = [];
+  @State visibleItems: DownloadInfo[] = [];
   @State query: string = '';
   @State searchMode: ListMode = ListMode.Normal;
   @State searchCategory: number = GalleryCategory.None;
@@ -485,6 +487,7 @@ export struct DownloadScene {
     const context = getAbilityContext();
     if (context === undefined) {
       this.items = ehDownloadStore.getItems();
+      this.refreshDownloadRows();
       return;
     }
 
@@ -496,6 +499,7 @@ export struct DownloadScene {
     }).catch((error: Error) => {
       this.statusText = 'Download load failed: ' + error.message;
       this.items = ehDownloadStore.getItems();
+      this.refreshDownloadRows();
     });
   }
 
@@ -527,7 +531,7 @@ export struct DownloadScene {
     this.blockingBusyMessage = 'Loading...';
   }
 
-  private visibleDownloadItems(): DownloadInfo[] {
+  private computeVisibleDownloadItems(): DownloadInfo[] {
     const visible = filterDownloadItems(this.items, '', this.statusFilter, 'All', this.sortMode, this.categoryFilter);
     const filtered: DownloadInfo[] = [];
     const options = this.downloadSearchOptions();
@@ -614,17 +618,11 @@ export struct DownloadScene {
   }
 
   private selectedTagNamespaceKey(): string {
-    return this.selectedTagNamespaces.slice().sort().join('|');
+    return sortedStringKey(this.selectedTagNamespaces);
   }
 
   private toggleTagNamespace(namespace: string): void {
-    const next = this.selectedTagNamespaces.slice();
-    const index = next.indexOf(namespace);
-    if (index >= 0) {
-      next.splice(index, 1);
-    } else {
-      next.push(namespace);
-    }
+    const next = toggleStringValue(this.selectedTagNamespaces, namespace);
     this.selectedTagNamespaces = next;
     this.refreshSearchSuggestions(next);
   }
@@ -639,7 +637,7 @@ export struct DownloadScene {
   }
 
   private downloadJumpTotalPages(): number {
-    const count = this.visibleDownloadItems().length;
+    const count = this.visibleItems.length;
     return count <= 0 ? 0 : Math.ceil(count / DOWNLOAD_JUMP_PAGE_SIZE);
   }
 
@@ -897,6 +895,7 @@ export struct DownloadScene {
   }
 
   private refreshDownloadRows(): void {
+    this.visibleItems = this.computeVisibleDownloadItems();
     this.syncDownloadCardStates();
   }
 
@@ -1413,7 +1412,7 @@ export struct DownloadScene {
               right: this.downloadContentPadding()
             })
             .translate({ y: this.downloadContentStartOffset() })
-          } else if (this.visibleDownloadItems().length === 0) {
+          } else if (this.visibleItems.length === 0) {
             Column() {
               Text(uiText('Downloads'))
                 .fontSize(22)
@@ -1431,7 +1430,7 @@ export struct DownloadScene {
             .translate({ y: this.downloadContentStartOffset() })
           } else {
             List({ space: 0, scroller: this.downloadScroller }) {
-              ForEach(this.visibleDownloadItems(), (item: DownloadInfo) => {
+              ForEach(this.visibleItems, (item: DownloadInfo) => {
                 ListItem() {
                   Column() {
                     if (galleryListMode() === 'Thumb') {
@@ -1569,6 +1568,7 @@ export struct DownloadScene {
               onAdvanceSearchChange: (flags: number) => {
                 this.advanceSearch = flags;
                 this.searchSubmitted = false;
+                this.refreshDownloadRows();
               },
               onMinRatingChange: (rating: number) => {
                 this.minRating = rating;

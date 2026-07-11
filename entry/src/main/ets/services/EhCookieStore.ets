@@ -36,6 +36,8 @@ export interface CookieDebugSummary {
 
 export class EhCookieStore {
   private cookies: CookieEntry[] = [];
+  private loaded: boolean = false;
+  private ensurePromise: Promise<void> | null = null;
 
   setCookieHeader(cookieHeader: string): void {
     this.cookies = [];
@@ -170,6 +172,24 @@ export class EhCookieStore {
 
   clear(): void {
     this.cookies = [];
+    this.loaded = true;
+  }
+
+  async ensureLoaded(context: common.UIAbilityContext): Promise<void> {
+    if (this.loaded) {
+      return;
+    }
+    if (this.ensurePromise !== null) {
+      await this.ensurePromise;
+      return;
+    }
+    this.ensurePromise = this.load(context);
+    try {
+      await this.ensurePromise;
+      this.loaded = true;
+    } finally {
+      this.ensurePromise = null;
+    }
   }
 
   async load(context: common.UIAbilityContext): Promise<void> {

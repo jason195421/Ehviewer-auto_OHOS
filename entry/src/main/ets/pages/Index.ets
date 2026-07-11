@@ -127,7 +127,7 @@ struct Index {
     ehSpiderInfoStore.load(context).catch(() => {});
     ehDownloadStore.load(context).catch(() => {});
     ehSearchHistoryStore.load(context).catch(() => {});
-    ehSettingsStore.load(context).then(() => {
+    ehSettingsStore.ensureLoaded(context).then(() => {
       this.settingsReady = true;
       this.loadSessionRoute(context);
       this.checkForUpdatesOnStartup();
@@ -152,7 +152,7 @@ struct Index {
   }
 
   private loadSessionRoute(ctx: common.UIAbilityContext): void {
-    ehCookieStore.load(ctx).then(() => {
+    ehCookieStore.ensureLoaded(ctx).then(() => {
       this.applyInitialRoute();
     }).catch(() => {
       this.applyInitialRoute();

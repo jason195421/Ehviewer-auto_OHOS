@@ -86,7 +86,7 @@ export default class EntryAbility extends UIAbility {
         this.applyPersistedSecureScreen();
       });
     }).catch(() => {});
-    const settingsReady = ehSettingsStore.load(this.context).then(() => {
+    const settingsReady = ehSettingsStore.ensureLoaded(this.context).then(() => {
       this.setIdentityAuthLocked(this.identityAuthEnabledInMemory());
       if (!isEhDirectConnectionProbeEnabled()) {
         return;

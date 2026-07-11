@@ -16,6 +16,7 @@ import { ehHistoryStore } from '../services/EhHistoryStore';
 import { ehLocalFavoritesStore } from '../services/EhLocalFavoritesStore';
 import { ehSettingsStore } from '../services/EhSettingsStore';
 import { ehTagTranslationStore } from '../services/EhTagTranslationStore';
+import { AsyncRequestGate } from '../services/AsyncRequestGate';
 import { DetailSearchRequest } from '../services/GalleryDetailActionSupport';
 import {
   createGalleryDetailLink,
@@ -34,6 +35,7 @@ import {
   rememberMainContentWidthVp
 } from '../services/EhWindowImmersive';
 import { LANGUAGE_REVISION_KEY, runDetailBackHandler } from '../shared/EhShared';
+import { sortedStringKey, toggleStringValue } from '../shared/StringCollectionSupport';
 import {
   themeFieldBackground,
   themeDangerText,
@@ -1149,6 +1151,7 @@ export struct GalleryListScene {
   @State activeSplitPane: string = 'left';
   private splitDragStartWidth: number = 0;
   private readerClosing: boolean = false;
+  private listRequestGate: AsyncRequestGate = new AsyncRequestGate();
   @State restoreDetailWithFade: boolean = false;
   @State detailLink: GalleryDetailLink = createEmptyGalleryDetailLink();
   @State detail: GalleryDetail = createEmptyDetail();
@@ -1397,9 +1400,9 @@ export struct GalleryListScene {
     const context = getAbilityContext();
     if (context !== undefined) {
       Promise.all([
-        ehCookieStore.load(context),
-        ehFilterStore.load(context),
-        ehSettingsStore.load(context),
+        ehCookieStore.ensureLoaded(context),
+        ehFilterStore.ensureLoaded(context),
+        ehSettingsStore.ensureLoaded(context),
         ehBookmarkStore.ensureLoaded(context),
         this.sourceRoute === GalleryRoute.Favorites ? ehLocalFavoritesStore.ensureLoaded(context) : Promise.resolve()
       ]).catch((error: Error) => {
@@ -1552,46 +1555,13 @@ export struct GalleryListScene {
   }
 
   private loadRemote(pageIndex: number, preserveExisting: boolean = false, onDone?: () => void): void {
-    this.pageIndex = pageIndex;
-    this.statusText = 'Loading...';
-    if (!preserveExisting) {
-      this.resultCount = '';
-      this.galleries = [];
-    }
-    this.nextUrl = '';
-    this.isLoadingMore = false;
-    this.appendExhausted = false;
-    if (pageIndex === 0) {
-      this.resetListScroll();
-      this.scrollResetVersion++;
-    }
-    this.renderVersion++;
-    this.closeDetail();
-    this.saveListCache();
+    const generation = this.beginListReplacement(pageIndex, preserveExisting);
     const request = this.loadRoutePageWithFallback(pageIndex);
 
     request.then((result: GalleryListLoadResult) => {
-      this.requestUrl = result.url;
-      this.galleries = this.visibleRemoteGalleries(result.galleries);
-      this.updateFavoriteCategories(result.favoriteCategories);
-      this.statusText = result.ok ? result.message : galleryListFailureMessage(result, this.activeSite);
-      this.totalPages = result.pages;
-      this.nextUrl = result.nextUrl;
-      this.resultCount = result.resultCount;
-      this.appendExhausted = this.isAppendExhausted(result, pageIndex, this.galleries.length);
-      this.renderVersion++;
-      this.saveListCache();
-      if (onDone !== undefined) {
-        onDone();
-      }
+      this.applyListReplacementResult(generation, result, pageIndex, true, onDone);
     }).catch((error: Error) => {
-      this.statusText = 'Load failed: ' + error.message;
-      this.galleries = [];
-      this.renderVersion++;
-      this.saveListCache();
-      if (onDone !== undefined) {
-        onDone();
-      }
+      this.applyListReplacementFailure(generation, error, onDone);
     });
   }
 
@@ -1604,48 +1574,29 @@ export struct GalleryListScene {
       }
       return;
     }
-    this.pageIndex = 0;
-    this.statusText = 'Loading...';
-    if (!preserveExisting) {
-      this.resultCount = '';
-      this.galleries = [];
-    }
-    this.nextUrl = '';
-    this.isLoadingMore = false;
-    this.appendExhausted = false;
-    this.resetListScroll();
-    this.scrollResetVersion++;
-    this.renderVersion++;
-    this.closeDetail();
-    this.saveListCache();
+    const generation = this.beginListReplacement(0, preserveExisting);
 
     this.client.loadGalleryListUrl(absoluteUrl, this.activeSite, this.includeAccountUConfig()).then((result: GalleryListLoadResult) => {
-      this.requestUrl = result.url;
-      this.galleries = this.visibleRemoteGalleries(result.galleries);
-      this.updateFavoriteCategories(result.favoriteCategories);
-      this.statusText = result.ok ? result.message : galleryListFailureMessage(result, this.activeSite);
-      this.totalPages = result.pages;
-      this.nextUrl = result.nextUrl;
-      this.resultCount = result.resultCount;
-      this.appendExhausted = this.isAppendExhausted(result, this.pageIndex, this.galleries.length);
-      this.renderVersion++;
-      this.saveListCache();
-      if (onDone !== undefined) {
-        onDone();
-      }
+      this.applyListReplacementResult(generation, result, 0, true, onDone);
     }).catch((error: Error) => {
-      this.statusText = 'Load failed: ' + error.message;
-      this.galleries = [];
-      this.renderVersion++;
-      this.saveListCache();
-      if (onDone !== undefined) {
-        onDone();
-      }
+      this.applyListReplacementFailure(generation, error, onDone);
     });
   }
 
   private loadLocal(pageIndex: number, preserveExisting: boolean = false, onDone?: () => void): void {
     this.activeSite = effectiveListSite(this.sourceRoute);
+    const generation = this.beginListReplacement(pageIndex, preserveExisting);
+
+    this.localProvider(this.keyword.trim(), pageIndex, this.localPageSize, this.localSearchOptions())
+      .then((result: GalleryListLoadResult) => {
+      this.applyListReplacementResult(generation, result, pageIndex, false, onDone);
+    }).catch((error: Error) => {
+      this.applyListReplacementFailure(generation, error, onDone);
+    });
+  }
+
+  private beginListReplacement(pageIndex: number, preserveExisting: boolean): number {
+    const generation = this.listRequestGate.begin();
     this.pageIndex = pageIndex;
     this.statusText = 'Loading...';
     if (!preserveExisting) {
@@ -1662,30 +1613,42 @@ export struct GalleryListScene {
     this.renderVersion++;
     this.closeDetail();
     this.saveListCache();
+    return generation;
+  }
 
-    this.localProvider(this.keyword.trim(), pageIndex, this.localPageSize, this.localSearchOptions())
-      .then((result: GalleryListLoadResult) => {
+  private applyListReplacementResult(generation: number, result: GalleryListLoadResult, pageIndex: number,
+    remote: boolean, onDone?: () => void): void {
+    if (this.listRequestGate.isCurrent(generation)) {
       this.requestUrl = result.url;
       this.galleries = this.visibleRemoteGalleries(result.galleries);
-      this.statusText = result.ok ? result.message : result.message;
+      if (remote) {
+        this.updateFavoriteCategories(result.favoriteCategories);
+      }
+      this.statusText = result.ok || !remote ? result.message : galleryListFailureMessage(result, this.activeSite);
       this.totalPages = result.pages;
       this.nextUrl = result.nextUrl;
       this.resultCount = result.resultCount;
       this.appendExhausted = this.isAppendExhausted(result, pageIndex, this.galleries.length);
       this.renderVersion++;
       this.saveListCache();
-      if (onDone !== undefined) {
-        onDone();
-      }
-    }).catch((error: Error) => {
+    }
+    this.finishListRequest(onDone);
+  }
+
+  private applyListReplacementFailure(generation: number, error: Error, onDone?: () => void): void {
+    if (this.listRequestGate.isCurrent(generation)) {
       this.statusText = 'Load failed: ' + error.message;
       this.galleries = [];
       this.renderVersion++;
       this.saveListCache();
-      if (onDone !== undefined) {
-        onDone();
-      }
-    });
+    }
+    this.finishListRequest(onDone);
+  }
+
+  private finishListRequest(onDone?: () => void): void {
+    if (onDone !== undefined) {
+      onDone();
+    }
   }
 
   private loadAppendPage(): void {
@@ -1711,6 +1674,7 @@ export struct GalleryListScene {
     }
     const nextPage = this.pageIndex + 1;
     this.isLoadingMore = true;
+    const generation = this.listRequestGate.snapshot();
 
     const request =
       this.nextUrl.length > 0 ?
@@ -1718,41 +1682,9 @@ export struct GalleryListScene {
         this.loadRoutePageWithFallback(nextPage);
 
     request.then((result: GalleryListLoadResult) => {
-      this.requestUrl = result.url;
-      const newGalleries = this.visibleRemoteGalleries(result.galleries);
-      this.updateFavoriteCategories(result.favoriteCategories);
-      if (newGalleries.length === 0) {
-        // Empty page = reached the end even if we don't know total
-        this.statusText = uiText('All pages loaded');
-        this.appendExhausted = true;
-        this.isLoadingMore = false;
-        this.saveListCache();
-        return;
-      }
-      const existingGids: Set<number> = new Set(this.galleries.map((g: GalleryInfo) => g.gid));
-      const unique: GalleryInfo[] = newGalleries.filter((g: GalleryInfo) => !existingGids.has(g.gid));
-      if (unique.length === 0) {
-        this.statusText = uiText('All pages loaded');
-        this.appendExhausted = true;
-        this.isLoadingMore = false;
-        this.saveListCache();
-        return;
-      }
-      this.galleries = this.galleries.concat(unique);
-      this.pageIndex = nextPage;
-      if (result.pages > 0) {
-        this.totalPages = result.pages;
-      }
-      this.nextUrl = result.nextUrl;
-      this.resultCount = result.resultCount;
-      this.statusText = result.ok ? result.message : galleryListFailureMessage(result, this.activeSite);
-      this.appendExhausted = this.isAppendExhausted(result, nextPage, unique.length);
-      this.isLoadingMore = false;
-      this.saveListCache();
+      this.applyAppendResult(generation, result, nextPage, true);
     }).catch((error: Error) => {
-      this.statusText = 'Load more failed: ' + error.message;
-      this.isLoadingMore = false;
-      this.saveListCache();
+      this.applyAppendFailure(generation, error);
     });
   }
 
@@ -1779,42 +1711,68 @@ export struct GalleryListScene {
     }
     const nextPage = this.pageIndex + 1;
     this.isLoadingMore = true;
+    const generation = this.listRequestGate.snapshot();
     this.localProvider(this.keyword.trim(), nextPage, this.localPageSize, this.localSearchOptions())
       .then((result: GalleryListLoadResult) => {
-      this.requestUrl = result.url;
-      const newGalleries = this.visibleRemoteGalleries(result.galleries);
-      if (newGalleries.length === 0) {
-        this.statusText = uiText('All pages loaded');
-        this.appendExhausted = true;
-        this.isLoadingMore = false;
-        this.saveListCache();
-        return;
-      }
-      const existingGids: Set<number> = new Set(this.galleries.map((g: GalleryInfo) => g.gid));
-      const unique: GalleryInfo[] = newGalleries.filter((g: GalleryInfo) => !existingGids.has(g.gid));
-      if (unique.length === 0) {
-        this.statusText = uiText('All pages loaded');
-        this.appendExhausted = true;
-        this.isLoadingMore = false;
-        this.saveListCache();
-        return;
-      }
-      this.galleries = this.galleries.concat(unique);
-      this.pageIndex = nextPage;
-      if (result.pages > 0) {
-        this.totalPages = result.pages;
-      }
-      this.nextUrl = result.nextUrl;
-      this.resultCount = result.resultCount;
-      this.statusText = result.ok ? result.message : result.message;
-      this.appendExhausted = this.isAppendExhausted(result, nextPage, unique.length);
-      this.isLoadingMore = false;
-      this.saveListCache();
+      this.applyAppendResult(generation, result, nextPage, false);
     }).catch((error: Error) => {
-      this.statusText = 'Load more failed: ' + error.message;
+      this.applyAppendFailure(generation, error);
+    });
+  }
+
+  private applyAppendResult(generation: number, result: GalleryListLoadResult, nextPage: number,
+    remote: boolean): void {
+    if (!this.listRequestGate.isCurrent(generation)) {
+      return;
+    }
+    this.requestUrl = result.url;
+    const incoming = this.visibleRemoteGalleries(result.galleries);
+    if (remote) {
+      this.updateFavoriteCategories(result.favoriteCategories);
+    }
+    const unique = this.uniqueAppendGalleries(incoming);
+    if (unique.length === 0) {
+      this.statusText = uiText('All pages loaded');
+      this.appendExhausted = true;
       this.isLoadingMore = false;
       this.saveListCache();
-    });
+      return;
+    }
+    this.galleries = this.galleries.concat(unique);
+    this.pageIndex = nextPage;
+    if (result.pages > 0) {
+      this.totalPages = result.pages;
+    }
+    this.nextUrl = result.nextUrl;
+    this.resultCount = result.resultCount;
+    this.statusText = result.ok || !remote ? result.message : galleryListFailureMessage(result, this.activeSite);
+    this.appendExhausted = this.isAppendExhausted(result, nextPage, unique.length);
+    this.isLoadingMore = false;
+    this.saveListCache();
+  }
+
+  private uniqueAppendGalleries(incoming: GalleryInfo[]): GalleryInfo[] {
+    const existingGids: Set<number> = new Set<number>();
+    for (let i = 0; i < this.galleries.length; i++) {
+      existingGids.add(this.galleries[i].gid);
+    }
+    const unique: GalleryInfo[] = [];
+    for (let i = 0; i < incoming.length; i++) {
+      if (!existingGids.has(incoming[i].gid)) {
+        existingGids.add(incoming[i].gid);
+        unique.push(incoming[i]);
+      }
+    }
+    return unique;
+  }
+
+  private applyAppendFailure(generation: number, error: Error): void {
+    if (!this.listRequestGate.isCurrent(generation)) {
+      return;
+    }
+    this.statusText = 'Load more failed: ' + error.message;
+    this.isLoadingMore = false;
+    this.saveListCache();
   }
 
   private loadRoutePageWithFallback(pageIndex: number): Promise<GalleryListLoadResult> {
@@ -4317,7 +4275,7 @@ export struct GalleryListContent {
   }
 
   private selectedTagNamespaceKey(): string {
-    return this.selectedTagNamespaces.slice().sort().join('|');
+    return sortedStringKey(this.selectedTagNamespaces);
   }
 
   private applySearchSuggestion(suggestion: SearchSuggestionItem): void {
@@ -4330,13 +4288,7 @@ export struct GalleryListContent {
   }
 
   private toggleTagNamespace(namespace: string): void {
-    const next = this.selectedTagNamespaces.slice();
-    const index = next.indexOf(namespace);
-    if (index >= 0) {
-      next.splice(index, 1);
-    } else {
-      next.push(namespace);
-    }
+    const next = toggleStringValue(this.selectedTagNamespaces, namespace);
     this.selectedTagNamespaces = next;
     this.refreshSearchSuggestions(next);
   }

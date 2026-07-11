@@ -47,6 +47,7 @@ import {
 } from '../services/GalleryDetailModule';
 import { DetailPreviewPager, loadGalleryPreviewPage, mergeGalleryPreviewSets, seedPreviewMap } from '../services/GalleryPreviewLoader';
 import { readerImageCache } from '../services/ReaderImageCache';
+import { AsyncRequestGate } from '../services/AsyncRequestGate';
 import { createReaderSessionState, readerSessionStore } from '../services/ReaderSessionStore';
 import { ehSettingsStore } from '../services/EhSettingsStore';
 import {
@@ -300,6 +301,7 @@ export struct GalleryDetailHostScene {
   onDetailScrollUpdate: (offset: number) => void = (_offset: number) => {};
 
   private client: EhHttpClient = new EhHttpClient();
+  private detailRequestGate: AsyncRequestGate = new AsyncRequestGate();
   private detailPreviewPager: DetailPreviewPager = new DetailPreviewPager();
   private previewMap: Map<number, GalleryPreview> = new Map();
   private previewPageSize: number = 0;
@@ -418,6 +420,7 @@ export struct GalleryDetailHostScene {
       }
       return;
     }
+    const requestGeneration = this.detailRequestGate.begin();
     const navigationState = this.restoreNavigationState();
     this.closeArchivePanel();
     this.detailPreviewPager.start();
@@ -440,7 +443,8 @@ export struct GalleryDetailHostScene {
     const requestGid = this.detailLink.gid;
     this.renderVersion++;
     loadGalleryDetailModule(this.client, this.detailLink).then((result: GalleryDetailModuleLoadResult) => {
-      if (this.detailLink.gid !== requestGid || this.detail.gid !== requestGid) {
+      if (!this.detailRequestGate.isCurrent(requestGeneration) || this.detailLink.gid !== requestGid ||
+        this.detail.gid !== requestGid) {
         if (done !== undefined) {
           done();
         }
@@ -472,7 +476,8 @@ export struct GalleryDetailHostScene {
         done();
       }
     }).catch((error: Error) => {
-      if (this.detailLink.gid === requestGid && this.detail.gid === requestGid) {
+      if (this.detailRequestGate.isCurrent(requestGeneration) && this.detailLink.gid === requestGid &&
+        this.detail.gid === requestGid) {
         this.detailStatus = 'Detail load failed: ' + error.message;
         this.renderVersion++;
       }

@@ -1,6 +1,7 @@
 import { GalleryTagGroup, GalleryTagInfo } from '../../model/GalleryModels';
 import { ehTagTranslationStore, EhTagSuggestion } from '../../services/EhTagTranslationStore';
 import { LANGUAGE_REVISION_KEY, shouldShowTagTranslations, uiText } from '../../shared/EhShared';
+import { sortedStringKey, toggleStringValue } from '../../shared/StringCollectionSupport';
 import {
   themeFieldBackground,
   themeOnPrimaryText,
@@ -50,7 +51,7 @@ export struct DetailTags {
   }
 
   private selectedNamespaceKey(): string {
-    return this.selectedTagNamespaces.slice().sort().join('|');
+    return sortedStringKey(this.selectedTagNamespaces);
   }
 
   private setEditMode(value: boolean): void {
@@ -80,7 +81,7 @@ export struct DetailTags {
   }
 
   private toggleTagNamespace(namespace: string): void {
-    this.selectedTagNamespaces = toggleNamespace(this.selectedTagNamespaces, namespace);
+    this.selectedTagNamespaces = toggleStringValue(this.selectedTagNamespaces, namespace);
     this.refreshSuggestions();
   }
 
@@ -404,17 +405,6 @@ function buildDetailTagSuggestions(text: string, limit: number, namespaces: stri
     });
   }
   return result;
-}
-
-function toggleNamespace(values: string[], namespace: string): string[] {
-  const next = values.slice();
-  const index = next.indexOf(namespace);
-  if (index >= 0) {
-    next.splice(index, 1);
-  } else {
-    next.push(namespace);
-  }
-  return next;
 }
 
 function activeTagText(text: string): string {

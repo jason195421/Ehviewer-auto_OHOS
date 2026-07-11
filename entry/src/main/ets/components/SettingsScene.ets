@@ -179,13 +179,13 @@ export struct SettingsScene {
     setActiveBackHandler(() => this.handleSystemBack());
     const context = getAbilityContext();
     if (context !== undefined) {
-      ehCookieStore.load(context).then(() => {
+      ehCookieStore.ensureLoaded(context).then(() => {
         this.signedIn = ehCookieStore.hasCookies();
         this.statusText = this.signedIn ? 'Cookie session loaded' : 'Tourist mode';
       }).catch((error: Error) => {
         this.statusText = 'Cookie load failed: ' + error.message;
       });
-      ehSettingsStore.load(context).then(() => {
+      ehSettingsStore.ensureLoaded(context).then(() => {
         this.settingEntries = ehSettingsStore.getEntries();
         this.themeName = currentThemeName();
       }).catch((error: Error) => {
@@ -860,7 +860,7 @@ export struct SettingsScene {
     if (key === 'filter') {
       const context = getAbilityContext();
       if (context !== undefined) {
-        ehFilterStore.load(context).then(() => {
+        ehFilterStore.ensureLoaded(context).then(() => {
           this.filterRules = ehFilterStore.getRules();
           this.openPanel(SettingsPanel.Filter);
         }).catch((error: Error) => {
@@ -923,10 +923,10 @@ export struct SettingsScene {
     const fileName = 'ehviewer_backup_' + stamp + '.json';
 
     Promise.all([
-      ehSettingsStore.load(context),
+      ehSettingsStore.ensureLoaded(context),
       ehHistoryStore.load(context),
       ehDownloadStore.load(context),
-      ehFilterStore.load(context),
+      ehFilterStore.ensureLoaded(context),
       ehLocalFavoritesStore.ensureLoaded(context),
       ehBookmarkStore.ensureLoaded(context)
     ]).then(() => {
