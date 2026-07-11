@@ -1038,6 +1038,16 @@ export function zhText(text: string): string {
     case 'Hide matching galleries': return '隐藏匹配的画廊';
     case 'Show EH limits': return '显示 EH 限制';
     case 'Display account and image limits in the drawer': return '在抽屉中显示账号和图片限制';
+    case 'Loading EH limits': return '正在加载 EH 配额';
+    case 'EH limits unavailable': return 'EH 配额不可用';
+    case 'Failed to load EH limits': return 'EH 配额加载失败';
+    case 'IP-based limits': return '基于 IP 的配额';
+    case 'No quota reset is currently needed': return '当前无需重置配额，请刷新后重试';
+    case 'from gallery visits': return '来自画廊访问';
+    case 'from torrent completions': return '来自种子完成';
+    case 'from archive downloads': return '来自归档下载';
+    case 'from Hentai@Home': return '来自 Hentai@Home';
+    case 'reset cost': return '重置费用';
     case 'Cellular network warning': return '移动网络警告';
     case 'Warn before network-heavy operations on mobile data': return '使用移动数据进行大量网络操作前提示';
     case 'Connected to cellular networks': return '正在使用移动网络';

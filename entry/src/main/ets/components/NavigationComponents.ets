@@ -1,6 +1,8 @@
 import { GalleryRoute } from '../model/GalleryModels';
 import { ehCookieStore } from '../services/EhCookieStore';
 import { ehDownloadStore } from '../services/EhDownloadStore';
+import { EhHomeLimits, EhHomeLimitsResult, ehHomeLimitsService } from '../services/EhHomeLimitsService';
+import { ehSettingsStore } from '../services/EhSettingsStore';
 import { LANGUAGE_REVISION_KEY, STATUS_BAR_HEIGHT_KEY, downloadQueueSummary, getAbilityContext, uiText, uiStatusText, DrawerItem, DRAWER_ITEMS } from '../shared/EhShared';
 import {
   themeDividerColor,
@@ -124,6 +126,10 @@ export struct EhDrawer {
       .cachedCount(4)
       .divider({ strokeWidth: 0.5, color: themeDividerColor(), startMargin: 56, endMargin: 0 })
 
+      if (this.signedIn && ehSettingsStore.getValue('show_eh_limits', 'On') === 'On') {
+        EhLimitsPanel()
+      }
+
       // ---- Footer: download summary ----
       if (this.downloadSummary.length > 0) {
         Row() {
@@ -147,6 +153,167 @@ export struct EhDrawer {
     .height('100%')
     .backgroundColor(themeSurface())
   }
+}
+
+@Component
+struct EhLimitsPanel {
+  @State limits: EhHomeLimits | null = null;
+  @State loading: boolean = false;
+  @State expanded: boolean = false;
+
+  aboutToAppear(): void {
+    this.limits = ehHomeLimitsService.getCached();
+    if (this.limits === null) {
+      this.loadLimits(false);
+    }
+  }
+
+  private loadLimits(force: boolean): void {
+    if (this.loading) {
+      return;
+    }
+    this.loading = true;
+    ehHomeLimitsService.load(force).then((result: EhHomeLimitsResult) => {
+      this.applyResult(result);
+    }).catch((error: Error) => {
+      this.showFailure(error.message);
+    });
+  }
+
+  private resetLimits(): void {
+    if (this.loading || this.limits === null) {
+      return;
+    }
+    if (this.limits.resetCost === 0) {
+      this.showToast('No quota reset is currently needed');
+      this.loadLimits(true);
+      return;
+    }
+    this.loading = true;
+    ehHomeLimitsService.reset().then((result: EhHomeLimitsResult) => {
+      this.applyResult(result);
+    }).catch((error: Error) => {
+      this.showFailure(error.message);
+    });
+  }
+
+  private applyResult(result: EhHomeLimitsResult): void {
+    this.loading = false;
+    if (!result.ok || result.limits === null) {
+      this.showFailure(result.message);
+      return;
+    }
+    this.limits = result.limits;
+  }
+
+  private showFailure(_detail: string): void {
+    this.loading = false;
+    this.showToast('Failed to load EH limits');
+  }
+
+  private showToast(message: string): void {
+    try {
+      this.getUIContext().getPromptAction().showToast({ message: uiText(message) });
+    } catch (error) {
+    }
+  }
+
+  private limitSummary(): string {
+    if (this.limits === null) {
+      return this.loading ? uiText('Loading EH limits') : uiText('EH limits unavailable');
+    }
+    if (this.limits.total === 0) {
+      return uiText('IP-based limits');
+    }
+    return this.limits.used.toString() + '/' + this.limits.total.toString();
+  }
+
+  private gp(value: number): string {
+    return formatNumber(value) + ' GP';
+  }
+
+  @Builder
+  private limitDetailRow(value: string, label: string, reset: boolean = false) {
+    Row() {
+      Text(value)
+        .fontSize(12)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(reset ? themeSelectedText() : themePrimaryText())
+
+      Text(uiText(label))
+        .fontSize(12)
+        .fontColor(reset ? themeSelectedText() : themeSecondaryText())
+        .margin({ left: 5 })
+    }
+    .justifyContent(FlexAlign.Center)
+    .width('100%')
+    .height(27)
+    .margin({ left: 12, right: 12, bottom: 3 })
+    .borderRadius(5)
+    .backgroundColor(reset ? themeSelectedBackground() : themeSurfaceVariant())
+    .onClick(() => {
+      if (reset) {
+        this.resetLimits();
+      }
+    })
+  }
+
+  build() {
+    Column() {
+      if (this.expanded && this.limits !== null) {
+        this.limitDetailRow(this.gp(this.limits.fromGalleryVisits), 'from gallery visits')
+        this.limitDetailRow(this.gp(this.limits.fromTorrentCompletions), 'from torrent completions')
+        this.limitDetailRow(this.gp(this.limits.fromArchiveDownloads), 'from archive downloads')
+        this.limitDetailRow(this.gp(this.limits.fromHentaiAtHome), 'from Hentai@Home')
+        this.limitDetailRow(this.gp(this.limits.resetCost), 'reset cost', true)
+      }
+
+      Row() {
+        Text(this.limitSummary())
+          .fontSize(14)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(themePrimaryText())
+          .textAlign(TextAlign.Center)
+          .layoutWeight(1)
+          .height(36)
+          .onClick(() => {
+            if (this.limits === null) {
+              this.loadLimits(false);
+            } else {
+              this.expanded = !this.expanded;
+            }
+          })
+
+        if (this.loading) {
+          LoadingProgress()
+            .width(18)
+            .height(18)
+            .color(themePrimaryColor())
+            .margin({ right: 10 })
+        } else {
+          SymbolGlyph($r('sys.symbol.arrow_clockwise'))
+            .fontSize(18)
+            .fontColor([themeSecondaryText()])
+            .width(34)
+            .height(34)
+            .onClick(() => { this.loadLimits(true); })
+        }
+      }
+      .width('100%')
+      .height(36)
+      .padding({ left: 8 })
+      .borderRadius(6)
+      .backgroundColor(themeSurfaceVariant())
+    }
+    .width('100%')
+    .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+    .border({ width: { top: 0.5 }, color: themeDividerColor() })
+  }
+}
+
+function formatNumber(value: number): string {
+  const text = Math.max(0, Math.trunc(value)).toString();
+  return text.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
 // ===================================================================
