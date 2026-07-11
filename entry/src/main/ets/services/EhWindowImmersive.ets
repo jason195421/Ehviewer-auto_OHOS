@@ -5,6 +5,7 @@ import { isDarkTheme, themeSystemBarContentColor, themeTransparentColor } from '
 export const MAIN_WINDOW_KEY: string = 'mainWindow';
 export const READER_WINDOW_KEY: string = 'readerWindow';
 export const EMBEDDED_READER_ACTIVE_KEY: string = 'embeddedReaderActive';
+export const MAIN_WINDOW_WIDTH_PX_KEY: string = 'mainWindowWidthPx';
 export const MAIN_CONTENT_WIDTH_VP_KEY: string = 'mainContentWidthVp';
 type SystemBarName = 'status' | 'navigation';
 type SpecificSystemBarName = 'status' | 'navigationIndicator';
@@ -17,6 +18,10 @@ let readerChromeGeneration: number = 0;
 
 export function rememberMainWindow(win: window.Window): void {
   AppStorage.set<window.Window | undefined>(MAIN_WINDOW_KEY, win);
+  try {
+    rememberMainWindowWidthPx(win.getWindowProperties().windowRect.width);
+  } catch (_error) {
+  }
 }
 
 export function getMainWindow(): window.Window | undefined {
@@ -31,8 +36,17 @@ export function rememberMainContentWidthVp(width: number): void {
   AppStorage.setOrCreate<number>(MAIN_CONTENT_WIDTH_VP_KEY, normalized);
 }
 
+export function rememberMainWindowWidthPx(width: number): void {
+  const normalized = Math.floor(width);
+  if (normalized <= 0 || Number.isNaN(normalized)) {
+    return;
+  }
+  AppStorage.setOrCreate<number>(MAIN_WINDOW_WIDTH_PX_KEY, normalized);
+}
+
 export function mainContentWidthFallbackVp(pxToVp: (value: number) => number): number {
   const remembered = AppStorage.get<number>(MAIN_CONTENT_WIDTH_VP_KEY);
+  const observedWindowWidth = AppStorage.get<number>(MAIN_WINDOW_WIDTH_PX_KEY);
   const win = getMainWindow();
   let windowWidth = 0;
   try {
@@ -41,6 +55,12 @@ export function mainContentWidthFallbackVp(pxToVp: (value: number) => number): n
     }
   } catch (_error) {
     windowWidth = 0;
+  }
+  if (observedWindowWidth !== undefined && observedWindowWidth > 0) {
+    const observedWidth = normalizeWindowWidthVp(observedWindowWidth, pxToVp);
+    if (observedWidth >= 240) {
+      return observedWidth;
+    }
   }
   if (windowWidth >= 240) {
     return windowWidth;

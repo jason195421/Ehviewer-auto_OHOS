@@ -1,5 +1,5 @@
 ﻿import { GalleryPreview } from '../../model/GalleryModels';
-import { mainContentWidthFallbackVp, rememberMainContentWidthVp } from '../../services/EhWindowImmersive';
+import { mainContentWidthFallbackVp } from '../../services/EhWindowImmersive';
 import {
   cachePreviewThumbnail,
   createEmptyPreview,
@@ -142,7 +142,6 @@ export struct DetailPreviews {
       const width = Math.floor(newArea.width as number);
       if (width > 0 && !Number.isNaN(width) && Math.abs(this.contentWidth - width) >= 1) {
         this.contentWidth = width;
-        rememberMainContentWidthVp(width);
       }
     })
   }

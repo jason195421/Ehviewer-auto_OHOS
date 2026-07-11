@@ -10,9 +10,10 @@ import {
 } from '../services/GalleryDetailModule';
 import {
   applyAppChromeImmersiveMode,
-  getMainWindow,
   isEmbeddedReaderActive,
-  leaveEmbeddedReaderFullscreen
+  leaveEmbeddedReaderFullscreen,
+  mainContentWidthFallbackVp,
+  rememberMainContentWidthVp
 } from '../services/EhWindowImmersive';
 import {
   themeOnPrimaryText,
@@ -30,7 +31,7 @@ import { ReaderSessionScene } from './ReaderHostScene';
 import { FloatingToolbarHost } from './NavigationComponents';
 import {
   areaDimensionToVp,
-  markPreviousRouteRightPane,
+  markCurrentRouteRightPane,
   saveSplitPaneRatio,
   SPLIT_PANE_BREAKPOINT,
   SPLIT_PANE_RATIO_REVISION_KEY,
@@ -148,6 +149,7 @@ export struct TopListScene {
     applyAppChromeImmersiveMode();
     this.restoreNavigationCache();
     this.syncSceneContentWidthFromWindow();
+    markCurrentRouteRightPane(this.useSplitLayout());
     setActiveBackHandler(() => this.handleSystemBack());
     this.loadTopList();
     setTimeout(() => {
@@ -156,7 +158,6 @@ export struct TopListScene {
   }
 
   aboutToDisappear(): void {
-    markPreviousRouteRightPane(this.useSplitLayout());
     this.saveNavigationCache();
   }
 
@@ -405,6 +406,7 @@ export struct TopListScene {
 
     this.restoreDetailWithFade = false;
     this.showDetail = true;
+    markCurrentRouteRightPane(this.useSplitLayout());
     const site = this.gallerySite();
     const detailLink = createGalleryDetailLink(gid, item.token, item.value, site, this.requestUrl);
     this.detailLink = detailLink;
@@ -419,6 +421,7 @@ export struct TopListScene {
     this.restoreDetailWithFade = false;
     this.showDetail = false;
     this.showReader = false;
+    markCurrentRouteRightPane(false);
     this.detailLink = createEmptyGalleryDetailLink();
     this.detail = createEmptyDetail();
     this.detailStatus = 'Tap a ranking item to load detail';
@@ -524,6 +527,8 @@ export struct TopListScene {
       return;
     }
     this.sceneContentWidth = normalized;
+    rememberMainContentWidthVp(normalized);
+    markCurrentRouteRightPane(this.useSplitLayout());
   }
 
   onSplitPaneRatioRevisionChange(): void {
@@ -548,23 +553,7 @@ export struct TopListScene {
   }
 
   private windowContentWidthVp(): number {
-    const win = getMainWindow();
-    if (win === undefined) {
-      return 0;
-    }
-    try {
-      const rawWidth = Math.floor(win.getWindowProperties().windowRect.width);
-      if (rawWidth <= 0 || Number.isNaN(rawWidth)) {
-        return 0;
-      }
-      const converted = Math.floor(this.getUIContext().px2vp(rawWidth));
-      if (converted >= 240) {
-        return converted;
-      }
-      return rawWidth >= 240 && rawWidth <= 1200 ? rawWidth : 0;
-    } catch (_error) {
-      return 0;
-    }
+    return mainContentWidthFallbackVp((value: number) => this.getUIContext().px2vp(value));
   }
 
   private useSplitLayout(): boolean {

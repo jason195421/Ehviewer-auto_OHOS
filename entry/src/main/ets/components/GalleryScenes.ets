@@ -61,7 +61,7 @@ import { GalleryDetailHostScene } from './GalleryDetailHostScene';
 import { ReaderSessionScene } from './ReaderHostScene';
 import {
   areaDimensionToVp,
-  markPreviousRouteRightPane,
+  markCurrentRouteRightPane,
   saveSplitPaneRatio,
   SPLIT_PANE_BREAKPOINT,
   SPLIT_PANE_RATIO_REVISION_KEY,
@@ -1393,6 +1393,7 @@ export struct GalleryListScene {
       this.localSearchBarVisible = false;
     }
     this.restoreNavigationCache();
+    markCurrentRouteRightPane(this.useSplitLayout());
     const context = getAbilityContext();
     if (context !== undefined) {
       Promise.all([
@@ -1430,13 +1431,11 @@ export struct GalleryListScene {
   }
 
   aboutToDisappear(): void {
-    markPreviousRouteRightPane(this.useSplitLayout());
     this.saveListCache();
     this.saveNavigationCache();
   }
 
   onPageHide(): void {
-    markPreviousRouteRightPane(this.useSplitLayout());
     this.saveListCache();
     this.saveNavigationCache();
   }
@@ -2470,6 +2469,7 @@ export struct GalleryListScene {
   private loadDetail(gallery: GalleryInfo): void {
     this.restoreDetailWithFade = false;
     this.showDetail = true;
+    markCurrentRouteRightPane(this.useSplitLayout());
     const detailLink = createGalleryDetailLinkFromGallery(gallery, this.activeSite, this.requestUrl);
     this.detailLink = detailLink;
     this.detail = initialDetailForLink(detailLink);
@@ -2495,6 +2495,7 @@ export struct GalleryListScene {
   private openDetailByToken(gid: number, token: string): void {
     this.restoreDetailWithFade = false;
     this.showDetail = true;
+    markCurrentRouteRightPane(this.useSplitLayout());
     const detailLink = createGalleryDetailLink(gid, token, 'Gallery ' + gid.toString(), this.activeSite, this.requestUrl);
     this.detailLink = detailLink;
     this.detail = initialDetailForLink(detailLink);
@@ -2508,6 +2509,7 @@ export struct GalleryListScene {
     this.restoreDetailWithFade = false;
     this.showDetail = false;
     this.showReader = false;
+    markCurrentRouteRightPane(false);
     this.detailLink = createEmptyGalleryDetailLink();
     this.detail = createEmptyDetail();
     this.detailStatus = 'Tap a gallery row to load detail';
@@ -2668,6 +2670,8 @@ export struct GalleryListScene {
       return;
     }
     this.sceneContentWidth = normalized;
+    rememberMainContentWidthVp(normalized);
+    markCurrentRouteRightPane(this.useSplitLayout());
   }
 
   private syncSceneContentWidthFromWindow(): void {
@@ -4080,7 +4084,6 @@ export struct GalleryListContent {
       return;
     }
     this.contentWidth = normalizedWidth;
-    rememberMainContentWidthVp(normalizedWidth);
   }
 
   private selectedSearchTagTokens(): string[] {

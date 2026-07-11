@@ -31,7 +31,6 @@ import {
 } from '../services/GalleryDetailModule';
 import {
   applyAppChromeImmersiveMode,
-  getMainWindow,
   isEmbeddedReaderActive,
   leaveEmbeddedReaderFullscreen,
   mainContentWidthFallbackVp,
@@ -87,7 +86,7 @@ import {
 } from './GallerySearchScenes';
 import {
   areaDimensionToVp,
-  markPreviousRouteRightPane,
+  markCurrentRouteRightPane,
   saveSplitPaneRatio,
   SPLIT_PANE_BREAKPOINT,
   SPLIT_PANE_RATIO_REVISION_KEY,
@@ -266,6 +265,7 @@ export struct DownloadScene {
     this.restoreNavigationCache();
     this.syncSceneContentWidthFromWindow();
     this.syncDownloadContentWidthFromWindow();
+    markCurrentRouteRightPane(this.useSplitLayout());
     setActiveBackHandler(() => this.handleSystemBack());
     this.unsubscribeStore = ehDownloadStore.subscribe((items: DownloadInfo[]) => {
       this.items = items;
@@ -283,7 +283,6 @@ export struct DownloadScene {
   }
 
   aboutToDisappear(): void {
-    markPreviousRouteRightPane(this.useSplitLayout());
     this.saveNavigationCache();
     this.unsubscribeStore();
     this.unsubscribeDownloadManager();
@@ -830,7 +829,6 @@ export struct DownloadScene {
       return;
     }
     this.downloadContentWidth = normalizedWidth;
-    rememberMainContentWidthVp(normalizedWidth);
   }
 
   private syncDownloadContentWidthFromWindow(): void {
@@ -854,7 +852,9 @@ export struct DownloadScene {
       return;
     }
     this.sceneContentWidth = normalized;
+    rememberMainContentWidthVp(normalized);
     this.syncDownloadContentWidthForCurrentLayout();
+    markCurrentRouteRightPane(this.useSplitLayout());
   }
 
   onSplitPaneRatioRevisionChange(): void {
@@ -884,23 +884,7 @@ export struct DownloadScene {
   }
 
   private windowContentWidthVp(): number {
-    const win = getMainWindow();
-    if (win === undefined) {
-      return 0;
-    }
-    try {
-      const rawWidth = Math.floor(win.getWindowProperties().windowRect.width);
-      if (rawWidth <= 0 || Number.isNaN(rawWidth)) {
-        return 0;
-      }
-      const converted = Math.floor(this.getUIContext().px2vp(rawWidth));
-      if (converted >= 240) {
-        return converted;
-      }
-      return rawWidth >= 240 && rawWidth <= 1200 ? rawWidth : 0;
-    } catch (_error) {
-      return 0;
-    }
+    return mainContentWidthFallbackVp((value: number) => this.getUIContext().px2vp(value));
   }
 
   private splitListPaneWidth(): number {
@@ -1241,6 +1225,7 @@ export struct DownloadScene {
   private openDetail(item: DownloadInfo): void {
     this.restoreDetailWithFade = false;
     this.showDetail = true;
+    markCurrentRouteRightPane(this.useSplitLayout());
     const detailLink = createGalleryDetailLinkFromGallery(item, currentGallerySite(),
       EhUrl.getReferer(currentGallerySite()));
     this.detailLink = detailLink;
@@ -1252,6 +1237,7 @@ export struct DownloadScene {
   private closeDetail(): void {
     this.restoreDetailWithFade = false;
     this.showDetail = false;
+    markCurrentRouteRightPane(false);
     this.detailLink = createEmptyGalleryDetailLink();
     this.detail = createEmptyDetail();
     this.detailRequestUrl = '';

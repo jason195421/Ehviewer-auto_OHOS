@@ -6,7 +6,8 @@ import {
   EMBEDDED_READER_ACTIVE_KEY,
   MAIN_WINDOW_KEY,
   prepareAppChromeBeforeContent,
-  rememberMainWindow
+  rememberMainWindow,
+  rememberMainWindowWidthPx
 } from '../services/EhWindowImmersive';
 import { applyWindowPrivacyMode, WINDOW_PRIVACY_STATUS_KEY } from '../services/EhWindowPrivacy';
 import { ehSettingsStore } from '../services/EhSettingsStore';
@@ -73,6 +74,9 @@ export default class EntryAbility extends UIAbility {
     this.updateSystemColorMode(this.context.config.colorMode);
     const windowReady = stage.getMainWindow().then((win) => {
       rememberMainWindow(win);
+      win.on('windowSizeChange', (size: window.Size) => {
+        rememberMainWindowWidthPx(size.width);
+      });
       this.updateWindowAvoidAreas(win);
       return prepareAppChromeBeforeContent(win).then(() => {
         this.updateWindowAvoidAreas(win);

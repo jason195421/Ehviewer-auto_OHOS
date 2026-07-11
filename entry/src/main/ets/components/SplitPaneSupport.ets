@@ -12,6 +12,7 @@ export const SPLIT_PANE_BREAKPOINT: number = 840;
 export const SPLIT_PANE_LIST_MIN_WIDTH: number = 340;
 export const SPLIT_PANE_SIDE_MIN_WIDTH: number = 360;
 const SPLIT_PANE_PREVIOUS_ROUTE_RIGHT_PANE_KEY: string = 'ehviewer_previous_route_right_pane';
+const SPLIT_PANE_CURRENT_ROUTE_RIGHT_PANE_KEY: string = 'ehviewer_current_route_right_pane';
 const SPLIT_PANE_DEFAULT_RATIO: number = 0.42;
 const SPLIT_PANE_MIN_RATIO: number = 0.25;
 const SPLIT_PANE_MAX_RATIO: number = 0.75;
@@ -29,8 +30,14 @@ export function splitPaneCurrentRatio(): number {
   return clampSplitPaneRatio(value);
 }
 
-export function markPreviousRouteRightPane(visible: boolean): void {
+export function markCurrentRouteRightPane(visible: boolean): void {
+  AppStorage.setOrCreate<boolean>(SPLIT_PANE_CURRENT_ROUTE_RIGHT_PANE_KEY, visible);
+}
+
+export function prepareSplitPaneRouteTransition(): void {
+  const visible = AppStorage.get<boolean>(SPLIT_PANE_CURRENT_ROUTE_RIGHT_PANE_KEY) === true;
   AppStorage.setOrCreate<boolean>(SPLIT_PANE_PREVIOUS_ROUTE_RIGHT_PANE_KEY, visible);
+  AppStorage.setOrCreate<boolean>(SPLIT_PANE_CURRENT_ROUTE_RIGHT_PANE_KEY, false);
 }
 
 export function shouldFadeRestoredRightPane(): boolean {

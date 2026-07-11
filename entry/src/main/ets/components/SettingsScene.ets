@@ -41,7 +41,11 @@ import { ehUpdateChecker, ReleaseInfo, UpdateCheckResult } from '../services/EhU
 import { galleryPageCache } from '../services/GalleryPageCache';
 import { CacheClearResult, CachePruneResult, readerImageCache } from '../services/ReaderImageCache';
 import { FilterRule, FILTER_MODE_RATING, FILTER_MODE_TITLE, ehFilterStore } from '../services/EhFilterStore';
-import { applyAppChromeImmersiveMode, mainContentWidthFallbackVp } from '../services/EhWindowImmersive';
+import {
+  applyAppChromeImmersiveMode,
+  mainContentWidthFallbackVp,
+  rememberMainContentWidthVp
+} from '../services/EhWindowImmersive';
 import { applyWindowPrivacyMode } from '../services/EhWindowPrivacy';
 import { ehAppLog } from '../services/EhAppLog';
 import { ehParseErrorBodyStore, ParseErrorBodyEntry } from '../services/EhParseErrorBodyStore';
@@ -89,7 +93,7 @@ import { collectWebCookies, hasLoginCookie, SessionScene, syncCookieHeaderToWebV
 import { UpdatePromptOverlay } from './UpdatePromptOverlay';
 import {
   areaDimensionToVp,
-  markPreviousRouteRightPane,
+  markCurrentRouteRightPane,
   saveSplitPaneRatio,
   SPLIT_PANE_BREAKPOINT,
   SPLIT_PANE_RATIO_REVISION_KEY,
@@ -171,6 +175,7 @@ export struct SettingsScene {
     applyAppChromeImmersiveMode();
     this.syncSceneContentWidthFromWindow();
     this.restoreNavigationCache();
+    markCurrentRouteRightPane(this.useSplitLayout());
     setActiveBackHandler(() => this.handleSystemBack());
     const context = getAbilityContext();
     if (context !== undefined) {
@@ -199,7 +204,6 @@ export struct SettingsScene {
   }
 
   aboutToDisappear(): void {
-    markPreviousRouteRightPane(this.useSplitLayout());
     this.saveNavigationCache();
   }
 
@@ -228,6 +232,7 @@ export struct SettingsScene {
     this.panel = SettingsPanel.Main;
     this.panelStack = [SettingsPanel.Main];
     this.restorePanelWithFade = false;
+    markCurrentRouteRightPane(false);
     this.restoreBackHandler();
     this.clearNavigationCache();
   }
@@ -245,6 +250,7 @@ export struct SettingsScene {
     nextStack.push(panel);
     this.panelStack = nextStack;
     this.panel = panel;
+    markCurrentRouteRightPane(this.useSplitLayout());
     this.saveNavigationCache();
     this.restoreBackHandler();
   }
@@ -255,6 +261,7 @@ export struct SettingsScene {
     if (splitPaneModeEnabled() && this.sceneContentWidth >= SPLIT_PANE_BREAKPOINT) {
       this.panelStack = [SettingsPanel.Main, panel];
       this.panel = panel;
+      markCurrentRouteRightPane(this.useSplitLayout());
       this.saveNavigationCache();
       this.restoreBackHandler();
       return;
@@ -277,6 +284,7 @@ export struct SettingsScene {
       this.panel = this.panelStack[this.panelStack.length - 1];
     }
     this.signedIn = ehCookieStore.hasCookies();
+    markCurrentRouteRightPane(this.useSplitLayout());
     this.saveNavigationCache();
     this.restoreBackHandler();
   }
@@ -335,6 +343,8 @@ export struct SettingsScene {
       return;
     }
     this.sceneContentWidth = normalized;
+    rememberMainContentWidthVp(normalized);
+    markCurrentRouteRightPane(this.useSplitLayout());
   }
 
   private syncSceneContentWidthFromWindow(): void {
