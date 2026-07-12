@@ -112,17 +112,6 @@ function normalizeSceneScrollOffset(offset: number): number {
   return offset;
 }
 
-async function pickDownloadsOutputPath(context: common.UIAbilityContext, fileName: string): Promise<string> {
-  const saveOptions = new picker.DocumentSaveOptions();
-  saveOptions.pickerMode = picker.DocumentPickerMode.DOWNLOAD;
-  const documentPicker = new picker.DocumentViewPicker(context);
-  const result = await documentPicker.save(saveOptions);
-  if (result.length === 0 || result[0].length === 0) {
-    return '';
-  }
-  return new fileUri.FileUri(result[0] + '/' + sanitizeExportFileName(fileName)).path;
-}
-
 async function pickDownloadDirectoryRoot(context: common.UIAbilityContext): Promise<string> {
   try {
     const saveOptions = new picker.DocumentSaveOptions();
@@ -138,22 +127,8 @@ async function pickDownloadDirectoryRoot(context: common.UIAbilityContext): Prom
   }
 }
 
-function sanitizeExportFileName(fileName: string): string {
-  return fileName.replace(/[\\/:*?"<>|]/g, '_');
-}
-
 function normalizeDownloadSceneLocation(value: string): string {
   return value === DOWNLOAD_LOCATION_DOWNLOADS ? DOWNLOAD_LOCATION_DOWNLOADS : DOWNLOAD_LOCATION_APP_FILES;
-}
-
-function downloadExportTimestamp(now: Date): string {
-  return now.getFullYear().toString() + padDownloadExportTwo(now.getMonth() + 1) + padDownloadExportTwo(now.getDate()) +
-    '_' + padDownloadExportTwo(now.getHours()) + padDownloadExportTwo(now.getMinutes()) +
-    padDownloadExportTwo(now.getSeconds());
-}
-
-function padDownloadExportTwo(value: number): string {
-  return value < 10 ? '0' + value.toString() : value.toString();
 }
 
 const DOWNLOAD_PAGE_PROGRESS_SCALE: number = 1000;
@@ -1060,7 +1035,7 @@ export struct DownloadScene {
     }
     const pickedRoot = await pickDownloadDirectoryRoot(context);
     if (pickedRoot.length > 0) {
-      ehDownloadFileStore.rememberPublicDownloadRoot(pickedRoot + '/EhViewer');
+      ehDownloadFileStore.rememberPublicDownloadRoot(pickedRoot);
       if (ehDownloadFileStore.canUseLocation(context, DOWNLOAD_LOCATION_DOWNLOADS)) {
         return true;
       }
@@ -1179,13 +1154,12 @@ export struct DownloadScene {
       return;
     }
     this.statusText = 'Exporting ' + selected.length.toString() + ' selected downloads...';
-    pickDownloadsOutputPath(context, 'EhViewer_downloads_' + downloadExportTimestamp(new Date()) + '.zip').then((path: string) => {
-      if (path.length === 0) {
-        this.showFloatingStatus('Export cancelled');
-        return;
+    this.ensurePublicDownloadAccess(context).then((ready: boolean) => {
+      if (!ready) {
+        throw new Error('Downloads access was not granted');
       }
       this.showBlockingBusy('Creating download archive...');
-      return ehDownloadFileStore.exportGalleriesZip(context, selected, path);
+      return ehDownloadFileStore.exportGalleriesZip(context, selected);
     }).then((result) => {
       this.hideBlockingBusy();
       if (result === undefined) {

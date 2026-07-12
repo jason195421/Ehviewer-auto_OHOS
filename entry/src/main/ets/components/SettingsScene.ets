@@ -626,7 +626,7 @@ export struct SettingsScene {
     }
     const pickedRoot = await this.pickDownloadDirectoryRoot(context);
     if (pickedRoot.length > 0) {
-      ehDownloadFileStore.rememberPublicDownloadRoot(pickedRoot + '/EhViewer');
+      ehDownloadFileStore.rememberPublicDownloadRoot(pickedRoot);
       if (ehDownloadFileStore.canUseLocation(context, normalized)) {
         return true;
       }

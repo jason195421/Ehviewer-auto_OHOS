@@ -86,13 +86,21 @@ export class EhDownloadFileStore {
   publicDownloadRoot(_context: common.UIAbilityContext): string {
     const pickedRoot = ehSettingsStore.getValue('download_public_root_path', '');
     if (pickedRoot.length > 0) {
-      return pickedRoot;
+      const normalized = normalizePublicDownloadRoot(pickedRoot);
+      if (normalized !== pickedRoot) {
+        if (migrateDuplicatePublicDownloadRoot(pickedRoot, normalized)) {
+          ehSettingsStore.setValue('download_public_root_path', normalized);
+          return normalized;
+        }
+        return pickedRoot;
+      }
+      return normalized;
     }
     throw new Error('Download directory access needs picker selection');
   }
 
   rememberPublicDownloadRoot(root: string): void {
-    const normalized = normalizePath(root);
+    const normalized = normalizePublicDownloadRoot(root);
     if (normalized.length > 0) {
       ehSettingsStore.setValue('download_public_root_path', normalized);
     }
@@ -453,6 +461,38 @@ export class EhDownloadFileStore {
       total: Math.max(0, restoredGallery.total),
       migrated: migrated
     };
+  }
+}
+
+function normalizePublicDownloadRoot(path: string): string {
+  const normalized = normalizePath(path);
+  const duplicateSuffix = '/ehviewer/ehviewer';
+  if (normalized.toLowerCase().endsWith(duplicateSuffix)) {
+    return normalized.substring(0, normalized.length - '/EhViewer'.length);
+  }
+  return normalized;
+}
+
+function migrateDuplicatePublicDownloadRoot(source: string, target: string): boolean {
+  if (source === target || !isDirectory(source)) {
+    return true;
+  }
+  try {
+    ensureDirectory(target);
+    const names = fs.listFileSync(source);
+    for (let i = 0; i < names.length; i++) {
+      const sourcePath = source + '/' + names[i];
+      const targetPath = uniqueChildPath(target, names[i]);
+      if (isDirectory(sourcePath)) {
+        fs.moveDirSync(sourcePath, targetPath);
+      } else {
+        fs.moveFileSync(sourcePath, targetPath);
+      }
+    }
+    fs.rmdirSync(source);
+    return true;
+  } catch (error) {
+    return false;
   }
 }
 

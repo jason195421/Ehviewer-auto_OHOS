@@ -1168,7 +1168,7 @@ export struct GalleryDetailHostScene {
     if (result.length === 0 || result[0].length === 0) {
       throw new Error('Downloads access was not granted');
     }
-    const directory = new fileUri.FileUri(result[0]).path + '/EhViewer';
+    const directory = new fileUri.FileUri(result[0]).path;
     ehDownloadFileStore.rememberPublicDownloadRoot(directory);
     await ehSettingsStore.save(context);
     return directory;
