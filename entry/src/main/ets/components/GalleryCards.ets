@@ -48,14 +48,7 @@ export struct GalleryListRow {
   }
 
   private metaGap(): number {
-    return this.isSmallThumb() ? 1 : 2;
-  }
-
-  private metaTopGap(): number {
-    if (this.isSmallThumb()) {
-      return 1;
-    }
-    return galleryListMode() === 'Extended' ? 6 : 2;
+    return this.isSmallThumb() ? 0 : 1;
   }
 
   private titleMaxLines(): number {
@@ -72,13 +65,7 @@ export struct GalleryListRow {
     if (galleryListMode() === 'Extended') {
       return 38;
     }
-    if (this.cardHeight() >= 160) {
-      return 58;
-    }
-    if (this.cardHeight() >= 140) {
-      return 50;
-    }
-    return 42;
+    return 54;
   }
 
   private isSmallThumb(): boolean {
@@ -98,7 +85,7 @@ export struct GalleryListRow {
   }
 
   private metaLineHeight(): number {
-    return this.isSmallThumb() ? 14 : 17;
+    return this.isSmallThumb() ? 13 : 16;
   }
 
   private sideMetaVisible(): boolean {
@@ -195,7 +182,6 @@ export struct GalleryListRow {
           .alignItems(HorizontalAlign.Start)
         }
         .width('100%')
-        .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
 
         Row() {
@@ -259,7 +245,6 @@ export struct GalleryListRow {
         }
         .width('100%')
         .alignItems(VerticalAlign.Bottom)
-        .margin({ top: this.metaTopGap() })
 
         if (this.hasTags()) {
           Flex({ wrap: FlexWrap.Wrap }) {
