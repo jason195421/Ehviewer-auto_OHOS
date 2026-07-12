@@ -10,17 +10,20 @@ import {
   DOWNLOAD_LOCATION_APP_FILES,
   DOWNLOAD_LOCATION_DOWNLOADS,
   DownloadDirectoryScanResult,
-  RestoredDownloadGallery,
   ehDownloadFileStore
 } from '../services/EhDownloadFileStore';
-import { DownloadInfo, DownloadLabel, DownloadState, ehDownloadStore } from '../services/EhDownloadStore';
+import { DownloadInfo, DownloadLabel, ehDownloadStore } from '../services/EhDownloadStore';
 import { ehHistoryStore } from '../services/EhHistoryStore';
 import { ehLocalFavoritesStore } from '../services/EhLocalFavoritesStore';
 import {
   DownloadMetadataRestoreResult,
-  rebuildImportedHistoryMetadata,
-  rebuildRestoredDownloadMetadata
+  rebuildImportedHistoryMetadata
 } from '../services/DownloadMetadataRestore';
+import {
+  DownloadRestoreResult,
+  DownloadZipImportResult,
+  restoreDownloadedItemsAndArchives
+} from '../services/DownloadZipImportService';
 import {
   HISTORY_INFO_SIZE_KEY,
   ehSettingsStore,
@@ -111,7 +114,6 @@ import {
   shouldUpdateSplitPaneFocus
 } from './SplitPaneSupport';
 
-const DOWNLOAD_PAGE_PROGRESS_SCALE: number = 1000;
 const DIAGNOSTIC_LOG_TAG: string = 'SettingsScene';
 const LOG_EXPORT_CHUNK_BYTES: number = 64 * 1024;
 const EH_LICENSE_URL: string = 'https://github.com/suibianqwe/Ehviewer_OHOS/blob/main/LICENSE';
@@ -1294,54 +1296,59 @@ export struct SettingsScene {
       if (currentLocation === DOWNLOAD_LOCATION_APP_FILES) {
         downloadsAccess = await this.ensureDownloadLocationAccess(context, DOWNLOAD_LOCATION_DOWNLOADS);
       }
-      await ehDownloadStore.load(context);
-      const restored: RestoredDownloadGallery[] = ehDownloadFileStore.restoreDownloadedGalleries(context);
-      this.statusText = 'Rebuilding downloaded metadata...';
-      this.showBlockingBusy('Rebuilding downloaded metadata...');
-      const metadataResult: DownloadMetadataRestoreResult =
-        await rebuildRestoredDownloadMetadata(context, restored, this.currentGallerySite());
-      let added = 0;
-      let updated = 0;
-      let migrated = 0;
-      let totalBytes = 0;
-      for (let i = 0; i < restored.length; i++) {
-        const item = restored[i];
-        const existed = ehDownloadStore.contains(item.gallery.gid);
-        const downloadItem = ehDownloadStore.addGallery(item.gallery, '');
-        if (downloadItem !== null) {
-          const total = Math.max(item.total, item.finished);
-          ehDownloadStore.setProgress(downloadItem.gid, item.finished, total,
-            item.finished * DOWNLOAD_PAGE_PROGRESS_SCALE);
-          ehDownloadStore.setStorage(downloadItem.gid, item.directory, item.fileSize);
-          ehDownloadStore.setState(downloadItem.gid,
-            total > 0 && item.finished >= total ? DownloadState.Finish : DownloadState.None);
-          totalBytes += item.fileSize;
-          if (item.migrated === true) {
-            migrated++;
-          }
-          if (existed) {
-            updated++;
-          } else {
-            added++;
-          }
-        }
-      }
-      await ehDownloadStore.save(context);
+      this.statusText = 'Scanning ZIP archives...';
+      this.showBlockingBusy('Scanning ZIP archives...');
+      const result: DownloadRestoreResult = await restoreDownloadedItemsAndArchives(context,
+        this.currentGallerySite(), downloadsAccess);
       this.hideBlockingBusy();
-      let message = 'Restored downloads: ' + added.toString() + ' added, ' + updated.toString() +
-        ' updated, ' + migrated.toString() + ' migrated, ' + metadataResult.rebuilt.toString() +
-        ' metadata rebuilt, ' + downloadSizeText(totalBytes) + '.';
-      if (metadataResult.fetched > 0) {
-        message += ' Fetched ' + metadataResult.fetched.toString() + ' details.';
+      let message = 'Restored downloads: ' + result.added.toString() + ' added, ' + result.updated.toString() +
+        ' updated, ' + result.migrated.toString() + ' migrated, ' + result.metadataRebuilt.toString() +
+        ' metadata rebuilt, ' + downloadSizeText(result.totalBytes) + '.';
+      if (result.metadataFetched > 0) {
+        message += ' Fetched ' + result.metadataFetched.toString() + ' details.';
+      }
+      if (result.archives.found > 0) {
+        message += result.archives.processed > 0 ?
+          ' ZIP archives processed: ' + result.archives.processed.toString() + ', skipped: ' +
+            result.archives.skipped.toString() + '.' :
+          ' Unprocessed ZIP archives: ' + result.archives.skipped.toString() + '.';
       }
       if (!downloadsAccess) {
         message += ' Downloads access was not granted; scanned app files only.';
       }
       this.showFloatingStatus(message);
+      if (result.archives.processed > 0) {
+        this.showDeleteProcessedZipDialog(result.archives);
+      }
     }).catch((error: Error) => {
       this.hideBlockingBusy();
       this.showFloatingStatus('Restore downloads failed: ' + error.message);
     });
+  }
+
+  private showDeleteProcessedZipDialog(result: DownloadZipImportResult): void {
+    const message = uiStatusText('ZIP import summary: processed ' + result.processed.toString() + ', skipped ' +
+      result.skipped.toString() + '. Delete processed archives?');
+    this.getUIContext().getPromptAction().showDialog({
+      title: uiText('ZIP archives processed'),
+      message: message,
+      buttons: [
+        {
+          text: uiText('Keep'),
+          color: themeSecondaryText()
+        },
+        {
+          text: uiText('Delete'),
+          color: themePrimaryColor()
+        }
+      ]
+    }).then((data) => {
+      if (data.index !== 1) {
+        return;
+      }
+      const removed = ehDownloadFileStore.removeFiles(result.processedPaths);
+      this.showFloatingStatus('Deleted processed ZIP archives: ' + removed.toString());
+    }).catch(() => {});
   }
 
   private createAppLogExport(context: common.UIAbilityContext): string {

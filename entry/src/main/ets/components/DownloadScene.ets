@@ -9,16 +9,15 @@ import {
 import {
   DOWNLOAD_LOCATION_APP_FILES,
   DOWNLOAD_LOCATION_DOWNLOADS,
-  ehDownloadFileStore,
-  RestoredDownloadGallery
+  ehDownloadFileStore
 } from '../services/EhDownloadFileStore';
 import { ehDownloadManager } from '../services/EhDownloadManager';
 import { DownloadInfo, DownloadState, ehDownloadStore } from '../services/EhDownloadStore';
 import { ehSettingsStore } from '../services/EhSettingsStore';
-import { rebuildRestoredDownloadMetadata } from '../services/DownloadMetadataRestore';
 import {
+  DownloadRestoreResult,
   DownloadZipImportResult,
-  importPublicDownloadArchives
+  restoreDownloadedItemsAndArchives
 } from '../services/DownloadZipImportService';
 import {
   confirmCellularNetworkWarningForSession,
@@ -987,44 +986,21 @@ export struct DownloadScene {
       if (currentLocation === DOWNLOAD_LOCATION_APP_FILES) {
         downloadsAccess = await this.ensurePublicDownloadAccess(context);
       }
-      await ehDownloadStore.load(context);
       this.statusText = 'Scanning ZIP archives...';
       this.showBlockingBusy('Scanning ZIP archives...');
-      const zipResult: DownloadZipImportResult = downloadsAccess ?
-        await importPublicDownloadArchives(context, currentGallerySite()) : {
-          found: 0,
-          processed: 0,
-          skipped: 0,
-          processedPaths: [],
-          importedGalleries: []
-        };
-      const restored: RestoredDownloadGallery[] = ehDownloadFileStore.restoreDownloadedGalleries(context);
-      this.statusText = 'Rebuilding downloaded metadata...';
-      this.showBlockingBusy('Rebuilding downloaded metadata...');
-      await rebuildRestoredDownloadMetadata(context, restored, currentGallerySite());
-      for (let i = 0; i < restored.length; i++) {
-        const item = ehDownloadStore.addGallery(restored[i].gallery, '');
-        if (item !== null) {
-          const total = Math.max(restored[i].total, restored[i].finished);
-          ehDownloadStore.setState(item.gid, total > 0 && restored[i].finished >= total ?
-            DownloadState.Finish : DownloadState.None);
-          ehDownloadStore.setProgress(item.gid, restored[i].finished, total,
-            restored[i].finished * DOWNLOAD_PAGE_PROGRESS_SCALE);
-          ehDownloadStore.setStorage(item.gid, restored[i].directory, restored[i].fileSize);
-        }
-      }
-      await ehDownloadStore.save(context);
+      const result: DownloadRestoreResult = await restoreDownloadedItemsAndArchives(context, currentGallerySite(),
+        downloadsAccess);
       this.hideBlockingBusy();
       const statusParts: string[] = [];
-      if (restored.length > 0) {
-        statusParts.push('Restored galleries: ' + restored.length.toString());
+      if (result.restored > 0) {
+        statusParts.push('Restored galleries: ' + result.restored.toString());
       }
-      if (zipResult.found > 0) {
-        if (zipResult.processed > 0) {
-          statusParts.push('ZIP archives processed: ' + zipResult.processed.toString() + ', skipped: ' +
-            zipResult.skipped.toString());
+      if (result.archives.found > 0) {
+        if (result.archives.processed > 0) {
+          statusParts.push('ZIP archives processed: ' + result.archives.processed.toString() + ', skipped: ' +
+            result.archives.skipped.toString());
         } else {
-          statusParts.push('Unprocessed ZIP archives: ' + zipResult.skipped.toString());
+          statusParts.push('Unprocessed ZIP archives: ' + result.archives.skipped.toString());
         }
       }
       if (statusParts.length <= 0) {
@@ -1035,8 +1011,8 @@ export struct DownloadScene {
         message += '. Downloads access was not granted; scanned app files only';
       }
       this.showFloatingStatus(message);
-      if (zipResult.processed > 0) {
-        this.showDeleteProcessedZipDialog(zipResult);
+      if (result.archives.processed > 0) {
+        this.showDeleteProcessedZipDialog(result.archives);
       }
     }).catch((error: Error) => {
       this.hideBlockingBusy();

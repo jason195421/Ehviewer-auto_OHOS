@@ -22,6 +22,17 @@ export interface DownloadZipImportResult {
   importedGalleries: RestoredDownloadGallery[];
 }
 
+export interface DownloadRestoreResult {
+  restored: number;
+  added: number;
+  updated: number;
+  migrated: number;
+  totalBytes: number;
+  metadataRebuilt: number;
+  metadataFetched: number;
+  archives: DownloadZipImportResult;
+}
+
 export async function importPublicDownloadArchives(context: common.UIAbilityContext, site: GallerySite,
   selectedPaths?: string[], seedGallery?: GalleryInfo): Promise<DownloadZipImportResult> {
   const paths = selectedPaths === undefined ? listPublicZipFiles(context) : filterZipFiles(selectedPaths);
@@ -75,6 +86,63 @@ export async function importDownloadedArchiveAndRegister(context: common.UIAbili
   }
   await ehDownloadStore.save(context);
   return restored;
+}
+
+export async function restoreDownloadedItemsAndArchives(context: common.UIAbilityContext, site: GallerySite,
+  scanPublicArchives: boolean): Promise<DownloadRestoreResult> {
+  await ehDownloadStore.load(context);
+  const archives: DownloadZipImportResult = scanPublicArchives ?
+    await importPublicDownloadArchives(context, site) : emptyZipImportResult();
+  const restored = ehDownloadFileStore.restoreDownloadedGalleries(context);
+  const metadata = await rebuildRestoredDownloadMetadata(context, restored, site);
+  let added = 0;
+  let updated = 0;
+  let migrated = 0;
+  let totalBytes = 0;
+  for (let i = 0; i < restored.length; i++) {
+    const source = restored[i];
+    const existed = ehDownloadStore.contains(source.gallery.gid);
+    const item = ehDownloadStore.addGallery(source.gallery, '');
+    if (item === null) {
+      continue;
+    }
+    const total = Math.max(source.total, source.finished);
+    ehDownloadStore.setState(item.gid, total > 0 && source.finished >= total ?
+      DownloadState.Finish : DownloadState.None);
+    ehDownloadStore.setProgress(item.gid, source.finished, total,
+      source.finished * DOWNLOAD_PAGE_PROGRESS_SCALE);
+    ehDownloadStore.setStorage(item.gid, source.directory, source.fileSize);
+    totalBytes += source.fileSize;
+    if (source.migrated === true) {
+      migrated++;
+    }
+    if (existed) {
+      updated++;
+    } else {
+      added++;
+    }
+  }
+  await ehDownloadStore.save(context);
+  return {
+    restored: restored.length,
+    added: added,
+    updated: updated,
+    migrated: migrated,
+    totalBytes: totalBytes,
+    metadataRebuilt: metadata.rebuilt,
+    metadataFetched: metadata.fetched,
+    archives: archives
+  };
+}
+
+function emptyZipImportResult(): DownloadZipImportResult {
+  return {
+    found: 0,
+    processed: 0,
+    skipped: 0,
+    processedPaths: [],
+    importedGalleries: []
+  };
 }
 
 function listPublicZipFiles(context: common.UIAbilityContext): string[] {

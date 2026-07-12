@@ -48,9 +48,9 @@
 请在 [GitHub Releases](https://github.com/suibianqwe/Ehviewer_OHOS/releases) 中下载最新的 `.hap` 安装包。  
 推荐使用 [小白调试助手](https://github.com/likuai2010/auto-installer) 安装。
 
-当前版本：`0.5.0`
+当前版本：`0.5.1`
 
-最新安装包：[`EhViewer_OHOS_0.5.0.hap`](https://github.com/suibianqwe/Ehviewer_OHOS/releases/download/v0.5.0/EhViewer_OHOS_0.5.0.hap)
+最新安装包：[`EhViewer_OHOS_0.5.1.hap`](https://github.com/suibianqwe/Ehviewer_OHOS/releases/download/v0.5.1/EhViewer_OHOS_0.5.1.hap)
 发布包类型：未签名 HAP  
 目标API：`26.0.0`  
 兼容API：`6.0.0(20)`  
@@ -88,6 +88,14 @@ API 20 起可安装；低于 API 23 的设备会自动跳过 SNI 域名前置增
 4. 应用会扫描下载文件夹、迁移到应用文件目录，并重建下载队列和漫画元数据。重复漫画会尽量保留文件更完整、体积更大的版本。
 
 如果部分漫画缺少元数据，应用会尝试联网抓取详情信息。
+
+## 0.5.1 重点变化
+
+- 完善宽屏分栏、路由切换、焦点返回和列表重排，阅读器保持独立全屏。
+- 完善详情页 Torrent、存档、H@H 和系统分享，下载任务支持通知进度、速度与隐私模式。
+- 支持从公共下载目录识别外来 ZIP、存档压缩包和应用导出包，自动解压并重建画廊元数据。
+- 统一下载页与设置页的“恢复下载项”流程，恢复结果支持已处理压缩包删除确认。
+- 修复 ExHentai 配额、搜索详情分栏状态、卡片语言与布局、本地收藏同步及浮窗返回等问题。
 
 ## 0.5.0 重点变化
 
