@@ -621,7 +621,97 @@ export function uiStatusText(text: string): string {
   if (text === 'Bookmark update failed') {
     return '书签更新失败';
   }
+  const composite = translateCompositeUiStatus(text);
+  if (composite !== text) {
+    return composite;
+  }
   return uiText(text);
+}
+
+interface UiStatusPrefixTranslation {
+  source: string;
+  target: string;
+}
+
+const UI_STATUS_PREFIX_TRANSLATIONS: UiStatusPrefixTranslation[] = [
+  { source: 'Archive failed: ', target: '存档失败：' },
+  { source: 'Comment vote failed: ', target: '评论投票失败：' },
+  { source: 'Cookie load failed, using current session: ', target: 'Cookie 加载失败，继续使用当前会话：' },
+  { source: 'Cover search failed: ', target: '封面搜索失败：' },
+  { source: 'Check for updates failed: ', target: '检查更新失败：' },
+  { source: 'Delete history failed: ', target: '删除历史记录失败：' },
+  { source: 'Download path cache refreshed: ', target: '下载路径缓存已刷新：' },
+  { source: 'Refresh download path cache failed: ', target: '刷新下载路径缓存失败：' },
+  { source: 'Exporting ', target: '正在导出 ' },
+  { source: 'Favorite failed: ', target: '收藏操作失败：' },
+  { source: 'Filter rule added: ', target: '已添加过滤规则：' },
+  { source: 'H@H failed: ', target: 'H@H 失败：' },
+  { source: 'Invalid gallery id: ', target: '无效的画廊 ID：' },
+  { source: 'Jump failed: ', target: '跳转失败：' },
+  { source: 'Loading detail for gid ', target: '正在加载画廊详情，GID ' },
+  { source: 'Loading page ', target: '正在加载第 ' },
+  { source: 'Loading preview page ', target: '正在加载预览页 ' },
+  { source: 'Log exported: ', target: '日志已导出：' },
+  { source: 'Network diagnostics exported: ', target: '网络诊断已导出：' },
+  { source: 'Open link failed: ', target: '打开链接失败：' },
+  { source: 'Opening browser: ', target: '正在打开浏览器：' },
+  { source: 'Page URL load failed: ', target: '页面 URL 加载失败：' },
+  { source: 'Preview page load failed: ', target: '预览页加载失败：' },
+  { source: 'Queued: ', target: '已排队：' },
+  { source: 'Queued ', target: '已排队 ' },
+  { source: 'Rating failed: ', target: '评分失败：' },
+  { source: 'Rating submitted: ', target: '评分已提交：' },
+  { source: 'Reader launch failed: ', target: '启动阅读器失败：' },
+  { source: 'Removed: ', target: '已移除：' },
+  { source: 'Removed ', target: '已移除 ' },
+  { source: 'Resolving page ', target: '正在解析第 ' },
+  { source: 'Restored ', target: '已恢复 ' },
+  { source: 'Rule already exists: ', target: '规则已存在：' },
+  { source: 'Share failed: ', target: '分享失败：' },
+  { source: 'Stopped: ', target: '已停止：' },
+  { source: 'Stopped ', target: '已停止 ' },
+  { source: 'Tag definition failed: ', target: '标签定义加载失败：' },
+  { source: 'Tag refresh failed: ', target: '标签刷新失败：' },
+  { source: 'Tag vote failed: ', target: '标签投票失败：' },
+  { source: 'Torrent failed: ', target: '种子加载失败：' },
+  { source: 'Cleared page cache: ', target: '已清理页面缓存：' },
+  { source: 'Preview page ', target: '预览页 ' },
+  { source: 'Page ', target: '第 ' },
+  { source: 'Selected ', target: '已选择 ' }
+];
+
+const UI_STATUS_FRAGMENT_TRANSLATIONS: UiStatusPrefixTranslation[] = [
+  { source: ' downloaded galleries', target: ' 个已下载画廊' },
+  { source: ' selected downloads', target: ' 个选中的下载项' },
+  { source: ' download items', target: ' 个下载项' },
+  { source: ' history items', target: ' 条历史记录' },
+  { source: ' local favorites', target: ' 个本地收藏' },
+  { source: ' metadata rebuilt', target: ' 个元数据已重建' },
+  { source: ' galleries', target: ' 个画廊' },
+  { source: ' entries', target: ' 个条目' },
+  { source: ' loaded', target: ' 已加载' },
+  { source: ' unavailable', target: ' 不可用' },
+  { source: ' pages', target: ' 页' },
+  { source: ' failed', target: ' 失败' }
+];
+
+function translateCompositeUiStatus(text: string): string {
+  let translated = text;
+  for (let i = 0; i < UI_STATUS_PREFIX_TRANSLATIONS.length; i++) {
+    const item = UI_STATUS_PREFIX_TRANSLATIONS[i];
+    if (text.startsWith(item.source)) {
+      translated = item.target + zhText(text.substring(item.source.length));
+      break;
+    }
+  }
+  if (translated === text) {
+    return text;
+  }
+  for (let i = 0; i < UI_STATUS_FRAGMENT_TRANSLATIONS.length; i++) {
+    const item = UI_STATUS_FRAGMENT_TRANSLATIONS[i];
+    translated = translated.split(item.source).join(item.target);
+  }
+  return translated;
 }
 
 export function uiPageText(prefix: string, page: number): string {
@@ -635,6 +725,22 @@ export function zhText(text: string): string {
   }
   if (text.endsWith(' stars and up')) {
     return text.replace(' stars and up', ' 星以上');
+  }
+  const belowStarsMatch = /^Below\s+(\d+)\s+stars$/.exec(text);
+  if (belowStarsMatch !== null) {
+    return belowStarsMatch[1] + ' 星以下';
+  }
+  const pageCountMatch = /^(\d+)\s+pages$/.exec(text);
+  if (pageCountMatch !== null) {
+    return pageCountMatch[1] + ' 页';
+  }
+  const favoredCountMatch = /^(\d+)\s+favored$/.exec(text);
+  if (favoredCountMatch !== null) {
+    return favoredCountMatch[1] + ' 次收藏';
+  }
+  const previewCountMatch = /^(\d+)\s+thumbnails\s+\/\s+(\d+)\s+pages$/.exec(text);
+  if (previewCountMatch !== null) {
+    return previewCountMatch[1] + ' 个缩略图 / ' + previewCountMatch[2] + ' 页';
   }
   switch (text) {
     case 'Homepage': return '主页';
@@ -1210,6 +1316,158 @@ export function zhText(text: string): string {
     case 'Refreshing...': return '正在刷新...';
     case 'All pages loaded': return '已加载全部页面';
     case 'Waiting for toplist.php': return '等待 toplist.php';
+    case 'EH': return 'EH';
+    case 'EX': return 'EX';
+    case 'CK': return 'CK';
+    case 'EhViewer': return 'EhViewer';
+    case 'H@H': return 'H@H';
+    case 'Forums': return '论坛';
+    case 'Repo': return '仓库';
+    case 'Jump/Seek': return '跳转/按日期查找';
+    case 'entries': return '个条目';
+    case 'Artist': return '艺术家';
+    case 'Group': return '社团';
+    case 'Parody': return '原作';
+    case 'Character': return '角色';
+    case 'Female': return '女性';
+    case 'Male': return '男性';
+    case 'Mixed': return '混合';
+    case 'Cosplayer': return '角色扮演者';
+    case 'Other': return '其他';
+    case 'Location': return '地点';
+    case 'Rows': return '行';
+    case 'Below ': return '低于 ';
+    case 'artist': return '艺术家';
+    case 'group': return '社团';
+    case 'parody': return '原作';
+    case 'character': return '角色';
+    case 'female': return '女性';
+    case 'male': return '男性';
+    case 'mixed': return '混合';
+    case 'language': return '语言';
+    case 'cosplayer': return '角色扮演者';
+    case 'other': return '其他';
+    case 'location': return '地点';
+    case 'rows': return '行';
+    case 'Doujinshi': return '同人志';
+    case 'Manga': return '漫画';
+    case 'Artist CG': return '艺术家 CG';
+    case 'Game CG': return '游戏 CG';
+    case 'Image Set': return '图集';
+    case 'Images': return '图片';
+    case 'Cosplay': return '角色扮演';
+    case 'Asian Porn': return '亚洲色情';
+    case 'Non-H': return '非 H';
+    case 'Western': return '西方';
+    case 'Misc': return '杂项';
+    case 'Vote+': return '赞成';
+    case 'Vote-': return '反对';
+    case 'Adding to favorites...': return '正在添加到收藏...';
+    case 'Removing from favorites...': return '正在移出收藏...';
+    case 'Deleting My Tags...': return '正在删除我的标签...';
+    case 'Refreshing detail...': return '正在刷新详情...';
+    case 'Submitting rating...': return '正在提交评分...';
+    case 'Preparing cover search...': return '正在准备封面搜索...';
+    case 'Detail loaded': return '详情已加载';
+    case 'No gallery loaded': return '未加载画廊';
+    case 'Read is waiting for preview pages': return '阅读器正在等待预览页';
+    case 'Preview pages are unavailable': return '预览页不可用';
+    case 'Rating needs a loaded gallery session': return '评分需要已加载的画廊会话';
+    case 'Similar search needs a loaded gallery': return '相似搜索需要已加载的画廊';
+    case 'Cover image is unavailable': return '封面图片不可用';
+    case 'Cover image cache failed': return '封面图片缓存失败';
+    case 'Comment vote requires gallery API key': return '评论投票需要画廊 API 密钥';
+    case 'Comment is not voteable': return '该评论不可投票';
+    case 'Comment vote submitted': return '评论投票已提交';
+    case 'Invalid comment vote response': return '评论投票响应无效';
+    case 'Torrent URL is unavailable': return '种子 URL 不可用';
+    case 'Invalid H@H resolution': return '无效的 H@H 分辨率';
+    case 'No H@H client available': return '没有可用的 H@H 客户端';
+    case 'No archiver continuation URL': return '未找到存档继续链接';
+    case 'No archiver download URL': return '未找到存档下载链接';
+    case 'Download needs a loaded gallery': return '下载需要已加载的画廊';
+    case 'Download needs app context': return '下载需要应用上下文';
+    case 'Download path cache needs an ability context': return '下载路径缓存需要 Ability 上下文';
+    case 'Download waits for Wi-Fi or confirmation': return '下载正在等待 Wi-Fi 或用户确认';
+    case 'Long press cards to select downloads': return '长按卡片选择下载项';
+    case 'No downloaded galleries to select': return '没有可选择的已下载画廊';
+    case 'Queued idle and failed downloads': return '已将空闲和失败的下载重新排队';
+    case 'Stopped waiting downloads': return '已停止等待中的下载';
+    case 'Restore needs app context': return '恢复需要应用上下文';
+    case 'Export needs app context': return '导出需要应用上下文';
+    case 'Enter a filter text first': return '请先输入过滤文本';
+    case 'Filter rule removed': return '已删除过滤规则';
+    case 'Clear log needs an ability context': return '清理日志需要 Ability 上下文';
+    case 'Saved log cleared': return '已清空保存的日志';
+    case 'Log exported': return '日志已导出';
+    case 'Network diagnostics exported': return '网络诊断已导出';
+    case 'Open link failed: Ability context is not ready': return '打开链接失败：Ability 上下文尚未就绪';
+    case 'Share failed: Ability context is not ready': return '分享失败：Ability 上下文尚未就绪';
+    case 'Share panel closed': return '分享面板已关闭';
+    case 'Reader launch failed: Ability context is not ready': return '启动阅读器失败：Ability 上下文尚未就绪';
+    case 'Reader session is empty': return '阅读器会话为空';
+    case 'Preview has no page URL': return '预览项没有页面 URL';
+    case 'Page loaded': return '页面已加载';
+    case 'Page loaded from cache': return '页面已从缓存加载';
+    case 'Page loaded from local cache': return '页面已从本地缓存加载';
+    case 'Page loaded from downloads': return '页面已从下载文件加载';
+    case 'Page URL is unavailable': return '页面 URL 不可用';
+    case 'Image download failed': return '图片下载失败';
+    case 'Network request failed': return '网络请求失败';
+    case 'Cannot parse sign in response': return '无法解析登录响应';
+    case 'Captcha required; use Cookie sign in or web login later': return '需要验证码，请使用 Cookie 登录或稍后通过网页登录';
+    case 'Tag is empty': return '标签为空';
+    case 'Donate entry is retained from the original app; payment integration is not migrated yet.': return '保留了原应用的捐赠入口，支付功能尚未移植。';
+    case 'EhViewer archive download': return 'EhViewer 存档下载';
+    case 'EhViewer download': return 'EhViewer 下载';
+    case 'Privacy mode disabled': return '隐私模式已关闭';
+    case 'unknown error': return '未知错误';
+    case 'Gallery Toplists': return '画廊排行榜';
+    case 'Uploader Toplists': return '上传者排行榜';
+    case 'Tagging Toplists': return '标签排行榜';
+    case 'Hentai@Home Toplists': return 'Hentai@Home 排行榜';
+    case 'EHTracker Toplists': return 'EHTracker 排行榜';
+    case 'Cleanup Toplists': return '清理排行榜';
+    case 'Rating&Reviewing Toplists': return '评分与审核排行榜';
+    case 'All Time': return '全部时间';
+    case 'Past Year': return '过去一年';
+    case 'Past Month': return '过去一个月';
+    case 'Yesterday': return '昨天';
+    case 'History deleted': return '历史记录已删除';
+    case 'Loading top lists...': return '正在加载排行榜...';
+    case 'No image selected for search': return '未选择用于搜索的图片';
+    case 'Tap a ranking item to load detail': return '点击排行条目加载详情';
+    case 'Core models and URL builders': return '核心模型与 URL 构建器';
+    case 'Network session and cookies': return '网络会话与 Cookie';
+    case 'HTML and API parsers': return 'HTML 与 API 解析器';
+    case 'Gallery list and detail UI': return '画廊列表与详情界面';
+    case 'Settings hierarchy': return '设置层级';
+    case 'Reader and image pipeline': return '阅读器与图片管线';
+    case 'Downloads and storage': return '下载与存储';
+    case 'app/src/main/java/com/hippo/ehviewer/client/data': return 'app/src/main/java/com/hippo/ehviewer/client/data';
+    case 'entry/src/main/ets/model': return 'entry/src/main/ets/model';
+    case 'EhEngine, EhRequest, OkHttp helpers': return 'EhEngine、EhRequest、OkHttp 辅助代码';
+    case 'HarmonyOS HTTP service': return 'HarmonyOS HTTP 服务';
+    case 'client/parser': return 'client/parser';
+    case 'ArkTS parser services': return 'ArkTS 解析服务';
+    case 'ui/scene/gallery': return 'ui/scene/gallery';
+    case 'ArkUI pages and components': return 'ArkUI 页面与组件';
+    case 'SettingsActivity and res/xml/*_settings.xml': return 'SettingsActivity 与 res/xml/*_settings.xml';
+    case 'ArkUI SettingsScene': return 'ArkUI SettingsScene';
+    case 'glgallery, glview, native image code': return 'glgallery、glview 与原生图片代码';
+    case 'ArkUI reader plus native image bridge': return 'ArkUI 阅读器与原生图片桥接';
+    case 'HistoryScene, EhDB history DAO': return 'HistoryScene 与 EhDB 历史 DAO';
+    case 'ArkUI HistoryScene and HarmonyOS preferences store': return 'ArkUI HistoryScene 与 HarmonyOS 首选项存储';
+    case 'download service and FileProvider': return '下载服务与 FileProvider';
+    case 'HarmonyOS background task and file APIs': return 'HarmonyOS 后台任务与文件 API';
+    case 'started: models, EhUrl, list/favorites URL builders': return '进行中：模型、EhUrl、列表/收藏 URL 构建器';
+    case 'started: GET/POST client, password/Web/Cookie sign-in, persistent Cookie store, referer-aware loads, duplicate request coalescing, bounded text request pool, transient failure retry, per-call cache-control, system/custom proxy, DoH and built-in host rules, friendly HTTP/network diagnostics, short shared response cache, persisted SpiderInfo showKey cache and showpage API fast path': return '进行中：GET/POST 客户端、密码/网页/Cookie 登录、持久化 Cookie、Referer 请求、重复请求合并、请求池、失败重试、缓存控制、代理、DoH、内置 hosts、网络诊断、共享响应缓存及 showpage API 快速路径';
+    case 'started: GalleryListParser, GalleryDetailParser, GalleryPageParser and TopListParser': return '进行中：GalleryListParser、GalleryDetailParser、GalleryPageParser 与 TopListParser';
+    case 'started: Android-style drawer hierarchy, settings-hosted sign-in flows, list/detail scenes, top-list scene, action-card header controls; GalleryCommentsScene implemented with HTML stripping, comment previews in detail page and full CommentsScene navigation in GalleryListScene/HistoryScene/TopListScene': return '进行中：Android 风格抽屉、设置内登录流程、列表/详情/排行场景和操作卡片；已实现评论 HTML 清理、详情评论预览及完整评论页面导航';
+    case 'started: drawer matches Android nav_drawer_main; all setting panels implemented; UConfig/MyTags open in embedded WebView; Filter rules managed via EhFilterStore with local preferences persistence and applied to gallery list; Export/Import data via DocumentViewPicker (cookies, settings, history, downloads, filters bundled to JSON); Identity authentication via userIAM.userAuth biometric/PIN prompt on app foreground': return '进行中：抽屉匹配 Android nav_drawer_main；已实现全部设置面板、UConfig/MyTags、过滤规则、数据导入导出及身份验证';
+    case 'started: GalleryPageParser, showpage API parser, preview-to-reader entry, previous/next, retry, zoom, fit mode, original-image toggle, info panel, first-page warmup, page cache, in-flight page coalescing, previous-page referer handoff, reader/thumb image file cache, prioritized three-slot image queue, configurable image timeout, transient image retry, partial-file cleanup, sequential adjacent preload and reading-direction tap zones': return '进行中：页面解析、showpage API、阅读入口、翻页、重试、缩放、适配模式、原图切换、信息面板、预热、缓存、请求合并、Referer 传递、图片队列、超时重试、残留清理、相邻页预载及阅读方向点击区域';
+    case 'started: viewed gallery details are persisted, listed, reopened, removed and cleared': return '进行中：已支持浏览历史的持久化、列表显示、重新打开、删除与清空';
+    case 'started: preferences-backed download queue and labels, detail-page enqueue/remove, Downloads scene, search, status/label filters, sorting, foreground queue runner, resume existing page files, page/image fetch progress, app-files gallery folder output, start/stop-all state transitions and finished cleanup': return '进行中：已支持持久化下载队列与标签、详情页加入/移除、下载页面、搜索过滤排序、前台队列、断点续传、进度显示、画廊目录输出、批量启停与完成项清理';
     case 'Signing in...': return '正在登录...';
     default: return text;
   }
@@ -2198,7 +2456,8 @@ export function downloadQueueSummary(items: DownloadInfo[]): string {
       failed++;
     }
   }
-  return 'W ' + wait.toString() + ' / D ' + active.toString() + ' / OK ' + done.toString() + ' / F ' + failed.toString();
+  return uiText('Waiting') + ' ' + wait.toString() + ' / ' + uiText('Downloading') + ' ' + active.toString() +
+    ' / ' + uiText('Downloaded') + ' ' + done.toString() + ' / ' + uiText('Failed') + ' ' + failed.toString();
 }
 
 export function routeTitle(route: GalleryRoute): string {

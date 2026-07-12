@@ -293,7 +293,7 @@ export struct TagGroupRow {
 
   build() {
     Row() {
-      Text(this.group.namespace)
+      Text(uiText(this.group.namespace))
         .fontSize(14)
         .fontColor(themeSecondaryText())
         .width(80)

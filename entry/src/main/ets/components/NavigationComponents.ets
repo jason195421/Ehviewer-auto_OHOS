@@ -75,7 +75,7 @@ export struct EhDrawer {
 
         Row() {
           // Avatar
-          Text(this.signedIn ? 'EH' : '?')
+          Text(this.signedIn ? uiText('EH') : '?')
             .fontSize(22)
             .fontWeight(FontWeight.Bold)
             .fontColor(themePrimaryColor())
@@ -86,7 +86,7 @@ export struct EhDrawer {
             .borderRadius(26)
 
           Column() {
-            Text('EhViewer')
+            Text(uiText('EhViewer'))
               .fontSize(17)
               .fontWeight(FontWeight.Bold)
               .fontColor(themeOnPrimaryText())

@@ -56,7 +56,7 @@ export struct DetailActions {
           DetailActionItem({
             symbolIcon: $r('sys.symbol.save'),
             label: this.isDetailLoaded && this.detail.torrentCount > 0 ?
-              'Torrent (' + this.detail.torrentCount.toString() + ')' : 'Torrent',
+              uiText('Torrent') + ' (' + this.detail.torrentCount.toString() + ')' : uiText('Torrent'),
             isActive: this.isDetailLoaded && this.detail.torrentCount > 0 && this.detail.torrentUrl.length > 0,
             onTap: this.onTorrent
           })
@@ -68,7 +68,7 @@ export struct DetailActions {
           })
           DetailActionItem({
             symbolIcon: $r('sys.symbol.arrow_down_circle'),
-            label: 'H@H',
+            label: uiText('H@H'),
             isActive: this.isDetailLoaded && this.detail.archiveUrl.length > 0,
             onTap: this.onHath
           })

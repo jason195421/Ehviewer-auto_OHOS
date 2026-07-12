@@ -4,7 +4,6 @@ import {
   cachePreviewThumbnail,
   createEmptyPreview,
   readerLocalImageSource,
-  shouldUseChineseUi,
   uiText
 } from '../../shared/EhShared';
 import {
@@ -81,9 +80,7 @@ export struct DetailPreviews {
         .fontColor(themePrimaryText())
         .width('100%')
       Text(!this.isDetailLoaded ? uiText('Loading previews...') :
-        (shouldUseChineseUi() ? this.previews.length.toString() + ' 个缩略图 / ' +
-          this.previewTotalPages().toString() + ' 页' :
-          this.previews.length.toString() + ' thumbnails / ' + this.previewTotalPages().toString() + ' pages'))
+        uiText(this.previews.length.toString() + ' thumbnails / ' + this.previewTotalPages().toString() + ' pages'))
         .fontSize(12)
         .fontColor(this.isDetailLoaded && this.previewTotalPages() > 1 ? themePrimaryColor() : themeSecondaryText())
         .width('100%')

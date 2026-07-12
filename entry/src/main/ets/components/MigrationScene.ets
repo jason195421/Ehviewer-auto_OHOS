@@ -1,5 +1,6 @@
 import { MigrationTask, migrationTasks } from '../services/MigrationStatus';
 import { applyAppChromeImmersiveMode } from '../services/EhWindowImmersive';
+import { uiText } from '../shared/EhShared';
 import { themePrimaryText, themeSecondaryText, themeSuccessText, themeSurface } from '../shared/EhTheme';
 
 @Component
@@ -13,20 +14,20 @@ export struct MigrationScene {
       ForEach(migrationTasks, (task: MigrationTask) => {
         ListItem() {
           Column() {
-            Text(task.name)
+            Text(uiText(task.name))
               .fontSize(15)
               .fontWeight(FontWeight.Medium)
               .fontColor(themePrimaryText())
-            Text(task.source)
+            Text(uiText(task.source))
               .fontSize(12)
               .fontColor(themeSecondaryText())
               .margin({ top: 6 })
             Row() {
-              Text(task.target)
+              Text(uiText(task.target))
                 .fontSize(12)
                 .fontColor(themeSecondaryText())
                 .layoutWeight(1)
-              Text(task.status)
+              Text(uiText(task.status))
                 .fontSize(12)
                 .fontColor(task.status.startsWith('started') || task.status.startsWith('done') ? themeSuccessText() :
                   themeSecondaryText())

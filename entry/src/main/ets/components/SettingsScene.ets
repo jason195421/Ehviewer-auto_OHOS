@@ -982,7 +982,7 @@ export struct SettingsScene {
         this.showToast(result.message);
       }
     }).catch((error: Error) => {
-      this.statusText = '检查更新失败: ' + error.message;
+      this.statusText = 'Check for updates failed: ' + error.message;
     });
   }
 

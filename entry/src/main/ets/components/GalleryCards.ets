@@ -401,7 +401,7 @@ export struct GalleryThumb {
           SymbolGlyph($r('sys.symbol.xmark'))
             .fontSize(22)
             .fontColor([themePlaceholderColor()])
-          Text('EH')
+          Text(uiText('EH'))
             .fontSize(10)
             .fontColor(themePlaceholderColor())
         }

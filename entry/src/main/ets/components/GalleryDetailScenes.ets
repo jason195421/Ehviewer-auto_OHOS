@@ -9,6 +9,7 @@ import {
   createEmptyDetail,
   galleryDisplayTitle,
   shouldShowTagTranslations,
+  uiStatusText,
   uiText
 } from '../shared/EhShared';
 import { themePageBackground, themeScrimColor } from '../shared/EhTheme';
@@ -648,7 +649,7 @@ struct TagVoteWideButton {
         SymbolGlyph(this.symbolIcon)
           .fontSize(22)
           .fontColor([this.enabledValue ? this.accentColor : themeInactiveActionText()])
-        Text(this.label)
+        Text(uiText(this.label))
           .fontSize(14)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.enabledValue ? themePrimaryText() : themeInactiveActionText())
@@ -746,7 +747,7 @@ struct ArchiveOptionsOverlay {
     if (this.mode === 'torrent') {
       return uiText('Torrents');
     }
-    return this.mode === 'hath' ? 'H@H' : uiText('Archive');
+    return this.mode === 'hath' ? uiText('H@H') : uiText('Archive');
   }
 
   private emptyText(): string {
@@ -808,7 +809,7 @@ struct ArchiveOptionsOverlay {
         .padding({ left: 18, right: 18, top: 16, bottom: 12 })
 
         if (this.statusText.length > 0 || this.archiverInfo.funds.length > 0) {
-          Text(this.statusText.length > 0 ? uiText(this.statusText) : this.archiverInfo.funds)
+          Text(this.statusText.length > 0 ? uiStatusText(this.statusText) : this.archiverInfo.funds)
             .fontSize(13)
             .fontColor(themeSecondaryText())
             .width('100%')

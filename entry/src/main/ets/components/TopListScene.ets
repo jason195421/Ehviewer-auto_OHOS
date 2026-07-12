@@ -25,7 +25,7 @@ import {
   themeSurface,
   themeTransparentColor
 } from '../shared/EhTheme';
-import { LANGUAGE_REVISION_KEY, STATUS_BAR_HEIGHT_KEY, setActiveBackHandler, runDetailBackHandler, createEmptyDetail, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneGalleryDetail, cloneGalleryInfo, cloneTopListDetail, nextFloatingToolbarOffset, topListChipColor, currentGallerySite } from '../shared/EhShared';
+import { LANGUAGE_REVISION_KEY, STATUS_BAR_HEIGHT_KEY, setActiveBackHandler, runDetailBackHandler, createEmptyDetail, createEmptyTopListDetail, createEmptyTopListInfo, createEmptyTopListBucket, createEmptyTopListItem, cloneGalleryDetail, cloneGalleryInfo, cloneTopListDetail, nextFloatingToolbarOffset, topListChipColor, currentGallerySite, uiText } from '../shared/EhShared';
 import { GalleryListScene, GalleryListStateView } from './GalleryScenes';
 import { GalleryDetailHostScene } from './GalleryDetailHostScene';
 import { ReaderSessionScene } from './ReaderHostScene';
@@ -711,7 +711,7 @@ export struct TopListScene {
         Column() {
           FloatingToolbarHost({
             kind: 'title',
-            title: '排行',
+            title: 'Top Lists',
             requestUrl: '',
             showRefreshButton: false,
             toolbarOffsetY: this.toolbarOffsetY,
@@ -806,7 +806,7 @@ export struct TopListTabs {
     Scroll() {
       Row({ space: 8 }) {
         ForEach(this.lists, (info: TopListInfo, index: number) => {
-          Text(info.title)
+          Text(uiText(info.title))
             .height(34)
             .fontSize(12)
             .fontColor(index === this.selectedIndex ? themeOnPrimaryText() : themePrimaryColor())
@@ -939,7 +939,7 @@ export struct TopListBucketCard {
   build() {
     Column() {
       Row() {
-        Text(this.bucket.title)
+        Text(uiText(this.bucket.title))
           .fontSize(16)
           .fontWeight(FontWeight.Bold)
           .fontColor(this.canOpenBucket ? themePrimaryColor() : themePrimaryText())
@@ -950,7 +950,7 @@ export struct TopListBucketCard {
               this.onOpenBucket(this.bucket);
             }
           })
-        Text(this.bucket.items.length.toString() + ' entries')
+        Text(this.bucket.items.length.toString() + ' ' + uiText('entries'))
           .fontSize(12)
           .fontColor(themeSecondaryText())
       }

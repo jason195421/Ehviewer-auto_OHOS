@@ -3,7 +3,6 @@ import { GalleryDetail } from '../../model/GalleryModels';
 import {
   categoryName,
   createEmptyDetail,
-  shouldUseChineseUi,
   uiText
 } from '../../shared/EhShared';
 import {
@@ -32,14 +31,14 @@ export struct DetailInfoBlock {
     if (this.detail.pages <= 0) {
       return '-';
     }
-    return this.detail.pages.toString() + (shouldUseChineseUi() ? ' 页' : ' pages');
+    return uiText(this.detail.pages.toString() + ' pages');
   }
 
   private favoriteText(): string {
     if (!this.isDetailLoaded) {
       return uiText('Loading...');
     }
-    return this.detail.favoriteCount.toString() + (shouldUseChineseUi() ? ' 次收藏' : ' favored');
+    return uiText(this.detail.favoriteCount.toString() + ' favored');
   }
 
   private languageText(): string {

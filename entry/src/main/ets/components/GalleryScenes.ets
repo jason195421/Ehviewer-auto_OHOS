@@ -3240,7 +3240,7 @@ struct ImageSearchPanel {
     try {
       const options = new picker.DocumentSelectOptions();
       options.maxSelectNumber = 1;
-      options.fileSuffixFilters = ['图片(.jpg,.jpeg,.png,.webp,.gif)|.jpg,.jpeg,.png,.webp,.gif'];
+      options.fileSuffixFilters = [uiText('Images') + '(.jpg,.jpeg,.png,.webp,.gif)|.jpg,.jpeg,.png,.webp,.gif'];
       const documentPicker = new picker.DocumentViewPicker(context);
       const uris = await documentPicker.select(options);
       if (uris.length > 0) {
@@ -4744,7 +4744,7 @@ export struct GalleryListContent {
 
         Column({ space: 10 }) {
           if (this.useSeekJumpPanel()) {
-            Text('Jump/Seek')
+            Text(uiText('Jump/Seek'))
               .fontSize(15)
               .fontWeight(FontWeight.Medium)
               .fontColor(themePrimaryText())

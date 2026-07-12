@@ -68,6 +68,7 @@ import {
   readerStartIndexAsync,
   readerPageImageCacheKey,
   saveGalleryToHistory,
+  uiStatusText,
   uiText
 } from '../shared/EhShared';
 import {
@@ -526,7 +527,7 @@ export struct GalleryDetailHostScene {
 
   private showToast(message: string): void {
     try {
-      this.getUIContext().getPromptAction().showToast({ message: uiText(message) });
+      this.getUIContext().getPromptAction().showToast({ message: uiStatusText(message) });
     } catch (error) {
     }
   }

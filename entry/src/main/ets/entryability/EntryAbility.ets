@@ -414,12 +414,12 @@ export default class EntryAbility extends UIAbility {
 
   private identityAuthTitle(authType: userAuth.UserAuthType): string {
     if (authType === userAuth.UserAuthType.PIN) {
-      return 'EhViewer ' + uiText('Password first');
+      return uiText('EhViewer') + ' ' + uiText('Password first');
     }
     if (authType === userAuth.UserAuthType.FACE) {
-      return 'EhViewer ' + uiText('Face first');
+      return uiText('EhViewer') + ' ' + uiText('Face first');
     }
-    return 'EhViewer ' + uiText('Fingerprint first');
+    return uiText('EhViewer') + ' ' + uiText('Fingerprint first');
   }
 
   private shouldTryNextIdentityAuthType(resultCode: number): boolean {

@@ -6,7 +6,7 @@ import {
   FILTER_MODE_UPLOADER
 } from '../services/EhFilterStore';
 import { ehTagTranslationStore } from '../services/EhTagTranslationStore';
-import { shouldShowTagTranslations, shouldUseChineseUi, uiText } from '../shared/EhShared';
+import { shouldShowTagTranslations, uiText } from '../shared/EhShared';
 import { sortedStringKey, toggleStringValue } from '../shared/StringCollectionSupport';
 import {
   themeDangerText,
@@ -141,7 +141,7 @@ export struct FilterPanel {
     if (rule.mode === FILTER_MODE_RATING) {
       const value = Number.parseInt(rule.text);
       if (!Number.isNaN(value) && value > 1) {
-        return shouldUseChineseUi() ? value.toString() + '星以下' : 'Below ' + value.toString() + ' stars';
+        return uiText('Below ' + value.toString() + ' stars');
       }
       return rule.text;
     }
