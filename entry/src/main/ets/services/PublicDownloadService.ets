@@ -1,6 +1,7 @@
 import { common } from '@kit.AbilityKit';
 import { request } from '@kit.BasicServicesKit';
 import { fileIo as fs } from '@kit.CoreFileKit';
+import { GalleryInfo, GallerySite } from '../model/GalleryModels';
 import { ehCookieStore } from './EhCookieStore';
 import { ehAppLog } from './EhAppLog';
 import {
@@ -9,6 +10,11 @@ import {
   ensureDownloadNotificationEnabled,
   publishDownloadResultNotification
 } from './DownloadNotificationSupport';
+import { importDownloadedArchiveAndRegister } from './DownloadZipImportService';
+import { getMainWindow } from './EhWindowImmersive';
+import { uiStatusText, uiText } from '../shared/EhShared';
+import { ehDownloadFileStore } from './EhDownloadFileStore';
+import { themePrimaryColor, themeSecondaryText } from '../shared/EhTheme';
 
 const DOWNLOAD_USER_AGENT: string = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36';
@@ -23,7 +29,8 @@ export interface PublicDownloadStartResult {
 }
 
 export async function startPublicDownload(context: common.UIAbilityContext, url: string, referer: string,
-  directory: string, fileName: string, title: string): Promise<PublicDownloadStartResult> {
+  directory: string, fileName: string, title: string, gallery?: GalleryInfo,
+  site: GallerySite = GallerySite.E): Promise<PublicDownloadStartResult> {
   try {
     ensureDirectory(directory);
     const path = uniqueDownloadPath(directory, sanitizeFileName(fileName));
@@ -63,8 +70,7 @@ export async function startPublicDownload(context: common.UIAbilityContext, url:
     const task = await request.agent.create(context, config);
     const completed = (_progress: request.agent.Progress): void => {
       const saved = finishPublicDownload(context, task, cachePath, path, completed, failed);
-      publishDownloadResultNotification(context, notificationId, displayName,
-        saved ? 'Download completed' : 'Download failed', saved ? directory : '').catch(() => {});
+      finishArchiveImport(context, path, directory, notificationId, displayName, saved, gallery, site);
     };
     const failed = (_progress: request.agent.Progress): void => {
       ehAppLog.error(context, 'PublicDownload', 'Download task failed tid=' + task.tid + ', target=' + path);
@@ -85,6 +91,49 @@ export async function startPublicDownload(context: common.UIAbilityContext, url:
     return { taskId: task.tid, path: path };
   } catch (error) {
     throw new Error(String(error));
+  }
+}
+
+function finishArchiveImport(context: common.UIAbilityContext, path: string, directory: string,
+  notificationId: number, displayName: string, saved: boolean, gallery: GalleryInfo | undefined,
+  site: GallerySite): void {
+  if (!saved) {
+    publishDownloadResultNotification(context, notificationId, displayName, 'Download failed').catch(() => {});
+    return;
+  }
+  const importPromise = gallery === undefined ? Promise.resolve(0) :
+    importDownloadedArchiveAndRegister(context, path, site, gallery).catch(() => 0);
+  importPromise.then((restored: number) => {
+    if (restored > 0) {
+      showRestoredGalleryStatus(restored, path);
+    }
+    publishDownloadResultNotification(context, notificationId, displayName, 'Download completed', directory)
+      .catch(() => {});
+  }).catch(() => {});
+}
+
+function showRestoredGalleryStatus(count: number, archivePath: string): void {
+  const win = getMainWindow();
+  if (win === undefined) {
+    return;
+  }
+  try {
+    win.getUIContext().getPromptAction().showToast({
+      message: uiStatusText('Restored galleries: ' + count.toString())
+    });
+    win.getUIContext().getPromptAction().showDialog({
+      title: uiText('ZIP archives processed'),
+      message: uiStatusText('ZIP import summary: processed 1, skipped 0. Delete processed archives?'),
+      buttons: [
+        { text: uiText('Keep'), color: themeSecondaryText() },
+        { text: uiText('Delete'), color: themePrimaryColor() }
+      ]
+    }).then((data) => {
+      if (data.index === 1) {
+        ehDownloadFileStore.removeFiles([archivePath]);
+      }
+    }).catch(() => {});
+  } catch (error) {
   }
 }
 

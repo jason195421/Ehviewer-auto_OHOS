@@ -520,6 +520,26 @@ export function uiStatusText(text: string): string {
   if (text.indexOf('Restore downloads failed: ') === 0) {
     return '恢复下载项失败：' + text.substring('Restore downloads failed: '.length);
   }
+  if (text.indexOf('Restored galleries: ') >= 0 || text.indexOf('ZIP archives processed: ') >= 0 ||
+      text.indexOf('Unprocessed ZIP archives: ') >= 0) {
+    return text.replace('Restored galleries: ', '已恢复画廊：')
+      .replace('ZIP archives processed: ', '已处理压缩包：')
+      .replace(', skipped: ', '，已跳过：')
+      .replace('Unprocessed ZIP archives: ', '未处理压缩包：')
+      .replace('. Downloads access was not granted; scanned app files only', '。未授权访问下载目录，仅扫描应用文件')
+      .replace('. ', '。');
+  }
+  if (text === 'No downloaded galleries found') {
+    return '未找到可恢复的画廊';
+  }
+  if (text.indexOf('ZIP import summary: processed ') === 0) {
+    return text.replace('ZIP import summary: processed ', '已处理压缩包 ')
+      .replace(', skipped ', ' 个，已跳过 ')
+      .replace('. Delete processed archives?', ' 个。是否删除已处理的压缩包？');
+  }
+  if (text.indexOf('Deleted processed ZIP archives: ') === 0) {
+    return '已删除压缩包：' + text.substring('Deleted processed ZIP archives: '.length);
+  }
   if (text.indexOf('Export load failed: ') === 0) {
     return '导出读取数据失败：' + text.substring('Export load failed: '.length);
   }
@@ -902,6 +922,7 @@ export function zhText(text: string): string {
     case 'Migrating downloaded files...': return '正在迁移下载文件...';
     case 'Switching download location...': return '正在切换下载位置...';
     case 'Rebuilding downloaded metadata...': return '正在重建下载元数据...';
+    case 'Scanning ZIP archives...': return '正在扫描压缩包...';
     case 'Rebuilding imported history metadata...': return '正在重建导入历史元数据...';
     case 'Creating download archive...': return '正在生成下载压缩包...';
     case 'Importing Android data...': return '正在导入 Android 数据...';
@@ -1002,6 +1023,8 @@ export function zhText(text: string): string {
     case 'Label': return '标签';
     case 'Add': return '添加';
     case 'Delete': return '删除';
+    case 'Keep': return '保留';
+    case 'ZIP archives processed': return '压缩包处理完成';
     case 'New label': return '新标签';
     case 'All': return '全部';
     case 'Default': return '默认';

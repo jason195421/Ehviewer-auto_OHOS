@@ -319,6 +319,37 @@ export class EhDownloadFileStore {
     return this.scanRestoredDownloadRoot(this.downloadRoot(context));
   }
 
+  inspectRestoredGalleryDirectory(directory: string): RestoredDownloadGallery | null {
+    return this.restoredItemFromDirectory(directory, false, '');
+  }
+
+  importGalleryDirectory(context: common.UIAbilityContext, source: string, gallery: GalleryInfo): string {
+    const root = this.downloadRoot(context);
+    ensureDirectory(root);
+    const target = this.galleryDirectory(context, gallery);
+    ensureDirectory(target);
+    removeGalleryImages(target);
+    copyDirectoryTree(source, target);
+    normalizeGalleryImageNames(target);
+    this.rewriteGalleryMetadataForDirectory(target, gallery);
+    return target;
+  }
+
+  removeFiles(paths: string[]): number {
+    let removed = 0;
+    for (let i = 0; i < paths.length; i++) {
+      if (!exists(paths[i]) || isDirectory(paths[i])) {
+        continue;
+      }
+      try {
+        fs.unlinkSync(paths[i]);
+        removed++;
+      } catch (error) {
+      }
+    }
+    return removed;
+  }
+
   removeGalleryDirectory(context: common.UIAbilityContext, gallery: GalleryInfo): DownloadDirectoryScanResult {
     return removeDirectoryTree(this.downloadedGalleryDirectory(context, gallery));
   }
@@ -358,7 +389,7 @@ export class EhDownloadFileStore {
 
   private zipExportRoot(context: common.UIAbilityContext): string {
     try {
-      return this.publicDownloadRoot(context);
+      return this.publicArchiveDownloadRoot(context);
     } catch (error) {
       throw new Error('Zip export needs Downloads access. Set Settings > EH > Download location to Downloads first.');
     }
@@ -841,6 +872,51 @@ function containsNumber(values: number[], value: number): boolean {
     }
   }
   return false;
+}
+
+function normalizeGalleryImageNames(directory: string): void {
+  try {
+    const names = fs.listFileSync(directory).filter((name: string) => isSupportedImageFile(name));
+    names.sort((left: string, right: string) => left.localeCompare(right, undefined, { numeric: true }));
+    const temporaryPaths: string[] = [];
+    const extensions: string[] = [];
+    const marker = '.__ehviewer_import_' + Date.now().toString() + '_';
+    for (let i = 0; i < names.length; i++) {
+      const extension = supportedImageExtension(names[i]);
+      const temporary = directory + '/' + marker + i.toString() + extension;
+      fs.moveFileSync(directory + '/' + names[i], temporary);
+      temporaryPaths.push(temporary);
+      extensions.push(extension);
+    }
+    for (let i = 0; i < temporaryPaths.length; i++) {
+      const target = directory + '/' + pageFileName(i, extensions[i]);
+      removeFileQuietly(target);
+      fs.moveFileSync(temporaryPaths[i], target);
+    }
+  } catch (error) {
+  }
+}
+
+function removeGalleryImages(directory: string): void {
+  try {
+    const names = fs.listFileSync(directory);
+    for (let i = 0; i < names.length; i++) {
+      if (isSupportedImageFile(names[i])) {
+        removeFileQuietly(directory + '/' + names[i]);
+      }
+    }
+  } catch (error) {
+  }
+}
+
+function supportedImageExtension(name: string): string {
+  const lower = name.toLowerCase();
+  for (let i = 0; i < SUPPORTED_IMAGE_EXTENSIONS.length; i++) {
+    if (lower.endsWith(SUPPORTED_IMAGE_EXTENSIONS[i])) {
+      return SUPPORTED_IMAGE_EXTENSIONS[i];
+    }
+  }
+  return '.jpg';
 }
 
 function galleryArchiveUri(gallery: GalleryInfo): string {

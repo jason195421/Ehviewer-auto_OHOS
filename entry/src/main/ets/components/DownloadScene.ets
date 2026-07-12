@@ -15,7 +15,11 @@ import {
 import { ehDownloadManager } from '../services/EhDownloadManager';
 import { DownloadInfo, DownloadState, ehDownloadStore } from '../services/EhDownloadStore';
 import { ehSettingsStore } from '../services/EhSettingsStore';
-import { DownloadMetadataRestoreResult, rebuildRestoredDownloadMetadata } from '../services/DownloadMetadataRestore';
+import { rebuildRestoredDownloadMetadata } from '../services/DownloadMetadataRestore';
+import {
+  DownloadZipImportResult,
+  importPublicDownloadArchives
+} from '../services/DownloadZipImportService';
 import {
   confirmCellularNetworkWarningForSession,
   shouldConfirmCellularNetworkOperation
@@ -984,16 +988,21 @@ export struct DownloadScene {
         downloadsAccess = await this.ensurePublicDownloadAccess(context);
       }
       await ehDownloadStore.load(context);
+      this.statusText = 'Scanning ZIP archives...';
+      this.showBlockingBusy('Scanning ZIP archives...');
+      const zipResult: DownloadZipImportResult = downloadsAccess ?
+        await importPublicDownloadArchives(context, currentGallerySite()) : {
+          found: 0,
+          processed: 0,
+          skipped: 0,
+          processedPaths: [],
+          importedGalleries: []
+        };
       const restored: RestoredDownloadGallery[] = ehDownloadFileStore.restoreDownloadedGalleries(context);
       this.statusText = 'Rebuilding downloaded metadata...';
       this.showBlockingBusy('Rebuilding downloaded metadata...');
-      const metadataResult: DownloadMetadataRestoreResult =
-        await rebuildRestoredDownloadMetadata(context, restored, currentGallerySite());
-      let added = 0;
-      let updated = 0;
-      let migrated = 0;
+      await rebuildRestoredDownloadMetadata(context, restored, currentGallerySite());
       for (let i = 0; i < restored.length; i++) {
-        const existed = ehDownloadStore.contains(restored[i].gallery.gid);
         const item = ehDownloadStore.addGallery(restored[i].gallery, '');
         if (item !== null) {
           const total = Math.max(restored[i].total, restored[i].finished);
@@ -1002,27 +1011,33 @@ export struct DownloadScene {
           ehDownloadStore.setProgress(item.gid, restored[i].finished, total,
             restored[i].finished * DOWNLOAD_PAGE_PROGRESS_SCALE);
           ehDownloadStore.setStorage(item.gid, restored[i].directory, restored[i].fileSize);
-          if (restored[i].migrated === true) {
-            migrated++;
-          }
-          if (existed) {
-            updated++;
-          } else {
-            added++;
-          }
         }
       }
       await ehDownloadStore.save(context);
       this.hideBlockingBusy();
-      let message = 'Restored ' + added.toString() + ' added, ' + updated.toString() + ' updated, ' +
-        migrated.toString() + ' migrated, ' + metadataResult.rebuilt.toString() + ' metadata rebuilt';
-      if (metadataResult.fetched > 0) {
-        message += ', ' + metadataResult.fetched.toString() + ' fetched';
+      const statusParts: string[] = [];
+      if (restored.length > 0) {
+        statusParts.push('Restored galleries: ' + restored.length.toString());
       }
+      if (zipResult.found > 0) {
+        if (zipResult.processed > 0) {
+          statusParts.push('ZIP archives processed: ' + zipResult.processed.toString() + ', skipped: ' +
+            zipResult.skipped.toString());
+        } else {
+          statusParts.push('Unprocessed ZIP archives: ' + zipResult.skipped.toString());
+        }
+      }
+      if (statusParts.length <= 0) {
+        statusParts.push('No downloaded galleries found');
+      }
+      let message = statusParts.join('. ');
       if (!downloadsAccess) {
         message += '. Downloads access was not granted; scanned app files only';
       }
       this.showFloatingStatus(message);
+      if (zipResult.processed > 0) {
+        this.showDeleteProcessedZipDialog(zipResult);
+      }
     }).catch((error: Error) => {
       this.hideBlockingBusy();
       this.showFloatingStatus('Restore failed: ' + error.message);
@@ -1806,6 +1821,31 @@ export struct DownloadScene {
         this.updateSceneContentWidth(areaDimensionToVp(newArea.width, (value: number) => this.getUIContext().px2vp(value)));
       })
     }
+  }
+
+  private showDeleteProcessedZipDialog(result: DownloadZipImportResult): void {
+    const message = uiStatusText('ZIP import summary: processed ' + result.processed.toString() + ', skipped ' +
+      result.skipped.toString() + '. Delete processed archives?');
+    this.getUIContext().getPromptAction().showDialog({
+      title: uiText('ZIP archives processed'),
+      message: message,
+      buttons: [
+        {
+          text: uiText('Keep'),
+          color: themeSecondaryText()
+        },
+        {
+          text: uiText('Delete'),
+          color: themePrimaryColor()
+        }
+      ]
+    }).then((data) => {
+      if (data.index !== 1) {
+        return;
+      }
+      const removed = ehDownloadFileStore.removeFiles(result.processedPaths);
+      this.showFloatingStatus('Deleted processed ZIP archives: ' + removed.toString());
+    }).catch(() => {});
   }
 }
 

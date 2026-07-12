@@ -1153,7 +1153,7 @@ export struct GalleryDetailHostScene {
     const title = this.detail.title.length > 0 ? this.detail.title : this.detail.gid.toString();
     const fileName = title + ' (' + this.detail.gid.toString() + ').zip';
     return startPublicDownload(context, url, detailArchiveReferer(this.detail, this.detailLink.site), directory,
-      fileName, title);
+      fileName, title, this.detail, this.detailLink.site);
   }
 
   private async ensurePublicDownloadDirectory(context: common.UIAbilityContext): Promise<string> {
