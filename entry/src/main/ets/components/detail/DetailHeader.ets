@@ -18,25 +18,50 @@ import {
   themeOnPrimaryText,
   themePrimaryColor
 } from '../../shared/EhTheme';
-import { GalleryThumb } from '../GalleryCards';
+import { GalleryThumb, galleryThumbnailAspectRatio } from '../GalleryCards';
 import { copyTextToClipboard } from './DetailInfo';
 @Component
 export struct DetailHeader {
-  @Prop detail: GalleryDetail = createEmptyDetail();
+  @Prop @Watch('onDetailChange') detail: GalleryDetail = createEmptyDetail();
   @Prop downloadText: string = 'Download';
   onDownload: () => void = () => {};
   onRead: () => void = () => {};
   onUploaderSearch: () => void = () => {};
   onCategorySearch: () => void = () => {};
+  @State coverAspectRatio: number = 0.75;
+
+  aboutToAppear(): void {
+    this.syncCoverAspectRatio();
+  }
+
+  onDetailChange(): void {
+    this.syncCoverAspectRatio();
+  }
+
+  private syncCoverAspectRatio(): void {
+    this.coverAspectRatio = galleryThumbnailAspectRatio(this.detail);
+  }
+
+  private updateCoverAspectRatio(aspectRatio: number): void {
+    if (Math.abs(this.coverAspectRatio - aspectRatio) < 0.001) {
+      return;
+    }
+    this.coverAspectRatio = aspectRatio;
+  }
 
   build() {
     Column() {
       Row({ space: 10 }) {
         GalleryThumb({
           url: this.detail.thumb === undefined ? '' : this.detail.thumb,
-          widthValue: this.detailThumbWidth(),
-          heightValue: this.detailThumbHeight()
+          widthValue: 0,
+          heightValue: 0,
+          onImageAspectRatio: (aspectRatio: number) => {
+            this.updateCoverAspectRatio(aspectRatio);
+          }
         })
+          .width(this.detailThumbWidth())
+          .aspectRatio(this.coverAspectRatio)
         Column() {
           Text(galleryDisplayTitle(this.detail))
             .fontSize(detailTitleFontSize())
@@ -101,19 +126,15 @@ export struct DetailHeader {
     return $r('sys.symbol.save');
   }
 
-  private detailThumbHeight(): number {
+  private detailThumbWidth(): number {
     const maxLines = detailTitleMaxLines();
     if (maxLines <= 3) {
-      return 160;
+      return 117;
     }
     if (maxLines >= 6) {
-      return 188;
+      return 137;
     }
-    return 176;
-  }
-
-  private detailThumbWidth(): number {
-    return Math.round(this.detailThumbHeight() * 0.73);
+    return 128;
   }
 }
 

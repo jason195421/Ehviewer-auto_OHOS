@@ -28,16 +28,37 @@ import {
 } from '../shared/EhTheme';
 
 const GALLERY_THUMB_LOCAL_SOURCE_CACHE: Map<string, string> = new Map<string, string>();
+const GALLERY_THUMB_ASPECT_RATIO_CACHE: Map<string, number> = new Map<string, number>();
 
-export function galleryThumbnailAspectRatio(gallery: GalleryInfo): number {
-  if (gallery.thumbWidth <= 0 || gallery.thumbHeight <= 0) {
+interface GalleryImageCompleteEvent {
+  width: number;
+  height: number;
+  componentWidth: number;
+  componentHeight: number;
+  loadingStatus: number;
+}
+
+function normalizedThumbnailAspectRatio(width: number, height: number): number {
+  if (width <= 0 || height <= 0) {
     return 0.75;
   }
-  const ratio = gallery.thumbWidth / gallery.thumbHeight;
+  const ratio = width / height;
   if (Number.isNaN(ratio) || ratio <= 0) {
     return 0.75;
   }
   return Math.max(0.3, Math.min(2.5, ratio));
+}
+
+export function galleryThumbnailAspectRatio(gallery: GalleryInfo): number {
+  if (gallery.thumbWidth > 0 && gallery.thumbHeight > 0) {
+    return normalizedThumbnailAspectRatio(gallery.thumbWidth, gallery.thumbHeight);
+  }
+  const thumbnailUrl = gallery.thumb === undefined ? '' : gallery.thumb;
+  const cachedRatio = GALLERY_THUMB_ASPECT_RATIO_CACHE.get(thumbnailUrl);
+  if (cachedRatio !== undefined) {
+    return cachedRatio;
+  }
+  return 0.75;
 }
 
 @Component
@@ -334,6 +355,7 @@ export struct GalleryThumb {
   widthValue: number = 86;
   heightValue: number = 118;
   radiusValue: number = 4;
+  onImageAspectRatio: (aspectRatio: number) => void = (_aspectRatio: number) => {};
 
   @State localUrl: string = '';
   @State loadFailed: boolean = false;
@@ -415,6 +437,14 @@ export struct GalleryThumb {
           .objectFit(ImageFit.Cover)
           .syncLoad(false)
           .borderRadius(this.radiusValue)
+          .onComplete((event?: GalleryImageCompleteEvent) => {
+            if (event === undefined || event.width <= 0 || event.height <= 0) {
+              return;
+            }
+            const aspectRatio = normalizedThumbnailAspectRatio(event.width, event.height);
+            GALLERY_THUMB_ASPECT_RATIO_CACHE.set(this.url, aspectRatio);
+            this.onImageAspectRatio(aspectRatio);
+          })
           .onError(() => {
             this.loadFailed = true;
           })
@@ -433,12 +463,32 @@ export struct GalleryThumb {
 @Component
 @Reusable
 export struct GalleryThumbCard {
-  @Prop gallery: GalleryInfo = createEmptyGallery();
+  @Prop @Watch('onGalleryChange') gallery: GalleryInfo = createEmptyGallery();
   @Prop selected: boolean = false;
   onLongPress: (gallery: GalleryInfo) => void = (_gallery: GalleryInfo) => {
   };
   @StorageProp(HISTORY_READ_REVISION_KEY) historyReadRevision: number = 0;
   @StorageProp(GALLERY_TITLE_REVISION_KEY) galleryTitleRevision: number = 0;
+  @State resolvedThumbnailAspectRatio: number = 0.75;
+
+  aboutToAppear(): void {
+    this.syncThumbnailAspectRatio();
+  }
+
+  onGalleryChange(): void {
+    this.syncThumbnailAspectRatio();
+  }
+
+  private syncThumbnailAspectRatio(): void {
+    this.resolvedThumbnailAspectRatio = galleryThumbnailAspectRatio(this.gallery);
+  }
+
+  private updateThumbnailAspectRatio(aspectRatio: number): void {
+    if (Math.abs(this.resolvedThumbnailAspectRatio - aspectRatio) < 0.001) {
+      return;
+    }
+    this.resolvedThumbnailAspectRatio = aspectRatio;
+  }
 
   private readPageText(): string {
     if (this.historyReadRevision < 0) {
@@ -462,15 +512,18 @@ export struct GalleryThumbCard {
         GalleryThumb({
           url: this.gallery.thumb === undefined ? '' : this.gallery.thumb,
           widthValue: 0,
-          heightValue: 0
+          heightValue: 0,
+          onImageAspectRatio: (aspectRatio: number) => {
+            this.updateThumbnailAspectRatio(aspectRatio);
+          }
         })
           .width('100%')
-          .aspectRatio(galleryThumbnailAspectRatio(this.gallery))
+          .aspectRatio(this.resolvedThumbnailAspectRatio)
 
         Column() {
           Column() {
             Text(galleryDisplayTitle(this.gallery))
-              .fontSize(12)
+              .fontSize(14)
               .fontWeight(FontWeight.Medium)
               .fontColor(themePrimaryText())
               .maxLines(5)
