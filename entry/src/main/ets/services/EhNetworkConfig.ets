@@ -1,4 +1,5 @@
 import { common } from '@kit.AbilityKit';
+import { deviceInfo } from '@kit.BasicServicesKit';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import { http } from '@kit.NetworkKit';
 import { connection } from '@kit.NetworkKit';
@@ -173,11 +174,41 @@ export function applyEhNetworkOptions(options: http.HttpRequestOptions, plan: Eh
 }
 
 export function applyConfiguredNetworkOptions(options: http.HttpRequestOptions): void {
-  options.usingProxy = proxyOption();
+  applyConfiguredProxyOptions(options);
   const dohUrl = currentDnsOverHttpsUrl();
   if (dohUrl.length > 0) {
     options.dnsOverHttps = dohUrl;
   }
+}
+
+export function applyConfiguredProxyOptions(options: http.HttpRequestOptions): void {
+  if (ehSettingsStore.getValue('proxy', 'System') === 'SOCKS') {
+    if (deviceInfo.apiAvailable('26.0.0')) {
+      const host = ehSettingsStore.getValue('proxy_host', '').trim();
+      const port = parseProxyPort(ehSettingsStore.getValue('proxy_port', ''));
+      if (host.length > 0 && isValidPort(port)) {
+        const socks5Proxy: http.Socks5Proxy = {
+          host: host,
+          port: port,
+          dnsStrategy: ehSettingsStore.getValue('proxy_socks_dns', 'Proxy') === 'System' ?
+            connection.Socks5DnsStrategy.SYSTEM_MODE : connection.Socks5DnsStrategy.PROXY_MODE,
+          exclusionList: parseProxyExclusionList(ehSettingsStore.getValue('proxy_exclusion_list', ''))
+        };
+        const username = ehSettingsStore.getValue('proxy_username', '').trim();
+        if (username.length > 0) {
+          socks5Proxy.username = username;
+          socks5Proxy.password = ehSettingsStore.getValue('proxy_password', '');
+        }
+        options.usingSocks5Proxy = socks5Proxy;
+        return;
+      }
+    }
+  }
+  options.usingProxy = proxyOption();
+}
+
+export function socks5ProxySupported(): boolean {
+  return deviceInfo.apiAvailable('26.0.0');
 }
 
 export function startEhDirectConnectionProbe(context?: common.UIAbilityContext): Promise<boolean> {
@@ -349,7 +380,7 @@ function proxyOption(): boolean | http.HttpProxy {
   if (proxyType === 'Off') {
     return false;
   }
-  if (proxyType === 'HTTP' || proxyType === 'SOCKS') {
+  if (proxyType === 'HTTP') {
     const host = ehSettingsStore.getValue('proxy_host', '').trim();
     const port = parseProxyPort(ehSettingsStore.getValue('proxy_port', ''));
     if (host.length > 0 && isValidPort(port)) {
@@ -367,7 +398,7 @@ function proxyOption(): boolean | http.HttpProxy {
       return proxy;
     }
   }
-  return proxyType === 'System';
+  return true;
 }
 
 function eFrontingIpForUrl(url: string, host: string): string {
@@ -540,12 +571,12 @@ async function probeFrontingIp(target: HostIpProbeTarget): Promise<HostIpQuality
       },
       expectDataType: http.HttpDataType.STRING,
       usingCache: false,
-      usingProxy: proxyOption(),
       usingProtocol: http.HttpProtocol.HTTP1_1,
       remoteValidation: 'skip',
       connectTimeout: FRONTING_PROBE_CONNECT_TIMEOUT_MS,
       readTimeout: FRONTING_PROBE_READ_TIMEOUT_MS
     };
+    applyConfiguredNetworkOptions(options);
     await requestProbeToCompletion(request, 'https://' + target.ip + '/', options);
     return {
       host: target.host,
@@ -929,14 +960,10 @@ async function probeDirectSelectedSite(): Promise<boolean> {
       },
       expectDataType: http.HttpDataType.STRING,
       usingCache: false,
-      usingProxy: proxyOption(),
       connectTimeout: DIRECT_PROBE_TIMEOUT_MS,
       readTimeout: DIRECT_PROBE_TIMEOUT_MS
     };
-    const dohUrl = currentDnsOverHttpsUrl();
-    if (dohUrl.length > 0) {
-      options.dnsOverHttps = dohUrl;
-    }
+    applyConfiguredNetworkOptions(options);
     const response = await requestProbeToCompletion(request, 'https://' + host + '/', options);
     const statusCode = Number(response.responseCode);
     return statusCode > 0 && statusCode < 500;
@@ -1103,7 +1130,8 @@ function proxySettingsKey(): string {
     ehSettingsStore.getValue('proxy_port', '') + ':' +
     ehSettingsStore.getValue('proxy_username', '') + ':' +
     hashText(ehSettingsStore.getValue('proxy_password', '')) + ':' +
-    ehSettingsStore.getValue('proxy_exclusion_list', '');
+    ehSettingsStore.getValue('proxy_exclusion_list', '') + ':' +
+    ehSettingsStore.getValue('proxy_socks_dns', 'Proxy');
 }
 
 export function currentDnsOverHttpsUrl(): string {

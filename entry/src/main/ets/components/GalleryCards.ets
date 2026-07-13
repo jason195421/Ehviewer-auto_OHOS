@@ -760,9 +760,9 @@ struct GalleryRatingStars {
   private starRow(filled: boolean) {
     Row({ space: 0 }) {
       ForEach([0, 1, 2, 3, 4], (_index: number) => {
-        SymbolGlyph(filled ? $r('sys.symbol.star_fill') : $r('sys.symbol.star'))
+        SymbolGlyph($r('sys.symbol.star_fill'))
           .fontSize(this.heightValue)
-          .fontColor([filled ? '#F4C43F' : themeSecondaryText()])
+          .fontColor([filled ? '#F4C43F' : '#B8BEC6'])
           .width(this.widthValue / 5)
           .height(this.heightValue)
       }, (index: number) => index.toString())

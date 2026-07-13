@@ -47,6 +47,7 @@ import {
   ensureEhHostRules,
   isEhDirectConnectionProbeEnabled,
   isEhFrontingBenchmarkEnabled,
+  socks5ProxySupported,
   startEhDirectConnectionProbe,
   startEhFrontingBenchmark
 } from '../services/EhNetworkConfig';
@@ -169,6 +170,7 @@ export struct SettingsScene {
   @State optionOptions: string[] = [];
   @State optionDescriptions: string[] = [];
   @State optionAllowCustomInput: boolean = false;
+  @State proxySettingsOpen: boolean = false;
   @State downloadMigrationDialogOpen: boolean = false;
   @State downloadMigrationCurrent: string = DOWNLOAD_LOCATION_APP_FILES;
   @State downloadMigrationTarget: string = DOWNLOAD_LOCATION_APP_FILES;
@@ -235,6 +237,10 @@ export struct SettingsScene {
   }
 
   private handleSystemBack(): boolean {
+    if (this.proxySettingsOpen) {
+      this.closeProxySettings();
+      return true;
+    }
     if (this.optionPickerOpen) {
       this.closeOptionPicker();
       return true;
@@ -256,6 +262,7 @@ export struct SettingsScene {
 
   private resetToTopLevel(): void {
     this.optionPickerOpen = false;
+    this.proxySettingsOpen = false;
     this.downloadMigrationDialogOpen = false;
     this.updateDialogVisible = false;
     this.webViewUrl = '';
@@ -273,6 +280,7 @@ export struct SettingsScene {
     this.restorePanelWithFade = false;
     this.activeSplitPane = SPLIT_PANE_FOCUS_RIGHT;
     this.optionPickerOpen = false;
+    this.proxySettingsOpen = false;
     if (this.panel === panel) {
       return;
     }
@@ -292,6 +300,7 @@ export struct SettingsScene {
     this.restorePanelWithFade = false;
     this.activeSplitPane = SPLIT_PANE_FOCUS_RIGHT;
     this.optionPickerOpen = false;
+    this.proxySettingsOpen = false;
     if (splitPaneModeEnabled() && this.sceneContentWidth >= SPLIT_PANE_BREAKPOINT) {
       this.panelStack = [SettingsPanel.Main, panel];
       this.panel = panel;
@@ -460,6 +469,12 @@ export struct SettingsScene {
       return;
     }
     this.commitSettingValue(key, value);
+  }
+
+  private updateSettingDraft(key: string, value: string): void {
+    if (isDirectTranslationApiKey(key)) {
+      ehSettingsStore.setValue(key, value);
+    }
   }
 
   private commitSettingValue(key: string, value: string): void {
@@ -869,9 +884,15 @@ export struct SettingsScene {
         }
       }
       this.optionOptions = options;
-      this.statusText = models.length > 0 ? 'Available models loaded' : 'No available models were returned';
+      this.showFloatingStatus(models.length > 0 ? 'Available models loaded: ' + models.length.toString() :
+        'No available models were returned');
     }).catch((error: Error) => {
-      this.showFloatingStatus('Available models could not be loaded: ' + error.message);
+      const message = cleanErrorMessage(error);
+      if (message === 'Translation API key is missing' || message === 'No custom translation API is selected') {
+        this.showFloatingStatus(message);
+      } else {
+        this.showFloatingStatus('Model list request failed: ' + message);
+      }
     });
   }
 
@@ -951,6 +972,10 @@ export struct SettingsScene {
     }
     if (key === 'network_diagnostics') {
       this.runNetworkDiagnostics();
+      return true;
+    }
+    if (key === 'proxy_settings') {
+      this.openProxySettings();
       return true;
     }
     if (key === 'restore_download_items') {
@@ -1483,6 +1508,58 @@ export struct SettingsScene {
     });
   }
 
+  private openProxySettings(): void {
+    this.optionPickerOpen = false;
+    this.proxySettingsOpen = true;
+    this.activeSplitPane = SPLIT_PANE_FOCUS_RIGHT;
+    this.statusText = '';
+  }
+
+  private closeProxySettings(): void {
+    this.proxySettingsOpen = false;
+    this.restoreBackHandler();
+  }
+
+  private saveProxySettings(type: string, host: string, port: string, username: string, password: string,
+    exclusions: string, socksDns: string): void {
+    const normalizedType = normalizeProxyOption(type);
+    if (normalizedType === 'SOCKS' && !socks5ProxySupported()) {
+      this.showFloatingStatus('SOCKS5 requires HarmonyOS API 26 or later');
+      return;
+    }
+    const normalizedHost = host.trim();
+    const normalizedPort = port.trim();
+    if (normalizedType === 'HTTP' || normalizedType === 'SOCKS') {
+      if (normalizedHost.length === 0 || !isValidProxyHostText(normalizedHost)) {
+        this.showFloatingStatus(normalizedHost.length === 0 ? 'Proxy host is required' :
+          'Invalid proxy host: ' + normalizedHost);
+        return;
+      }
+      if (!isValidProxyPortText(normalizedPort)) {
+        this.showFloatingStatus('Proxy port is invalid');
+        return;
+      }
+    }
+    ehSettingsStore.setValue('proxy', normalizedType);
+    ehSettingsStore.setValue('proxy_host', normalizedHost);
+    ehSettingsStore.setValue('proxy_port', normalizedPort);
+    ehSettingsStore.setValue('proxy_username', username.trim());
+    ehSettingsStore.setValue('proxy_password', password);
+    ehSettingsStore.setValue('proxy_exclusion_list', normalizeProxyExclusionListText(exclusions));
+    ehSettingsStore.setValue('proxy_socks_dns', socksDns === 'System' ? 'System' : 'Proxy');
+    this.settingEntries = ehSettingsStore.getEntries();
+    this.settingsRenderRevision++;
+    this.closeProxySettings();
+    this.refreshNetworkRuntime();
+    const context = getAbilityContext();
+    if (context !== undefined) {
+      ehSettingsStore.save(context).catch((error: Error) => {
+        this.showFloatingStatus('Save failed: ' + error.message);
+      });
+    }
+    this.showFloatingStatus('Proxy settings saved');
+  }
+
   private showDeleteProcessedZipDialog(result: DownloadZipImportResult): void {
     const message = uiStatusText('ZIP import summary: processed ' + result.processed.toString() + ', skipped ' +
       result.skipped.toString() + '. Delete processed archives?');
@@ -1808,6 +1885,9 @@ export struct SettingsScene {
           },
           onSetSetting: (key: string, value: string) => {
             this.saveSettingValue(key, value);
+          },
+          onTextDraftChange: (key: string, value: string) => {
+            this.updateSettingDraft(key, value);
           }
         })
           .width(this.useSplitLayout() ? this.splitSidePaneWidth() : '100%')
@@ -1951,6 +2031,31 @@ export struct SettingsScene {
       }
 
       // Option picker floats on top of everything.
+      if (this.proxySettingsOpen) {
+        ProxySettingsOverlay({
+          initialType: normalizeProxyOption(ehSettingsStore.getValue('proxy', 'System')),
+          initialHost: ehSettingsStore.getValue('proxy_host', ''),
+          initialPort: ehSettingsStore.getValue('proxy_port', ''),
+          initialUsername: ehSettingsStore.getValue('proxy_username', ''),
+          initialPassword: ehSettingsStore.getValue('proxy_password', ''),
+          initialExclusions: ehSettingsStore.getValue('proxy_exclusion_list', ''),
+          initialSocksDns: ehSettingsStore.getValue('proxy_socks_dns', 'Proxy'),
+          socksSupported: socks5ProxySupported(),
+          onCancel: () => {
+            this.closeProxySettings();
+          },
+          onSave: (type: string, host: string, port: string, username: string, password: string,
+            exclusions: string, socksDns: string) => {
+            this.saveProxySettings(type, host, port, username, password, exclusions, socksDns);
+          }
+        })
+          .width(this.settingsLayerWidth())
+          .height('100%')
+          .position({ x: this.settingsLayerTranslateX(), y: 0 })
+          .zIndex(26)
+          .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
+      }
+
       if (this.optionPickerOpen) {
         SettingsOptionPanel({
           title: this.optionTitle,
@@ -2022,6 +2127,255 @@ export struct SettingsScene {
     .onAreaChange((_oldArea: Area, newArea: Area) => {
       this.updateSceneContentWidth(areaDimensionToVp(newArea.width, (value: number) => this.getUIContext().px2vp(value)));
     })
+  }
+}
+
+@Component
+struct ProxySettingsOverlay {
+  initialType: string = 'System';
+  initialHost: string = '';
+  initialPort: string = '';
+  initialUsername: string = '';
+  initialPassword: string = '';
+  initialExclusions: string = '';
+  initialSocksDns: string = 'Proxy';
+  socksSupported: boolean = false;
+  @State draftType: string = 'System';
+  @State draftHost: string = '';
+  @State draftPort: string = '';
+  @State draftUsername: string = '';
+  @State draftPassword: string = '';
+  @State draftExclusions: string = '';
+  @State draftSocksDns: string = 'Proxy';
+  onCancel: () => void = () => {};
+  onSave: (type: string, host: string, port: string, username: string, password: string,
+    exclusions: string, socksDns: string) => void = () => {};
+
+  aboutToAppear(): void {
+    this.draftType = normalizeProxyOption(this.initialType);
+    this.draftHost = this.initialHost;
+    this.draftPort = this.initialPort;
+    this.draftUsername = this.initialUsername;
+    this.draftPassword = this.initialPassword;
+    this.draftExclusions = this.initialExclusions;
+    this.draftSocksDns = this.initialSocksDns === 'System' ? 'System' : 'Proxy';
+  }
+
+  private customProxySelected(): boolean {
+    return this.draftType === 'HTTP' || this.draftType === 'SOCKS';
+  }
+
+  @Builder
+  private typeButton(type: string, label: string) {
+    Button(uiText(label), { type: ButtonType.Normal, stateEffect: type !== 'SOCKS' || this.socksSupported })
+      .height(42)
+      .layoutWeight(1)
+      .fontSize(14)
+      .fontColor(this.draftType === type ? themeOnPrimaryText() : themePrimaryText())
+      .backgroundColor(this.draftType === type ? themePrimaryColor() : themeFieldBackground())
+      .borderRadius(6)
+      .opacity(type === 'SOCKS' && !this.socksSupported ? 0.45 : 1)
+      .enabled(type !== 'SOCKS' || this.socksSupported)
+      .onClick(() => {
+        this.draftType = type;
+      })
+  }
+
+  @Builder
+  private dnsButton(value: string, summary: string) {
+    Button({ type: ButtonType.Normal, stateEffect: true }) {
+      Column({ space: 3 }) {
+        Text(uiText(value))
+          .fontSize(14)
+          .fontColor(this.draftSocksDns === value ? themeOnPrimaryText() : themePrimaryText())
+        Text(uiText(summary))
+          .fontSize(10)
+          .fontColor(this.draftSocksDns === value ? themeOnPrimaryText() : themeSecondaryText())
+          .maxLines(2)
+          .textAlign(TextAlign.Center)
+      }
+      .justifyContent(FlexAlign.Center)
+    }
+    .height(58)
+    .layoutWeight(1)
+    .backgroundColor(this.draftSocksDns === value ? themePrimaryColor() : themeFieldBackground())
+    .borderRadius(6)
+    .onClick(() => {
+      this.draftSocksDns = value;
+    })
+  }
+
+  build() {
+    Stack({ alignContent: Alignment.Center }) {
+      Column()
+        .width('100%')
+        .height('100%')
+        .backgroundColor(themeScrimColor())
+        .onClick(this.onCancel)
+
+      Column() {
+        Row() {
+          Text(uiText('Proxy'))
+            .fontSize(18)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(themePrimaryText())
+            .layoutWeight(1)
+          Button({ type: ButtonType.Circle, stateEffect: true }) {
+            SymbolGlyph($r('sys.symbol.xmark'))
+              .fontSize(18)
+              .fontColor([themePrimaryText()])
+          }
+          .width(40)
+          .height(40)
+          .backgroundColor(themeSurfaceVariant())
+          .onClick(this.onCancel)
+        }
+        .width('100%')
+
+        Scroll() {
+          Column({ space: 10 }) {
+            Text(uiText('Proxy type'))
+              .fontSize(13)
+              .fontColor(themeSecondaryText())
+              .width('100%')
+            Row({ space: 8 }) {
+              this.typeButton('Off', 'Direct')
+              this.typeButton('System', 'System')
+            }
+            .width('100%')
+            Row({ space: 8 }) {
+              this.typeButton('HTTP', 'HTTP')
+              this.typeButton('SOCKS', 'SOCKS')
+            }
+            .width('100%')
+
+            if (!this.socksSupported) {
+              Text(uiText('SOCKS5 requires HarmonyOS API 26 or later'))
+                .fontSize(12)
+                .fontColor(themeTertiaryText())
+                .lineHeight(18)
+                .width('100%')
+            }
+
+            if (this.customProxySelected()) {
+              Text(uiText('Proxy host'))
+                .fontSize(12)
+                .fontColor(themeSecondaryText())
+                .width('100%')
+              TextInput({ text: this.draftHost, placeholder: uiText('Host or IP address') })
+                .height(44)
+                .fontSize(14)
+                .fontColor(themePrimaryText())
+                .backgroundColor(themeFieldBackground())
+                .onChange((value: string) => {
+                  this.draftHost = value;
+                })
+              Text(uiText('Proxy port'))
+                .fontSize(12)
+                .fontColor(themeSecondaryText())
+                .width('100%')
+              TextInput({ text: this.draftPort, placeholder: uiText('Proxy port') })
+                .height(44)
+                .fontSize(14)
+                .fontColor(themePrimaryText())
+                .backgroundColor(themeFieldBackground())
+                .onChange((value: string) => {
+                  this.draftPort = value;
+                })
+              Text(uiText('Proxy username'))
+                .fontSize(12)
+                .fontColor(themeSecondaryText())
+                .width('100%')
+              TextInput({ text: this.draftUsername, placeholder: uiText('Optional authentication username') })
+                .height(44)
+                .fontSize(14)
+                .fontColor(themePrimaryText())
+                .backgroundColor(themeFieldBackground())
+                .onChange((value: string) => {
+                  this.draftUsername = value;
+                })
+              Text(uiText('Proxy password'))
+                .fontSize(12)
+                .fontColor(themeSecondaryText())
+                .width('100%')
+              TextInput({ text: this.draftPassword, placeholder: uiText('Optional authentication password') })
+                .height(44)
+                .type(InputType.Password)
+                .fontSize(14)
+                .fontColor(themePrimaryText())
+                .backgroundColor(themeFieldBackground())
+                .onChange((value: string) => {
+                  this.draftPassword = value;
+                })
+              Text(uiText('Proxy exclusions'))
+                .fontSize(12)
+                .fontColor(themeSecondaryText())
+                .width('100%')
+              TextInput({ text: this.draftExclusions,
+                placeholder: uiText('Comma-separated hosts that bypass the proxy') })
+                .height(44)
+                .fontSize(14)
+                .fontColor(themePrimaryText())
+                .backgroundColor(themeFieldBackground())
+                .onChange((value: string) => {
+                  this.draftExclusions = value;
+                })
+
+              if (this.draftType === 'SOCKS') {
+                Text(uiText('SOCKS5 DNS'))
+                  .fontSize(13)
+                  .fontColor(themeSecondaryText())
+                  .width('100%')
+                  .margin({ top: 2 })
+                Row({ space: 8 }) {
+                  this.dnsButton('Proxy', 'Resolve target domains through the proxy')
+                  this.dnsButton('System', 'Resolve target domains through the system')
+                }
+                .width('100%')
+              }
+            }
+          }
+          .width('100%')
+          .padding({ top: 10, bottom: 10 })
+        }
+        .layoutWeight(1)
+        .scrollBar(BarState.Auto)
+
+        Row({ space: 8 }) {
+          Button(uiText('Cancel'), { type: ButtonType.Normal, stateEffect: true })
+            .height(42)
+            .layoutWeight(1)
+            .fontSize(14)
+            .fontColor(themePrimaryText())
+            .backgroundColor(themeSurfaceVariant())
+            .borderRadius(6)
+            .onClick(this.onCancel)
+          Button(uiText('Save'), { type: ButtonType.Normal, stateEffect: true })
+            .height(42)
+            .layoutWeight(1)
+            .fontSize(14)
+            .fontColor(themeOnPrimaryText())
+            .backgroundColor(themePrimaryColor())
+            .borderRadius(6)
+            .onClick(() => {
+              this.onSave(this.draftType, this.draftHost, this.draftPort, this.draftUsername,
+                this.draftPassword, this.draftExclusions, this.draftSocksDns);
+            })
+        }
+        .width('100%')
+        .margin({ top: 8 })
+      }
+      .width('88%')
+      .height('82%')
+      .constraintSize({ maxWidth: 460, maxHeight: 650 })
+      .padding(18)
+      .backgroundColor(themeSurface())
+      .borderRadius(8)
+      .shadow({ radius: 18, color: '#33000000', offsetX: 0, offsetY: 8 })
+    }
+    .width('100%')
+    .height('100%')
+    .hitTestBehavior(HitTestMode.BLOCK_HIERARCHY)
   }
 }
 
@@ -2261,6 +2615,7 @@ export struct SettingsDetailPanel {
   onSignOut: () => void = () => {};
   onCycleSetting: (row: SettingsRowItem) => void = () => {};
   onSetSetting: (key: string, value: string) => void = () => {};
+  onTextDraftChange: (key: string, value: string) => void = () => {};
 
   build() {
     Column() {
@@ -2303,6 +2658,7 @@ export struct SettingsDetailPanel {
                 onTextChange: (key: string, value: string) => {
                   this.onSetSetting(key, value);
                 },
+                onTextDraftChange: this.onTextDraftChange,
                 onSwitchChange: (key: string, isOn: boolean) => {
                   this.onSetSetting(key, isOn ? 'On' : 'Off');
                 },
@@ -2325,6 +2681,7 @@ export struct SettingsDetailPanel {
                 onTextChange: (key: string, value: string) => {
                   this.onSetSetting(key, value);
                 },
+                onTextDraftChange: this.onTextDraftChange,
                 onSwitchChange: (key: string, isOn: boolean) => {
                   this.onSetSetting(key, isOn ? 'On' : 'Off');
                 },
@@ -2553,6 +2910,7 @@ export struct SettingsStaticRow {
   @State inputValue: string = '';
   onTap: () => void = () => {};
   onTextChange: (key: string, value: string) => void = () => {};
+  onTextDraftChange: (key: string, value: string) => void = () => {};
   onSwitchChange: (key: string, isOn: boolean) => void = () => {};
   onOptionSelect: (key: string, value: string) => void = () => {};
   private committedInputValue: string = '';
@@ -2594,6 +2952,9 @@ export struct SettingsStaticRow {
             .margin({ left: 12 })
             .onChange((value: string) => {
               this.inputValue = value;
+              if (this.row.key !== undefined && isDirectTranslationApiKey(this.row.key)) {
+                this.onTextDraftChange(this.row.key, value);
+              }
             })
             .onSubmit(() => {
               this.commitInputValue();
@@ -2730,6 +3091,19 @@ function isSecretSettingKey(key: string | undefined): boolean {
     key === 'translation_custom_api_key' || key === 'translation_gemini_api_key';
 }
 
+function isDirectTranslationApiKey(key: string): boolean {
+  return key === 'translation_deepseek_api_key' || key === 'translation_official_openai_api_key' ||
+    key === 'translation_gemini_api_key';
+}
+
+function cleanErrorMessage(error: Error): string {
+  let message = error.message.length > 0 ? error.message : String(error);
+  while (message.indexOf('Error: ') === 0) {
+    message = message.substring('Error: '.length);
+  }
+  return message;
+}
+
 function isCustomTranslationApiField(key: string): boolean {
   return key === 'translation_custom_api_name' || key === 'translation_custom_api_base_url' ||
     key === 'translation_custom_api_key' || key === 'translation_custom_api_model';
@@ -2838,7 +3212,8 @@ function settingsRowRenderKey(row: SettingsRowItem): string {
 
 function isNetworkSettingKey(key: string): boolean {
   return key === 'proxy' || key === 'proxy_host' || key === 'proxy_port' || key === 'proxy_username' ||
-    key === 'proxy_password' || key === 'proxy_exclusion_list' || key === 'built_in_hosts' ||
+    key === 'proxy_password' || key === 'proxy_exclusion_list' || key === 'proxy_socks_dns' ||
+    key === 'built_in_hosts' ||
     key === 'built_ex_hosts' || key === 'dns_over_https' || key === 'domain_fronting' ||
     key === 'auto_direct_connection' || key === 'gallery_site';
 }
@@ -2857,19 +3232,26 @@ function normalizeProxyExclusionListText(value: string): string {
 
 function proxyDiagnosticText(): string {
   const proxy = normalizeProxyOption(ehSettingsStore.getValue('proxy', 'System'));
-  if (proxy !== 'HTTP') {
+  if (proxy !== 'HTTP' && proxy !== 'SOCKS') {
     return proxy;
   }
   const host = ehSettingsStore.getValue('proxy_host', '').trim();
   const port = ehSettingsStore.getValue('proxy_port', '').trim();
   const username = ehSettingsStore.getValue('proxy_username', '').trim();
   const exclusions = ehSettingsStore.getValue('proxy_exclusion_list', '').trim();
-  let text = 'HTTP ' + (host.length > 0 ? host : '(missing host)') + ':' + (port.length > 0 ? port : '(missing port)');
+  let text = proxy + ' ' + (host.length > 0 ? host : '(missing host)') + ':' +
+    (port.length > 0 ? port : '(missing port)');
   if (username.length > 0) {
     text += ' user=' + username + ' password=***';
   }
   if (exclusions.length > 0) {
     text += ' exclusions=' + exclusions;
+  }
+  if (proxy === 'SOCKS') {
+    text += ' dns=' + ehSettingsStore.getValue('proxy_socks_dns', 'Proxy');
+    if (!socks5ProxySupported()) {
+      text += ' unavailable(api<26)';
+    }
   }
   return text;
 }

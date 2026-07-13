@@ -643,6 +643,10 @@ export function uiStatusText(text: string): string {
   if (text === 'Bookmark update failed') {
     return '书签更新失败';
   }
+  const modelCountMatch = /^Available models loaded: (\d+)$/.exec(text);
+  if (modelCountMatch !== null) {
+    return '已获取 ' + modelCountMatch[1] + ' 个可用模型';
+  }
   const composite = translateCompositeUiStatus(text);
   if (composite !== text) {
     return composite;
@@ -658,6 +662,7 @@ interface UiStatusPrefixTranslation {
 const UI_STATUS_PREFIX_TRANSLATIONS: UiStatusPrefixTranslation[] = [
   { source: 'Archive failed: ', target: '存档失败：' },
   { source: 'Available models could not be loaded: ', target: '无法获取可用模型：' },
+  { source: 'Model list request failed: ', target: '模型列表获取失败：' },
   { source: 'Comment vote failed: ', target: '评论投票失败：' },
   { source: 'Cookie load failed, using current session: ', target: 'Cookie 加载失败，继续使用当前会话：' },
   { source: 'Cover search failed: ', target: '封面搜索失败：' },
@@ -882,6 +887,25 @@ export function zhText(text: string): string {
     case 'Custom API saved': return '自定义 API 已保存';
     case 'Available models loaded': return '可用模型已加载';
     case 'No available models were returned': return '服务未返回可用模型';
+    case 'Proxy settings saved': return '代理设置已保存';
+    case 'SOCKS5 requires HarmonyOS API 26 or later': return 'SOCKS5 需要 HarmonyOS API 26 或更高版本';
+    case 'Proxy host is required': return '代理主机不能为空';
+    case 'Proxy port is invalid': return '代理端口无效';
+    case 'Proxy type': return '代理类型';
+    case 'Direct': return '直接连接';
+    case 'Proxy host': return '代理主机';
+    case 'Host or IP address': return '主机名或 IP 地址';
+    case 'Proxy port': return '代理端口';
+    case 'Proxy username': return '代理用户名';
+    case 'Optional authentication username': return '可选的认证用户名';
+    case 'Proxy password': return '代理密码';
+    case 'Optional authentication password': return '可选的认证密码';
+    case 'Proxy exclusions': return '代理排除列表';
+    case 'Comma-separated hosts that bypass the proxy': return '使用英文逗号分隔不经过代理的主机';
+    case 'SOCKS5 DNS': return 'SOCKS5 DNS';
+    case 'Resolve target domains through the proxy': return '由代理服务器解析目标域名';
+    case 'Resolve target domains through the system': return '由系统解析目标域名';
+    case 'Save': return '保存';
     case 'Translate titles': return '翻译标题';
     case 'Show original titles': return '显示原标题';
     case 'Test translation': return '测试翻译';
@@ -1209,6 +1233,7 @@ export function zhText(text: string): string {
     case 'Read cache size': return '阅读缓存大小';
     case 'App language': return '应用语言';
     case 'Proxy': return '代理';
+    case 'Configure direct, system, HTTP or SOCKS5 proxy': return '配置直接连接、系统代理、HTTP 或 SOCKS5 代理';
     case 'Network diagnostics': return '网络诊断';
     case 'Built-in hosts': return '内置 hosts';
     case 'Built EX hosts': return '内置 EX hosts';
@@ -2839,19 +2864,10 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
       optionSettingsRow('read_cache_size', 'Read cache size', 'Reader cache budget', entries,
         ['160 MB', '320 MB', '640 MB', '1 GB', '2 GB']),
       optionSettingsRow('app_language', 'App language', 'Language override', entries, ['System', 'English', 'zh-CN']),
-      optionSettingsRow('proxy', 'Proxy',
-        'Follow the system proxy by default; Off bypasses it; HTTP uses a custom proxy',
-        entries, ['System', 'Off', 'HTTP']),
+      staticSettingsRow('proxy_settings', 'Proxy',
+        'Configure direct, system, HTTP or SOCKS5 proxy', settingEntryValue(entries, 'proxy', 'System'), 'action'),
       staticSettingsRow('network_diagnostics', 'Network diagnostics', 'Test E, EX, forums and repo connectivity with current settings', 'Run', 'action'),
     ];
-    const proxyType = settingEntryValue(entries, 'proxy', 'System');
-    if (proxyType === 'HTTP' || proxyType === 'SOCKS') {
-      rows.push(textSettingsRow('proxy_host', 'Proxy host', 'Host or IP address for HTTP proxy', entries, '127.0.0.1'));
-      rows.push(textSettingsRow('proxy_port', 'Proxy port', '1-65535', entries, '8080'));
-      rows.push(textSettingsRow('proxy_username', 'Proxy username', 'Optional proxy authentication username', entries, ''));
-      rows.push(textSettingsRow('proxy_password', 'Proxy password', 'Optional proxy authentication password', entries, ''));
-      rows.push(textSettingsRow('proxy_exclusion_list', 'Proxy exclusions', 'Comma-separated hosts that should bypass the proxy', entries, 'localhost,127.0.0.1'));
-    }
     rows.push(optionSettingsRow('built_in_hosts', 'Built-in hosts', 'Force bundled host overrides; leave Off for normal Cloudflare DNS', entries, ON_OFF_OPTIONS));
     rows.push(optionSettingsRow('built_ex_hosts', 'Built EX hosts', 'Force bundled ExHentai host overrides; leave Off unless your network needs them', entries, ON_OFF_OPTIONS));
     rows.push(optionSettingsRow('dns_over_https', 'Secure DNS (DoH)', 'Resolve DNS pollution in some regions',
@@ -3160,11 +3176,8 @@ export function isValidProxyPortText(value: string): boolean {
 }
 
 export function normalizeProxyOption(value: string): string {
-  if (value === 'Off' || value === 'HTTP') {
+  if (value === 'Off' || value === 'HTTP' || value === 'SOCKS') {
     return value;
-  }
-  if (value === 'SOCKS') {
-    return 'HTTP';
   }
   return 'System';
 }

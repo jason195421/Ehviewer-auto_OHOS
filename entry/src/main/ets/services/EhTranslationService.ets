@@ -1,6 +1,6 @@
 import { http } from '@kit.NetworkKit';
 import { ehSettingsStore } from './EhSettingsStore';
-import { applyConfiguredNetworkOptions } from './EhNetworkConfig';
+import { applyConfiguredProxyOptions } from './EhNetworkConfig';
 import {
   SavedTranslationApi,
   findSavedTranslationApi,
@@ -74,6 +74,11 @@ interface ChatRequestBody {
   messages: ChatMessage[];
   stream: boolean;
   temperature: number;
+  thinking?: DeepSeekThinking;
+}
+
+interface DeepSeekThinking {
+  type: string;
 }
 
 interface ChatResponseMessage {
@@ -143,9 +148,11 @@ interface GeminiModelListResponse {
 const MAX_CACHE_ENTRIES: number = 1200;
 const MAX_ACTIVE_REQUESTS: number = 3;
 const DEFAULT_TIMEOUT_MS: number = 15000;
+const TRANSLATION_CANCELLED_MESSAGE: string = 'Translation request cancelled';
 const TRANSLATION_CACHE: TranslationCacheEntry[] = [];
 const PENDING_TRANSLATIONS: PendingTranslationEntry[] = [];
 const SLOT_WAITERS: TranslationSlotWaiter[] = [];
+const ACTIVE_TRANSLATION_HTTP_REQUESTS: http.HttpRequest[] = [];
 let activeRequests: number = 0;
 let lastTranslationErrorAt: number = 0;
 let lastTranslationErrorMessage: string = '';
@@ -159,6 +166,11 @@ export class EhTranslationService {
       this.clearCache();
     }
     AppStorage.setOrCreate<boolean>(TRANSLATION_ENABLED_KEY, enabled);
+    if (!enabled) {
+      translationSessionRevision++;
+      this.clearCache();
+      cancelTranslationRequests();
+    }
   }
 
   async translateTitle(text: string): Promise<string> {
@@ -193,7 +205,9 @@ export class EhTranslationService {
         return normalized;
       })
       .catch((error: Error) => {
-        notifyTranslationError(error);
+        if (!isTranslationCancellation(error)) {
+          notifyTranslationError(error);
+        }
         throw error;
       })
       .finally(() => {
@@ -215,7 +229,7 @@ export class EhTranslationService {
         throw new Error('Translation API key is missing');
       }
       const body = await requestText('https://generativelanguage.googleapis.com/v1beta/models',
-        http.RequestMethod.GET, '', '', apiKey);
+        http.RequestMethod.GET, '', '', apiKey, {}, false);
       const parsed = JSON.parse(body) as GeminiModelListResponse;
       const result: string[] = [];
       const models = parsed.models === undefined ? [] : parsed.models;
@@ -249,7 +263,7 @@ export class EhTranslationService {
     if (apiKey.trim().length === 0) {
       throw new Error('Translation API key is missing');
     }
-    const body = await requestText(modelsUrl(baseUrl), http.RequestMethod.GET, '', apiKey.trim());
+    const body = await requestText(modelsUrl(baseUrl), http.RequestMethod.GET, '', apiKey.trim(), '', {}, false);
     const parsed = JSON.parse(body) as ModelListResponse;
     if (!Array.isArray(parsed.data)) {
       throw new Error(parsed.error?.message === undefined ? 'Invalid model list response' : parsed.error.message);
@@ -286,7 +300,7 @@ export class EhTranslationService {
         return await this.translateWithChatApi(text, target, contentKind,
           'https://api.deepseek.com/chat/completions',
           ehSettingsStore.getValue('translation_deepseek_api_key', ''),
-          ehSettingsStore.getValue('translation_deepseek_model', 'deepseek-v4-flash'));
+          ehSettingsStore.getValue('translation_deepseek_model', 'deepseek-v4-flash'), true);
       }
       if (provider === 'OpenAI') {
         return await this.translateWithChatApi(text, target, contentKind,
@@ -473,7 +487,7 @@ export class EhTranslationService {
   }
 
   private async translateWithChatApi(text: string, target: string, contentKind: string, url: string,
-    apiKey: string, model: string): Promise<string> {
+    apiKey: string, model: string, disableThinking: boolean = false): Promise<string> {
     if (apiKey.trim().length === 0) {
       throw new Error('Translation API key is missing');
     }
@@ -489,6 +503,9 @@ export class EhTranslationService {
       stream: false,
       temperature: 0.1
     };
+    if (disableThinking) {
+      requestBody.thinking = { type: 'disabled' };
+    }
     const body = await requestText(url, http.RequestMethod.POST, JSON.stringify(requestBody), apiKey.trim());
     const parsed = JSON.parse(body) as ChatResponseBody;
     const content = parsed.choices?.[0]?.message?.content;
@@ -526,9 +543,43 @@ export class EhTranslationService {
 
 export const ehTranslationService: EhTranslationService = new EhTranslationService();
 
+function cancelTranslationRequests(): void {
+  const active = ACTIVE_TRANSLATION_HTTP_REQUESTS.splice(0, ACTIVE_TRANSLATION_HTTP_REQUESTS.length);
+  for (let i = 0; i < active.length; i++) {
+    try {
+      active[i].destroy();
+    } catch (_error) {
+    }
+  }
+  while (SLOT_WAITERS.length > 0) {
+    const waiter = SLOT_WAITERS.shift();
+    if (waiter !== undefined) {
+      waiter.resume();
+    }
+  }
+}
+
+function removeActiveTranslationRequest(request: http.HttpRequest): void {
+  const index = ACTIVE_TRANSLATION_HTTP_REQUESTS.indexOf(request);
+  if (index >= 0) {
+    ACTIVE_TRANSLATION_HTTP_REQUESTS.splice(index, 1);
+  }
+}
+
+function isTranslationCancellation(error: Error): boolean {
+  return error.message === TRANSLATION_CANCELLED_MESSAGE;
+}
+
 async function requestText(url: string, method: http.RequestMethod, body: string = '', bearerToken: string = '',
-  googleApiKey: string = '', extraHeaders: Record<string, string> = {}): Promise<string> {
+  googleApiKey: string = '', extraHeaders: Record<string, string> = {},
+  translationRequest: boolean = true): Promise<string> {
+  if (translationRequest && AppStorage.get<boolean>(TRANSLATION_ENABLED_KEY) !== true) {
+    throw new Error(TRANSLATION_CANCELLED_MESSAGE);
+  }
   const request = http.createHttp();
+  if (translationRequest) {
+    ACTIVE_TRANSLATION_HTTP_REQUESTS.push(request);
+  }
   try {
     const timeout = translationTimeoutMs();
     const headers: Record<string, string> = {
@@ -554,24 +605,51 @@ async function requestText(url: string, method: http.RequestMethod, body: string
       connectTimeout: timeout,
       readTimeout: timeout
     };
-    applyConfiguredNetworkOptions(options);
+    applyConfiguredProxyOptions(options);
     if (method === http.RequestMethod.POST) {
       options.extraData = body;
     }
     const response = await request.request(url, options);
     const statusCode = Number(response.responseCode);
     if (statusCode < 200 || statusCode >= 300) {
-      throw new Error('HTTP ' + statusCode.toString());
+      const responseBody = typeof response.result === 'string' ? response.result : '';
+      const detail = apiErrorMessage(responseBody);
+      throw new Error('HTTP ' + statusCode.toString() + (detail.length > 0 ? ': ' + detail : ''));
     }
     return response.result as string;
   } catch (error) {
+    if (translationRequest && AppStorage.get<boolean>(TRANSLATION_ENABLED_KEY) !== true) {
+      throw new Error(TRANSLATION_CANCELLED_MESSAGE);
+    }
+    if (error instanceof Error) {
+      throw error;
+    }
     throw new Error(String(error));
   } finally {
+    if (translationRequest) {
+      removeActiveTranslationRequest(request);
+    }
     try {
       request.destroy();
     } catch (_error) {
     }
   }
+}
+
+function apiErrorMessage(body: string): string {
+  if (body.length === 0) {
+    return '';
+  }
+  try {
+    const parsed = JSON.parse(body) as ChatResponseBody;
+    const message = parsed.error?.message;
+    if (typeof message === 'string' && message.trim().length > 0) {
+      return message.trim();
+    }
+  } catch (_error) {
+  }
+  const normalized = body.replace(/\s+/g, ' ').trim();
+  return normalized.length > 160 ? normalized.substring(0, 160) + '...' : normalized;
 }
 
 function translationTimeoutMs(): number {

@@ -97,6 +97,7 @@ export function defaultSettingEntries(): SettingEntry[] {
     { key: 'proxy_username', value: '' },
     { key: 'proxy_password', value: '' },
     { key: 'proxy_exclusion_list', value: '' },
+    { key: 'proxy_socks_dns', value: 'Proxy' },
     { key: 'built_in_hosts', value: 'Off' },
     { key: 'built_ex_hosts', value: 'Off' },
     { key: 'dns_over_https', value: 'Off' },
@@ -223,9 +224,6 @@ export class EhSettingsStore {
         this.setValue('network_proxy_20260613', 'Applied');
       }
       if (!hasProxyApi24Migration) {
-        if (this.getValue('proxy', 'System') === 'SOCKS') {
-          this.setValue('proxy', 'HTTP');
-        }
         this.setValue('network_proxy_20260707', 'Applied');
       }
       if (!hasPassthroughMigration) {
