@@ -3424,17 +3424,23 @@ export function galleryDetailCardThumbWidth(): number {
   return 86;
 }
 
+export function galleryDetailCardBaseHeight(): number {
+  const value = ehSettingsStore.getValue('detail_size', 'Medium');
+  const largeLayout = value === 'Large' || value === 'Loose';
+  if (value === 'Compact') {
+    return 96;
+  }
+  if (largeLayout) {
+    return 158;
+  }
+  return 124;
+}
+
 export function galleryDetailCardHeight(): number {
   const value = ehSettingsStore.getValue('detail_size', 'Medium');
   const largeLayout = value === 'Large' || value === 'Loose';
-  const extendedHeight = galleryListMode() === 'Extended' ? (largeLayout ? 31 : 25) : 0;
-  if (value === 'Compact') {
-    return 96 + extendedHeight;
-  }
-  if (largeLayout) {
-    return 158 + extendedHeight;
-  }
-  return 124 + extendedHeight;
+  const extendedHeight = galleryListMode() === 'Extended' ? (largeLayout ? 39 : 31) : 0;
+  return galleryDetailCardBaseHeight() + extendedHeight;
 }
 
 export function galleryDetailCardPreferredWidth(): number {

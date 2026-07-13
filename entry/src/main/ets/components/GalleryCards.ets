@@ -5,6 +5,7 @@ import {
   categoryColor,
   categoryName,
   createEmptyGallery,
+  galleryDetailCardBaseHeight,
   galleryDetailCardHeight,
   galleryDetailCardThumbWidth,
   gallerySimpleLanguage,
@@ -77,6 +78,10 @@ export struct GalleryListRow {
     return galleryDetailCardHeight();
   }
 
+  private detailAreaHeight(): number {
+    return galleryDetailCardBaseHeight();
+  }
+
   private cardGap(): number {
     return this.isLooseLayout() ? 8 : 6;
   }
@@ -101,7 +106,7 @@ export struct GalleryListRow {
   }
 
   private isSmallThumb(): boolean {
-    return galleryDetailCardThumbWidth() <= 70 || this.cardHeight() <= 100;
+    return galleryDetailCardThumbWidth() <= 70 || this.detailAreaHeight() <= 100;
   }
 
   private isLooseLayout(): boolean {
@@ -109,9 +114,6 @@ export struct GalleryListRow {
   }
 
   private cardThumbWidth(): number {
-    if (galleryListMode() === 'Extended') {
-      return this.cardHeight() * 0.75;
-    }
     return galleryDetailCardThumbWidth();
   }
 
@@ -184,20 +186,40 @@ export struct GalleryListRow {
   }
 
   private previewTags(): string[] {
-    if (this.gallery.simpleTags === undefined) {
-      return [];
-    }
     const tags: string[] = [];
-    for (let i = 0; i < this.gallery.simpleTags.length; i++) {
-      const normalized = this.gallery.simpleTags[i].toLowerCase();
-      if (normalized.indexOf('language:') !== 0) {
-        tags.push(this.gallery.simpleTags[i]);
+    if (this.gallery.simpleTags !== undefined) {
+      for (let i = 0; i < this.gallery.simpleTags.length && tags.length < 8; i++) {
+        this.appendPreviewTag(tags, this.gallery.simpleTags[i]);
       }
-      if (tags.length >= 6) {
-        break;
+    }
+    if (this.gallery.tagList !== undefined) {
+      for (let i = 0; i < this.gallery.tagList.length && tags.length < 8; i++) {
+        this.appendPreviewTag(tags, this.gallery.tagList[i]);
+      }
+    }
+    if (this.gallery.detailTags !== undefined) {
+      for (let i = 0; i < this.gallery.detailTags.length && tags.length < 8; i++) {
+        const group = this.gallery.detailTags[i];
+        for (let j = 0; j < group.tags.length && tags.length < 8; j++) {
+          const value = group.namespace.length > 0 ? group.namespace + ':' + group.tags[j] : group.tags[j];
+          this.appendPreviewTag(tags, value);
+        }
       }
     }
     return tags;
+  }
+
+  private appendPreviewTag(tags: string[], value: string): void {
+    const normalized = value.trim().toLowerCase();
+    if (normalized.length === 0 || normalized.indexOf('language:') === 0) {
+      return;
+    }
+    for (let i = 0; i < tags.length; i++) {
+      if (tags[i].trim().toLowerCase() === normalized) {
+        return;
+      }
+    }
+    tags.push(value.trim());
   }
 
   private readPageText(): string {
@@ -239,134 +261,152 @@ export struct GalleryListRow {
     return tag;
   }
 
-  build() {
-    Stack({ alignContent: Alignment.TopStart }) {
-      Row() {
-        GalleryThumb({
-          url: this.gallery.thumb === undefined ? '' : this.gallery.thumb,
-          widthValue: this.cardThumbWidth(),
-          heightValue: this.cardHeight(),
-          radiusValue: 6
-        })
-          .height('100%')
-
-        Column() {
-          Column() {
-            Text(galleryDisplayTitle(this.gallery))
-              .fontSize(this.titleFontSize())
-              .fontWeight(FontWeight.Medium)
-              .fontColor(themePrimaryText())
-              .lineHeight(this.titleLineHeight())
-              .maxLines(this.titleMaxLines())
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-              .width('100%')
-          }
+  @Builder
+  private detailMetadata() {
+    Row() {
+      Column({ space: this.metaGap() }) {
+        Text(this.gallery.uploader === undefined || this.gallery.uploader.length === 0 ?
+          uiText('unknown uploader') : this.gallery.uploader)
+          .fontSize(this.uploaderFontSize())
+          .fontColor(themeSecondaryText())
+          .lineHeight(this.metaLineHeight())
+          .height(this.metaLineHeight())
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
           .width('100%')
-          .height(this.titleHeight())
-          .clip(true)
-          .justifyContent(FlexAlign.Start)
-          .alignItems(HorizontalAlign.Start)
 
-        Blank()
-
-        Column() {
-            Row() {
-              Column({ space: this.metaGap() }) {
-                Text(this.gallery.uploader === undefined || this.gallery.uploader.length === 0 ?
-                  uiText('unknown uploader') : this.gallery.uploader)
-                  .fontSize(this.uploaderFontSize())
-                  .fontColor(themeSecondaryText())
-                  .lineHeight(this.metaLineHeight())
-                  .height(this.metaLineHeight())
-                  .maxLines(1)
-                  .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  .width('100%')
-
-                Row() {
-                  Text(this.languageText())
-                    .fontSize(this.metaFontSize())
-                    .fontColor(themeSecondaryText())
-                    .fontWeight(FontWeight.Medium)
-                    .lineHeight(this.metaLineHeight())
-                    .maxLines(1)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-                    .layoutWeight(1)
-                  if (this.showReadPageText()) {
-                    Text(this.readPageText())
-                      .fontSize(this.metaFontSize())
-                      .fontColor(themeSecondaryText())
-                      .fontWeight(FontWeight.Medium)
-                      .lineHeight(this.metaLineHeight())
-                      .maxLines(1)
-                      .textOverflow({ overflow: TextOverflow.Ellipsis })
-                      .margin({ left: 8 })
-                  }
-                }
-                .width('100%')
-                .height(this.metaLineHeight())
-
-                Text(this.gallery.posted === undefined ? '' : this.gallery.posted)
-                  .fontSize(this.metaFontSize())
-                  .fontColor(themeTertiaryText())
-                  .lineHeight(this.metaLineHeight())
-                  .height(this.metaLineHeight())
-                  .maxLines(1)
-                  .textOverflow({ overflow: TextOverflow.Ellipsis })
-              }
-              .alignItems(HorizontalAlign.Start)
-              .layoutWeight(1)
-
-              Column({ space: this.isLooseLayout() ? 6 : 4 }) {
-                Rating({ rating: this.gallery.rating, indicator: true })
-                  .stars(5)
-                  .stepSize(0.5)
-                  .height(this.ratingHeight())
-                  .width(this.ratingWidth())
-                CategoryBadge({
-                  category: this.gallery.category,
-                  fontSizeValue: this.categoryFontSize(),
-                  heightValue: this.categoryHeight(),
-                  horizontalPadding: this.isLooseLayout() ? 10 : 8
-                })
-              }
-              .alignItems(HorizontalAlign.End)
-              .margin({ left: this.isLooseLayout() ? 10 : 8 })
-            }
-            .width('100%')
-            .alignItems(VerticalAlign.Bottom)
-
-            if (this.isExtendedMode()) {
-              Flex({ wrap: FlexWrap.Wrap }) {
-                ForEach(this.previewTags(), (tag: string, index: number) => {
-                  GalleryTagChip({
-                    text: this.tagDisplayText(tag),
-                    backgroundColorValue: this.tagColor(index),
-                    color: this.tagTextColor(index),
-                    fontSizeValue: this.tagFontSize(),
-                    heightValue: this.tagRowHeight(),
-                    horizontalPadding: this.isLooseLayout() ? 9 : 7
-                  })
-                    .margin({ right: this.isLooseLayout() ? 6 : 4 })
-                }, (tag: string, index: number) => tag + ':' + index.toString())
-              }
-              .width('100%')
-              .height(this.tagRowHeight())
-              .clip(true)
-              .margin({ top: this.isLooseLayout() ? 6 : 4 })
-            }
+        Row() {
+          Text(this.languageText())
+            .fontSize(this.metaFontSize())
+            .fontColor(themeSecondaryText())
+            .fontWeight(FontWeight.Medium)
+            .lineHeight(this.metaLineHeight())
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .layoutWeight(1)
+          if (this.showReadPageText()) {
+            Text(this.readPageText())
+              .fontSize(this.metaFontSize())
+              .fontColor(themeSecondaryText())
+              .fontWeight(FontWeight.Medium)
+              .lineHeight(this.metaLineHeight())
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .margin({ left: 8 })
+          }
         }
         .width('100%')
-        .alignItems(HorizontalAlign.Start)
-        }
-        .height('100%')
-        .layoutWeight(1)
-        .padding({
-          left: this.isLooseLayout() ? 12 : (this.isSmallThumb() ? 8 : 10),
-          right: this.isLooseLayout() ? 10 : (this.isSmallThumb() ? 6 : 8),
-          top: this.isLooseLayout() ? 8 : (this.isSmallThumb() ? 5 : this.cardGap()),
-          bottom: this.isLooseLayout() ? 8 : (this.isSmallThumb() ? 5 : this.cardGap())
+        .height(this.metaLineHeight())
+
+        Text(this.gallery.posted === undefined ? '' : this.gallery.posted)
+          .fontSize(this.metaFontSize())
+          .fontColor(themeTertiaryText())
+          .lineHeight(this.metaLineHeight())
+          .height(this.metaLineHeight())
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+
+      Column({ space: this.isLooseLayout() ? 6 : 4 }) {
+        Rating({ rating: this.gallery.rating, indicator: true })
+          .stars(5)
+          .stepSize(0.5)
+          .height(this.ratingHeight())
+          .width(this.ratingWidth())
+        CategoryBadge({
+          category: this.gallery.category,
+          fontSizeValue: this.categoryFontSize(),
+          heightValue: this.categoryHeight(),
+          horizontalPadding: this.isLooseLayout() ? 10 : 8
         })
+      }
+      .alignItems(HorizontalAlign.End)
+      .margin({ left: this.isLooseLayout() ? 10 : 8 })
+    }
+    .width('100%')
+    .alignItems(VerticalAlign.Bottom)
+  }
+
+  @Builder
+  private detailArea() {
+    Row() {
+      GalleryThumb({
+        url: this.gallery.thumb === undefined ? '' : this.gallery.thumb,
+        widthValue: this.cardThumbWidth(),
+        heightValue: this.detailAreaHeight(),
+        radiusValue: 6
+      })
+        .height('100%')
+
+      Column() {
+        Column() {
+          Text(galleryDisplayTitle(this.gallery))
+            .fontSize(this.titleFontSize())
+            .fontWeight(FontWeight.Medium)
+            .fontColor(themePrimaryText())
+            .lineHeight(this.titleLineHeight())
+            .maxLines(this.titleMaxLines())
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .width('100%')
+        }
+        .width('100%')
+        .height(this.titleHeight())
+        .clip(true)
+        .justifyContent(FlexAlign.Start)
         .alignItems(HorizontalAlign.Start)
+
+        Blank()
+        this.detailMetadata()
+      }
+      .height('100%')
+      .layoutWeight(1)
+      .padding({
+        left: this.isLooseLayout() ? 12 : (this.isSmallThumb() ? 8 : 10),
+        right: this.isLooseLayout() ? 10 : (this.isSmallThumb() ? 6 : 8),
+        top: this.isLooseLayout() ? 8 : (this.isSmallThumb() ? 5 : this.cardGap()),
+        bottom: this.isLooseLayout() ? 8 : (this.isSmallThumb() ? 5 : this.cardGap())
+      })
+      .alignItems(HorizontalAlign.Start)
+    }
+    .width('100%')
+    .height(this.detailAreaHeight())
+  }
+
+  @Builder
+  private extendedTagArea() {
+    Flex({ wrap: FlexWrap.Wrap }) {
+      ForEach(this.previewTags(), (tag: string, index: number) => {
+        GalleryTagChip({
+          text: this.tagDisplayText(tag),
+          backgroundColorValue: this.tagColor(index),
+          color: this.tagTextColor(index),
+          fontSizeValue: this.tagFontSize(),
+          heightValue: this.tagRowHeight(),
+          horizontalPadding: this.isLooseLayout() ? 9 : 7
+        })
+          .margin({ right: this.isLooseLayout() ? 6 : 4 })
+      }, (tag: string, index: number) => tag + ':' + index.toString())
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .clip(true)
+    .padding({
+      left: this.isLooseLayout() ? 12 : 8,
+      right: this.isLooseLayout() ? 10 : 6,
+      top: this.isLooseLayout() ? 6 : 4,
+      bottom: this.isLooseLayout() ? 8 : 6
+    })
+  }
+
+  build() {
+    Stack({ alignContent: Alignment.TopStart }) {
+      Column() {
+        this.detailArea()
+        if (this.isExtendedMode()) {
+          this.extendedTagArea()
+        }
       }
       .width('100%')
       .height('100%')
