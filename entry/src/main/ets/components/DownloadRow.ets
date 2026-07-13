@@ -6,8 +6,8 @@ import {
   downloadStateLabel,
   downloadStateColor,
   galleryDisplayTitle,
-  galleryThumbHeight,
-  galleryThumbWidth,
+  galleryDetailCardHeight,
+  galleryDetailCardThumbWidth,
   ratingText,
   uiText,
   uiValue
@@ -74,8 +74,8 @@ export struct DownloadRow {
     Row() {
       GalleryThumb({
         url: this.item.thumb === undefined ? '' : this.item.thumb,
-        widthValue: galleryThumbWidth(),
-        heightValue: galleryThumbHeight()
+        widthValue: galleryDetailCardThumbWidth(),
+        heightValue: galleryDetailCardHeight()
       })
         .onClick(() => {
           this.onThumb();
@@ -173,7 +173,7 @@ export struct DownloadRow {
           .alignItems(VerticalAlign.Bottom)
         }
       }
-      .height(galleryThumbHeight())
+      .height(galleryDetailCardHeight())
       .layoutWeight(1)
       .margin({ left: 10 })
       .alignItems(HorizontalAlign.Start)
@@ -220,7 +220,7 @@ export struct DownloadRow {
         })
       }
       .width(54)
-      .height(galleryThumbHeight())
+      .height(galleryDetailCardHeight())
       .alignItems(HorizontalAlign.End)
       .margin({ left: 8 })
     }

@@ -121,8 +121,10 @@ import {
   galleryListMode,
   categoryName,
   galleryDisplayTitle,
+  galleryDetailCardHeight,
+  galleryDetailCardMinWidth,
+  galleryDetailCardPreferredWidth,
   galleryThumbnailPreferredColumnWidth,
-  galleryThumbHeight,
   toggleGalleryDownload,
   downloadButtonText,
   shouldShowTagTranslations
@@ -4206,7 +4208,7 @@ export struct GalleryListContent {
     const rows = Math.ceil(this.galleries.length / columns);
     const cardHeight = galleryListMode() === 'Thumb' ?
       Math.max(0, this.galleryCardWidth() / this.galleryThumbnailAspectRatioAverage + 69) :
-      galleryThumbHeight();
+      galleryDetailCardHeight();
     return this.searchResultStripHeight() + rows * cardHeight +
       Math.max(0, rows - 1) * this.galleryCardGap() +
       this.galleryCardGap() * 2 + (this.isLoadingMore ? 40 : 0);
@@ -4239,11 +4241,8 @@ export struct GalleryListContent {
   }
 
   private galleryCardPreferredWidth(): number {
-    if (galleryListMode() === 'Extended') {
-      return 340;
-    }
-    if (galleryListMode() === 'Detail') {
-      return 340;
+    if (galleryListMode() !== 'Thumb') {
+      return galleryDetailCardPreferredWidth();
     }
     return galleryThumbnailPreferredColumnWidth();
   }
@@ -4314,11 +4313,8 @@ export struct GalleryListContent {
   }
 
   private galleryCardMinWidth(): number {
-    if (galleryListMode() === 'Extended') {
-      return 300;
-    }
-    if (galleryListMode() === 'Detail') {
-      return 300;
+    if (galleryListMode() !== 'Thumb') {
+      return galleryDetailCardMinWidth();
     }
     return 104;
   }

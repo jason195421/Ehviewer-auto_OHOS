@@ -3,8 +3,6 @@ import {
   categoryColor,
   categoryName,
   createEmptyDetail,
-  detailTitleFontSize,
-  detailTitleMaxLines,
   galleryDisplayTitle,
   uiStatusText,
   uiText
@@ -64,10 +62,10 @@ export struct DetailHeader {
           .aspectRatio(this.coverAspectRatio)
         Column() {
           Text(galleryDisplayTitle(this.detail))
-            .fontSize(detailTitleFontSize())
+            .fontSize(18)
             .fontWeight(FontWeight.Bold)
             .fontColor(themeOnPrimaryText())
-            .maxLines(detailTitleMaxLines())
+            .maxLines(5)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .onClick(() => {
               copyTextToClipboard(galleryDisplayTitle(this.detail), this.getUIContext());
@@ -127,13 +125,6 @@ export struct DetailHeader {
   }
 
   private detailThumbWidth(): number {
-    const maxLines = detailTitleMaxLines();
-    if (maxLines <= 3) {
-      return 117;
-    }
-    if (maxLines >= 6) {
-      return 137;
-    }
     return 128;
   }
 }

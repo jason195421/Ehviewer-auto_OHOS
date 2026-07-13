@@ -31,6 +31,8 @@ export function defaultSettingEntries(): SettingEntry[] {
     { key: 'show_jpn_title', value: 'Off' },
     { key: 'default_fav_slot', value: 'Ask' },
     { key: 'show_gallery_pages', value: 'Off' },
+    { key: 'show_gallery_rating', value: 'On' },
+    { key: 'show_gallery_language', value: 'On' },
     { key: 'show_tag_translations', value: 'On' },
     { key: 'split_screen_mode', value: 'On' },
     { key: 'split_screen_ratio', value: '0.42' },

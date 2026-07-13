@@ -1155,15 +1155,19 @@ export function zhText(text: string): string {
     case 'List mode': return '列表模式';
     case 'Gallery list style from original Android preferences': return '原 Android 偏好中的画廊列表样式';
     case 'Detail size': return '详情大小';
-    case 'Gallery detail image and metadata density': return '画廊详情图片和元数据密度';
+    case 'Gallery card size in detail and extended modes': return '详情和扩展模式中的画廊卡片大小';
     case 'Thumb size': return '缩略图大小';
-    case 'Thumbnail size used in gallery rows': return '画廊行中使用的缩略图大小';
+    case 'Thumbnail column size in thumbnail mode': return '缩略图模式中的缩略图列宽';
     case 'History size': return '历史记录数量';
     case 'Maximum stored gallery history records': return '最多保存的画廊历史记录数量';
     case 'Show Japanese title': return '显示日文标题';
     case 'Prefer original title when available': return '可用时优先显示原始标题';
     case 'Show gallery pages': return '显示画廊页数';
     case 'Display page count in gallery list rows': return '在画廊列表中显示页数';
+    case 'Show gallery rating': return '显示画廊评分';
+    case 'Display rating in thumbnail cards': return '在缩略图卡片中显示画廊评分';
+    case 'Show gallery language': return '显示画廊语言';
+    case 'Display language in thumbnail cards': return '在缩略图卡片中显示画廊语言';
     case 'Show tag translations': return '显示标签翻译';
     case 'Use translated tag labels when data is available': return '有数据时使用翻译后的标签名称';
     case 'Split screen mode': return '分屏模式';
@@ -2561,18 +2565,28 @@ export function settingsPanelTitle(panel: SettingsPanel): string {
 export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, entries: SettingEntry[]): SettingsRowItem[] {
   if (panel === SettingsPanel.Eh) {
     const followSystemDarkMode = settingEntryValue(entries, 'follow_system_dark_mode', 'Off') === 'On';
-    return [
+    const listMode = settingEntryValue(entries, 'list_mode', 'Detail');
+    const rows: SettingsRowItem[] = [
       staticSettingsRow('identity_cookie', 'Identity cookies', 'View or import ipb_member_id, ipb_pass_hash and igneous', 'Session', 'action'),
       optionSettingsRow('gallery_site', 'Gallery site', 'Original setting chooses E-Hentai or ExHentai where supported', entries, ['E-Hentai', 'ExHentai']),
       staticSettingsRow('u_config', 'UConfig', 'Account configuration page, requires sign in', 'Open', 'action'),
       optionSettingsRow('use_account_default_filter', 'Use account filters', 'Use filtering options captured from UConfig', entries, ON_OFF_OPTIONS),
       staticSettingsRow('my_tags', 'My Tags', 'Manage watched and hidden tags, requires sign in', 'Open', 'action'),
       optionSettingsRow('launch_page', 'Launch page', 'Default start scene after warnings and sign-in checks', entries, ['Homepage', 'Subscription', 'What\'s Hot', 'Favorites']),
-      optionSettingsRow('list_mode', 'List mode', 'Gallery list style from original Android preferences', entries, ['Detail', 'Thumb', 'Extended']),
-      optionSettingsRow('detail_size', 'Detail size', 'Gallery detail image and metadata density', entries,
-        ['Compact', 'Medium', 'Loose']),
-      optionSettingsRow('thumb_size', 'Thumb size', 'Thumbnail size used in gallery rows', entries,
-        ['Small', 'Medium', 'Large', 'XLarge']),
+      optionSettingsRow('list_mode', 'List mode', 'Gallery list style from original Android preferences', entries, ['Detail', 'Thumb', 'Extended'])
+    ];
+    if (listMode === 'Thumb') {
+      rows.push(optionSettingsRow('thumb_size', 'Thumb size', 'Thumbnail column size in thumbnail mode', entries,
+        ['Small', 'Medium', 'Large', 'XLarge']));
+      rows.push(optionSettingsRow('show_gallery_rating', 'Show gallery rating',
+        'Display rating in thumbnail cards', entries, ON_OFF_OPTIONS));
+      rows.push(optionSettingsRow('show_gallery_language', 'Show gallery language',
+        'Display language in thumbnail cards', entries, ON_OFF_OPTIONS));
+    } else {
+      rows.push(optionSettingsRow('detail_size', 'Detail size', 'Gallery card size in detail and extended modes', entries,
+        ['Compact', 'Medium', 'Loose']));
+    }
+    rows.push(
       optionSettingsRow(HISTORY_INFO_SIZE_KEY, 'History size', 'Maximum stored gallery history records',
         entries, historyInfoSizeOptions()),
       optionSettingsRow('show_jpn_title', 'Show Japanese title', 'Prefer original title when available', entries, ON_OFF_OPTIONS),
@@ -2588,7 +2602,8 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
       staticSettingsRow('filter', 'Filter', 'Keyword/gallery filtering rules', 'Open', 'action'),
       optionSettingsRow('show_eh_limits', 'Show EH limits', 'Display account and image limits in the drawer', entries, ON_OFF_OPTIONS),
       optionSettingsRow('cellular_network_warning', 'Cellular network warning', 'Warn before network-heavy operations on mobile data', entries, ON_OFF_OPTIONS)
-    ];
+    );
+    return rows;
   }
 
   if (panel === SettingsPanel.Read) {
@@ -3358,6 +3373,14 @@ export function showGalleryPages(): boolean {
   return ehSettingsStore.getValue('show_gallery_pages', 'Off') === 'On';
 }
 
+export function showGalleryRating(): boolean {
+  return ehSettingsStore.getValue('show_gallery_rating', 'On') === 'On';
+}
+
+export function showGalleryLanguage(): boolean {
+  return ehSettingsStore.getValue('show_gallery_language', 'On') === 'On';
+}
+
 export function galleryListMode(): string {
   return ehSettingsStore.getValue('list_mode', 'Detail');
 }
@@ -3390,40 +3413,48 @@ export function galleryThumbnailPreferredColumnWidth(): number {
   return 156;
 }
 
-export function galleryThumbHeight(): number {
-  const value = ehSettingsStore.getValue('thumb_size', 'Medium');
-  if (value === 'Small') {
+export function galleryDetailCardThumbWidth(): number {
+  const value = ehSettingsStore.getValue('detail_size', 'Medium');
+  if (value === 'Compact') {
+    return 70;
+  }
+  if (value === 'Large' || value === 'Loose') {
+    return 104;
+  }
+  return 86;
+}
+
+export function galleryDetailCardHeight(): number {
+  const value = ehSettingsStore.getValue('detail_size', 'Medium');
+  if (value === 'Compact') {
     return 96;
   }
-  if (value === 'Large') {
+  if (value === 'Large' || value === 'Loose') {
     return 142;
-  }
-  if (value === 'XLarge') {
-    return 170;
   }
   return 118;
 }
 
-export function detailTitleFontSize(): number {
+export function galleryDetailCardPreferredWidth(): number {
   const value = ehSettingsStore.getValue('detail_size', 'Medium');
   if (value === 'Compact') {
-    return 16;
+    return 300;
   }
   if (value === 'Large' || value === 'Loose') {
-    return 20;
+    return 400;
   }
-  return 18;
+  return 340;
 }
 
-export function detailTitleMaxLines(): number {
+export function galleryDetailCardMinWidth(): number {
   const value = ehSettingsStore.getValue('detail_size', 'Medium');
   if (value === 'Compact') {
-    return 3;
+    return 260;
   }
   if (value === 'Large' || value === 'Loose') {
-    return 6;
+    return 340;
   }
-  return 5;
+  return 300;
 }
 
 export function readerShowProgress(): boolean {

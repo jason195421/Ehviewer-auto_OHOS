@@ -52,6 +52,7 @@ import {
   downloadStateColor,
   downloadStateLabel,
   filterDownloadItems,
+  galleryDetailCardPreferredWidth,
   galleryListMode,
   galleryThumbnailPreferredColumnWidth,
   getAbilityContext,
@@ -754,7 +755,7 @@ export struct DownloadScene {
     if (galleryListMode() === 'Thumb') {
       return galleryThumbnailPreferredColumnWidth();
     }
-    return 340;
+    return galleryDetailCardPreferredWidth();
   }
 
   private downloadCardGap(): number {

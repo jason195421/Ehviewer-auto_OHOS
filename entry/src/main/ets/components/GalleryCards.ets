@@ -5,15 +5,17 @@ import {
   categoryColor,
   categoryName,
   createEmptyGallery,
+  galleryDetailCardHeight,
+  galleryDetailCardThumbWidth,
   gallerySimpleLanguage,
   galleryDisplayTitle,
   galleryListMode,
-  galleryThumbHeight,
-  galleryThumbWidth,
   GALLERY_TITLE_REVISION_KEY,
   HISTORY_READ_REVISION_KEY,
   readerLocalImageSource,
+  showGalleryLanguage,
   showGalleryPages,
+  showGalleryRating,
   uiText
 } from '../shared/EhShared';
 import {
@@ -72,7 +74,7 @@ export struct GalleryListRow {
   @StorageProp(GALLERY_TITLE_REVISION_KEY) galleryTitleRevision: number = 0;
 
   private cardHeight(): number {
-    return galleryThumbHeight();
+    return galleryDetailCardHeight();
   }
 
   private cardGap(): number {
@@ -101,7 +103,7 @@ export struct GalleryListRow {
   }
 
   private isSmallThumb(): boolean {
-    return galleryThumbWidth() <= 70 || this.cardHeight() <= 100;
+    return galleryDetailCardThumbWidth() <= 70 || this.cardHeight() <= 100;
   }
 
   private titleFontSize(): number {
@@ -189,7 +191,7 @@ export struct GalleryListRow {
       Row() {
         GalleryThumb({
           url: this.gallery.thumb === undefined ? '' : this.gallery.thumb,
-          widthValue: galleryThumbWidth(),
+          widthValue: galleryDetailCardThumbWidth(),
           heightValue: this.cardHeight(),
           radiusValue: 6
         })
@@ -506,6 +508,48 @@ export struct GalleryThumbCard {
     return showGalleryPages() && this.gallery.pages > 0;
   }
 
+  private languageText(): string {
+    const language = gallerySimpleLanguage(this.gallery);
+    return language.length > 0 ? language : '-';
+  }
+
+  @Builder
+  private thumbnailRightMetadata() {
+    Column({ space: 1 }) {
+      if (showGalleryLanguage() && showGalleryRating() && this.showReadPageText()) {
+        Text(this.languageText())
+          .fontSize(12)
+          .fontColor(themeTertiaryText())
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+      if (this.showReadPageText()) {
+        Row({ space: 6 }) {
+          if (showGalleryLanguage() && !showGalleryRating()) {
+            Text(this.languageText())
+              .fontSize(12)
+              .fontColor(themeTertiaryText())
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          Text(this.readPageText())
+            .fontSize(13)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(themeTertiaryText())
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+      } else if (showGalleryLanguage()) {
+        Text(this.languageText())
+          .fontSize(12)
+          .fontColor(themeTertiaryText())
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+    }
+    .alignItems(HorizontalAlign.End)
+  }
+
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       Column() {
@@ -523,7 +567,7 @@ export struct GalleryThumbCard {
         Column() {
           Column() {
             Text(galleryDisplayTitle(this.gallery))
-              .fontSize(14)
+              .fontSize(15)
               .fontWeight(FontWeight.Medium)
               .fontColor(themePrimaryText())
               .maxLines(5)
@@ -535,20 +579,25 @@ export struct GalleryThumbCard {
           .alignItems(HorizontalAlign.Start)
 
           Row() {
-            CategoryBadge({ category: this.gallery.category })
-            Blank()
-            if (this.showReadPageText()) {
-              Text(this.readPageText())
-                .fontSize(11)
-                .fontColor(themeTertiaryText())
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
+            Column({ space: 2 }) {
+              if (showGalleryRating()) {
+                Rating({ rating: this.gallery.rating, indicator: true })
+                  .stars(5)
+                  .stepSize(0.5)
+                  .height(14)
+                  .width(74)
+              }
+              CategoryBadge({ category: this.gallery.category })
             }
+            .alignItems(HorizontalAlign.Start)
+            Blank()
+            this.thumbnailRightMetadata()
           }
           .width('100%')
-          .margin({ top: 4 })
+          .alignItems(VerticalAlign.Bottom)
+          .margin({ top: 6 })
         }
-        .padding({ left: 6, right: 6, top: 6, bottom: 6 })
+        .padding({ left: 8, right: 8, top: 7, bottom: 8 })
         .alignItems(HorizontalAlign.Start)
       }
 
