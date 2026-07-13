@@ -35,6 +35,8 @@ export function normalizeGalleryLanguageCode(value: string): string {
     case 'dutch': return 'NL';
     case 'ja':
     case 'japanese': return 'JA';
+    case 'ot':
+    case 'other': return 'OT';
     default: return '';
   }
 }
@@ -57,6 +59,7 @@ export function galleryLanguageCodeToName(code: string): string {
     case 'NL': return 'dutch';
     case 'JA': return 'japanese';
     case 'N/A': return 'speechless';
+    case 'OT': return 'other';
     default: return '';
   }
 }
