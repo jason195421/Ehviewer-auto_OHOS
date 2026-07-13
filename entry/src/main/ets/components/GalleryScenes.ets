@@ -200,10 +200,21 @@ interface SearchResultDraft {
   imageShowExpunged: boolean;
 }
 
+interface NestedSearchFrame {
+  draft: SearchResultDraft;
+  showDetail: boolean;
+  detailLink: GalleryDetailLink;
+  detail: GalleryDetail;
+  detailStatus: string;
+  detailRequestUrl: string;
+  detailScrollOffset: number;
+}
+
 interface GalleryListNavigationCache {
   activeSplitPane: string;
   showSearchResultScene: boolean;
   searchResultDraft: SearchResultDraft;
+  nestedSearchFrames?: NestedSearchFrame[];
   searchResultDetailOpened: boolean;
   searchOriginShowDetail: boolean;
   searchOriginDetailLink: GalleryDetailLink;
@@ -270,6 +281,29 @@ function cloneSearchResultDraft(draft: SearchResultDraft): SearchResultDraft {
     imageOnlySearchCovers: draft.imageOnlySearchCovers,
     imageShowExpunged: draft.imageShowExpunged
   };
+}
+
+function cloneNestedSearchFrame(frame: NestedSearchFrame): NestedSearchFrame {
+  return {
+    draft: cloneSearchResultDraft(frame.draft),
+    showDetail: frame.showDetail,
+    detailLink: cloneGalleryDetailLink(frame.detailLink),
+    detail: cloneGalleryDetail(frame.detail),
+    detailStatus: frame.detailStatus,
+    detailRequestUrl: frame.detailRequestUrl,
+    detailScrollOffset: frame.detailScrollOffset
+  };
+}
+
+function cloneNestedSearchFrames(frames: NestedSearchFrame[] | undefined): NestedSearchFrame[] {
+  const cloned: NestedSearchFrame[] = [];
+  if (frames === undefined) {
+    return cloned;
+  }
+  for (let i = 0; i < frames.length; i++) {
+    cloned.push(cloneNestedSearchFrame(frames[i]));
+  }
+  return cloned;
 }
 
 function cloneFavoriteCategories(categories: FavoriteCategoryInfo[]): FavoriteCategoryInfo[] {
@@ -1143,6 +1177,7 @@ export struct GalleryListScene {
   @State showSearchResultScene: boolean = false;
   @State searchResultDraft: SearchResultDraft = createEmptySearchResultDraft();
   @State searchResultDetailOpened: boolean = false;
+  @State searchResultSceneRevision: number = 0;
   @State searchMode: ListMode = ListMode.Normal;
   @State searchCategory: number = GalleryCategory.None;
   @State searchAdvancedPanelOpened: boolean = false;
@@ -1206,6 +1241,7 @@ export struct GalleryListScene {
   private searchOriginDetailRequestUrl: string = '';
   private searchOriginDetailScrollOffset: number = 0;
   private navigationCacheSuppressed: boolean = false;
+  private nestedSearchFrames: NestedSearchFrame[] = [];
 
   private cacheKey(): string {
     const mode = this.useForcedMode ? this.forcedMode.toString() : listModeForRoute(this.sourceRoute).toString();
@@ -1290,6 +1326,7 @@ export struct GalleryListScene {
     this.showSearchResultScene = this.isSearchResultScene ? false : cache.showSearchResultScene;
     this.searchResultDraft = this.isSearchResultScene ? createEmptySearchResultDraft() :
       cloneSearchResultDraft(cache.searchResultDraft);
+    this.nestedSearchFrames = this.isSearchResultScene ? [] : cloneNestedSearchFrames(cache.nestedSearchFrames);
     this.searchResultDetailOpened = this.isSearchResultScene ? false : cache.searchResultDetailOpened;
     this.searchOriginShowDetail = this.isSearchResultScene ? false : cache.searchOriginShowDetail;
     this.searchOriginDetailLink = this.isSearchResultScene ? createEmptyGalleryDetailLink() :
@@ -1355,6 +1392,7 @@ export struct GalleryListScene {
       showSearchResultScene: this.isSearchResultScene ? false : this.showSearchResultScene,
       searchResultDraft: this.isSearchResultScene ? createEmptySearchResultDraft() :
         cloneSearchResultDraft(this.searchResultDraft),
+      nestedSearchFrames: this.isSearchResultScene ? [] : cloneNestedSearchFrames(this.nestedSearchFrames),
       searchResultDetailOpened: this.isSearchResultScene ? false : this.searchResultDetailOpened,
       searchOriginShowDetail: this.isSearchResultScene ? false : this.searchOriginShowDetail,
       searchOriginDetailLink: this.isSearchResultScene ? createEmptyGalleryDetailLink() :
@@ -1408,6 +1446,7 @@ export struct GalleryListScene {
     this.searchOriginDetailStatus = '';
     this.searchOriginDetailRequestUrl = '';
     this.searchOriginDetailScrollOffset = 0;
+    this.nestedSearchFrames = [];
   }
 
   private restoreSearchOrigin(): void {
@@ -1594,6 +1633,7 @@ export struct GalleryListScene {
     this.showSearchResultScene = false;
     this.searchResultDraft = createEmptySearchResultDraft();
     this.searchResultDetailOpened = false;
+    this.searchResultSceneRevision++;
     this.clearSearchOrigin();
     this.localSearchBarVisible = false;
     this.fabExpanded = false;
@@ -2459,6 +2499,21 @@ export struct GalleryListScene {
   }
 
   private closeSearchResultScene(): void {
+    const frame = this.nestedSearchFrames.pop();
+    if (frame !== undefined) {
+      this.searchResultDraft = cloneSearchResultDraft(frame.draft);
+      this.showDetail = frame.showDetail;
+      this.detailLink = cloneGalleryDetailLink(frame.detailLink);
+      this.detail = cloneGalleryDetail(frame.detail);
+      this.detailStatus = frame.detailStatus;
+      this.detailRequestUrl = frame.detailRequestUrl;
+      this.detailScrollOffset = frame.detailScrollOffset;
+      this.searchResultDetailOpened = frame.showDetail;
+      this.activeSplitPane = frame.showDetail ? SPLIT_PANE_FOCUS_RIGHT : SPLIT_PANE_FOCUS_LEFT;
+      this.searchResultSceneRevision++;
+      this.saveNavigationCache();
+      return;
+    }
     this.showSearchResultScene = false;
     this.searchResultDraft = createEmptySearchResultDraft();
     this.restoreSearchOrigin();
@@ -2728,7 +2783,21 @@ export struct GalleryListScene {
   private openSearchResult(request: DetailSearchRequest): void {
     this.showReader = false;
     this.activeSplitPane = SPLIT_PANE_FOCUS_LEFT;
-    this.captureSearchOrigin();
+    if (this.showSearchResultScene && this.searchResultDetailOpened) {
+      this.nestedSearchFrames.push({
+        draft: cloneSearchResultDraft(this.searchResultDraft),
+        showDetail: this.showDetail,
+        detailLink: cloneGalleryDetailLink(this.detailLink),
+        detail: cloneGalleryDetail(this.detail),
+        detailStatus: this.detailStatus,
+        detailRequestUrl: this.detailRequestUrl,
+        detailScrollOffset: this.detailScrollOffset
+      });
+      this.searchResultDetailOpened = false;
+    } else {
+      this.captureSearchOrigin();
+      this.nestedSearchFrames = [];
+    }
     this.searchResultDraft = {
       keyword: request.keyword,
       mode: request.mode,
@@ -2751,6 +2820,7 @@ export struct GalleryListScene {
     this.detailStatus = request.title;
     this.fabExpanded = false;
     this.showSearchResultScene = true;
+    this.searchResultSceneRevision++;
     this.saveNavigationCache();
     setTimeout(() => {
       this.refreshSearchResultNavigationCache();
@@ -2822,35 +2892,37 @@ export struct GalleryListScene {
 
   @Builder
   private searchResultSceneContent() {
-    GalleryListScene({
-      sceneTitle: this.searchResultDraft.keyword.length > 0 ? this.searchResultDraft.keyword : 'Search',
-      listMode: 'Search',
-      sourceRoute: this.searchResultDraft.sourceRoute,
-      initialKeyword: this.searchResultDraft.keyword,
-      initialSearchMode: this.searchResultDraft.mode,
-      initialSearchCategory: this.searchResultDraft.category,
-      initialAdvancedSearchEnabled: this.searchResultDraft.advancedEnabled,
-      initialAdvanceSearch: this.searchResultDraft.advanceSearch,
-      initialMinRating: this.searchResultDraft.minRating,
-      initialPageFrom: this.searchResultDraft.pageFrom,
-      initialPageTo: this.searchResultDraft.pageTo,
-      initialSearchFilterEnabled: this.searchResultDraft.searchFilterEnabled,
-      initialSearchSubmitted: this.searchResultDraft.submitted,
-      initialSearchAdvancedPanelOpened: this.searchResultDraft.searchAdvancedPanelOpened,
-      initialImagePath: this.searchResultDraft.imagePath,
-      initialImageUseSimilarityScan: this.searchResultDraft.imageUseSimilarityScan,
-      initialImageOnlySearchCovers: this.searchResultDraft.imageOnlySearchCovers,
-      initialImageShowExpunged: this.searchResultDraft.imageShowExpunged,
-      isSearchResultScene: true,
-      delegateDetailToHost: true,
-      onOpenDetailInHost: (link: GalleryDetailLink) => {
-        this.openDetailLink(link);
-        return true;
-      },
-      onBack: () => {
-        this.closeSearchResultScene();
-      }
-    })
+    ForEach([this.searchResultSceneRevision], (_revision: number) => {
+      GalleryListScene({
+        sceneTitle: this.searchResultDraft.keyword.length > 0 ? this.searchResultDraft.keyword : 'Search',
+        listMode: 'Search',
+        sourceRoute: this.searchResultDraft.sourceRoute,
+        initialKeyword: this.searchResultDraft.keyword,
+        initialSearchMode: this.searchResultDraft.mode,
+        initialSearchCategory: this.searchResultDraft.category,
+        initialAdvancedSearchEnabled: this.searchResultDraft.advancedEnabled,
+        initialAdvanceSearch: this.searchResultDraft.advanceSearch,
+        initialMinRating: this.searchResultDraft.minRating,
+        initialPageFrom: this.searchResultDraft.pageFrom,
+        initialPageTo: this.searchResultDraft.pageTo,
+        initialSearchFilterEnabled: this.searchResultDraft.searchFilterEnabled,
+        initialSearchSubmitted: this.searchResultDraft.submitted,
+        initialSearchAdvancedPanelOpened: this.searchResultDraft.searchAdvancedPanelOpened,
+        initialImagePath: this.searchResultDraft.imagePath,
+        initialImageUseSimilarityScan: this.searchResultDraft.imageUseSimilarityScan,
+        initialImageOnlySearchCovers: this.searchResultDraft.imageOnlySearchCovers,
+        initialImageShowExpunged: this.searchResultDraft.imageShowExpunged,
+        isSearchResultScene: true,
+        delegateDetailToHost: true,
+        onOpenDetailInHost: (link: GalleryDetailLink) => {
+          this.openDetailLink(link);
+          return true;
+        },
+        onBack: () => {
+          this.closeSearchResultScene();
+        }
+      })
+    }, (revision: number) => revision.toString())
   }
 
   build() {
