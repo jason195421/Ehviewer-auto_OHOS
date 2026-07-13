@@ -78,11 +78,11 @@ export struct GalleryListRow {
   }
 
   private cardGap(): number {
-    return 6;
+    return this.isLooseLayout() ? 8 : 6;
   }
 
   private metaGap(): number {
-    return 2;
+    return this.isLooseLayout() ? 4 : 2;
   }
 
   private titleMaxLines(): number {
@@ -90,7 +90,10 @@ export struct GalleryListRow {
   }
 
   private titleLineHeight(): number {
-    return this.isSmallThumb() ? 18 : 19;
+    if (this.isSmallThumb()) {
+      return 18;
+    }
+    return this.isLooseLayout() ? 21 : 19;
   }
 
   private titleHeight(): number {
@@ -101,28 +104,83 @@ export struct GalleryListRow {
     return galleryDetailCardThumbWidth() <= 70 || this.cardHeight() <= 100;
   }
 
+  private isLooseLayout(): boolean {
+    return galleryDetailCardThumbWidth() >= 104;
+  }
+
+  private cardThumbWidth(): number {
+    if (galleryListMode() === 'Extended') {
+      return this.cardHeight() * 0.75;
+    }
+    return galleryDetailCardThumbWidth();
+  }
+
   private titleFontSize(): number {
-    return this.isSmallThumb() ? 14 : 15;
+    if (this.isSmallThumb()) {
+      return 14;
+    }
+    return this.isLooseLayout() ? 17 : 15;
   }
 
   private uploaderFontSize(): number {
-    return this.isSmallThumb() ? 11 : 12;
+    if (this.isSmallThumb()) {
+      return 11;
+    }
+    return this.isLooseLayout() ? 14 : 12;
   }
 
   private metaFontSize(): number {
-    return this.isSmallThumb() ? 11 : 13;
+    if (this.isSmallThumb()) {
+      return 11;
+    }
+    return this.isLooseLayout() ? 14 : 13;
   }
 
   private metaLineHeight(): number {
-    return this.isSmallThumb() ? 14 : 16;
+    if (this.isSmallThumb()) {
+      return 14;
+    }
+    return this.isLooseLayout() ? 20 : 16;
   }
 
-  private sideMetaVisible(): boolean {
-    return !this.isSmallThumb();
+  private ratingHeight(): number {
+    if (this.isSmallThumb()) {
+      return 14;
+    }
+    return this.isLooseLayout() ? 18 : 16;
   }
 
-  private hasTags(): boolean {
-    return galleryListMode() === 'Extended' && this.previewTags().length > 0;
+  private ratingWidth(): number {
+    if (this.isSmallThumb()) {
+      return 76;
+    }
+    return this.isLooseLayout() ? 96 : 86;
+  }
+
+  private categoryFontSize(): number {
+    if (this.isSmallThumb()) {
+      return 12;
+    }
+    return this.isLooseLayout() ? 14 : 13;
+  }
+
+  private categoryHeight(): number {
+    if (this.isSmallThumb()) {
+      return 21;
+    }
+    return this.isLooseLayout() ? 25 : 23;
+  }
+
+  private tagFontSize(): number {
+    return this.isLooseLayout() ? 14 : 12;
+  }
+
+  private tagRowHeight(): number {
+    return this.isLooseLayout() ? 25 : 21;
+  }
+
+  private isExtendedMode(): boolean {
+    return galleryListMode() === 'Extended';
   }
 
   private previewTags(): string[] {
@@ -186,7 +244,7 @@ export struct GalleryListRow {
       Row() {
         GalleryThumb({
           url: this.gallery.thumb === undefined ? '' : this.gallery.thumb,
-          widthValue: galleryDetailCardThumbWidth(),
+          widthValue: this.cardThumbWidth(),
           heightValue: this.cardHeight(),
           radiusValue: 6
         })
@@ -258,37 +316,43 @@ export struct GalleryListRow {
               .alignItems(HorizontalAlign.Start)
               .layoutWeight(1)
 
-              if (this.sideMetaVisible()) {
-                Column({ space: 4 }) {
-                  Rating({ rating: this.gallery.rating, indicator: true })
-                    .stars(5)
-                    .stepSize(0.5)
-                    .height(14)
-                    .width(74)
-                  CategoryBadge({ category: this.gallery.category })
-                }
-                .alignItems(HorizontalAlign.End)
-                .margin({ left: 8 })
+              Column({ space: this.isLooseLayout() ? 6 : 4 }) {
+                Rating({ rating: this.gallery.rating, indicator: true })
+                  .stars(5)
+                  .stepSize(0.5)
+                  .height(this.ratingHeight())
+                  .width(this.ratingWidth())
+                CategoryBadge({
+                  category: this.gallery.category,
+                  fontSizeValue: this.categoryFontSize(),
+                  heightValue: this.categoryHeight(),
+                  horizontalPadding: this.isLooseLayout() ? 10 : 8
+                })
               }
+              .alignItems(HorizontalAlign.End)
+              .margin({ left: this.isLooseLayout() ? 10 : 8 })
             }
             .width('100%')
             .alignItems(VerticalAlign.Bottom)
 
-            if (this.hasTags()) {
+            if (this.isExtendedMode()) {
               Flex({ wrap: FlexWrap.Wrap }) {
                 ForEach(this.previewTags(), (tag: string, index: number) => {
                   GalleryTagChip({
                     text: this.tagDisplayText(tag),
                     backgroundColorValue: this.tagColor(index),
-                    color: this.tagTextColor(index)
+                    color: this.tagTextColor(index),
+                    fontSizeValue: this.tagFontSize(),
+                    heightValue: this.tagRowHeight(),
+                    horizontalPadding: this.isLooseLayout() ? 9 : 7
                   })
-                    .margin({ right: 4 })
+                    .margin({ right: this.isLooseLayout() ? 6 : 4 })
                 }, (tag: string, index: number) => tag + ':' + index.toString())
               }
               .width('100%')
-              .height(21)
+              .height(this.tagRowHeight())
               .clip(true)
-              .margin({ top: 4 })
+              .margin({ top: this.isLooseLayout() ? 6 : 4 })
             }
         }
         .width('100%')
@@ -297,10 +361,10 @@ export struct GalleryListRow {
         .height('100%')
         .layoutWeight(1)
         .padding({
-          left: this.isSmallThumb() ? 8 : 10,
-          right: this.isSmallThumb() ? 6 : 8,
-          top: this.isSmallThumb() ? 5 : this.cardGap(),
-          bottom: this.isSmallThumb() ? 5 : this.cardGap()
+          left: this.isLooseLayout() ? 12 : (this.isSmallThumb() ? 8 : 10),
+          right: this.isLooseLayout() ? 10 : (this.isSmallThumb() ? 6 : 8),
+          top: this.isLooseLayout() ? 8 : (this.isSmallThumb() ? 5 : this.cardGap()),
+          bottom: this.isLooseLayout() ? 8 : (this.isSmallThumb() ? 5 : this.cardGap())
         })
         .alignItems(HorizontalAlign.Start)
       }
@@ -333,14 +397,17 @@ export struct GalleryTagChip {
   @Prop text: string = '';
   @Prop backgroundColorValue: string = '#D8EEF7';
   @Prop color: string = '#205E78';
+  @Prop fontSizeValue: number = 12;
+  @Prop heightValue: number = 21;
+  @Prop horizontalPadding: number = 7;
 
   build() {
     Text(this.text)
-      .fontSize(12)
+      .fontSize(this.fontSizeValue)
       .fontWeight(FontWeight.Medium)
       .fontColor(this.color)
-      .height(21)
-      .padding({ left: 7, right: 7 })
+      .height(this.heightValue)
+      .padding({ left: this.horizontalPadding, right: this.horizontalPadding })
       .backgroundColor(this.backgroundColorValue)
       .borderRadius(3)
       .maxLines(1)
@@ -586,8 +653,8 @@ export struct GalleryThumbCard {
                 Rating({ rating: this.gallery.rating, indicator: true })
                   .stars(5)
                   .stepSize(0.5)
-                  .height(14)
-                  .width(74)
+                  .height(16)
+                  .width(86)
               }
               CategoryBadge({ category: this.gallery.category })
             }
@@ -625,14 +692,17 @@ export struct GalleryThumbCard {
 @Component
 export struct CategoryBadge {
   @Prop category: number = GalleryCategory.Unknown;
+  @Prop fontSizeValue: number = 14;
+  @Prop heightValue: number = 24;
+  @Prop horizontalPadding: number = 8;
 
   build() {
     Text(categoryName(this.category))
-      .fontSize(12)
+      .fontSize(this.fontSizeValue)
       .fontWeight(FontWeight.Bold)
       .fontColor(Color.White)
-      .height(21)
-      .padding({ left: 8, right: 8, top: 2, bottom: 2 })
+      .height(this.heightValue)
+      .padding({ left: this.horizontalPadding, right: this.horizontalPadding, top: 2, bottom: 2 })
       .backgroundColor(categoryColor(this.category))
       .borderRadius(3)
   }

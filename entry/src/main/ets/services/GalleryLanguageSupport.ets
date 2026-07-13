@@ -3,7 +3,12 @@ export function normalizeGalleryLanguageCode(value: string): string {
     case 'en':
     case 'english': return 'EN';
     case 'zh':
-    case 'chinese': return 'ZH';
+    case 'chinese':
+    case 'chinese tr':
+    case 'chinese translated': return 'ZH';
+    case 'n/a':
+    case 'na':
+    case 'speechless': return 'N/A';
     case 'es':
     case 'spanish': return 'ES';
     case 'ko':
@@ -51,6 +56,7 @@ export function galleryLanguageCodeToName(code: string): string {
     case 'HU': return 'hungarian';
     case 'NL': return 'dutch';
     case 'JA': return 'japanese';
+    case 'N/A': return 'speechless';
     default: return '';
   }
 }
