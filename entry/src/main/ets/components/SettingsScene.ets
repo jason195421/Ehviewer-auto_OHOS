@@ -720,7 +720,7 @@ export struct SettingsScene {
       return;
     }
     if (row.options === undefined || row.options.length === 0) {
-      this.statusText = row.title + ' is not migrated yet';
+      this.statusText = row.title + ' is not available yet';
       return;
     }
     if (row.type === 'switch') {
@@ -863,7 +863,7 @@ export struct SettingsScene {
       return true;
     }
     if (key === 'donate') {
-      this.statusText = 'Donate entry is retained from the original app; payment integration is not migrated yet.';
+      this.statusText = 'Donation is not available in this version.';
       return true;
     }
     if (key === 'dump_logcat') {
@@ -2133,7 +2133,7 @@ export struct SettingsDetailPanel {
             SettingsActionRow({
               title: this.signedIn ? uiText('Account session') : uiText('Sign in'),
               summary: this.signedIn ? uiText('Cookie session is available. Open to replace or inspect cookies.') :
-                uiText('Open password, WebView or Cookie sign-in. This matches the original startup sign-in flow.'),
+                uiText('Open password, WebView or Cookie sign-in and manage the current session.'),
               value: this.signedIn ? uiText('Signed in') : uiText('Tourist'),
               onTap: this.onOpenSession
             })

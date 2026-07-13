@@ -1110,7 +1110,7 @@ export function zhText(text: string): string {
     case 'Run': return '运行';
     case 'Scan': return '扫描';
     case 'Link': return '链接';
-    case 'Not migrated': return '未迁移';
+    case 'Unavailable': return '暂不可用';
     case 'Available': return '可用';
     case 'No session': return '无会话';
     case 'Theme': return '主题';
@@ -1170,16 +1170,15 @@ export function zhText(text: string): string {
     case 'Lock and local data controls': return '锁定和本地数据控制';
     case 'Network, cache, hosts and diagnostics': return '网络、缓存、hosts 和诊断';
     case 'Version and license': return '版本和许可证';
-    case 'Settings follow the original Android header groups': return '设置按原 Android 应用分组';
     case 'Account session': return '账号会话';
     case 'Cookie session is available. Open to replace or inspect cookies.': return 'Cookie 会话可用。打开后可替换或查看 Cookie。';
-    case 'Open password, WebView or Cookie sign-in. This matches the original startup sign-in flow.': return '打开密码、网页或 Cookie 登录，保持原应用启动登录流程。';
+    case 'Open password, WebView or Cookie sign-in and manage the current session.': return '使用密码、网页或 Cookie 登录并管理当前会话。';
     case 'Clear the persisted identity cookies': return '清除已保存的身份 Cookie';
-    case 'Original app cycles Light, Dark and Black from drawer/footer and Settings': return '原应用可在抽屉/底部和设置中切换亮色、暗色、黑色主题';
+    case 'Choose Light, Dark or Black for the app interface': return '选择应用界面的亮色、暗色或黑色主题';
     case 'Identity cookies': return '身份 Cookie';
     case 'View or import ipb_member_id, ipb_pass_hash and igneous': return '查看或导入 ipb_member_id、ipb_pass_hash 和 igneous';
     case 'Gallery site': return '画廊站点';
-    case 'Original setting chooses E-Hentai or ExHentai where supported': return '按原设置选择 E-Hentai 或可用时的 ExHentai';
+    case 'Select E-Hentai or ExHentai for browsing and requests': return '选择用于浏览和请求的 E-Hentai 或 ExHentai 站点';
     case 'Account configuration page, requires sign in': return '账号配置页面，需要登录';
     case 'Use account filters': return '使用账号过滤';
     case 'Use filtering options captured from UConfig': return '使用账号配置中抓取的过滤选项';
@@ -1188,7 +1187,7 @@ export function zhText(text: string): string {
     case 'Launch page': return '启动页面';
     case 'Default start scene after warnings and sign-in checks': return '警告和登录检查后的默认启动页面';
     case 'List mode': return '列表模式';
-    case 'Gallery list style from original Android preferences': return '原 Android 偏好中的画廊列表样式';
+    case 'Choose detail, thumbnail or extended gallery cards': return '选择详情、缩略图或扩展画廊卡片样式';
     case 'Detail size': return '详情大小';
     case 'Gallery card size in detail and extended modes': return '详情和扩展模式中的画廊卡片大小';
     case 'Thumb size': return '缩略图大小';
@@ -1236,11 +1235,11 @@ export function zhText(text: string): string {
     case 'Reading direction': return '阅读方向';
     case 'Left-to-right, right-to-left or vertical reader movement': return '从左到右、从右到左或纵向阅读';
     case 'Page scaling': return '页面缩放';
-    case 'Fit width, fit height or original page scaling': return '原始尺寸、匹配宽度、匹配长度、匹配屏幕或固定缩放';
+    case 'Choose how reader pages fit the screen': return '选择阅读页面适应屏幕的方式';
     case 'Start position': return '开页位置';
     case 'Where a gallery starts when opened': return '页面打开时的初始对齐位置';
     case 'Auto transfer time': return '自动翻页时间';
-    case 'Automatic next-page delay from original seekbar preference': return '原应用滑动条设置的自动下一页延迟';
+    case 'Delay before automatically advancing to the next page': return '自动翻到下一页前的等待时间';
     case 'Standalone reader': return '独立阅读器';
     case 'Open reader in a standalone ability': return '使用独立 Ability 打开阅读器';
     case 'Keep screen on': return '保持屏幕常亮';
@@ -1338,25 +1337,23 @@ export function zhText(text: string): string {
     case 'Force bundled ExHentai host overrides; leave Off unless your network needs them': return '强制使用内置 ExHentai host；仅在网络需要时开启';
     case 'Use DoH resolver': return '使用 DoH 解析器';
     case 'Resolve DNS pollution in some regions': return '解决某些地区的 DNS 污染问题';
-    case 'Original network compatibility switch': return '原应用网络兼容性开关';
     case 'Bypass SNI blocking using built-in host fronting': return '使用内置 hosts 绕过 SNI 封锁';
     case 'Use direct connection when the selected site responds within 5s': return '所选站点 5 秒内可直连时不使用 hosts 和域名前置';
     case 'Export data': return '导出数据';
     case 'Save settings, history, downloads and filter rules to a JSON file': return '将设置、历史记录、下载和过滤规则保存为 JSON 文件';
     case 'Import data': return '导入数据';
-    case 'Restore from a JSON backup or Android exported database': return '从 JSON 备份或原安卓导出数据库恢复';
+    case 'Restore settings and local data from a supported backup file': return '从支持的备份文件恢复设置和本地数据';
     case 'Wi-Fi server/client': return 'Wi-Fi 服务器/客户端';
-    case 'Original Wi-Fi transfer tools': return '原应用 Wi-Fi 传输工具';
+    case 'Transfer app data over the local network': return '通过局域网传输应用数据';
     case 'Declaration': return '声明';
-    case 'Original declaration and project notice': return '原应用声明和项目说明';
     case 'Current HarmonyOS repository': return '当前 HarmonyOS 仓库';
     case 'Author': return '作者';
     case 'xiaojieonly/Ehviewer_CN_SXJ contributors': return 'xiaojieonly/Ehviewer_CN_SXJ 贡献者';
-    case 'GitHub release for the current port': return '当前移植版 GitHub release';
+    case 'Open the latest project release': return '打开项目的最新发布版本';
     case 'Issue help': return '问题帮助';
-    case 'Issue tracker for the current port': return '当前移植版问题反馈';
+    case 'Open the project issue tracker': return '打开项目问题反馈页面';
     case 'License': return '许可证';
-    case 'Inherited from original app': return '继承自原应用';
+    case 'Open-source license used by this project': return '本项目使用的开源许可';
     case 'Version': return '版本';
     case 'Git commit': return 'Git 提交';
     case 'Branch and describe from the build workspace': return '构建工作区分支和 describe 信息';
@@ -1373,7 +1370,8 @@ export function zhText(text: string): string {
     case 'Close automatic updates': return '关闭自动更新';
     case 'Disable startup update check': return '禁用启动时更新检查';
     case 'Donate': return '捐赠';
-    case 'Original donation entry': return '原应用捐赠入口';
+    case 'Support project development': return '支持项目开发';
+    case 'Choose the app interface theme': return '选择应用界面主题';
     case 'Download items will be shown here': return '下载项会显示在这里';
     case 'No items match the current filter': return '没有符合当前过滤条件的项目';
     case 'Pull down to refresh': return '下拉刷新';
@@ -1482,7 +1480,8 @@ export function zhText(text: string): string {
     case 'Cannot parse sign in response': return '无法解析登录响应';
     case 'Captcha required; use Cookie sign in or web login later': return '需要验证码，请使用 Cookie 登录或稍后通过网页登录';
     case 'Tag is empty': return '标签为空';
-    case 'Donate entry is retained from the original app; payment integration is not migrated yet.': return '保留了原应用的捐赠入口，支付功能尚未移植。';
+    case 'Donation is not available in this version.': return '当前版本暂不支持捐赠。';
+    case 'This setting is not available yet.': return '此设置暂不可用。';
     case 'EhViewer archive download': return 'EhViewer 存档下载';
     case 'EhViewer download': return 'EhViewer 下载';
     case 'Privacy mode disabled': return '隐私模式已关闭';
@@ -2603,12 +2602,12 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
     const listMode = settingEntryValue(entries, 'list_mode', 'Detail');
     const rows: SettingsRowItem[] = [
       staticSettingsRow('identity_cookie', 'Identity cookies', 'View or import ipb_member_id, ipb_pass_hash and igneous', 'Session', 'action'),
-      optionSettingsRow('gallery_site', 'Gallery site', 'Original setting chooses E-Hentai or ExHentai where supported', entries, ['E-Hentai', 'ExHentai']),
+      optionSettingsRow('gallery_site', 'Gallery site', 'Select E-Hentai or ExHentai for browsing and requests', entries, ['E-Hentai', 'ExHentai']),
       staticSettingsRow('u_config', 'UConfig', 'Account configuration page, requires sign in', 'Open', 'action'),
       optionSettingsRow('use_account_default_filter', 'Use account filters', 'Use filtering options captured from UConfig', entries, ON_OFF_OPTIONS),
       staticSettingsRow('my_tags', 'My Tags', 'Manage watched and hidden tags, requires sign in', 'Open', 'action'),
       optionSettingsRow('launch_page', 'Launch page', 'Default start scene after warnings and sign-in checks', entries, ['Homepage', 'Subscription', 'What\'s Hot', 'Favorites']),
-      optionSettingsRow('list_mode', 'List mode', 'Gallery list style from original Android preferences', entries, ['Detail', 'Thumb', 'Extended'])
+      optionSettingsRow('list_mode', 'List mode', 'Choose detail, thumbnail or extended gallery cards', entries, ['Detail', 'Thumb', 'Extended'])
     ];
     if (listMode === 'Thumb') {
       rows.push(optionSettingsRow('thumb_size', 'Thumb size', 'Thumbnail column size in thumbnail mode', entries,
@@ -2632,7 +2631,7 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
       optionSettingsRow('theme',
         followSystemDarkMode ? 'Dark mode theme' : 'Theme',
         followSystemDarkMode ? 'Choose Dark or Black when the system enters dark mode' :
-          'Original app cycles Light, Dark and Black from drawer/footer and Settings',
+          'Choose Light, Dark or Black for the app interface',
         entries, followSystemDarkMode ? ['Dark', 'Black'] : ['Light', 'Dark', 'Black']),
       staticSettingsRow('filter', 'Filter', 'Keyword/gallery filtering rules', 'Open', 'action'),
       optionSettingsRow('show_eh_limits', 'Show EH limits', 'Display account and image limits in the drawer', entries, ON_OFF_OPTIONS),
@@ -2649,11 +2648,11 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
         continuousMode ? ['Default', 'Portrait', 'Landscape', 'Auto rotate'] :
           ['Default', 'Portrait', 'Landscape', 'Auto rotate', 'Match image']),
       optionSettingsRow('reading_direction', 'Reading direction', 'Left-to-right, right-to-left or vertical reader movement', entries, ['Left to right', 'Right to left', 'Top to bottom']),
-      optionSettingsRow('page_scaling', 'Page scaling', 'Fit width, fit height or original page scaling', entries,
+      optionSettingsRow('page_scaling', 'Page scaling', 'Choose how reader pages fit the screen', entries,
         continuousMode ? ['Actual size', 'Fit width', 'Fixed scale'] :
           ['Actual size', 'Fit width', 'Fit height', 'Fit screen', 'Fixed scale']),
       optionSettingsRow('start_position', 'Start position', 'Where a gallery starts when opened', entries, ['Top left', 'Top right', 'Bottom left', 'Bottom right', 'Center']),
-      optionSettingsRow('start_transfer_time', 'Auto transfer time', 'Automatic next-page delay from original seekbar preference', entries, readerAutoTransferTimeOptions()),
+      optionSettingsRow('start_transfer_time', 'Auto transfer time', 'Delay before automatically advancing to the next page', entries, readerAutoTransferTimeOptions()),
       optionSettingsRow('reader_standalone', 'Standalone reader', 'Open reader in a standalone ability', entries, ON_OFF_OPTIONS),
       optionSettingsRow('keep_screen_on', 'Keep screen on', 'Prevent screen sleep while reading', entries, ON_OFF_OPTIONS),
       optionSettingsRow('gallery_show_clock', 'Show clock', 'Show clock overlay in the reader', entries, ON_OFF_OPTIONS),
@@ -2765,8 +2764,8 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
     rows.push(optionSettingsRow('domain_fronting', 'Domain fronting', 'Bypass SNI blocking using built-in host fronting', entries, ON_OFF_OPTIONS));
     rows.push(optionSettingsRow('auto_direct_connection', 'Direct connection check', 'Use direct connection when the selected site responds within 5s', entries, ON_OFF_OPTIONS));
     rows.push(staticSettingsRow('export_data', 'Export data', 'Save settings, history, downloads and filter rules to a JSON file', 'Export', 'action'));
-    rows.push(staticSettingsRow('import_data', 'Import data', 'Restore from a JSON backup or Android exported database', 'Import', 'action'));
-    rows.push(staticSettingsRow('wifi_transfer', 'Wi-Fi server/client', 'Original Wi-Fi transfer tools', 'Not migrated', 'activity'));
+    rows.push(staticSettingsRow('import_data', 'Import data', 'Restore settings and local data from a supported backup file', 'Import', 'action'));
+    rows.push(staticSettingsRow('wifi_transfer', 'Wi-Fi server/client', 'Transfer app data over the local network', 'Unavailable', 'activity'));
     return rows;
   }
 
@@ -2774,16 +2773,16 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
     return [
       staticSettingsRow('declaration', 'Declaration', 'Current HarmonyOS repository', 'Info', 'message'),
       staticSettingsRow('author', 'Author', EH_AUTHOR_NAME, 'GitHub', 'url'),
-      staticSettingsRow('latest_release', 'Version', 'GitHub release for the current port', EH_RELEASE_TAG, 'url'),
-      staticSettingsRow('issue_help', 'Issue help', 'Issue tracker for the current port', 'Issues', 'url'),
-      staticSettingsRow('license', 'License', 'Inherited from original app', 'GPL-3.0', 'url'),
+      staticSettingsRow('latest_release', 'Version', 'Open the latest project release', EH_RELEASE_TAG, 'url'),
+      staticSettingsRow('issue_help', 'Issue help', 'Open the project issue tracker', 'Issues', 'url'),
+      staticSettingsRow('license', 'License', 'Open-source license used by this project', 'GPL-3.0', 'url'),
       staticSettingsRow('check_for_updates', 'Check for updates', 'Check the latest GitHub release', 'Run', 'action'),
       optionSettingsRow('close_auto_updates', 'Close automatic updates', 'Disable startup update check', entries, ON_OFF_OPTIONS),
-      staticSettingsRow('donate', 'Donate', 'Original donation entry', 'Not migrated', 'url')
+      staticSettingsRow('donate', 'Donate', 'Support project development', 'Unavailable', 'url')
     ];
   }
 
-  return [staticSettingsRow('theme', 'Theme', 'Current staged theme', themeName, 'list')];
+  return [staticSettingsRow('theme', 'Theme', 'Choose the app interface theme', themeName, 'list')];
 }
 
 const ON_OFF_OPTIONS: string[] = ['On', 'Off'];
@@ -3035,7 +3034,7 @@ export function settingMigrationMessage(key: string): string {
   if (key === 'wifi_transfer') {
     return 'Wi-Fi transfer needs a HarmonyOS local server/client implementation.';
   }
-  return 'This original app entry has not been migrated yet.';
+  return 'This setting is not available yet.';
 }
 
 export function isValidProxyPortText(value: string): boolean {

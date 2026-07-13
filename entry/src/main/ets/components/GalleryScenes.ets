@@ -4517,6 +4517,10 @@ export struct GalleryListContent {
     return (this.isSearchResultScene || this.useLocalSearchBar) && !this.searchSubmitted;
   }
 
+  private useStandardTagResultNavBar(): boolean {
+    return this.isSearchResultScene && this.searchSubmitted && this.searchModeValue === ListMode.Tag;
+  }
+
   private shouldShowSearchOnlyFab(): boolean {
     return (this.isSearchResultScene || this.useLocalSearchBar) && !this.searchSubmitted;
   }
@@ -4673,7 +4677,7 @@ export struct GalleryListContent {
   }
 
   @Builder
-  private galleryFlowItem(gallery: GalleryInfo) {
+  private galleryFlowItem(gallery: GalleryInfo, addTopSpacing: boolean = false) {
     FlowItem() {
       GalleryThumbCard({
         gallery: gallery,
@@ -4689,6 +4693,7 @@ export struct GalleryListContent {
         })
     }
     .width('100%')
+    .margin({ top: addTopSpacing ? this.galleryCardGap() : 0 })
     .reuseId('gallery-thumb-flow-item')
     .animation({ duration: 220, curve: Curve.EaseOut })
     .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
@@ -4782,8 +4787,8 @@ export struct GalleryListContent {
   @Builder
   private galleryThumbnailWaterFlow() {
     WaterFlow({ footer: this.galleryListFooter(), scroller: this.listScroller }) {
-      ForEach(this.galleries, (gallery: GalleryInfo) => {
-        this.galleryFlowItem(gallery)
+      ForEach(this.galleries, (gallery: GalleryInfo, index: number) => {
+        this.galleryFlowItem(gallery, index < this.galleryColumnCount())
       }, (gallery: GalleryInfo) => this.galleryCardKey(gallery))
     }
     .columnsTemplate(this.galleryWaterFlowColumnsTemplate())
@@ -4794,8 +4799,7 @@ export struct GalleryListContent {
     .cachedCount(10)
     .padding({
       left: this.galleryContentPadding(),
-      right: this.galleryContentPadding(),
-      top: this.galleryCardGap()
+      right: this.galleryContentPadding()
     })
     .width('100%')
     .height(this.listViewportHeight())
@@ -5247,7 +5251,7 @@ export struct GalleryListContent {
 
       // 浮动导航栏
       Column() {
-        if (this.isSearchResultScene || this.useLocalSearchBar) {
+        if ((this.isSearchResultScene || this.useLocalSearchBar) && !this.useStandardTagResultNavBar()) {
           this.searchResultNavBar()
         } else {
           EhNavBar({
@@ -5260,7 +5264,7 @@ export struct GalleryListContent {
             showFavoriteButton: this.showFavoriteButton,
             showBookmarkButton: this.showBookmarkButton,
             showRefreshButton: false,
-            showBackButton: this.showBackButton,
+            showBackButton: this.showBackButton || this.useStandardTagResultNavBar(),
             translateY: this.toolbarOffsetY,
             onMenu: () => {
               this.onMenu();

@@ -1406,11 +1406,12 @@ export struct DownloadScene {
   @Builder
   private downloadThumbnailWaterFlow() {
     WaterFlow({ scroller: this.downloadScroller }) {
-      ForEach(this.visibleItems, (item: DownloadInfo) => {
+      ForEach(this.visibleItems, (item: DownloadInfo, index: number) => {
         FlowItem() {
           this.downloadCardContent(item)
         }
         .width('100%')
+        .margin({ top: index < this.downloadColumnCount() ? this.downloadCardGap() : 0 })
         .reuseId('download-thumb-flow-item')
         .animation({ duration: 220, curve: Curve.EaseOut })
         .transition(TransitionEffect.OPACITY.animation({ duration: 160, curve: Curve.EaseInOut }))
@@ -1425,7 +1426,6 @@ export struct DownloadScene {
     .padding({
       left: this.downloadContentPadding(),
       right: this.downloadContentPadding(),
-      top: this.downloadCardGap(),
       bottom: this.downloadCardGap()
     })
     .translate({ y: this.downloadContentStartOffset() })
