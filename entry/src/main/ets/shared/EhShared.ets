@@ -3426,13 +3426,14 @@ export function galleryDetailCardThumbWidth(): number {
 
 export function galleryDetailCardHeight(): number {
   const value = ehSettingsStore.getValue('detail_size', 'Medium');
+  const extendedHeight = galleryListMode() === 'Extended' ? 25 : 0;
   if (value === 'Compact') {
-    return 96;
+    return 96 + extendedHeight;
   }
   if (value === 'Large' || value === 'Loose') {
-    return 142;
+    return 142 + extendedHeight;
   }
-  return 118;
+  return 124 + extendedHeight;
 }
 
 export function galleryDetailCardPreferredWidth(): number {

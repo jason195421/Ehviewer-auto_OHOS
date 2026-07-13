@@ -82,24 +82,19 @@ export struct GalleryListRow {
   }
 
   private metaGap(): number {
-    return this.isSmallThumb() ? 0 : 1;
+    return 2;
   }
 
   private titleMaxLines(): number {
-    if (this.isSmallThumb()) {
-      return 2;
-    }
-    return galleryListMode() === 'Extended' ? 2 : 3;
+    return this.isSmallThumb() ? 2 : 3;
+  }
+
+  private titleLineHeight(): number {
+    return this.isSmallThumb() ? 18 : 19;
   }
 
   private titleHeight(): number {
-    if (this.isSmallThumb()) {
-      return 34;
-    }
-    if (galleryListMode() === 'Extended') {
-      return 38;
-    }
-    return 54;
+    return this.titleLineHeight() * this.titleMaxLines();
   }
 
   private isSmallThumb(): boolean {
@@ -119,7 +114,7 @@ export struct GalleryListRow {
   }
 
   private metaLineHeight(): number {
-    return this.isSmallThumb() ? 13 : 16;
+    return this.isSmallThumb() ? 14 : 16;
   }
 
   private sideMetaVisible(): boolean {
@@ -198,13 +193,12 @@ export struct GalleryListRow {
           .height('100%')
 
         Column() {
-        Column() {
           Column() {
             Text(galleryDisplayTitle(this.gallery))
               .fontSize(this.titleFontSize())
               .fontWeight(FontWeight.Medium)
               .fontColor(themePrimaryText())
-              .lineHeight(this.titleFontSize() + 3)
+              .lineHeight(this.titleLineHeight())
               .maxLines(this.titleMaxLines())
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .width('100%')
@@ -214,88 +208,91 @@ export struct GalleryListRow {
           .clip(true)
           .justifyContent(FlexAlign.Start)
           .alignItems(HorizontalAlign.Start)
-        }
-        .width('100%')
-        .alignItems(HorizontalAlign.Start)
 
-        Row() {
-          Column() {
-            Text(this.gallery.uploader === undefined || this.gallery.uploader.length === 0 ? uiText('unknown uploader') :
-              this.gallery.uploader)
-              .fontSize(this.uploaderFontSize())
-              .fontColor(themeSecondaryText())
-              .lineHeight(this.metaLineHeight())
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-              .width('100%')
+        Blank()
 
+        Column() {
             Row() {
-              Text(this.languageText())
-                .fontSize(this.metaFontSize())
-                .fontColor(themeSecondaryText())
-                .fontWeight(FontWeight.Medium)
-                .lineHeight(this.metaLineHeight())
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                .layoutWeight(1)
-              if (this.showReadPageText()) {
-                Text(this.readPageText())
-                  .fontSize(this.metaFontSize())
+              Column({ space: this.metaGap() }) {
+                Text(this.gallery.uploader === undefined || this.gallery.uploader.length === 0 ?
+                  uiText('unknown uploader') : this.gallery.uploader)
+                  .fontSize(this.uploaderFontSize())
                   .fontColor(themeSecondaryText())
-                  .fontWeight(FontWeight.Medium)
                   .lineHeight(this.metaLineHeight())
+                  .height(this.metaLineHeight())
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  .margin({ left: 8 })
+                  .width('100%')
+
+                Row() {
+                  Text(this.languageText())
+                    .fontSize(this.metaFontSize())
+                    .fontColor(themeSecondaryText())
+                    .fontWeight(FontWeight.Medium)
+                    .lineHeight(this.metaLineHeight())
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    .layoutWeight(1)
+                  if (this.showReadPageText()) {
+                    Text(this.readPageText())
+                      .fontSize(this.metaFontSize())
+                      .fontColor(themeSecondaryText())
+                      .fontWeight(FontWeight.Medium)
+                      .lineHeight(this.metaLineHeight())
+                      .maxLines(1)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
+                      .margin({ left: 8 })
+                  }
+                }
+                .width('100%')
+                .height(this.metaLineHeight())
+
+                Text(this.gallery.posted === undefined ? '' : this.gallery.posted)
+                  .fontSize(this.metaFontSize())
+                  .fontColor(themeTertiaryText())
+                  .lineHeight(this.metaLineHeight())
+                  .height(this.metaLineHeight())
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+              }
+              .alignItems(HorizontalAlign.Start)
+              .layoutWeight(1)
+
+              if (this.sideMetaVisible()) {
+                Column({ space: 4 }) {
+                  Rating({ rating: this.gallery.rating, indicator: true })
+                    .stars(5)
+                    .stepSize(0.5)
+                    .height(14)
+                    .width(74)
+                  CategoryBadge({ category: this.gallery.category })
+                }
+                .alignItems(HorizontalAlign.End)
+                .margin({ left: 8 })
               }
             }
             .width('100%')
-            .margin({ top: this.metaGap() })
+            .alignItems(VerticalAlign.Bottom)
 
-            Text(this.gallery.posted === undefined ? '' : this.gallery.posted)
-              .fontSize(this.metaFontSize())
-              .fontColor(themeTertiaryText())
-              .lineHeight(this.metaLineHeight())
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-              .margin({ top: this.metaGap() })
-          }
-          .alignItems(HorizontalAlign.Start)
-          .layoutWeight(1)
-
-          if (this.sideMetaVisible()) {
-            Column() {
-              Rating({ rating: this.gallery.rating, indicator: true })
-                .stars(5)
-                .stepSize(0.5)
-                .height(14)
-                .width(74)
-              CategoryBadge({ category: this.gallery.category })
-                .margin({ top: 1 })
+            if (this.hasTags()) {
+              Flex({ wrap: FlexWrap.Wrap }) {
+                ForEach(this.previewTags(), (tag: string, index: number) => {
+                  GalleryTagChip({
+                    text: this.tagDisplayText(tag),
+                    backgroundColorValue: this.tagColor(index),
+                    color: this.tagTextColor(index)
+                  })
+                    .margin({ right: 4 })
+                }, (tag: string, index: number) => tag + ':' + index.toString())
+              }
+              .width('100%')
+              .height(21)
+              .clip(true)
+              .margin({ top: 4 })
             }
-            .alignItems(HorizontalAlign.End)
-            .margin({ left: 8 })
-          }
         }
         .width('100%')
-        .alignItems(VerticalAlign.Bottom)
-
-        if (this.hasTags()) {
-          Flex({ wrap: FlexWrap.Wrap }) {
-            ForEach(this.previewTags(), (tag: string, index: number) => {
-              GalleryTagChip({
-                text: this.tagDisplayText(tag),
-                backgroundColorValue: this.tagColor(index),
-                color: this.tagTextColor(index)
-              })
-                .margin({ right: 4 })
-            }, (tag: string, index: number) => tag + ':' + index.toString())
-          }
-          .width('100%')
-          .height(21)
-          .clip(true)
-          .margin({ top: this.metaGap() })
-        }
+        .alignItems(HorizontalAlign.Start)
         }
         .height('100%')
         .layoutWeight(1)
@@ -515,10 +512,11 @@ export struct GalleryThumbCard {
 
   @Builder
   private thumbnailRightMetadata() {
-    Column({ space: 1 }) {
+    Column({ space: 6 }) {
       if (showGalleryLanguage() && showGalleryRating() && this.showReadPageText()) {
         Text(this.languageText())
-          .fontSize(12)
+          .fontSize(14)
+          .lineHeight(18)
           .fontColor(themeTertiaryText())
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -527,13 +525,15 @@ export struct GalleryThumbCard {
         Row({ space: 6 }) {
           if (showGalleryLanguage() && !showGalleryRating()) {
             Text(this.languageText())
-              .fontSize(12)
+              .fontSize(14)
+              .lineHeight(18)
               .fontColor(themeTertiaryText())
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
           Text(this.readPageText())
-            .fontSize(13)
+            .fontSize(14)
+            .lineHeight(18)
             .fontWeight(FontWeight.Medium)
             .fontColor(themeTertiaryText())
             .maxLines(1)
@@ -541,7 +541,8 @@ export struct GalleryThumbCard {
         }
       } else if (showGalleryLanguage()) {
         Text(this.languageText())
-          .fontSize(12)
+          .fontSize(14)
+          .lineHeight(18)
           .fontColor(themeTertiaryText())
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -568,6 +569,7 @@ export struct GalleryThumbCard {
           Column() {
             Text(galleryDisplayTitle(this.gallery))
               .fontSize(15)
+              .lineHeight(19)
               .fontWeight(FontWeight.Medium)
               .fontColor(themePrimaryText())
               .maxLines(5)
@@ -579,7 +581,7 @@ export struct GalleryThumbCard {
           .alignItems(HorizontalAlign.Start)
 
           Row() {
-            Column({ space: 2 }) {
+            Column({ space: 6 }) {
               if (showGalleryRating()) {
                 Rating({ rating: this.gallery.rating, indicator: true })
                   .stars(5)
