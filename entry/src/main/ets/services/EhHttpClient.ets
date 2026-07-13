@@ -52,7 +52,6 @@ export interface EhTextRequestOptions {
   imagePreferenceUConfig?: boolean;
   connectTimeoutMs?: number;
   readTimeoutMs?: number;
-  deadlineTimeoutMs?: number;
 }
 
 interface CachedHttpResponse {
@@ -86,7 +85,6 @@ const TEXT_READ_TIMEOUT_MS: number = 15000;
 const TEXT_DEADLINE_TIMEOUT_MS: number = 26000;
 const IMAGE_SEARCH_TIMEOUT_MS: number = 100000;
 const API_TIMEOUT_MS: number = 10000;
-const API_DEADLINE_TIMEOUT_MS: number = 18000;
 const TEXT_RETRY_DELAYS_MS: number[] = [250, 750];
 const CHROME_USER_AGENT: string = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36';
 const CHROME_ACCEPT: string = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8';
@@ -296,8 +294,7 @@ export class EhHttpClient {
         readTimeout: requestOptions?.readTimeoutMs ?? TEXT_READ_TIMEOUT_MS
       };
       applyEhNetworkOptions(options, plan);
-      const response = await requestWithDeadline(request, plan.url, options,
-        requestOptions?.deadlineTimeoutMs ?? TEXT_DEADLINE_TIMEOUT_MS);
+      const response = await requestToCompletion(request, plan.url, options);
       const statusCode = Number(response.responseCode);
       recordEhRequestOutcome(plan, statusCode >= 200 && statusCode < 500, Date.now() - startedAt);
       outcomeRecorded = true;
@@ -406,7 +403,7 @@ export class EhHttpClient {
         readTimeout: TEXT_READ_TIMEOUT_MS
       };
       applyEhNetworkOptions(options, plan);
-      const response = await requestWithDeadline(request, plan.url, options, TEXT_DEADLINE_TIMEOUT_MS);
+      const response = await requestToCompletion(request, plan.url, options);
       const statusCode = Number(response.responseCode);
       recordEhRequestOutcome(plan, statusCode >= 200 && statusCode < 500, Date.now() - startedAt);
       outcomeRecorded = true;
@@ -464,7 +461,7 @@ export class EhHttpClient {
         readTimeout: API_TIMEOUT_MS
       };
       applyEhNetworkOptions(options, plan);
-      const response = await requestWithDeadline(request, plan.url, options, API_DEADLINE_TIMEOUT_MS);
+      const response = await requestToCompletion(request, plan.url, options);
       const statusCode = Number(response.responseCode);
       recordEhRequestOutcome(plan, statusCode >= 200 && statusCode < 500, Date.now() - startedAt);
       outcomeRecorded = true;
@@ -1163,8 +1160,7 @@ export class EhHttpClient {
       if (redirectUrl.length > 0) {
         response = await this.getText(redirectUrl, referer, 0, {
           connectTimeoutMs: IMAGE_SEARCH_TIMEOUT_MS,
-          readTimeoutMs: IMAGE_SEARCH_TIMEOUT_MS,
-          deadlineTimeoutMs: IMAGE_SEARCH_TIMEOUT_MS
+          readTimeoutMs: IMAGE_SEARCH_TIMEOUT_MS
         });
       }
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -1356,7 +1352,7 @@ export class EhHttpClient {
       request.on('headersReceive', (header: Object) => {
         responseHeaders = header as Record<string, Object>;
       });
-      const response = await requestWithDeadline(request, plan.url, options, timeoutMs);
+      const response = await requestToCompletion(request, plan.url, options);
       const statusCode = Number(response.responseCode);
       recordEhRequestOutcome(plan, statusCode >= 200 && statusCode < 500, Date.now() - startedAt);
       outcomeRecorded = true;
@@ -1485,38 +1481,13 @@ function sleepRetry(attempt: number): Promise<void> {
   });
 }
 
-function requestWithDeadline(request: http.HttpRequest, url: string, options: http.HttpRequestOptions,
-  timeoutMs: number): Promise<http.HttpResponse> {
-  return new Promise<http.HttpResponse>((resolve: (value: http.HttpResponse) => void, reject: (reason: Error) => void) => {
-    let finished = false;
-    const timer = setTimeout(() => {
-      if (finished) {
-        return;
-      }
-      finished = true;
-      try {
-        request.destroy();
-      } catch (error) {
-      }
-      reject(new Error('Network request timed out after ' + Math.floor(timeoutMs / 1000).toString() + 's'));
-    }, timeoutMs);
-
-    request.request(url, options).then((response: http.HttpResponse) => {
-      if (finished) {
-        return;
-      }
-      finished = true;
-      clearTimeout(timer);
-      resolve(response);
-    }).catch((error: Error) => {
-      if (finished) {
-        return;
-      }
-      finished = true;
-      clearTimeout(timer);
-      reject(error);
-    });
-  });
+async function requestToCompletion(request: http.HttpRequest, url: string,
+  options: http.HttpRequestOptions): Promise<http.HttpResponse> {
+  try {
+    return await request.request(url, options);
+  } catch (error) {
+    throw new Error(networkErrorMessage(error));
+  }
 }
 
 function syncSetCookiesToWebView(url: string, setCookieHeader: string): void {

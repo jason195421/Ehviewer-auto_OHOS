@@ -530,7 +530,7 @@ async function probeFrontingIp(target: HostIpProbeTarget): Promise<HostIpQuality
       connectTimeout: FRONTING_PROBE_CONNECT_TIMEOUT_MS,
       readTimeout: FRONTING_PROBE_READ_TIMEOUT_MS
     };
-    await requestWithProbeDeadline(request, 'https://' + target.ip + '/', options, FRONTING_PROBE_DEADLINE_MS);
+    await requestProbeToCompletion(request, 'https://' + target.ip + '/', options);
     return {
       host: target.host,
       ip: target.ip,
@@ -554,38 +554,13 @@ async function probeFrontingIp(target: HostIpProbeTarget): Promise<HostIpQuality
   }
 }
 
-function requestWithProbeDeadline(request: http.HttpRequest, url: string, options: http.HttpRequestOptions,
-  timeoutMs: number): Promise<http.HttpResponse> {
-  return new Promise<http.HttpResponse>((resolve: (value: http.HttpResponse) => void, reject: (reason: Error) => void) => {
-    let finished = false;
-    const timer = setTimeout(() => {
-      if (finished) {
-        return;
-      }
-      finished = true;
-      try {
-        request.destroy();
-      } catch (error) {
-      }
-      reject(new Error('Probe timed out'));
-    }, timeoutMs);
-
-    request.request(url, options).then((response: http.HttpResponse) => {
-      if (finished) {
-        return;
-      }
-      finished = true;
-      clearTimeout(timer);
-      resolve(response);
-    }).catch((error: Error) => {
-      if (finished) {
-        return;
-      }
-      finished = true;
-      clearTimeout(timer);
-      reject(error);
-    });
-  });
+async function requestProbeToCompletion(request: http.HttpRequest, url: string,
+  options: http.HttpRequestOptions): Promise<http.HttpResponse> {
+  try {
+    return await request.request(url, options);
+  } catch (error) {
+    throw new Error(String(error));
+  }
 }
 
 function collectFrontingProbeTargets(): HostIpProbeTarget[] {
@@ -943,7 +918,7 @@ async function probeDirectSelectedSite(): Promise<boolean> {
     if (dohUrl.length > 0) {
       options.dnsOverHttps = dohUrl;
     }
-    const response = await requestWithProbeDeadline(request, 'https://' + host + '/', options, DIRECT_PROBE_TIMEOUT_MS);
+    const response = await requestProbeToCompletion(request, 'https://' + host + '/', options);
     const statusCode = Number(response.responseCode);
     return statusCode > 0 && statusCode < 500;
   } catch (error) {

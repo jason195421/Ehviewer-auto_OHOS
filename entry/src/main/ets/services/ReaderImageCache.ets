@@ -411,6 +411,7 @@ function streamImageToFile(request: http.HttpRequest, url: string, options: http
     let idleTimer = -1;
     let totalTimer = -1;
     let responseExtension = '';
+    let pendingFailureMessage = '';
     const tempPath = path + '.part';
     removeFileQuietly(tempPath);
     try {
@@ -459,18 +460,11 @@ function streamImageToFile(request: http.HttpRequest, url: string, options: http
     };
 
     const failRequest = (message: string): void => {
-      if (finished) {
+      if (finished || pendingFailureMessage.length > 0) {
         return;
       }
-      finished = true;
+      pendingFailureMessage = message;
       clearTimers();
-      cleanup();
-      try {
-        request.destroy();
-      } catch (error) {
-      }
-      removeFileQuietly(tempPath);
-      reject(new Error(message));
     };
 
     const armIdleTimer = (delayMs: number): void => {
@@ -516,7 +510,7 @@ function streamImageToFile(request: http.HttpRequest, url: string, options: http
     armTotalTimer(imageUnknownTotalTimeoutMs(timeoutMs));
 
     request.on('dataReceive', (data: ArrayBuffer) => {
-      if (finished) {
+      if (finished || pendingFailureMessage.length > 0) {
         return;
       }
       try {
@@ -531,7 +525,7 @@ function streamImageToFile(request: http.HttpRequest, url: string, options: http
       }
     });
     request.on('headersReceive', (header: Object) => {
-      if (finished) {
+      if (finished || pendingFailureMessage.length > 0) {
         return;
       }
       const contentLength = headerContentLength(header);
@@ -544,7 +538,7 @@ function streamImageToFile(request: http.HttpRequest, url: string, options: http
       }
     });
     request.on('dataReceiveProgress', (progress: http.DataReceiveProgressInfo) => {
-      if (finished) {
+      if (finished || pendingFailureMessage.length > 0) {
         return;
       }
       updateKnownTotalBytes(progress.totalSize);
@@ -561,6 +555,11 @@ function streamImageToFile(request: http.HttpRequest, url: string, options: http
       finished = true;
       clearTimers();
       cleanup();
+      if (pendingFailureMessage.length > 0) {
+        removeFileQuietly(tempPath);
+        reject(new Error(pendingFailureMessage));
+        return;
+      }
       const finalPath = responseImagePath(path, responseExtension);
       if (statusCode >= 200 && statusCode < 300 && receivedBytes > 0) {
         try {
@@ -583,7 +582,7 @@ function streamImageToFile(request: http.HttpRequest, url: string, options: http
       clearTimers();
       cleanup();
       removeFileQuietly(tempPath);
-      reject(error);
+      reject(pendingFailureMessage.length > 0 ? new Error(pendingFailureMessage) : error);
     });
   });
 }
