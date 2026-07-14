@@ -3,6 +3,7 @@ import { GalleryDetail, GalleryPage, GalleryPreview, GallerySite } from '../mode
 import { READER_ABILITY_CONTEXT_KEY } from '../entryability/ReaderAbility';
 import { EhHttpClient, GalleryDetailLoadResult, GalleryPageLoadResult } from '../services/EhHttpClient';
 import { ehDownloadFileStore } from '../services/EhDownloadFileStore';
+import { ehSettingsStore } from '../services/EhSettingsStore';
 import { galleryPageCache } from '../services/GalleryPageCache';
 import {
   createReaderSessionState,
@@ -260,7 +261,9 @@ export struct ReaderSessionScene {
   }
 
   private async preloadReaderPages(index: number): Promise<void> {
-    const count = readerPreloadCount();
+    const configuredCount = readerPreloadCount();
+    const count = ehSettingsStore.getValue('adaptive_dual_page', 'Off') === 'On' ?
+      Math.max(1, configuredCount) : configuredCount;
     if (count <= 0) {
       return;
     }
@@ -487,6 +490,8 @@ export struct ReaderSessionScene {
       renderVersion: this.renderVersion,
       page: this.page,
       readerPages: this.readerPages,
+      readerPreviews: this.detail.previewSet,
+      galleryId: this.detail.gid,
       statusText: this.statusText,
       pageIndex: this.pageIndex,
       totalPages: this.readerTotalPages(),
@@ -508,6 +513,11 @@ export struct ReaderSessionScene {
       },
       onRefreshPage: (index: number) => {
         this.loadReaderPageByIndex(index);
+      },
+      onAdaptiveDualPageChange: (enabled: boolean) => {
+        if (enabled) {
+          this.preloadReaderPages(this.pageIndex);
+        }
       }
     })
   }

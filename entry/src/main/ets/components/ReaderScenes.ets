@@ -8,7 +8,7 @@ import { systemShare } from '@kit.ShareKit';
 import inputConsumer from '@ohos.multimodalInput.inputConsumer';
 import { KeyCode } from '@ohos.multimodalInput.keyCode';
 import { KeyEvent } from '@ohos.multimodalInput.keyEvent';
-import { GalleryPage } from '../model/GalleryModels';
+import { GalleryPage, GalleryPreview } from '../model/GalleryModels';
 import {
   applyReaderWindowState,
   applyReaderBrightnessFromSettings,
@@ -98,11 +98,18 @@ interface ReaderPageImageSize {
   height: number;
 }
 
+interface ReaderPageGroupItem {
+  index: number;
+  key: string;
+}
+
 @Component
 export struct ReaderScene {
   @Prop @Watch('onRenderVersionChange') renderVersion: number = 0;
   @Prop page: GalleryPage = createEmptyPage();
   @Prop readerPages: ReaderPageState[] = [];
+  @Prop @Watch('onReaderPreviewsChange') readerPreviews: GalleryPreview[] = [];
+  @Prop @Watch('onGalleryIdChange') galleryId: number = 0;
   @Prop statusText: string = '';
   @Prop @Watch('onPageIndexChange') pageIndex: number = 0;
   @Prop @Watch('onTotalPagesChange') totalPages: number = 0;
@@ -112,6 +119,7 @@ export struct ReaderScene {
   onJump: (index: number) => void = () => {};
   onRetry: () => void = () => {};
   onRefreshPage: (index: number) => void = () => {};
+  onAdaptiveDualPageChange: (enabled: boolean) => void = (_enabled: boolean) => {};
   restoreAppChromeOnExit: boolean = true;
   @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeightPx: number = 0;
   @StorageProp(BOTTOM_AVOID_HEIGHT_KEY) bottomAvoidHeight: number = 0;
@@ -149,12 +157,17 @@ export struct ReaderScene {
   @State clockText: string = '';
   private swiperController: SwiperController = new SwiperController();
   private sliderHideTimer: number = -1;
-  private readerPageIndexesSource: ArrayDataSource<number> = new ArrayDataSource<number>([]);
+  private readerPageIndexesSource: ArrayDataSource<ReaderPageGroupItem> =
+    new ArrayDataSource<ReaderPageGroupItem>([]);
   private readerPageIndexesCount: number = -1;
   private readerPageIndexesReversed: boolean = false;
   private readerPageIndexesSignature: string = '';
+  private readerPageGroupRevision: number = 0;
   private readerPageImageSizes: ReaderPageImageSize[] = [];
+  private readerImageSizeGalleryId: number = -1;
   private pageGroupRefreshTimer: number = -1;
+  private pageGroupRefreshPending: boolean = false;
+  private swiperAnimating: boolean = false;
   private continuousScroller: Scroller = new Scroller();
   private activeImageWidth: number = 0;
   private activeImageHeight: number = 0;
@@ -210,6 +223,9 @@ export struct ReaderScene {
     }
     this.readerWindowActive = true;
     this.adaptiveDualPage = ehSettingsStore.getValue('adaptive_dual_page', 'Off') === 'On';
+    this.resetReaderImageSizesForGallery();
+    this.syncReaderPreviewImageSizes();
+    this.currentIndex = this.pageGroupAnchorForPageIndex(this.pageIndex);
     this.syncReaderPageIndexSource();
     if (this.restoreAppChromeOnExit) {
       setEmbeddedReaderActive(true);
@@ -219,7 +235,6 @@ export struct ReaderScene {
     this.menuVisible = false;
     this.imageActionsVisible = false;
     this.sliderVisible = false;
-    this.currentIndex = this.pageGroupAnchorForPageIndex(this.pageIndex);
     this.imageActionPageIndex = this.currentIndex;
     this.syncOverlayState();
     this.syncDirectionState();
@@ -298,6 +313,8 @@ export struct ReaderScene {
   private cleanupReaderScene(): void {
     this.readerWindowActive = false;
     this.clearPageGroupRefreshTimer();
+    this.pageGroupRefreshPending = false;
+    this.swiperAnimating = false;
     this.clearSliderTimer();
     this.clearScreenTapTimer();
     this.clearAutoTransferTimer();
@@ -371,6 +388,25 @@ export struct ReaderScene {
 
   onRenderVersionChange(): void {
     this.applyReaderWindowSettings();
+  }
+
+  onGalleryIdChange(): void {
+    if (!this.resetReaderImageSizesForGallery()) {
+      return;
+    }
+    this.syncReaderPreviewImageSizes();
+    this.currentIndex = this.pageGroupAnchorForPageIndex(this.pageIndex);
+    this.sliderLiveIndex = this.clampReaderPageIndex(this.currentIndex);
+    this.readerPageIndexesCount = -1;
+    if (this.readerWindowActive) {
+      this.syncReaderPageIndexSource();
+    }
+  }
+
+  onReaderPreviewsChange(): void {
+    if (this.syncReaderPreviewImageSizes()) {
+      this.schedulePageGroupRefresh();
+    }
   }
 
   onTotalPagesChange(): void {
@@ -508,6 +544,35 @@ export struct ReaderScene {
     return null;
   }
 
+  private resetReaderImageSizesForGallery(): boolean {
+    if (this.readerImageSizeGalleryId === this.galleryId) {
+      return false;
+    }
+    this.clearPageGroupRefreshTimer();
+    this.pageGroupRefreshPending = false;
+    this.readerPageImageSizes = [];
+    this.readerImageSizeGalleryId = this.galleryId;
+    return true;
+  }
+
+  private syncReaderPreviewImageSizes(): boolean {
+    let changed = false;
+    for (let i = 0; i < this.readerPreviews.length; i++) {
+      const preview = this.readerPreviews[i];
+      if (preview.index < 0 || preview.width <= 0 || preview.height <= 0 ||
+        this.pageImageSize(preview.index) !== null) {
+        continue;
+      }
+      this.readerPageImageSizes.push({
+        index: preview.index,
+        width: preview.width,
+        height: preview.height
+      });
+      changed = true;
+    }
+    return changed;
+  }
+
   private rememberPageImageSize(index: number, width: number, height: number): void {
     if (width <= 0 || height <= 0) {
       return;
@@ -534,16 +599,25 @@ export struct ReaderScene {
     }
   }
 
-  private schedulePageGroupRefresh(): void {
-    this.clearPageGroupRefreshTimer();
+  private schedulePageGroupRefresh(delay: number = READER_PAGE_GROUP_REFRESH_DELAY): void {
+    this.pageGroupRefreshPending = true;
+    if (this.pageGroupRefreshTimer !== -1) {
+      return;
+    }
     this.pageGroupRefreshTimer = setTimeout(() => {
       this.pageGroupRefreshTimer = -1;
       if (!this.readerWindowActive) {
+        this.pageGroupRefreshPending = false;
         return;
       }
+      if (this.swiperAnimating) {
+        this.schedulePageGroupRefresh(60);
+        return;
+      }
+      this.pageGroupRefreshPending = false;
       this.normalizeCurrentPageGroup();
       this.syncReaderPageIndexSource();
-    }, READER_PAGE_GROUP_REFRESH_DELAY) as number;
+    }, Math.max(0, delay)) as number;
   }
 
   private shouldPairPage(index: number): boolean {
@@ -609,7 +683,7 @@ export struct ReaderScene {
     return createEmptyPage();
   }
 
-  private readerPageIndexSource(): ArrayDataSource<number> {
+  private readerPageIndexSource(): ArrayDataSource<ReaderPageGroupItem> {
     this.syncReaderPageIndexSource();
     return this.readerPageIndexesSource;
   }
@@ -629,7 +703,12 @@ export struct ReaderScene {
     this.readerPageIndexesCount = count;
     this.readerPageIndexesReversed = this.swiperReversed;
     this.readerPageIndexesSignature = signature;
-    this.readerPageIndexesSource.setItems(pages);
+    this.readerPageGroupRevision++;
+    const items: ReaderPageGroupItem[] = [];
+    for (let i = 0; i < pages.length; i++) {
+      items.push({ index: pages[i], key: this.readerPageGroupRevision.toString() + ':' + pages[i].toString() });
+    }
+    this.readerPageIndexesSource.setItems(items);
   }
 
   private visualIndexForPageIndex(index: number): number {
@@ -722,6 +801,7 @@ export struct ReaderScene {
 
   private applyMenuSettings(): void {
     this.applyAdaptiveDualPageMenuConstraints();
+    const previousAdaptiveDualPage = this.adaptiveDualPage;
     ehSettingsStore.setValue('adaptive_dual_page', this.menuAdaptiveDualPage ? 'On' : 'Off');
     ehSettingsStore.setValue('screen_rotation', this.menuScreenRotation);
     ehSettingsStore.setValue('reading_direction', this.menuReadingDirection);
@@ -745,6 +825,9 @@ export struct ReaderScene {
     }
     this.fitMode = nextFitMode;
     this.adaptiveDualPage = this.menuAdaptiveDualPage;
+    if (previousAdaptiveDualPage !== this.adaptiveDualPage) {
+      this.onAdaptiveDualPageChange(this.adaptiveDualPage);
+    }
     this.startPosition = normalizeStartPositionOption(this.menuStartPosition);
     this.readerPageIndexesCount = -1;
     this.currentIndex = this.pageGroupAnchorForPageIndex(this.currentIndex);
@@ -1557,26 +1640,26 @@ export struct ReaderScene {
     Stack({ alignContent: Alignment.Center }) {
       if (this.isContinuousVerticalMode()) {
         List({ space: 0, scroller: this.continuousScroller }) {
-          LazyForEach(this.readerPageIndexSource(), (index: number) => {
+          LazyForEach(this.readerPageIndexSource(), (item: ReaderPageGroupItem) => {
             ListItem() {
               ReaderContinuousImageItem({
-                page: this.pageForIndex(index),
-                statusText: index === this.pageIndex ? this.statusText : uiText('Image page is loading'),
+                page: this.pageForIndex(item.index),
+                statusText: item.index === this.pageIndex ? this.statusText : uiText('Image page is loading'),
                 preferOriginal: this.preferOriginal,
                 fitMode: this.fitMode,
                 zoomScale: this.fixedScale,
                 sharedOffsetX: this.continuousOffsetX,
-                isActive: index === this.currentIndex,
+                isActive: item.index === this.currentIndex,
                 onTap: () => {},
                 onRetry: () => {
-                  this.onJump(index);
+                  this.onJump(item.index);
                 },
                 onImageLongPress: () => {
-                  this.currentIndex = index;
-                  this.showImageActions(index);
+                  this.currentIndex = item.index;
+                  this.showImageActions(item.index);
                 },
                 onImageSizeChange: (width: number, height: number) => {
-                  if (index === this.currentIndex) {
+                  if (item.index === this.currentIndex) {
                     this.onActiveImageSizeChange(width, height);
                   }
                 },
@@ -1585,22 +1668,22 @@ export struct ReaderScene {
                   this.fixedScale = Math.max(READER_MIN_SCALE, Math.min(READER_MAX_SCALE, percent / 100));
                 },
                 onHorizontalBoundsChange: (maxOffsetX: number) => {
-                  if (index === this.currentIndex) {
+                  if (item.index === this.currentIndex) {
                     this.onContinuousHorizontalBoundsChange(maxOffsetX);
                   }
                 },
                 onHorizontalDragStart: (maxOffsetX: number) => {
-                  if (index === this.currentIndex) {
+                  if (item.index === this.currentIndex) {
                     this.onContinuousHorizontalDragStart(maxOffsetX);
                   }
                 },
                 onHorizontalDragUpdate: (offsetX: number, maxOffsetX: number) => {
-                  if (index === this.currentIndex) {
+                  if (item.index === this.currentIndex) {
                     this.onContinuousHorizontalDragUpdate(offsetX, maxOffsetX);
                   }
                 },
                 onHorizontalDragEnd: (velocityX: number, maxOffsetX: number) => {
-                  if (index === this.currentIndex) {
+                  if (item.index === this.currentIndex) {
                     this.onContinuousHorizontalDragEnd(velocityX, maxOffsetX);
                   }
                 }
@@ -1608,7 +1691,7 @@ export struct ReaderScene {
                 .width('100%')
             }
             .reuseId('reader-continuous-page')
-          }, (index: number) => index.toString())
+          }, (item: ReaderPageGroupItem) => item.key)
         }
         .width('100%')
         .height('100%')
@@ -1621,9 +1704,9 @@ export struct ReaderScene {
         })
       } else {
         Swiper(this.swiperController) {
-          LazyForEach(this.readerPageIndexSource(), (index: number) => {
-            this.ReaderPageGroup(index)
-          }, (index: number) => index.toString())
+          LazyForEach(this.readerPageIndexSource(), (item: ReaderPageGroupItem) => {
+            this.ReaderPageGroup(item.index)
+          }, (item: ReaderPageGroupItem) => item.key)
         }
         .index(this.visualIndexForPageIndex(this.currentIndex))
         .cachedCount(this.readerRenderCacheCount())
@@ -1641,6 +1724,15 @@ export struct ReaderScene {
         .disableSwipe(this.isDisableSwipe)
         .onChange((index: number) => {
           this.onSwiperChange(index);
+        })
+        .onAnimationStart((_index: number, _targetIndex: number) => {
+          this.swiperAnimating = true;
+        })
+        .onAnimationEnd((_index: number) => {
+          this.swiperAnimating = false;
+          if (this.pageGroupRefreshPending) {
+            this.schedulePageGroupRefresh(0);
+          }
         })
         .width('100%')
         .height('100%')
