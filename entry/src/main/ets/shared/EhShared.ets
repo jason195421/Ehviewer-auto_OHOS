@@ -27,8 +27,8 @@ import {
   parseSavedTranslationApis
 } from '../services/TranslationApiConfigSupport';
 import { decodeHtmlEntities } from './HtmlEntitySupport';
+import { traditionalChineseText } from './EhTraditionalChinese';
 import {
-  EH_THEME_PRIMARY_COLOR,
   currentDarkModeThemeName as themeCurrentDarkModeThemeName,
   currentThemeName as themeCurrentThemeName,
   isBlackTheme as themeIsBlackTheme,
@@ -176,35 +176,42 @@ export function notifyGalleryTitleChanged(): void {
 }
 
 export function shouldUseChineseUi(): boolean {
-  const language = ehSettingsStore.getValue('app_language', 'System');
-  if (language === 'zh-CN') {
-    return true;
-  }
-  if (language === 'English') {
-    return false;
-  }
-  return isSystemChineseLanguage();
+  return currentUiLanguage() !== 'English';
 }
 
 export function shouldShowTagTranslations(): boolean {
   return ehSettingsStore.getValue('show_tag_translations', 'On') === 'On';
 }
 
-function isSystemChineseLanguage(): boolean {
+function currentUiLanguage(): string {
+  const language = ehSettingsStore.getValue('app_language', 'System');
+  if (language === 'zh-CN' || language === 'zh-TW' || language === 'English') {
+    return language;
+  }
   try {
     const systemLanguage = i18n.System.getSimplifiedLanguage();
-    const supportedLanguages: Array<string> = ['zh-Hans'];
-    return i18n.I18NUtil.getBestMatchLocale(systemLanguage, supportedLanguages) === 'zh-Hans';
+    const supportedLanguages: Array<string> = ['zh-Hans', 'zh-Hant'];
+    const matchedLanguage = i18n.I18NUtil.getBestMatchLocale(systemLanguage, supportedLanguages);
+    if (matchedLanguage === 'zh-Hans') {
+      return 'zh-CN';
+    }
+    if (matchedLanguage === 'zh-Hant') {
+      return 'zh-TW';
+    }
   } catch (error) {
-    return false;
   }
+  return 'English';
+}
+
+function localizedChineseText(text: string): string {
+  return currentUiLanguage() === 'zh-TW' ? traditionalChineseText(text) : text;
 }
 
 export function uiText(text: string): string {
   if (!shouldUseChineseUi()) {
     return text;
   }
-  return zhText(text);
+  return localizedChineseText(zhText(text));
 }
 
 export function uiValue(value: string): string {
@@ -225,6 +232,10 @@ export function uiStatusText(text: string): string {
   if (!shouldUseChineseUi()) {
     return text;
   }
+  return localizedChineseText(simplifiedUiStatusText(text));
+}
+
+function simplifiedUiStatusText(text: string): string {
   if (text.indexOf('Identity authentication mode: ') === 0) {
     return '身份验证模式：' + uiText(text.substring('Identity authentication mode: '.length));
   }
@@ -655,7 +666,7 @@ export function uiStatusText(text: string): string {
   if (composite !== text) {
     return composite;
   }
-  return uiText(text);
+  return zhText(text);
 }
 
 interface UiStatusPrefixTranslation {
@@ -750,7 +761,7 @@ function translateCompositeUiStatus(text: string): string {
 }
 
 export function uiPageText(prefix: string, page: number): string {
-  return shouldUseChineseUi() ? prefix + page.toString() + ' 页' : prefix + page.toString();
+  return shouldUseChineseUi() ? localizedChineseText(prefix + page.toString() + ' 页') : prefix + page.toString();
 }
 
 export function zhText(text: string): string {
@@ -1244,6 +1255,7 @@ export function zhText(text: string): string {
     case 'System': return '跟随系统';
     case 'English': return '英语';
     case 'zh-CN': return '简体中文';
+    case 'zh-TW': return '繁体中文';
     case 'Portrait': return '竖屏';
     case 'Landscape': return '横屏';
     case 'Auto rotate': return '自动旋转';
@@ -1501,6 +1513,14 @@ export function zhText(text: string): string {
     case 'Donate': return '捐赠';
     case 'Support project development': return '支持项目开发';
     case 'Choose the app interface theme': return '选择应用界面主题';
+    case 'Theme color': return '主题色';
+    case 'Choose the accent color used by app bars, buttons and selected items': return '选择标题栏、按钮和选中项使用的强调色';
+    case 'Blue': return '蓝色';
+    case 'Teal': return '青绿色';
+    case 'Green': return '绿色';
+    case 'Purple': return '紫色';
+    case 'Orange': return '橙色';
+    case 'Rose': return '玫红色';
     case 'Download items will be shown here': return '下载项会显示在这里';
     case 'No items match the current filter': return '没有符合当前过滤条件的项目';
     case 'Pull down to refresh': return '下拉刷新';
@@ -2460,8 +2480,6 @@ export function downloadStateColor(state: DownloadState): string {
   return paletteDownloadStateIdleColor();
 }
 
-const APP_THEME_COLOR: string = EH_THEME_PRIMARY_COLOR;
-
 export function currentThemeName(): string {
   return themeCurrentThemeName();
 }
@@ -2545,7 +2563,7 @@ function parseHexChannel(color: string, start: number): number {
 }
 
 function mixHexColor(from: string, to: string, amount: number): string {
-  const source = from.length >= 7 && from.charAt(0) === '#' ? from : APP_THEME_COLOR;
+  const source = from.length >= 7 && from.charAt(0) === '#' ? from : palettePrimaryColor();
   const target = to.length >= 7 && to.charAt(0) === '#' ? to : '#FFFFFF';
   const ratio = Math.max(0, Math.min(1, amount));
   const r = parseHexChannel(source, 1) + (parseHexChannel(target, 1) - parseHexChannel(source, 1)) * ratio;
@@ -2555,7 +2573,7 @@ function mixHexColor(from: string, to: string, amount: number): string {
 }
 
 export function themeSurfaceColor(amount: number = 0.88): string {
-  return mixHexColor(APP_THEME_COLOR, '#FFFFFF', amount);
+  return mixHexColor(palettePrimaryColor(), '#FFFFFF', amount);
 }
 
 export function immersiveChromeHeightFromOffset(offsetY: number, expandedHeight: number): number {
@@ -2765,6 +2783,9 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
         followSystemDarkMode ? 'Choose Dark or Black when the system enters dark mode' :
           'Choose Light, Dark or Black for the app interface',
         entries, followSystemDarkMode ? ['Dark', 'Black'] : ['Light', 'Dark', 'Black']),
+      optionSettingsRow('theme_color', 'Theme color',
+        'Choose the accent color used by app bars, buttons and selected items', entries,
+        ['Blue', 'Teal', 'Green', 'Purple', 'Orange', 'Rose']),
       staticSettingsRow('filter', 'Filter', 'Keyword/gallery filtering rules', '', 'navigation'),
       optionSettingsRow('show_eh_limits', 'Show EH limits', 'Display account and image limits in the drawer', entries, ON_OFF_OPTIONS),
       optionSettingsRow('cellular_network_warning', 'Cellular network warning', 'Warn before network-heavy operations on mobile data', entries, ON_OFF_OPTIONS)
@@ -2938,7 +2959,8 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
         currentReaderCacheSizeText(), 'action'),
       optionSettingsRow('read_cache_size', 'Read cache size', 'Reader cache budget', entries,
         ['160 MB', '320 MB', '640 MB', '1 GB', '2 GB']),
-      optionSettingsRow('app_language', 'App language', 'Language override', entries, ['System', 'English', 'zh-CN']),
+      optionSettingsRow('app_language', 'App language', 'Language override', entries,
+        ['System', 'English', 'zh-CN', 'zh-TW']),
       staticSettingsRow('proxy_settings', 'Proxy',
         'Configure direct, system, HTTP or SOCKS5 proxy', settingEntryValue(entries, 'proxy', 'System'), 'dialog'),
       staticSettingsRow('network_diagnostics', 'Network diagnostics', 'Test E, EX, forums and repo connectivity with current settings', 'Run', 'action'),

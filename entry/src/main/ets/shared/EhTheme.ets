@@ -214,6 +214,106 @@ const BLACK_PALETTE: EhColorPalette = {
   readerSelectOutline: '#4B5563'
 };
 
+interface EhThemeAccent {
+  name: string;
+  light: string;
+  dark: string;
+  black: string;
+  indicator: string;
+}
+
+const THEME_ACCENTS: EhThemeAccent[] = [
+  { name: 'Blue', light: '#2F6F8F', dark: '#24586F', black: '#173E50', indicator: '#8ED8F0' },
+  { name: 'Teal', light: '#287D78', dark: '#205F5B', black: '#153F3D', indicator: '#79DDD5' },
+  { name: 'Green', light: '#397A48', dark: '#2E613A', black: '#1D4127', indicator: '#91DDA1' },
+  { name: 'Purple', light: '#74549C', dark: '#594178', black: '#3B2B51', indicator: '#C8ABEC' },
+  { name: 'Orange', light: '#A85B24', dark: '#7D461F', black: '#533016', indicator: '#F3B37D' },
+  { name: 'Rose', light: '#A64D72', dark: '#7C3B57', black: '#52273B', indicator: '#EFA5C3' }
+];
+
+function normalizeThemeColorName(colorName: string): string {
+  for (let i = 0; i < THEME_ACCENTS.length; i++) {
+    if (THEME_ACCENTS[i].name === colorName) {
+      return colorName;
+    }
+  }
+  return 'Blue';
+}
+
+function currentThemeAccent(): EhThemeAccent {
+  const colorName = normalizeThemeColorName(ehSettingsStore.getValue('theme_color', 'Blue'));
+  for (let i = 0; i < THEME_ACCENTS.length; i++) {
+    if (THEME_ACCENTS[i].name === colorName) {
+      return THEME_ACCENTS[i];
+    }
+  }
+  return THEME_ACCENTS[0];
+}
+
+function accentPrimaryColor(): string {
+  const accent = currentThemeAccent();
+  const themeName = currentThemeName();
+  if (themeName === 'Black') {
+    return accent.black;
+  }
+  if (themeName === 'Dark') {
+    return accent.dark;
+  }
+  return accent.light;
+}
+
+function accentIndicatorColor(): string {
+  return currentThemeName() === 'Light' ? currentThemeAccent().light : currentThemeAccent().indicator;
+}
+
+function colorChannel(color: string, start: number): number {
+  const value = Number.parseInt(color.substring(start, start + 2), 16);
+  return Number.isNaN(value) ? 0 : value;
+}
+
+function colorChannelHex(value: number): string {
+  const normalized = Math.max(0, Math.min(255, Math.round(value)));
+  const hex = normalized.toString(16).toUpperCase();
+  return hex.length === 1 ? '0' + hex : hex;
+}
+
+function mixThemeColor(from: string, to: string, amount: number): string {
+  const ratio = Math.max(0, Math.min(1, amount));
+  const red = colorChannel(from, 1) + (colorChannel(to, 1) - colorChannel(from, 1)) * ratio;
+  const green = colorChannel(from, 3) + (colorChannel(to, 3) - colorChannel(from, 3)) * ratio;
+  const blue = colorChannel(from, 5) + (colorChannel(to, 5) - colorChannel(from, 5)) * ratio;
+  return '#' + colorChannelHex(red) + colorChannelHex(green) + colorChannelHex(blue);
+}
+
+function accentFieldBackground(): string {
+  const themeName = currentThemeName();
+  if (themeName === 'Black') {
+    return mixThemeColor(accentIndicatorColor(), BLACK_PALETTE.surface, 0.88);
+  }
+  if (themeName === 'Dark') {
+    return mixThemeColor(accentIndicatorColor(), DARK_PALETTE.surface, 0.82);
+  }
+  return mixThemeColor(accentPrimaryColor(), LIGHT_PALETTE.surface, 0.90);
+}
+
+function accentSelectedBackground(lightVariant: boolean): string {
+  const themeName = currentThemeName();
+  if (themeName === 'Black') {
+    return mixThemeColor(accentIndicatorColor(), BLACK_PALETTE.surface, lightVariant ? 0.66 : 0.78);
+  }
+  if (themeName === 'Dark') {
+    return mixThemeColor(accentIndicatorColor(), DARK_PALETTE.surface, lightVariant ? 0.60 : 0.74);
+  }
+  return mixThemeColor(accentPrimaryColor(), LIGHT_PALETTE.surface, lightVariant ? 0.82 : 0.70);
+}
+
+function accentSelectedText(): string {
+  if (currentThemeName() === 'Light') {
+    return mixThemeColor(accentPrimaryColor(), '#000000', 0.28);
+  }
+  return mixThemeColor(accentIndicatorColor(), '#FFFFFF', 0.20);
+}
+
 export function currentThemeName(): string {
   const storedThemeName = normalizeThemeName(ehSettingsStore.getValue('theme', 'Light'));
   if (ehSettingsStore.getValue('follow_system_dark_mode', 'Off') !== 'On') {
@@ -266,11 +366,11 @@ export function themePageBackground(): string {
 }
 
 export function themePrimaryColor(): string {
-  return currentThemePalette().primary;
+  return accentPrimaryColor();
 }
 
 export function themeDetailActionColor(): string {
-  return isDarkTheme() ? currentThemePalette().selectedIndicator : currentThemePalette().primary;
+  return isDarkTheme() ? accentIndicatorColor() : accentPrimaryColor();
 }
 
 export function themeSurface(): string {
@@ -282,7 +382,7 @@ export function themeSurfaceVariant(): string {
 }
 
 export function themeFieldBackground(): string {
-  return currentThemePalette().fieldBackground;
+  return accentFieldBackground();
 }
 
 export function themePrimaryText(): string {
@@ -310,19 +410,19 @@ export function themePlaceholderColor(): string {
 }
 
 export function themeSelectedBackground(): string {
-  return currentThemePalette().selectedBackground;
+  return accentSelectedBackground(false);
 }
 
 export function themeSelectedBackgroundLight(): string {
-  return currentThemePalette().selectedBackgroundLight;
+  return accentSelectedBackground(true);
 }
 
 export function themeSelectedText(): string {
-  return currentThemePalette().selectedText;
+  return accentSelectedText();
 }
 
 export function themeSelectedIndicatorColor(): string {
-  return currentThemePalette().selectedIndicator;
+  return accentIndicatorColor();
 }
 
 export function themeScrimColor(): string {
@@ -418,7 +518,7 @@ export function themeDownloadStateWaitColor(): string {
 }
 
 export function themeDownloadStateActiveColor(): string {
-  return currentThemePalette().downloadStateActive;
+  return isDarkTheme() ? accentIndicatorColor() : accentPrimaryColor();
 }
 
 export function themeDownloadStateDoneColor(): string {

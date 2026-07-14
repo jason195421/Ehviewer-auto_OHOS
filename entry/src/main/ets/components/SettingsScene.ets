@@ -565,7 +565,7 @@ export struct SettingsScene {
     if (key === 'show_jpn_title') {
       notifyGalleryTitleChanged();
     }
-    if (key === 'theme' || key === 'follow_system_dark_mode') {
+    if (key === 'theme' || key === 'theme_color' || key === 'follow_system_dark_mode') {
       notifyThemeChanged();
       this.settingsRenderRevision++;
       applyAppChromeImmersiveMode();
@@ -611,7 +611,7 @@ export struct SettingsScene {
       const displayValue = settingDisplayValueForStatus(key, normalizedValue);
       this.statusText = isNetworkSettingKey(key) ? 'Saved network setting: ' + key + ' = ' + displayValue +
         '. Refresh Homepage or run Network diagnostics.' : 'Saved: ' + key + ' = ' + displayValue;
-      if (key === 'theme' || key === 'follow_system_dark_mode') {
+      if (key === 'theme' || key === 'theme_color' || key === 'follow_system_dark_mode') {
         this.statusText = 'Theme refreshed';
       }
       if (cachePrune !== null && key === 'read_cache_size') {
@@ -1412,7 +1412,7 @@ export struct SettingsScene {
               if (e.key === 'app_language' && ehSettingsStore.getValue('app_language', 'System') !== e.value) {
                 languageChanged = true;
               }
-              if ((e.key === 'theme' || e.key === 'follow_system_dark_mode') &&
+              if ((e.key === 'theme' || e.key === 'theme_color' || e.key === 'follow_system_dark_mode') &&
                 ehSettingsStore.getValue(e.key, '') !== importedValue) {
                 themeChanged = true;
               }

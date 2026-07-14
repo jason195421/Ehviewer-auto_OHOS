@@ -30,6 +30,7 @@ export function defaultSettingEntries(): SettingEntry[] {
     { key: 'use_account_default_filter', value: 'On' },
     { key: 'follow_system_dark_mode', value: 'Off' },
     { key: 'theme', value: 'Light' },
+    { key: 'theme_color', value: 'Blue' },
     { key: 'launch_page', value: 'Homepage' },
     { key: 'list_mode', value: 'Detail' },
     { key: 'detail_size', value: 'Medium' },
