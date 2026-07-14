@@ -47,6 +47,7 @@ export function defaultSettingEntries(): SettingEntry[] {
     { key: 'translation_buttons_enabled', value: 'On' },
     { key: 'translation_provider', value: 'Google Web' },
     { key: 'translation_machine_provider', value: 'Google Web' },
+    { key: 'translation_batch_enabled', value: 'On' },
     { key: 'translation_ai_enabled', value: 'Off' },
     { key: 'translation_ai_provider', value: 'DeepSeek' },
     { key: 'translation_target_language', value: 'Simplified Chinese' },

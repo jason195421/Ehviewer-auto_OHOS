@@ -41,6 +41,17 @@ interface TranslationSlotWaiter {
   resume: () => void;
 }
 
+interface MachineTranslationBatchItem {
+  text: string;
+  target: string;
+  provider: string;
+  requestKey: string;
+  priority: number;
+  allowWhenDisabled: boolean;
+  resolve: (value: string | PromiseLike<string>) => void;
+  reject: (reason?: Object) => void;
+}
+
 interface MyMemoryResponseData {
   translatedText?: string;
 }
@@ -166,7 +177,10 @@ interface GeminiModelListResponse {
 }
 
 const MAX_CACHE_ENTRIES: number = 1200;
-const MAX_ACTIVE_REQUESTS: number = 3;
+const DEFAULT_MAX_ACTIVE_REQUESTS: number = 3;
+const MACHINE_BATCH_MAX_ACTIVE_REQUESTS: number = 1;
+const MACHINE_BATCH_WINDOW_MS: number = 200;
+const MACHINE_BATCH_MAX_ITEMS: number = 20;
 const AI_TRANSLATION_CHUNK_LENGTH: number = 2400;
 const AI_TRANSLATION_MAX_ATTEMPTS: number = 2;
 const OPENAI_PROMPT_CACHE_SHARDS: number = 4;
@@ -257,6 +271,10 @@ let translationSessionRevision: number = 0;
 let translationWaiterSequence: number = 0;
 
 export class EhTranslationService {
+  private machineBatchQueue: MachineTranslationBatchItem[] = [];
+  private machineBatchTimer: number = -1;
+  private machineBatchSequence: number = 0;
+
   setEnabled(enabled: boolean): void {
     const wasEnabled = AppStorage.get<boolean>(TRANSLATION_ENABLED_KEY) === true;
     if (enabled && !wasEnabled) {
@@ -267,6 +285,7 @@ export class EhTranslationService {
     if (!enabled) {
       translationSessionRevision++;
       this.clearCache();
+      this.cancelPendingMachineBatches();
       cancelTranslationRequests();
     }
   }
@@ -300,6 +319,7 @@ export class EhTranslationService {
     const pending = getPendingTranslation(key);
     if (pending !== null) {
       promoteTranslationWaiter(key, priority);
+      this.promoteMachineBatchPriority(key, priority);
       return pending;
     }
     const promise = this.translateInternal(source, provider, target, contentKind, key, priority, allowWhenDisabled)
@@ -383,6 +403,10 @@ export class EhTranslationService {
 
   private async translateInternal(text: string, provider: string, target: string,
     contentKind: string, requestKey: string, priority: number, allowWhenDisabled: boolean): Promise<string> {
+    if (isMachineTranslationProvider(provider) && !allowWhenDisabled &&
+      ehSettingsStore.getValue('translation_batch_enabled', 'On') === 'On') {
+      return await this.enqueueMachineTranslation(text, target, provider, requestKey, priority, allowWhenDisabled);
+    }
     await acquireTranslationSlot(requestKey, priority);
     try {
       if (isMachineTranslationProvider(provider)) {
@@ -416,6 +440,132 @@ export class EhTranslationService {
       return await this.translateWithGoogleWeb(text, target, allowWhenDisabled);
     } finally {
       releaseTranslationSlot();
+    }
+  }
+
+  private enqueueMachineTranslation(text: string, target: string, provider: string, requestKey: string,
+    priority: number, allowWhenDisabled: boolean): Promise<string> {
+    const promise = new Promise<string>((resolve: (value: string | PromiseLike<string>) => void,
+      reject: (reason?: Object) => void) => {
+      this.machineBatchQueue.push({
+        text: text,
+        target: target,
+        provider: provider,
+        requestKey: requestKey,
+        priority: priority,
+        allowWhenDisabled: allowWhenDisabled,
+        resolve: resolve,
+        reject: reject
+      });
+    });
+    if (this.machineBatchTimer < 0) {
+      this.machineBatchTimer = setTimeout(() => {
+        this.machineBatchTimer = -1;
+        this.flushMachineTranslationQueue();
+      }, MACHINE_BATCH_WINDOW_MS);
+    }
+    if (this.machineBatchQueue.length >= MACHINE_BATCH_MAX_ITEMS) {
+      clearTimeout(this.machineBatchTimer);
+      this.machineBatchTimer = -1;
+      this.flushMachineTranslationQueue();
+    }
+    return promise;
+  }
+
+  private flushMachineTranslationQueue(): void {
+    if (this.machineBatchQueue.length === 0) {
+      return;
+    }
+    const queued = this.machineBatchQueue.splice(0, this.machineBatchQueue.length);
+    queued.sort((left: MachineTranslationBatchItem, right: MachineTranslationBatchItem) =>
+      right.priority - left.priority);
+    while (queued.length > 0) {
+      const first = queued.shift() as MachineTranslationBatchItem;
+      const batch: MachineTranslationBatchItem[] = [first];
+      const limit = machineBatchCharacterLimit(first.provider);
+      let combinedLength = first.text.length;
+      for (let i = 0; i < queued.length && batch.length < MACHINE_BATCH_MAX_ITEMS;) {
+        const candidate = queued[i];
+        const matches = candidate.provider === first.provider && candidate.target === first.target &&
+          candidate.allowWhenDisabled === first.allowWhenDisabled;
+        const nextLength = combinedLength + candidate.text.length + machineBatchSeparator(0).length;
+        if (matches && nextLength <= limit) {
+          batch.push(candidate);
+          combinedLength = nextLength;
+          queued.splice(i, 1);
+        } else {
+          i++;
+        }
+      }
+      this.processMachineTranslationBatch(batch);
+    }
+  }
+
+  private async processMachineTranslationBatch(batch: MachineTranslationBatchItem[]): Promise<void> {
+    let maxPriority = batch[0].priority;
+    for (let i = 1; i < batch.length; i++) {
+      maxPriority = Math.max(maxPriority, batch[i].priority);
+    }
+    await acquireTranslationSlot(batch[0].requestKey, maxPriority);
+    try {
+      if (batch.length === 1) {
+        batch[0].resolve(await this.translateWithMachineFallback(batch[0].text, batch[0].target,
+          batch[0].provider, batch[0].allowWhenDisabled));
+        return;
+      }
+      const separator = machineBatchSeparator(this.machineBatchSequence++);
+      const sources: string[] = [];
+      for (let i = 0; i < batch.length; i++) {
+        sources.push(batch[i].text);
+      }
+      const translated = await this.translateWithMachineFallback(sources.join(separator), batch[0].target,
+        batch[0].provider, batch[0].allowWhenDisabled);
+      const results = translated.split(separator);
+      if (results.length === batch.length && machineBatchResultsAreUsable(results)) {
+        for (let i = 0; i < batch.length; i++) {
+          batch[i].resolve(results[i].trim());
+        }
+        return;
+      }
+      await this.translateMachineBatchIndividually(batch);
+    } catch (error) {
+      const failure = error instanceof Error ? error : new Error(String(error));
+      for (let i = 0; i < batch.length; i++) {
+        batch[i].reject(failure);
+      }
+    } finally {
+      releaseTranslationSlot();
+    }
+  }
+
+  private async translateMachineBatchIndividually(batch: MachineTranslationBatchItem[]): Promise<void> {
+    for (let i = 0; i < batch.length; i++) {
+      try {
+        batch[i].resolve(await this.translateWithMachineFallback(batch[i].text, batch[i].target,
+          batch[i].provider, batch[i].allowWhenDisabled));
+      } catch (error) {
+        batch[i].reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    }
+  }
+
+  private promoteMachineBatchPriority(requestKey: string, priority: number): void {
+    for (let i = 0; i < this.machineBatchQueue.length; i++) {
+      if (this.machineBatchQueue[i].requestKey === requestKey && priority > this.machineBatchQueue[i].priority) {
+        this.machineBatchQueue[i].priority = priority;
+      }
+    }
+  }
+
+  private cancelPendingMachineBatches(): void {
+    if (this.machineBatchTimer >= 0) {
+      clearTimeout(this.machineBatchTimer);
+      this.machineBatchTimer = -1;
+    }
+    const queued = this.machineBatchQueue.splice(0, this.machineBatchQueue.length);
+    const error = new Error(TRANSLATION_CANCELLED_MESSAGE);
+    for (let i = 0; i < queued.length; i++) {
+      queued[i].reject(error);
     }
   }
 
@@ -1002,6 +1152,32 @@ function machineProviderFallbackOrder(primaryProvider: string): string[] {
   return result;
 }
 
+function machineBatchCharacterLimit(provider: string): number {
+  if (provider === 'MyMemory') {
+    return 120;
+  }
+  if (provider === 'Bing Web' || provider === 'Youdao Web') {
+    return 800;
+  }
+  if (provider === 'Baidu Web') {
+    return 900;
+  }
+  return 1600;
+}
+
+function machineBatchSeparator(sequence: number): string {
+  return '\n⟦※◇◆' + sequence.toString() + '◆◇※⟧\n';
+}
+
+function machineBatchResultsAreUsable(results: string[]): boolean {
+  for (let i = 0; i < results.length; i++) {
+    if (results[i].trim().length === 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function activePromptConfigurationKey(): string {
   const selected = ehSettingsStore.getValue('translation_prompt_selected', 'preset_faithful');
   const custom = ehSettingsStore.getValue('translation_prompt_custom_profiles', '[]');
@@ -1209,7 +1385,7 @@ function removePendingTranslation(key: string): void {
 }
 
 function acquireTranslationSlot(key: string, priority: number): Promise<void> {
-  if (activeRequests < MAX_ACTIVE_REQUESTS) {
+  if (activeRequests < activeTranslationRequestLimit()) {
     activeRequests++;
     return Promise.resolve();
   }
@@ -1228,13 +1404,19 @@ function acquireTranslationSlot(key: string, priority: number): Promise<void> {
 
 function releaseTranslationSlot(): void {
   activeRequests = Math.max(0, activeRequests - 1);
-  if (SLOT_WAITERS.length > 0 && activeRequests < MAX_ACTIVE_REQUESTS) {
+  while (SLOT_WAITERS.length > 0 && activeRequests < activeTranslationRequestLimit()) {
     const waiterIndex = highestPriorityWaiterIndex();
     const waiter = waiterIndex < 0 ? undefined : SLOT_WAITERS.splice(waiterIndex, 1)[0];
     if (waiter !== undefined) {
       waiter.resume();
     }
   }
+}
+
+function activeTranslationRequestLimit(): number {
+  const machineBatchEnabled = ehSettingsStore.getValue('translation_batch_enabled', 'On') === 'On' &&
+    ehSettingsStore.getValue('translation_ai_enabled', 'Off') !== 'On';
+  return machineBatchEnabled ? MACHINE_BATCH_MAX_ACTIVE_REQUESTS : DEFAULT_MAX_ACTIVE_REQUESTS;
 }
 
 function promoteTranslationWaiter(key: string, priority: number): void {

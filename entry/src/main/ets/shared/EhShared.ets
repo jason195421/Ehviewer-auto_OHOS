@@ -825,6 +825,8 @@ export function zhText(text: string): string {
     case 'Machine translation provider': return '普通机翻服务';
     case 'Choose a web translation service used when AI translation is off': return '选择关闭 AI 翻译时使用的网页翻译服务';
     case 'Choose the web translation service': return '选择网页翻译服务';
+    case 'Merge translation requests': return '合并翻译请求';
+    case 'Combine pending texts to reduce public service request frequency': return '合并待翻译文本，降低公共服务请求频率';
     case 'AI translation': return 'AI 翻译';
     case 'AI translation service': return 'AI 翻译服务';
     case 'Choose the AI translation service': return '选择 AI 翻译服务';
@@ -2857,6 +2859,8 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
         'Choose the web translation service', '', 'section'));
       rows.push(optionSettingsRow('translation_machine_provider', 'Machine translation provider',
         'Choose the web translation service', entries, machineProviderOptions, machineProviderDescriptions));
+      rows.push(optionSettingsRow('translation_batch_enabled', 'Merge translation requests',
+        'Combine pending texts to reduce public service request frequency', entries, ON_OFF_OPTIONS));
       rows.push(staticSettingsRow('translation_public_notice', 'Public translation notice',
         'Public providers require no token but may be rate-limited or unavailable; translated text is sent to the selected service',
         machineProvider === 'Google Web' ? 'Experimental' : 'Public service', 'info'));
