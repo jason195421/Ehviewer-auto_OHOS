@@ -237,6 +237,10 @@ export function uiStatusText(text: string): string {
 }
 
 function simplifiedUiStatusText(text: string): string {
+  const deleteDownloadsMatch = /^Delete (\d+) selected downloads and their files\?$/.exec(text);
+  if (deleteDownloadsMatch !== null) {
+    return '将删除选中的 ' + deleteDownloadsMatch[1] + ' 个下载项及其文件，是否继续？';
+  }
   if (text.indexOf('Wi-Fi server error: ') === 0) {
     return 'Wi-Fi 服务器错误：' + text.substring('Wi-Fi server error: '.length);
   }

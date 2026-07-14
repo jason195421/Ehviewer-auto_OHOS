@@ -247,6 +247,7 @@ export struct DownloadScene {
   private downloadScrollOffset: number = 0;
   private toolbarRestoring: boolean = false;
   private cellularWarningDialogOpen: boolean = false;
+  private deleteConfirmationDialogOpen: boolean = false;
   private downloadCardStates: Map<number, DownloadCardState> = new Map<number, DownloadCardState>();
   private translationVisibleItems: number[] = [];
 
@@ -1164,8 +1165,6 @@ export struct DownloadScene {
       ehDownloadFileStore.removeGalleryDirectory(context, item);
     }
     ehDownloadStore.removeGallery(item.gid);
-    this.statusText = 'Removed: ' + item.title;
-    this.persistDownloads();
   }
 
   private deleteSelectedDownloads(): void {
@@ -1174,11 +1173,39 @@ export struct DownloadScene {
       this.statusText = 'Long press cards to select downloads';
       return;
     }
+    if (this.deleteConfirmationDialogOpen) {
+      return;
+    }
+    this.deleteConfirmationDialogOpen = true;
+    this.getUIContext().getPromptAction().showDialog({
+      title: uiText('Delete'),
+      message: uiStatusText('Delete ' + selected.length.toString() + ' selected downloads and their files?'),
+      buttons: [
+        {
+          text: uiText('Cancel'),
+          color: themeSecondaryText()
+        },
+        {
+          text: uiText('Delete'),
+          color: themePrimaryColor()
+        }
+      ]
+    }).then((data) => {
+      this.deleteConfirmationDialogOpen = false;
+      if (data.index === 1) {
+        this.removeSelectedDownloads(selected);
+      }
+    }).catch(() => {
+      this.deleteConfirmationDialogOpen = false;
+    });
+  }
+
+  private removeSelectedDownloads(selected: DownloadInfo[]): void {
     for (let i = 0; i < selected.length; i++) {
       this.removeItem(selected[i]);
     }
     this.clearDownloadSelection();
-    this.statusText = 'Removed ' + selected.length.toString() + ' downloads';
+    this.statusText = 'Removed ' + selected.length.toString() + ' download items';
     this.persistDownloads();
   }
 
