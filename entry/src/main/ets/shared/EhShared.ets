@@ -846,7 +846,7 @@ export function zhText(text: string): string {
     case 'Choose a web translation service used when AI translation is off': return '选择关闭 AI 翻译时使用的网页翻译服务';
     case 'Choose the web translation service': return '选择网页翻译服务';
     case 'Merge translation requests': return '合并翻译请求';
-    case 'Combine pending texts to reduce public service request frequency': return '合并待翻译文本，降低公共服务请求频率';
+    case 'Combine pending texts into fewer requests; AI batches contain up to 5 texts': return '合并待翻译文本以减少请求；AI 每批最多合并 5 条';
     case 'AI translation': return 'AI 翻译';
     case 'AI translation service': return 'AI 翻译服务';
     case 'Choose the AI translation service': return '选择 AI 翻译服务';
@@ -2911,16 +2911,18 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
         'Choose the web translation service', '', 'section'));
       rows.push(optionSettingsRow('translation_machine_provider', 'Machine translation provider',
         'Choose the web translation service', entries, machineProviderOptions, machineProviderDescriptions));
-      rows.push(optionSettingsRow('translation_batch_enabled', 'Merge translation requests',
-        'Combine pending texts to reduce public service request frequency', entries, ON_OFF_OPTIONS));
-      rows.push(staticSettingsRow('translation_public_notice', 'Public translation notice',
-        'Public providers require no token but may be rate-limited or unavailable; translated text is sent to the selected service',
-        machineProvider === 'Google Web' ? 'Experimental' : 'Public service', 'info'));
     } else {
       rows.push(staticSettingsRow('translation_ai_section', 'AI translation service',
         'Choose the AI translation service', '', 'section'));
       rows.push(optionSettingsRow('translation_ai_provider', 'AI translation provider',
         'Choose the AI service used while AI translation is enabled', entries, aiProviderOptions, aiProviderDescriptions));
+    }
+    rows.push(optionSettingsRow('translation_batch_enabled', 'Merge translation requests',
+      'Combine pending texts into fewer requests; AI batches contain up to 5 texts', entries, ON_OFF_OPTIONS));
+    if (!aiEnabled) {
+      rows.push(staticSettingsRow('translation_public_notice', 'Public translation notice',
+        'Public providers require no token but may be rate-limited or unavailable; translated text is sent to the selected service',
+        machineProvider === 'Google Web' ? 'Experimental' : 'Public service', 'info'));
     }
     if (aiEnabled && aiProvider === 'DeepSeek') {
       rows.push(textSettingsRow('translation_deepseek_api_key', 'DeepSeek API key',
