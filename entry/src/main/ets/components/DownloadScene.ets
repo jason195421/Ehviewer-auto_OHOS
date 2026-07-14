@@ -14,7 +14,11 @@ import {
 import { ehDownloadManager } from '../services/EhDownloadManager';
 import { DownloadInfo, DownloadState, ehDownloadStore } from '../services/EhDownloadStore';
 import { TRANSLATION_BUTTONS_VISIBLE_KEY, ehSettingsStore } from '../services/EhSettingsStore';
-import { TRANSLATION_ENABLED_KEY, ehTranslationService } from '../services/EhTranslationService';
+import {
+  TRANSLATION_ENABLED_KEY,
+  ehTranslationService,
+  translationPriorityForIndex
+} from '../services/EhTranslationService';
 import {
   DownloadRestoreResult,
   DownloadZipImportResult,
@@ -231,6 +235,8 @@ export struct DownloadScene {
   @State downloadJumpDraft: string = '1';
   @State downloadJumpPageIndex: number = 0;
   @State viewportHeight: number = 0;
+  @State translationVisibleStart: number = -1;
+  @State translationVisibleEnd: number = -1;
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
   @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeightPx: number = 0;
   @StorageProp(SPLIT_PANE_RATIO_REVISION_KEY) @Watch('onSplitPaneRatioRevisionChange') splitPaneRatioRevision: number = 0;
@@ -242,6 +248,7 @@ export struct DownloadScene {
   private toolbarRestoring: boolean = false;
   private cellularWarningDialogOpen: boolean = false;
   private downloadCardStates: Map<number, DownloadCardState> = new Map<number, DownloadCardState>();
+  private translationVisibleItems: number[] = [];
 
   aboutToAppear(): void {
     applyAppChromeImmersiveMode();
@@ -891,6 +898,42 @@ export struct DownloadScene {
     this.syncDownloadCardStates();
   }
 
+  private updateVisibleTranslationItem(index: number, visible: boolean): void {
+    const existing = this.translationVisibleItems.indexOf(index);
+    if (visible && existing < 0) {
+      this.translationVisibleItems.push(index);
+    } else if (!visible && existing >= 0) {
+      this.translationVisibleItems.splice(existing, 1);
+    }
+    if (this.translationVisibleItems.length === 0) {
+      this.translationVisibleStart = -1;
+      this.translationVisibleEnd = -1;
+      return;
+    }
+    let start = this.translationVisibleItems[0];
+    let end = start;
+    for (let i = 1; i < this.translationVisibleItems.length; i++) {
+      start = Math.min(start, this.translationVisibleItems[i]);
+      end = Math.max(end, this.translationVisibleItems[i]);
+    }
+    this.translationVisibleStart = start;
+    this.translationVisibleEnd = end;
+  }
+
+  private setVisibleTranslationRange(start: number, end: number): void {
+    this.translationVisibleItems = [];
+    this.translationVisibleStart = start;
+    this.translationVisibleEnd = end;
+  }
+
+  private translationPriorityFor(index: number): number {
+    if (!this.translationEnabled) {
+      return 0;
+    }
+    return translationPriorityForIndex(index, this.translationVisibleStart, this.translationVisibleEnd,
+      this.downloadColumnCount());
+  }
+
   private syncDownloadCardStates(): void {
     const live: Map<number, DownloadCardState> = new Map<number, DownloadCardState>();
     for (let i = 0; i < this.items.length; i++) {
@@ -1305,13 +1348,14 @@ export struct DownloadScene {
   }
 
   @Builder
-  private downloadCardContent(item: DownloadInfo) {
+  private downloadCardContent(item: DownloadInfo, index: number) {
     Column() {
       if (galleryListMode() === 'Thumb') {
         GalleryThumbCard({
           gallery: item,
           selected: this.isDownloadSelected(item.gid),
           translateTitle: this.translationEnabled,
+          translationPriority: this.translationPriorityFor(index),
           onLongPress: (_pressed: GalleryInfo) => {
             this.toggleDownloadSelection(item);
           }
@@ -1326,6 +1370,7 @@ export struct DownloadScene {
           gallery: item,
           selected: this.isDownloadSelected(item.gid),
           translateTitle: this.translationEnabled,
+          translationPriority: this.translationPriorityFor(index),
           onLongPress: (_pressed: GalleryInfo) => {
             this.toggleDownloadSelection(item);
           }
@@ -1367,12 +1412,15 @@ export struct DownloadScene {
   private downloadStandardList() {
     List({ space: 0, scroller: this.downloadScroller }) {
       ListItemGroup({ header: this.downloadListEdgeSpacer() }) {
-        ForEach(this.visibleItems, (item: DownloadInfo) => {
+        ForEach(this.visibleItems, (item: DownloadInfo, index: number) => {
           ListItem() {
-            this.downloadCardContent(item)
+            this.downloadCardContent(item, index)
           }
           .margin({ bottom: this.downloadCardGap() })
           .reuseId('download-card-item')
+          .onVisibleAreaChange([0.0, 0.01], (visible: boolean, _ratio: number) => {
+            this.updateVisibleTranslationItem(index, visible);
+          })
           .animation({ duration: 220, curve: Curve.EaseOut })
           .transition(TransitionEffect.OPACITY.animation({ duration: 160, curve: Curve.EaseInOut }))
         }, (item: DownloadInfo) => item.gid.toString())
@@ -1409,7 +1457,7 @@ export struct DownloadScene {
     WaterFlow({ scroller: this.downloadScroller }) {
       ForEach(this.visibleItems, (item: DownloadInfo, index: number) => {
         FlowItem() {
-          this.downloadCardContent(item)
+          this.downloadCardContent(item, index)
         }
         .width('100%')
         .margin({ top: index < this.downloadColumnCount() ? this.downloadCardGap() : 0 })
@@ -1441,6 +1489,9 @@ export struct DownloadScene {
     })
     .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) => {
       this.rememberDownloadScrollOffset();
+    })
+    .onScrollIndex((first: number, last: number) => {
+      this.setVisibleTranslationRange(first, last);
     })
     .onScrollStop(() => {
       this.rememberDownloadScrollOffset();

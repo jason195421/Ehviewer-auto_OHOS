@@ -823,7 +823,10 @@ export function zhText(text: string): string {
     case 'Machine translation': return '普通机翻';
     case 'Machine translation provider': return '普通机翻服务';
     case 'Choose a web translation service used when AI translation is off': return '选择关闭 AI 翻译时使用的网页翻译服务';
+    case 'Choose the web translation service': return '选择网页翻译服务';
     case 'AI translation': return 'AI 翻译';
+    case 'AI translation service': return 'AI 翻译服务';
+    case 'Choose the AI translation service': return '选择 AI 翻译服务';
     case 'Use the selected AI service instead of ordinary machine translation': return '使用所选 AI 服务代替普通机翻';
     case 'AI translation provider': return 'AI 翻译服务';
     case 'Choose the AI service used while AI translation is enabled': return '选择启用 AI 翻译时使用的服务';
@@ -839,6 +842,7 @@ export function zhText(text: string): string {
     case 'Create a custom prompt from the current content': return '以当前内容新建自定义提示词';
     case 'Prompt saved': return '提示词已保存';
     case 'Prompt selected': return '已切换提示词';
+    case 'Prompt deleted': return '提示词已删除';
     case 'Built-in preset': return '内置预设';
     case 'Prompt name and content are required': return '提示词名称和内容不能为空';
     case 'Built-in presets are read-only; saving creates a custom copy': return '内置预设不可覆盖，保存时会创建自定义副本';
@@ -2839,25 +2843,25 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
     const rows: SettingsRowItem[] = [
       optionSettingsRow('translation_buttons_enabled', 'Translation feature',
         'Show translation buttons on gallery lists, details and comments', entries, ON_OFF_OPTIONS),
+      optionSettingsRow('translation_ai_enabled', 'AI translation',
+        'Use the selected AI service instead of ordinary machine translation', entries, ON_OFF_OPTIONS),
       optionSettingsRow('translation_target_language', 'Target language',
         'Language used for gallery titles and comments', entries,
         ['Simplified Chinese', 'Traditional Chinese', 'English', 'Japanese', 'Korean']),
       optionSettingsRow('translation_timeout', 'Translation timeout',
-        'Maximum wait time for a translation request', entries, ['10s', '15s', '20s', '30s', '45s', '60s']),
-      staticSettingsRow('translation_machine_section', 'Machine translation',
-        'Choose a web translation service used when AI translation is off', '', 'section'),
-      optionSettingsRow('translation_machine_provider', 'Machine translation provider',
-        'Choose a web translation service used when AI translation is off', entries, machineProviderOptions,
-        machineProviderDescriptions),
-      staticSettingsRow('translation_public_notice', 'Public translation notice',
-        'Public providers require no token but may be rate-limited or unavailable; translated text is sent to the selected service',
-        machineProvider === 'Google Web' ? 'Experimental' : 'Public service', 'info'),
-      staticSettingsRow('translation_ai_section', 'AI translation',
-        'Use the selected AI service instead of ordinary machine translation', '', 'section'),
-      optionSettingsRow('translation_ai_enabled', 'AI translation',
-        'Use the selected AI service instead of ordinary machine translation', entries, ON_OFF_OPTIONS)
+        'Maximum wait time for a translation request', entries, ['10s', '15s', '20s', '30s', '45s', '60s'])
     ];
-    if (aiEnabled) {
+    if (!aiEnabled) {
+      rows.push(staticSettingsRow('translation_machine_section', 'Machine translation',
+        'Choose the web translation service', '', 'section'));
+      rows.push(optionSettingsRow('translation_machine_provider', 'Machine translation provider',
+        'Choose the web translation service', entries, machineProviderOptions, machineProviderDescriptions));
+      rows.push(staticSettingsRow('translation_public_notice', 'Public translation notice',
+        'Public providers require no token but may be rate-limited or unavailable; translated text is sent to the selected service',
+        machineProvider === 'Google Web' ? 'Experimental' : 'Public service', 'info'));
+    } else {
+      rows.push(staticSettingsRow('translation_ai_section', 'AI translation service',
+        'Choose the AI translation service', '', 'section'));
       rows.push(optionSettingsRow('translation_ai_provider', 'AI translation provider',
         'Choose the AI service used while AI translation is enabled', entries, aiProviderOptions, aiProviderDescriptions));
     }

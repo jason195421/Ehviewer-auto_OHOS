@@ -104,6 +104,7 @@ function isGalleryDetailUrl(url: string): boolean {
 export struct CommentLinkedText {
   @Prop @Watch('onContentChanged') html: string = '';
   @Prop @Watch('onTranslationChanged') translateComment: boolean = false;
+  @Prop @Watch('onTranslationPriorityChanged') translationPriority: number = 2;
   @Prop maxLines: number = 1000;
   @Prop openGalleryLinksInApp: boolean = false;
   @Prop selectable: boolean = true;
@@ -124,18 +125,22 @@ export struct CommentLinkedText {
     this.updateTranslation();
   }
 
+  onTranslationPriorityChanged(): void {
+    this.updateTranslation();
+  }
+
   private updateTranslation(): void {
     this.translationRequestVersion++;
     const version = this.translationRequestVersion;
     this.translatedText = '';
-    if (!this.translateComment) {
+    if (!this.translateComment || this.translationPriority <= 0) {
       return;
     }
     const source = commentPlainTextFromHtml(this.html);
     if (source.length === 0) {
       return;
     }
-    ehTranslationService.translateComment(source).then((translated: string) => {
+    ehTranslationService.translateComment(source, this.translationPriority).then((translated: string) => {
       if (version === this.translationRequestVersion && this.translateComment) {
         this.translatedText = translated;
       }
@@ -229,6 +234,7 @@ export struct GalleryCommentRow {
   selectableText: boolean = true;
   rowClickable: boolean = false;
   @Prop translateComment: boolean = false;
+  @Prop translationPriority: number = 2;
   onVoteComment: (comment: GalleryComment, vote: number) => void = (_comment: GalleryComment, _vote: number) => {};
   onOpenGalleryLink: (url: string) => void = (_url: string) => {};
   onTapRow: () => void = () => {};
@@ -294,6 +300,7 @@ export struct GalleryCommentRow {
         openGalleryLinksInApp: this.openGalleryLinksInApp,
         selectable: this.selectableText,
         translateComment: this.translateComment,
+        translationPriority: this.translationPriority,
         onOpenGalleryLink: this.onOpenGalleryLink,
         onTapText: this.onTapRow
       })

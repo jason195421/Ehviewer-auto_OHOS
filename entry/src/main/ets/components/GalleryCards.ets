@@ -74,6 +74,7 @@ export struct GalleryListRow {
   @Prop gallery: GalleryInfo = createEmptyGallery();
   @Prop selected: boolean = false;
   @Prop translateTitle: boolean = false;
+  @Prop translationPriority: number = 2;
   onLongPress: (gallery: GalleryInfo) => void = (_gallery: GalleryInfo) => {
   };
   @StorageProp(HISTORY_READ_REVISION_KEY) historyReadRevision: number = 0;
@@ -356,6 +357,7 @@ export struct GalleryListRow {
           TranslationText({
             sourceText: galleryDisplayTitle(this.gallery),
             translationEnabled: this.translateTitle,
+            translationPriority: this.translationPriority,
             fontSizeValue: this.titleFontSize(),
             fontWeightValue: FontWeight.Medium,
             fontColorValue: themePrimaryText(),
@@ -590,6 +592,7 @@ export struct GalleryThumbCard {
   @Prop @Watch('onGalleryChange') gallery: GalleryInfo = createEmptyGallery();
   @Prop selected: boolean = false;
   @Prop translateTitle: boolean = false;
+  @Prop translationPriority: number = 2;
   onLongPress: (gallery: GalleryInfo) => void = (_gallery: GalleryInfo) => {
   };
   @StorageProp(HISTORY_READ_REVISION_KEY) historyReadRevision: number = 0;
@@ -696,6 +699,7 @@ export struct GalleryThumbCard {
             TranslationText({
               sourceText: galleryDisplayTitle(this.gallery),
               translationEnabled: this.translateTitle,
+              translationPriority: this.translationPriority,
               fontSizeValue: 15,
               lineHeightValue: 19,
               fontWeightValue: FontWeight.Medium,

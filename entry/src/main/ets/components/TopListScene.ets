@@ -1,7 +1,11 @@
 import { GalleryCategory, GalleryDetail, GalleryRoute, GallerySite, TopListBucket, TopListDetail, TopListInfo, TopListItem, TopListKind } from '../model/GalleryModels';
 import { EhHttpClient, TopListLoadResult } from '../services/EhHttpClient';
 import { AsyncRequestGate } from '../services/AsyncRequestGate';
-import { TRANSLATION_ENABLED_KEY, ehTranslationService } from '../services/EhTranslationService';
+import {
+  TRANSLATION_ENABLED_KEY,
+  ehTranslationService,
+  translationPriorityForIndex
+} from '../services/EhTranslationService';
 import { TRANSLATION_BUTTONS_VISIBLE_KEY } from '../services/EhSettingsStore';
 import { DEFAULT_ADVANCE_SEARCH, ListMode } from '../services/EhUrl';
 import { DetailSearchRequest } from '../services/GalleryDetailActionSupport';
@@ -884,6 +888,8 @@ export struct TopListBoard {
   @Prop statusBarHeight: number = 0;
   @Prop renderVersion: number = 0;
   @Prop translateTitles: boolean = false;
+  @State translationVisibleStart: number = -1;
+  @State translationVisibleEnd: number = -1;
   onSelectList: (index: number) => void = () => {};
   onOpenBucket: (bucket: TopListBucket) => void = () => {};
   onOpenItem: (item: TopListItem, info: TopListInfo) => void = () => {};
@@ -893,6 +899,13 @@ export struct TopListBoard {
   };
   private boardScroller: Scroller = new Scroller();
   private readonly TABS_BAR_HEIGHT: number = 42;
+
+  private translationPriorityFor(index: number): number {
+    if (!this.translateTitles) {
+      return 0;
+    }
+    return translationPriorityForIndex(index, this.translationVisibleStart, this.translationVisibleEnd);
+  }
 
   private tabsVisualTop(): number {
     return Math.max(0, this.topPadding + this.toolbarOffsetY);
@@ -925,12 +938,13 @@ export struct TopListBoard {
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       List({ space: 10, scroller: this.boardScroller }) {
-        ForEach(this.info.buckets, (bucket: TopListBucket) => {
+        ForEach(this.info.buckets, (bucket: TopListBucket, index: number) => {
           ListItem() {
             TopListBucketCard({
               bucket: bucket,
               info: this.info,
               translateTitles: this.translateTitles,
+              translationPriority: this.translationPriorityFor(index),
               canOpenBucket: this.info.kind === TopListKind.Gallery,
               onOpenBucket: this.onOpenBucket,
               onOpenItem: this.onOpenItem
@@ -955,6 +969,10 @@ export struct TopListBoard {
         return {
           offsetRemain: this.onScrollUpdate(normalizeSceneScrollOffset(this.boardScroller.currentOffset().yOffset), offset)
         };
+      })
+      .onScrollIndex((first: number, last: number) => {
+        this.translationVisibleStart = first;
+        this.translationVisibleEnd = last;
       })
       .onScrollStop(() => {
         const offset = normalizeSceneScrollOffset(this.boardScroller.currentOffset().yOffset);
@@ -981,6 +999,7 @@ export struct TopListBucketCard {
   @Prop info: TopListInfo = createEmptyTopListInfo();
   @Prop canOpenBucket: boolean = false;
   @Prop translateTitles: boolean = false;
+  @Prop translationPriority: number = 2;
   onOpenBucket: (bucket: TopListBucket) => void = () => {};
   onOpenItem: (item: TopListItem, info: TopListInfo) => void = () => {};
 
@@ -1010,6 +1029,7 @@ export struct TopListBucketCard {
             item: item,
             color: topListChipColor(index),
             translateTitle: this.translateTitles && this.info.kind === TopListKind.Gallery,
+            translationPriority: this.translationPriority,
             onTap: () => {
               this.onOpenItem(item, this.info);
             }
@@ -1031,6 +1051,7 @@ export struct TopListChip {
   item: TopListItem = createEmptyTopListItem();
   color: string = themePrimaryColor();
   @Prop translateTitle: boolean = false;
+  @Prop translationPriority: number = 2;
   onTap: () => void = () => {};
 
   build() {
@@ -1038,6 +1059,7 @@ export struct TopListChip {
       TranslationText({
         sourceText: this.item.value,
         translationEnabled: this.translateTitle,
+        translationPriority: this.translationPriority,
         fontSizeValue: 13,
         lineHeightValue: 18,
         fontColorValue: themeOnPrimaryText(),

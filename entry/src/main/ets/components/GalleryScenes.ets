@@ -18,7 +18,11 @@ import { TRANSLATION_BUTTONS_VISIBLE_KEY, ehSettingsStore } from '../services/Eh
 import { ehTagTranslationStore } from '../services/EhTagTranslationStore';
 import { AsyncRequestGate } from '../services/AsyncRequestGate';
 import { gallerySiteCandidates } from '../services/EhGallerySiteFallback';
-import { TRANSLATION_ENABLED_KEY, ehTranslationService } from '../services/EhTranslationService';
+import {
+  TRANSLATION_ENABLED_KEY,
+  ehTranslationService,
+  translationPriorityForIndex
+} from '../services/EhTranslationService';
 import { DetailSearchRequest } from '../services/GalleryDetailActionSupport';
 import {
   createGalleryDetailLink,
@@ -3877,6 +3881,8 @@ export struct GalleryListContent {
   private galleryThumbnailAspectRatioAverage: number = 0.75;
   @State private contentOpacity: number = 1;
   @State toolbarOffsetY: number = 0;
+  @State translationVisibleStart: number = -1;
+  @State translationVisibleEnd: number = -1;
   @State favoriteDrawerVisible: boolean = false;
   @State favoriteDrawerOffsetX: number = 288;
   @State favoriteDrawerOverlayOpacity: number = 0;
@@ -3884,6 +3890,7 @@ export struct GalleryListContent {
   @State bookmarkDrawerOffsetX: number = 288;
   @State bookmarkDrawerOverlayOpacity: number = 0;
   private toolbarRestoring: boolean = false;
+  private translationVisibleItems: number[] = [];
   private unregisterActiveBackHandler: () => void = () => {};
   private barHeight: number = 56; // matches EhNavBar body height
   private readonly FAVORITE_DRAWER_WIDTH: number = 288;
@@ -3905,6 +3912,9 @@ export struct GalleryListContent {
   }
 
   onGalleriesChanged(): void {
+    this.translationVisibleItems = [];
+    this.translationVisibleStart = -1;
+    this.translationVisibleEnd = -1;
     if (this.galleries.length === 0) {
       this.galleryThumbnailAspectRatioAverage = 0.75;
       return;
@@ -4008,6 +4018,42 @@ export struct GalleryListContent {
     setTimeout(() => {
       this.syncContentWidthFromWindow();
     }, 0);
+  }
+
+  private updateVisibleTranslationItem(index: number, visible: boolean): void {
+    const existing = this.translationVisibleItems.indexOf(index);
+    if (visible && existing < 0) {
+      this.translationVisibleItems.push(index);
+    } else if (!visible && existing >= 0) {
+      this.translationVisibleItems.splice(existing, 1);
+    }
+    if (this.translationVisibleItems.length === 0) {
+      this.translationVisibleStart = -1;
+      this.translationVisibleEnd = -1;
+      return;
+    }
+    let start = this.translationVisibleItems[0];
+    let end = start;
+    for (let i = 1; i < this.translationVisibleItems.length; i++) {
+      start = Math.min(start, this.translationVisibleItems[i]);
+      end = Math.max(end, this.translationVisibleItems[i]);
+    }
+    this.translationVisibleStart = start;
+    this.translationVisibleEnd = end;
+  }
+
+  private setVisibleTranslationRange(start: number, end: number): void {
+    this.translationVisibleItems = [];
+    this.translationVisibleStart = start;
+    this.translationVisibleEnd = end;
+  }
+
+  private translationPriorityFor(index: number): number {
+    if (!this.translationEnabled) {
+      return 0;
+    }
+    return translationPriorityForIndex(index, this.translationVisibleStart, this.translationVisibleEnd,
+      this.galleryColumnCount());
   }
 
   aboutToDisappear(): void {
@@ -4642,12 +4688,13 @@ export struct GalleryListContent {
   }
 
   @Builder
-  private galleryItem(gallery: GalleryInfo) {
+  private galleryItem(gallery: GalleryInfo, index: number) {
     ListItem() {
       if (galleryListMode() === 'Thumb') {
         GalleryThumbCard({
           gallery: gallery,
           translateTitle: this.translationEnabled,
+          translationPriority: this.translationPriorityFor(index),
           onLongPress: (pressed: GalleryInfo) => {
             this.onLongPressGallery(pressed);
           }
@@ -4661,6 +4708,7 @@ export struct GalleryListContent {
         GalleryListRow({
           gallery: gallery,
           translateTitle: this.translationEnabled,
+          translationPriority: this.translationPriorityFor(index),
           onLongPress: (pressed: GalleryInfo) => {
             this.onLongPressGallery(pressed);
           }
@@ -4673,16 +4721,20 @@ export struct GalleryListContent {
       }
     }
     .reuseId('gallery-card-item')
+    .onVisibleAreaChange([0.0, 0.01], (visible: boolean, _ratio: number) => {
+      this.updateVisibleTranslationItem(index, visible);
+    })
     .animation({ duration: 220, curve: Curve.EaseOut })
     .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
   }
 
   @Builder
-  private galleryFlowItem(gallery: GalleryInfo, addTopSpacing: boolean = false) {
+  private galleryFlowItem(gallery: GalleryInfo, index: number, addTopSpacing: boolean = false) {
     FlowItem() {
       GalleryThumbCard({
         gallery: gallery,
         translateTitle: this.translationEnabled,
+        translationPriority: this.translationPriorityFor(index),
         onLongPress: (pressed: GalleryInfo) => {
           this.onLongPressGallery(pressed);
         }
@@ -4750,8 +4802,8 @@ export struct GalleryListContent {
           footer: this.galleryListFooter(),
           space: this.galleryCardGap()
         }) {
-          ForEach(this.galleries, (gallery: GalleryInfo) => {
-            this.galleryItem(gallery)
+          ForEach(this.galleries, (gallery: GalleryInfo, index: number) => {
+            this.galleryItem(gallery, index)
           }, (gallery: GalleryInfo) => this.galleryCardKey(gallery))
         }
       }
@@ -4789,7 +4841,7 @@ export struct GalleryListContent {
   private galleryThumbnailWaterFlow() {
     WaterFlow({ footer: this.galleryListFooter(), scroller: this.listScroller }) {
       ForEach(this.galleries, (gallery: GalleryInfo, index: number) => {
-        this.galleryFlowItem(gallery, index < this.galleryColumnCount())
+        this.galleryFlowItem(gallery, index, index < this.galleryColumnCount())
       }, (gallery: GalleryInfo) => this.galleryCardKey(gallery))
     }
     .columnsTemplate(this.galleryWaterFlowColumnsTemplate())
@@ -4812,6 +4864,9 @@ export struct GalleryListContent {
     })
     .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) => {
       this.handleGalleryListDidScroll();
+    })
+    .onScrollIndex((first: number, last: number) => {
+      this.setVisibleTranslationRange(first, last);
     })
     .onScrollStop(() => {
       this.rememberListOffset(normalizeGalleryListScrollOffset(this.listScroller.currentOffset().yOffset));

@@ -105,6 +105,8 @@ import {
 import {
   currentThemeName,
   themeFieldBackground,
+  themeDangerBackground,
+  themeDangerText,
   themeOnPrimaryText,
   themePageBackground,
   themePrimaryColor,
@@ -2805,6 +2807,7 @@ struct TranslationPromptPanel {
   @State promptName: string = '';
   @State promptText: string = '';
   @State localCustomProfiles: string = '[]';
+  @State profileSelectorVisible: boolean = false;
   onBack: () => void = () => {};
   onSave: (selectedId: string, customProfiles: string, status: string) => void = () => {};
 
@@ -2825,7 +2828,47 @@ struct TranslationPromptPanel {
 
   private chooseProfile(profile: TranslationPromptProfile): void {
     this.loadProfile(profile);
+    this.profileSelectorVisible = false;
     this.onSave(profile.id, this.localCustomProfiles, 'Prompt selected');
+  }
+
+  private profileDisplayName(profile: TranslationPromptProfile): string {
+    return profile.builtIn ? uiText(profile.name) : profile.name;
+  }
+
+  private profileNames(): string[] {
+    const names: string[] = [];
+    for (let i = 0; i < this.profiles.length; i++) {
+      const base = this.profileDisplayName(this.profiles[i]);
+      let candidate = base;
+      let suffix = 2;
+      while (names.indexOf(candidate) >= 0) {
+        candidate = base + ' (' + suffix.toString() + ')';
+        suffix++;
+      }
+      names.push(candidate);
+    }
+    return names;
+  }
+
+  private selectedProfileName(): string {
+    const names = this.profileNames();
+    for (let i = 0; i < this.profiles.length; i++) {
+      if (this.profiles[i].id === this.activeId) {
+        return names[i];
+      }
+    }
+    return '';
+  }
+
+  private chooseProfileByName(name: string): void {
+    const names = this.profileNames();
+    for (let i = 0; i < names.length; i++) {
+      if (names[i] === name) {
+        this.chooseProfile(this.profiles[i]);
+        return;
+      }
+    }
   }
 
   private beginNewPrompt(): void {
@@ -2876,61 +2919,63 @@ struct TranslationPromptPanel {
     this.onSave(id, this.localCustomProfiles, 'Prompt saved');
   }
 
+  private deletePrompt(): void {
+    const current = findTranslationPromptProfile(this.profiles, this.editingId);
+    if (current === null || current.builtIn) {
+      return;
+    }
+    const customProfiles = cloneTranslationPromptProfiles(parseCustomTranslationPromptProfiles(this.localCustomProfiles));
+    for (let i = customProfiles.length - 1; i >= 0; i--) {
+      if (customProfiles[i].id === current.id) {
+        customProfiles.splice(i, 1);
+      }
+    }
+    this.localCustomProfiles = serializeCustomTranslationPromptProfiles(customProfiles);
+    this.profiles = allTranslationPromptProfiles(this.localCustomProfiles);
+    const fallback = this.profiles[0];
+    if (fallback !== undefined) {
+      this.loadProfile(fallback);
+      this.onSave(fallback.id, this.localCustomProfiles, 'Prompt deleted');
+    }
+  }
+
   build() {
-    Column() {
-      AppSubToolbar({
-        title: uiText('System prompts'),
-        onBack: this.onBack
-      })
+    Stack({ alignContent: Alignment.Center }) {
+      Column() {
+        AppSubToolbar({
+          title: uiText('System prompts'),
+          onBack: this.onBack
+        })
 
-      Scroll() {
-        Column({ space: 10 }) {
-          Text(uiText('Prompt preset'))
-            .fontSize(16)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(themePrimaryText())
-            .width('100%')
-          Text(uiText('Built-in presets and saved custom prompts'))
-            .fontSize(12)
-            .fontColor(themeSecondaryText())
-            .width('100%')
-
-          ForEach(this.profiles, (profile: TranslationPromptProfile) => {
-            Button({ type: ButtonType.Normal, stateEffect: true }) {
-              Row() {
-                Column({ space: 4 }) {
-                  Text(profile.builtIn ? uiText(profile.name) : profile.name)
-                    .fontSize(14)
-                    .fontWeight(profile.id === this.activeId ? FontWeight.Medium : FontWeight.Regular)
-                    .fontColor(profile.id === this.activeId ? themePrimaryColor() : themePrimaryText())
-                    .width('100%')
-                  Text(uiText(profile.builtIn ? 'Built-in preset' : 'Custom prompt'))
-                    .fontSize(11)
-                    .fontColor(themeSecondaryText())
-                    .width('100%')
-                }
-                .alignItems(HorizontalAlign.Start)
+        Scroll() {
+          Column({ space: 10 }) {
+          Button({ type: ButtonType.Normal, stateEffect: true }) {
+            Row() {
+              Text(uiText('Prompt preset'))
+                .fontSize(15)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(themePrimaryText())
                 .layoutWeight(1)
-                if (profile.id === this.activeId) {
-                  Text(uiText('Selected'))
-                    .fontSize(11)
-                    .fontColor(themeOnPrimaryText())
-                    .padding({ left: 9, right: 9, top: 4, bottom: 4 })
-                    .backgroundColor(themePrimaryColor())
-                    .borderRadius(12)
-                    .margin({ left: 8 })
-                }
-              }
-              .width('100%')
+              Text(this.selectedProfileName())
+                .fontSize(14)
+                .fontColor(themeSecondaryText())
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .margin({ left: 12, right: 8 })
+              SymbolGlyph($r('sys.symbol.chevron_down'))
+                .fontSize(16)
+                .fontColor([themeSecondaryText()])
             }
             .width('100%')
-            .padding(12)
-            .backgroundColor(profile.id === this.activeId ? themeSelectedBackground() : themeSurface())
-            .borderRadius(6)
-            .onClick(() => {
-              this.chooseProfile(profile);
-            })
-          }, (profile: TranslationPromptProfile) => profile.id)
+          }
+          .width('100%')
+          .height(52)
+          .padding({ left: 14, right: 14 })
+          .backgroundColor(themeSurface())
+          .borderRadius(6)
+          .onClick(() => {
+            this.profileSelectorVisible = true;
+          })
 
           Button(uiText('New prompt'))
             .height(40)
@@ -2978,31 +3023,57 @@ struct TranslationPromptPanel {
               this.promptText = value;
             })
 
-          if (findTranslationPromptProfile(this.profiles, this.editingId)?.builtIn === true) {
-            Text(uiText('Built-in presets are read-only; saving creates a custom copy'))
-              .fontSize(12)
-              .fontColor(themeSecondaryText())
-              .width('100%')
+          Row({ space: 10 }) {
+            if (findTranslationPromptProfile(this.profiles, this.editingId)?.builtIn === false) {
+              Button(uiText('Delete'))
+                .height(44)
+                .fontSize(14)
+                .fontColor(themeDangerText())
+                .backgroundColor(themeDangerBackground())
+                .borderRadius(6)
+                .onClick(() => {
+                  this.deletePrompt();
+                })
+            }
+            Button(uiText('Save'))
+              .height(44)
+              .layoutWeight(1)
+              .fontSize(14)
+              .fontColor(themeOnPrimaryText())
+              .backgroundColor(themePrimaryColor())
+              .borderRadius(6)
+              .onClick(() => {
+                this.savePrompt();
+              })
           }
-
-          Button(uiText('Save'))
-            .height(44)
-            .width('100%')
-            .fontSize(14)
-            .fontColor(themeOnPrimaryText())
-            .backgroundColor(themePrimaryColor())
-            .borderRadius(6)
-            .onClick(() => {
-              this.savePrompt();
-            })
-            .margin({ bottom: 16 })
+          .width('100%')
+          .margin({ bottom: 16 })
+          }
+          .width('100%')
+          .padding({ left: 12, right: 12, top: 12 })
         }
         .width('100%')
-        .padding({ left: 12, right: 12, top: 12 })
+        .layoutWeight(1)
+        .edgeEffect(EdgeEffect.None)
       }
       .width('100%')
-      .layoutWeight(1)
-      .edgeEffect(EdgeEffect.None)
+      .height('100%')
+      .backgroundColor(themePageBackground())
+
+      if (this.profileSelectorVisible) {
+        SettingsOptionPanel({
+          title: uiText('Prompt preset'),
+          value: this.selectedProfileName(),
+          options: this.profileNames(),
+          onBack: () => {
+            this.profileSelectorVisible = false;
+          },
+          onSelect: (value: string) => {
+            this.chooseProfileByName(value);
+          }
+        })
+          .zIndex(20)
+      }
     }
     .width('100%')
     .height('100%')

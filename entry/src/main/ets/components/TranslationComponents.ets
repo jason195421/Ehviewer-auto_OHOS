@@ -4,6 +4,7 @@ import { ehTranslationService } from '../services/EhTranslationService';
 export struct TranslationText {
   @Prop @Watch('onSourceChanged') sourceText: string = '';
   @Prop @Watch('onEnabledChanged') translationEnabled: boolean = false;
+  @Prop @Watch('onPriorityChanged') translationPriority: number = 2;
   @Prop contentKind: string = 'gallery title';
   @Prop fontSizeValue: number = 15;
   @Prop fontColorValue: ResourceColor = Color.Black;
@@ -27,15 +28,20 @@ export struct TranslationText {
     this.updateTranslation();
   }
 
+  onPriorityChanged(): void {
+    this.updateTranslation();
+  }
+
   private updateTranslation(): void {
     this.requestVersion++;
     const version = this.requestVersion;
     this.translatedText = '';
-    if (!this.translationEnabled || this.sourceText.trim().length === 0) {
+    if (!this.translationEnabled || this.translationPriority <= 0 || this.sourceText.trim().length === 0) {
       return;
     }
     const request = this.contentKind === 'gallery comment' ?
-      ehTranslationService.translateComment(this.sourceText) : ehTranslationService.translateTitle(this.sourceText);
+      ehTranslationService.translateComment(this.sourceText, this.translationPriority) :
+      ehTranslationService.translateTitle(this.sourceText, this.translationPriority);
     request.then((translated: string) => {
       if (version === this.requestVersion && this.translationEnabled) {
         this.translatedText = translated;

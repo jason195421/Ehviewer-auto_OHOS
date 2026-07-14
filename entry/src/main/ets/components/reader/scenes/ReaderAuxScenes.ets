@@ -1,5 +1,9 @@
 import { GalleryComment } from '../../../model/GalleryModels';
-import { TRANSLATION_ENABLED_KEY, ehTranslationService } from '../../../services/EhTranslationService';
+import {
+  TRANSLATION_ENABLED_KEY,
+  ehTranslationService,
+  translationPriorityForIndex
+} from '../../../services/EhTranslationService';
 import { TRANSLATION_BUTTONS_VISIBLE_KEY } from '../../../services/EhSettingsStore';
 import { uiText } from '../../../shared/EhShared';
 import {
@@ -24,6 +28,15 @@ export struct CommentsScene {
   @StorageProp('statusBarHeight') statusBarHeightPx: number = 0;
   @StorageLink(TRANSLATION_ENABLED_KEY) translationEnabled: boolean = false;
   @StorageProp(TRANSLATION_BUTTONS_VISIBLE_KEY) translationButtonsVisible: boolean = true;
+  @State translationVisibleStart: number = -1;
+  @State translationVisibleEnd: number = -1;
+
+  private translationPriorityFor(index: number): number {
+    if (!this.translationEnabled) {
+      return 0;
+    }
+    return translationPriorityForIndex(index, this.translationVisibleStart, this.translationVisibleEnd);
+  }
 
   private statusBarVp(): number {
     return this.getUIContext().px2vp(this.statusBarHeightPx);
@@ -68,7 +81,7 @@ export struct CommentsScene {
         })
       } else {
         List({ space: 0 }) {
-          ForEach(this.comments, (comment: GalleryComment) => {
+          ForEach(this.comments, (comment: GalleryComment, index: number) => {
             ListItem() {
               GalleryCommentRow({
                 comment: comment,
@@ -76,6 +89,7 @@ export struct CommentsScene {
                 compact: false,
                 openGalleryLinksInApp: true,
                 translateComment: this.translationEnabled,
+                translationPriority: this.translationPriorityFor(index),
                 onVoteComment: this.onVoteComment,
                 onOpenGalleryLink: this.onOpenGalleryLink
               })
@@ -94,6 +108,10 @@ export struct CommentsScene {
         .height('100%')
         .layoutWeight(1)
         .cachedCount(4)
+        .onScrollIndex((first: number, last: number) => {
+          this.translationVisibleStart = first;
+          this.translationVisibleEnd = Math.min(last, this.comments.length - 1);
+        })
       }
     }
     .width('100%')

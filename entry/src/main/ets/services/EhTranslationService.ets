@@ -12,6 +12,18 @@ export const TRANSLATION_ENABLED_KEY: string = 'ehviewerTranslationEnabled';
 export const TRANSLATION_ERROR_REVISION_KEY: string = 'ehviewerTranslationErrorRevision';
 export const TRANSLATION_ERROR_MESSAGE_KEY: string = 'ehviewerTranslationErrorMessage';
 
+export function translationPriorityForIndex(index: number, visibleStart: number, visibleEnd: number,
+  columnCount: number = 1, nearbyRows: number = 3): number {
+  if (visibleStart < 0 || visibleEnd < 0) {
+    return 0;
+  }
+  if (index >= visibleStart && index <= visibleEnd) {
+    return 2;
+  }
+  const nearbyCount = Math.max(1, columnCount) * Math.max(0, nearbyRows);
+  return index >= visibleStart - nearbyCount && index <= visibleEnd + nearbyCount ? 1 : 0;
+}
+
 interface TranslationCacheEntry {
   key: string;
   value: string;
@@ -23,6 +35,9 @@ interface PendingTranslationEntry {
 }
 
 interface TranslationSlotWaiter {
+  key: string;
+  priority: number;
+  sequence: number;
   resume: () => void;
 }
 
@@ -236,6 +251,7 @@ let activeRequests: number = 0;
 let lastTranslationErrorAt: number = 0;
 let lastTranslationErrorMessage: string = '';
 let translationSessionRevision: number = 0;
+let translationWaiterSequence: number = 0;
 
 export class EhTranslationService {
   setEnabled(enabled: boolean): void {
@@ -252,15 +268,15 @@ export class EhTranslationService {
     }
   }
 
-  async translateTitle(text: string): Promise<string> {
-    return this.translate(text, 'gallery title');
+  async translateTitle(text: string, priority: number = 2): Promise<string> {
+    return this.translate(text, 'gallery title', priority);
   }
 
-  async translateComment(text: string): Promise<string> {
-    return this.translate(text, 'gallery comment');
+  async translateComment(text: string, priority: number = 2): Promise<string> {
+    return this.translate(text, 'gallery comment', priority);
   }
 
-  async translate(text: string, contentKind: string = 'text'): Promise<string> {
+  async translate(text: string, contentKind: string = 'text', priority: number = 2): Promise<string> {
     const source = text.trim();
     if (source.length === 0) {
       return '';
@@ -275,9 +291,10 @@ export class EhTranslationService {
     }
     const pending = getPendingTranslation(key);
     if (pending !== null) {
+      promoteTranslationWaiter(key, priority);
       return pending;
     }
-    const promise = this.translateInternal(source, provider, target, contentKind)
+    const promise = this.translateInternal(source, provider, target, contentKind, key, priority)
       .then((translated: string) => {
         const normalized = normalizeTranslationResult(translated, source);
         putCachedTranslation(key, normalized);
@@ -357,8 +374,8 @@ export class EhTranslationService {
   }
 
   private async translateInternal(text: string, provider: string, target: string,
-    contentKind: string): Promise<string> {
-    await acquireTranslationSlot();
+    contentKind: string, requestKey: string, priority: number): Promise<string> {
+    await acquireTranslationSlot(requestKey, priority);
     try {
       if (provider === 'MyMemory') {
         return await this.translateWithMyMemory(text, target);
@@ -1129,13 +1146,16 @@ function removePendingTranslation(key: string): void {
   }
 }
 
-function acquireTranslationSlot(): Promise<void> {
+function acquireTranslationSlot(key: string, priority: number): Promise<void> {
   if (activeRequests < MAX_ACTIVE_REQUESTS) {
     activeRequests++;
     return Promise.resolve();
   }
   return new Promise<void>((resolve: (value: void | PromiseLike<void>) => void) => {
     SLOT_WAITERS.push({
+      key: key,
+      priority: priority,
+      sequence: translationWaiterSequence++,
       resume: () => {
         activeRequests++;
         resolve();
@@ -1147,9 +1167,30 @@ function acquireTranslationSlot(): Promise<void> {
 function releaseTranslationSlot(): void {
   activeRequests = Math.max(0, activeRequests - 1);
   if (SLOT_WAITERS.length > 0 && activeRequests < MAX_ACTIVE_REQUESTS) {
-    const waiter = SLOT_WAITERS.shift();
+    const waiterIndex = highestPriorityWaiterIndex();
+    const waiter = waiterIndex < 0 ? undefined : SLOT_WAITERS.splice(waiterIndex, 1)[0];
     if (waiter !== undefined) {
       waiter.resume();
     }
   }
+}
+
+function promoteTranslationWaiter(key: string, priority: number): void {
+  for (let i = 0; i < SLOT_WAITERS.length; i++) {
+    if (SLOT_WAITERS[i].key === key && priority > SLOT_WAITERS[i].priority) {
+      SLOT_WAITERS[i].priority = priority;
+    }
+  }
+}
+
+function highestPriorityWaiterIndex(): number {
+  let result = -1;
+  for (let i = 0; i < SLOT_WAITERS.length; i++) {
+    if (result < 0 || SLOT_WAITERS[i].priority > SLOT_WAITERS[result].priority ||
+      (SLOT_WAITERS[i].priority === SLOT_WAITERS[result].priority &&
+        SLOT_WAITERS[i].sequence < SLOT_WAITERS[result].sequence)) {
+      result = i;
+    }
+  }
+  return result;
 }
