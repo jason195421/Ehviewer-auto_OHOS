@@ -126,6 +126,7 @@ export enum SettingsPanel {
   Translation = 'translation',
   TranslationPrompt = 'translation_prompt',
   Advanced = 'advanced',
+  WifiTransfer = 'wifi_transfer',
   About = 'about',
   Session = 'session',
   WebView = 'webview',
@@ -236,6 +237,33 @@ export function uiStatusText(text: string): string {
 }
 
 function simplifiedUiStatusText(text: string): string {
+  if (text.indexOf('Wi-Fi server error: ') === 0) {
+    return 'Wi-Fi 服务器错误：' + text.substring('Wi-Fi server error: '.length);
+  }
+  if (text.indexOf('Unable to start Wi-Fi server: ') === 0) {
+    return '无法启动 Wi-Fi 服务器：' + text.substring('Unable to start Wi-Fi server: '.length);
+  }
+  if (text.indexOf('Wi-Fi client error: ') === 0) {
+    return 'Wi-Fi 客户端错误：' + text.substring('Wi-Fi client error: '.length);
+  }
+  if (text.indexOf('Unable to connect: ') === 0) {
+    return '连接失败：' + text.substring('Unable to connect: '.length);
+  }
+  if (text.indexOf('Device connection error: ') === 0) {
+    return '设备连接错误：' + text.substring('Device connection error: '.length);
+  }
+  if (text.indexOf('Send failed: ') === 0) {
+    return '发送失败：' + text.substring('Send failed: '.length);
+  }
+  if (text.indexOf('Received data is invalid: ') === 0) {
+    return '接收的数据无效：' + text.substring('Received data is invalid: '.length);
+  }
+  if (text.indexOf('Transfer completed: ') === 0) {
+    return '传输完成：' + text.substring('Transfer completed: '.length).replace(' items', ' 项');
+  }
+  if (text.indexOf('Received and saved: ') === 0) {
+    return '已接收并保存：' + text.substring('Received and saved: '.length).replace(' items', ' 项');
+  }
   if (text.indexOf('Identity authentication mode: ') === 0) {
     return '身份验证模式：' + uiText(text.substring('Identity authentication mode: '.length));
   }
@@ -1494,7 +1522,57 @@ export function zhText(text: string): string {
     case 'Import data': return '导入数据';
     case 'Restore settings and local data from a supported backup file': return '从支持的备份文件恢复设置和本地数据';
     case 'Wi-Fi server/client': return 'Wi-Fi 服务器/客户端';
-    case 'Transfer app data over the local network': return '通过局域网传输应用数据';
+    case 'Send or receive bookmarks, local favorites and download records over the local network':
+      return '通过局域网发送或接收搜索书签、本地收藏和下载记录';
+    case 'Send data': return '发送数据';
+    case 'Act as the migration server': return '作为迁移发送端';
+    case 'Receive data': return '接收数据';
+    case 'Connect to the sending device': return '连接到发送设备';
+    case 'Connection status': return '连接状态';
+    case 'Page': return '分页';
+    case 'Items': return '项目';
+    case 'Local address': return '本机地址';
+    case 'Gateway': return '默认网关';
+    case 'Port': return '端口';
+    case 'Connected device': return '已连接设备';
+    case 'Data to send': return '要发送的数据';
+    case 'Search bookmarks': return '搜索书签';
+    case 'Saved quick searches and their search options': return '已保存的快捷搜索及搜索条件';
+    case 'Local favorites': return '本地收藏';
+    case 'Locally saved gallery information': return '保存在本机的画廊信息';
+    case 'Download records': return '下载记录';
+    case 'Download labels and gallery records; image files are not transferred': return '下载标签和画廊记录；不传输图片文件';
+    case 'Server address': return '服务器地址';
+    case 'The default gateway is filled automatically. You can also enter the sender IPv4 address.':
+      return '会自动填入默认网关，也可以手动输入发送端的 IPv4 地址。';
+    case 'Start sending': return '开始发送';
+    case 'Stop sending': return '停止发送';
+    case 'Connect and receive': return '连接并接收';
+    case 'Disconnect': return '断开连接';
+    case 'Compatible with the original Android app': return '兼容原 Android 应用';
+    case 'Both devices must be on the same local network. The original Android client only connects to the gateway, so use the sending device hotspot when transferring to it.':
+      return '两台设备必须处于同一局域网。原 Android 客户端只连接默认网关，因此向其传输时请开启发送设备的热点。';
+    case 'Keep both transfer pages open until every page is confirmed. Wi-Fi transfer sends metadata only and does not copy downloaded images.':
+      return '所有分页确认完成前请保持两端传输页面开启。Wi-Fi 迁移只传输元数据，不复制已下载图片。';
+    case 'Only start the server on a trusted local network. It stops automatically when this page is closed.':
+      return '请只在可信局域网中启动服务器；关闭此页面后服务器会自动停止。';
+    case 'Wi-Fi transfer is idle': return 'Wi-Fi 传输空闲';
+    case 'Wi-Fi transfer needs app context': return 'Wi-Fi 传输需要应用上下文';
+    case 'Wi-Fi transfer stopped': return 'Wi-Fi 传输已停止';
+    case 'No data is available for this transfer': return '没有可传输的数据';
+    case 'Starting Wi-Fi server': return '正在启动 Wi-Fi 服务器';
+    case 'Waiting for a receiving device': return '正在等待接收设备';
+    case 'Receiving device connected; sending data': return '接收设备已连接，正在发送数据';
+    case 'Receiving device disconnected; waiting again': return '接收设备已断开，重新等待连接';
+    case 'Connecting to sending device': return '正在连接发送设备';
+    case 'Connected and ready to receive': return '已连接，等待接收数据';
+    case 'The sending device disconnected': return '发送设备已断开连接';
+    case 'Enter a valid IPv4 server address': return '请输入有效的服务器 IPv4 地址';
+    case 'Sending data': return '正在发送数据';
+    case 'Receiving data': return '正在接收数据';
+    case 'Waiting for page confirmation': return '等待接收端确认当前分页';
+    case 'The receiving device did not confirm the data in time': return '接收设备未在规定时间内确认数据';
+    case 'Received data is not compatible': return '接收的数据格式不兼容';
     case 'Declaration': return '声明';
     case 'Current HarmonyOS repository': return '当前 HarmonyOS 仓库';
     case 'Author': return '作者';
@@ -3001,7 +3079,8 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
     rows.push(optionSettingsRow('auto_direct_connection', 'Direct connection check', 'Use direct connection when the selected site responds within 5s', entries, ON_OFF_OPTIONS));
     rows.push(staticSettingsRow('export_data', 'Export data', 'Save settings, history, downloads and filter rules to a JSON file', 'Export', 'action'));
     rows.push(staticSettingsRow('import_data', 'Import data', 'Restore settings and local data from a supported backup file', 'Import', 'action'));
-    rows.push(staticSettingsRow('wifi_transfer', 'Wi-Fi server/client', 'Transfer app data over the local network', 'Unavailable', 'activity'));
+    rows.push(staticSettingsRow('wifi_transfer', 'Wi-Fi server/client',
+      'Send or receive bookmarks, local favorites and download records over the local network', '', 'navigation'));
     return rows;
   }
 
@@ -3270,31 +3349,6 @@ export function cloneStringOptions(options: string[]): string[] {
     result.push(options[i]);
   }
   return result;
-}
-
-export function settingMigrationMessage(key: string): string {
-  if (key === 'u_config') {
-    return 'UConfig requires the account configuration parser and editor. The sign-in/session part is already available.';
-  }
-  if (key === 'my_tags') {
-    return 'My Tags opens the native watched and hidden tag editor.';
-  }
-  if (key === 'filter') {
-    return 'Filter rules need the local rule database before they can hide galleries in list scenes.';
-  }
-  if (key === 'pattern_protection') {
-    return 'Identity authentication uses HarmonyOS biometric, face or PIN verification.';
-  }
-  if (key === 'export_data') {
-    return 'Export data needs a backup bundle writer for settings, cookies, downloads and history.';
-  }
-  if (key === 'import_data') {
-    return 'Import data needs the matching backup reader before it can safely replace local state.';
-  }
-  if (key === 'wifi_transfer') {
-    return 'Wi-Fi transfer needs a HarmonyOS local server/client implementation.';
-  }
-  return 'This setting is not available yet.';
 }
 
 export function isValidProxyPortText(value: string): boolean {

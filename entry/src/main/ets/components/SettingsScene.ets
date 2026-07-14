@@ -122,7 +122,7 @@ import {
   themeSurfaceVariant,
   themeTertiaryText
 } from '../shared/EhTheme';
-import { EhBackupBundle, SessionMode, SettingsHeaderItem, SettingsRowItem, SettingsPanel, SETTINGS_HEADERS, uiText, uiValue, uiStatusText, setActiveBackHandler, padTwo, getAbilityContext, downloadSizeText, settingsPanelTitle, settingsRowsForPanel, settingEntryValue, cloneStringOptions, settingMigrationMessage, isValidProxyHostText, isValidProxyPortText, normalizeProxyOption, formatNetworkDiagnostics, normalizeAutoTransferTimeOption, normalizeBrightnessLevelOption, normalizeIdentityAuthenticationOption, normalizeReaderCacheSizeOption } from '../shared/EhShared';
+import { EhBackupBundle, SessionMode, SettingsHeaderItem, SettingsRowItem, SettingsPanel, SETTINGS_HEADERS, uiText, uiValue, uiStatusText, setActiveBackHandler, padTwo, getAbilityContext, downloadSizeText, settingsPanelTitle, settingsRowsForPanel, settingEntryValue, cloneStringOptions, isValidProxyHostText, isValidProxyPortText, normalizeProxyOption, formatNetworkDiagnostics, normalizeAutoTransferTimeOption, normalizeBrightnessLevelOption, normalizeIdentityAuthenticationOption, normalizeReaderCacheSizeOption } from '../shared/EhShared';
 import { FilterPanel } from './DownloadMigrationScenes';
 import { BlockingBusyOverlay } from './BlockingBusyOverlay';
 import { ConfirmActionOverlay } from './ConfirmActionOverlay';
@@ -137,6 +137,7 @@ import {
   syncCookieHeaderToWebView
 } from './SessionScene';
 import { UpdatePromptOverlay } from './UpdatePromptOverlay';
+import { WifiMigrationPanel } from './WifiMigrationPanel';
 import {
   areaDimensionToVp,
   markCurrentRouteRightPane,
@@ -1158,7 +1159,7 @@ export struct SettingsScene {
       return true;
     }
     if (key === 'wifi_transfer') {
-      this.statusText = settingMigrationMessage(key);
+      this.openPanel(SettingsPanel.WifiTransfer);
       return true;
     }
     return false;
@@ -2049,6 +2050,24 @@ export struct SettingsScene {
           },
           onToggle: (id: number) => {
             this.toggleFilterRule(id);
+          }
+        })
+          .width(this.settingsLayerWidth())
+          .height('100%')
+          .position({ x: this.settingsLayerTranslateX(), y: 0 })
+          .onTouch((event: TouchEvent) => {
+            if (shouldUpdateSplitPaneFocus(event)) {
+              this.activeSplitPane = SPLIT_PANE_FOCUS_RIGHT;
+            }
+          })
+          .zIndex(10)
+          .animation({ duration: this.splitDragging ? 0 : 220, curve: Curve.EaseOut })
+          .transition(TransitionEffect.move(TransitionEdge.END)
+            .animation({ duration: 300, curve: Curve.EaseOut }))
+      } else if (this.panel === SettingsPanel.WifiTransfer) {
+        WifiMigrationPanel({
+          onBack: () => {
+            this.closePanel();
           }
         })
           .width(this.settingsLayerWidth())
