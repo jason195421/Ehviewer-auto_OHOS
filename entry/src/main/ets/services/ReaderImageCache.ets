@@ -22,6 +22,7 @@ interface PendingImageDownload {
 
 const PENDING_IMAGE_DOWNLOADS: PendingImageDownload[] = [];
 const WAITING_IMAGE_SLOTS: (() => void)[] = [];
+const ACTIVE_IMAGE_TEMP_PATHS: string[] = [];
 const MAX_ACTIVE_IMAGE_DOWNLOADS: number = 6;
 const DEFAULT_IMAGE_CACHE_BYTES: number = 160 * 1024 * 1024;
 const IMAGE_RETRY_DELAYS_MS: number[] = [300, 900, 1800, 3200];
@@ -34,6 +35,7 @@ const IMAGE_MIN_EXPECTED_SPEED_BYTES_PER_SECOND: number = 64 * 1024;
 const IMAGE_UNKNOWN_TOTAL_TIMEOUT_MS: number = 5 * 60 * 1000;
 const IMAGE_MAX_TOTAL_TIMEOUT_MS: number = 10 * 60 * 1000;
 let activeImageDownloads: number = 0;
+let imageTempFileSequence: number = 0;
 
 interface CachedImageFile {
   path: string;
@@ -412,12 +414,14 @@ function streamImageToFile(request: http.HttpRequest, url: string, options: http
     let totalTimer = -1;
     let responseExtension = '';
     let pendingFailureMessage = '';
-    const tempPath = path + '.part';
+    const tempPath = nextImageTempPath(path);
     removeFileQuietly(tempPath);
+    markImageTempPathActive(tempPath);
     try {
       const file = fs.openSync(tempPath, fs.OpenMode.CREATE | fs.OpenMode.TRUNC | fs.OpenMode.READ_WRITE);
       fd = file.fd;
     } catch (error) {
+      unmarkImageTempPathActive(tempPath);
       reject(new Error(String(error)));
       return;
     }
@@ -557,6 +561,7 @@ function streamImageToFile(request: http.HttpRequest, url: string, options: http
       cleanup();
       if (pendingFailureMessage.length > 0) {
         removeFileQuietly(tempPath);
+        unmarkImageTempPathActive(tempPath);
         reject(new Error(pendingFailureMessage));
         return;
       }
@@ -567,12 +572,14 @@ function streamImageToFile(request: http.HttpRequest, url: string, options: http
           fs.moveFileSync(tempPath, finalPath);
         } catch (error) {
           removeFileQuietly(tempPath);
+          unmarkImageTempPathActive(tempPath);
           reject(new Error(String(error)));
           return;
         }
       } else {
         removeFileQuietly(tempPath);
       }
+      unmarkImageTempPathActive(tempPath);
       resolve({ statusCode: Number(statusCode), path: finalPath });
     }).catch((error: Error) => {
       if (finished) {
@@ -582,6 +589,7 @@ function streamImageToFile(request: http.HttpRequest, url: string, options: http
       clearTimers();
       cleanup();
       removeFileQuietly(tempPath);
+      unmarkImageTempPathActive(tempPath);
       reject(pendingFailureMessage.length > 0 ? new Error(pendingFailureMessage) : error);
     });
   });
@@ -785,6 +793,28 @@ function removeFileQuietly(path: string): void {
   }
 }
 
+function nextImageTempPath(path: string): string {
+  imageTempFileSequence++;
+  return path + '.' + Date.now().toString() + '_' + imageTempFileSequence.toString() + '.part';
+}
+
+function markImageTempPathActive(path: string): void {
+  if (ACTIVE_IMAGE_TEMP_PATHS.indexOf(path) < 0) {
+    ACTIVE_IMAGE_TEMP_PATHS.push(path);
+  }
+}
+
+function unmarkImageTempPathActive(path: string): void {
+  const index = ACTIVE_IMAGE_TEMP_PATHS.indexOf(path);
+  if (index >= 0) {
+    ACTIVE_IMAGE_TEMP_PATHS.splice(index, 1);
+  }
+}
+
+function isImageTempPathActive(path: string): boolean {
+  return ACTIVE_IMAGE_TEMP_PATHS.indexOf(path) >= 0;
+}
+
 function removeFile(path: string): boolean {
   try {
     if (exists(path)) {
@@ -954,7 +984,9 @@ function scanImageCacheDirectory(directory: string): CachedImageFile[] {
           continue;
         }
         if (path.endsWith('.part')) {
-          removeFileQuietly(path);
+          if (!isImageTempPathActive(path)) {
+            removeFileQuietly(path);
+          }
           continue;
         }
         files.push({

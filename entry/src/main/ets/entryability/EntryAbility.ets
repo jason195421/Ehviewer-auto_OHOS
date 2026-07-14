@@ -56,6 +56,7 @@ export default class EntryAbility extends UIAbility {
   private authPending: boolean = false;
   private identityAuthGraceUntilMs: number = 0;
   private startupDirectProbeToast: string = '';
+  private mainContentLoaded: boolean = false;
   private pendingDownloadDirectory: string = '';
   // Largest bottom avoid (nav bar / gesture indicator) height observed this session, in px.
   // The reader hides system bars (setWindowSystemBarEnable([])), which makes the live avoid
@@ -101,19 +102,7 @@ export default class EntryAbility extends UIAbility {
     }).catch(() => {});
     const settingsReady = ehSettingsStore.ensureLoaded(this.context).then(() => {
       this.setIdentityAuthLocked(this.identityAuthEnabledInMemory());
-      if (!isEhDirectConnectionProbeEnabled()) {
-        return ensureEhHostRules().then(() => {
-          startEhFrontingBenchmark(this.context);
-        });
-      }
-      return startEhDirectConnectionProbe(this.context).then((directAvailable: boolean) => {
-        this.startupDirectProbeToast = directAvailable
-          ? 'Direct connection available, domain fronting disabled'
-          : 'Direct connection unavailable, domain fronting enabled';
-        if (!directAvailable) {
-          startEhFrontingBenchmark(this.context);
-        }
-      });
+      this.initializeNetworkRuntime();
     }).catch(() => {});
     Promise.all([windowReady, settingsReady]).then(() => {
       this.loadIndexContent(stage);
@@ -142,12 +131,38 @@ export default class EntryAbility extends UIAbility {
         ehAppLog.error(this.context, 'EntryAbility', 'Failed to load main page: ' + error.message);
         return;
       }
+      this.mainContentLoaded = true;
       resetCellularNetworkWarningConfirmation();
       this.checkAndPromptBiometricLock();
       this.showStartupCellularNetworkWarning();
       this.showStartupDirectProbeToast();
       this.pruneCacheOnStartup();
       this.openPendingDownloadDirectory();
+    });
+  }
+
+  private initializeNetworkRuntime(): void {
+    if (!isEhDirectConnectionProbeEnabled()) {
+      ensureEhHostRules().then(() => {
+        startEhFrontingBenchmark(this.context);
+      }).catch((error: Error) => {
+        ehAppLog.warn(this.context, 'EntryAbility', 'Network initialization failed: ' + error.message);
+      });
+      return;
+    }
+    startEhDirectConnectionProbe(this.context).then((directAvailable: boolean) => {
+      this.startupDirectProbeToast = directAvailable
+        ? 'Direct connection available, domain fronting disabled'
+        : 'Direct connection unavailable, domain fronting enabled';
+      if (!directAvailable) {
+        startEhFrontingBenchmark(this.context);
+      }
+      this.showStartupDirectProbeToast();
+    }).catch((error: Error) => {
+      this.startupDirectProbeToast = 'Direct connection unavailable, domain fronting enabled';
+      startEhFrontingBenchmark(this.context);
+      this.showStartupDirectProbeToast();
+      ehAppLog.warn(this.context, 'EntryAbility', 'Direct connection probe failed: ' + error.message);
     });
   }
 
@@ -211,7 +226,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   private showStartupDirectProbeToast(): void {
-    if (this.startupDirectProbeToast.length === 0 || this.windowStage === undefined) {
+    if (!this.mainContentLoaded || this.startupDirectProbeToast.length === 0 || this.windowStage === undefined) {
       return;
     }
     const message = this.startupDirectProbeToast;
