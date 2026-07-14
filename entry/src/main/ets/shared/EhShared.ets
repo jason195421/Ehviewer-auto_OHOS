@@ -252,6 +252,9 @@ export function uiStatusText(text: string): string {
   if (text === 'Enter ipb_member_id and ipb_pass_hash, or paste a full Cookie header') {
     return '输入 ipb_member_id 和 ipb_pass_hash，或粘贴完整 Cookie 头';
   }
+  if (text === 'Enter ipb_member_id, ipb_pass_hash and optional igneous') {
+    return '输入 ipb_member_id、ipb_pass_hash 和可选的 igneous';
+  }
   if (text === 'Finish login in the web page; Cookie will be captured automatically') {
     return '在网页中完成登录，Cookie 会自动捕获';
   }
@@ -1195,6 +1198,7 @@ export function zhText(text: string): string {
     case 'Sign in via WebView': return '通过网页登录';
     case 'Sign in via Cookies': return '通过 Cookie 登录';
     case 'Cookie Sign In': return 'Cookie 登录';
+    case 'Web Sign In': return '网页登录';
     case 'Use this when password login needs captcha, or when importing an ExHentai session.': return '当密码登录需要验证码，或导入 ExHentai 会话时使用。';
     case 'Full Cookie header': return '完整 Cookie 头';
     case 'Clear': return '清除';

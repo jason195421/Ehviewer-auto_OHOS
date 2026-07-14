@@ -6,6 +6,7 @@ const PREFERENCES_NAME: string = 'ehviewer_session';
 const COOKIE_KEY: string = 'cookie_header';
 const KEY_IPB_MEMBER_ID: string = 'ipb_member_id';
 const KEY_IPB_PASS_HASH: string = 'ipb_pass_hash';
+const KEY_IGNEOUS: string = 'igneous';
 const KEY_CONTENT_WARNING: string = 'nw';
 const KEY_UCONFIG: string = 'uconfig';
 const UCONFIG_IMAGE_SIZE_KEY: string = 'xr';
@@ -121,7 +122,15 @@ export class EhCookieStore {
   }
 
   getEditableCookieHeader(): string {
-    return this.buildCookieHeader({ includeContentWarning: false, includeUConfig: true });
+    const names = [KEY_IPB_MEMBER_ID, KEY_IPB_PASS_HASH, KEY_IGNEOUS];
+    const pairs: string[] = [];
+    for (let i = 0; i < names.length; i++) {
+      const value = this.cookieValue(names[i]);
+      if (value.length > 0) {
+        pairs.push(names[i] + '=' + value);
+      }
+    }
+    return pairs.join('; ');
   }
 
   private buildCookieHeader(options: CookieHeaderOptions): string {
@@ -207,7 +216,7 @@ export class EhCookieStore {
   async save(context: common.UIAbilityContext): Promise<void> {
     try {
       const prefs = await preferences.getPreferences(context, { name: PREFERENCES_NAME });
-      await prefs.put(COOKIE_KEY, this.getCookieHeader());
+      await prefs.put(COOKIE_KEY, this.getStoredCookieHeader());
       await prefs.flush();
     } catch (error) {
       throw new Error(String(error));
@@ -256,12 +265,16 @@ export class EhCookieStore {
   }
 
   private hasCookie(name: string): boolean {
+    return this.cookieValue(name).length > 0;
+  }
+
+  private cookieValue(name: string): string {
     for (let i = 0; i < this.cookies.length; i++) {
       if (this.cookies[i].name === name && this.cookies[i].value.length > 0) {
-        return true;
+        return this.cookies[i].value;
       }
     }
-    return false;
+    return '';
   }
 
   private isInvalidNetworkIdentityCookie(name: string, value: string): boolean {

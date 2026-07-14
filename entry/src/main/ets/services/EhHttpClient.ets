@@ -1,5 +1,4 @@
 import { http } from '@kit.NetworkKit';
-import { webview } from '@kit.ArkWeb';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import {
   ArchiverInfo,
@@ -300,7 +299,6 @@ export class EhHttpClient {
       outcomeRecorded = true;
 
       ehCookieStore.absorbSetCookieHeader(response.cookies);
-      syncSetCookiesToWebView(url, response.cookies);
       return {
         statusCode: statusCode,
         body: response.result as string,
@@ -409,7 +407,6 @@ export class EhHttpClient {
       outcomeRecorded = true;
 
       ehCookieStore.absorbSetCookieHeader(response.cookies);
-      syncSetCookiesToWebView(url, response.cookies);
       return {
         statusCode: statusCode,
         body: response.result as string,
@@ -467,7 +464,6 @@ export class EhHttpClient {
       outcomeRecorded = true;
 
       ehCookieStore.absorbSetCookieHeader(response.cookies);
-      syncSetCookiesToWebView(url, response.cookies);
       return {
         statusCode: statusCode,
         body: response.result as string,
@@ -1358,7 +1354,6 @@ export class EhHttpClient {
       outcomeRecorded = true;
 
       ehCookieStore.absorbSetCookieHeader(response.cookies);
-      syncSetCookiesToWebView(url, response.cookies);
       return {
         statusCode: statusCode,
         body: response.result as string,
@@ -1372,7 +1367,6 @@ export class EhHttpClient {
         outcomeRecorded = true;
         const cookies = responseHeaderValue(responseHeaders, 'set-cookie');
         ehCookieStore.absorbSetCookieHeader(cookies);
-        syncSetCookiesToWebView(url, cookies);
         return {
           statusCode: 302,
           body: '',
@@ -1487,33 +1481,6 @@ async function requestToCompletion(request: http.HttpRequest, url: string,
     return await request.request(url, options);
   } catch (error) {
     throw new Error(networkErrorMessage(error));
-  }
-}
-
-function syncSetCookiesToWebView(url: string, setCookieHeader: string): void {
-  if (setCookieHeader.length === 0) {
-    return;
-  }
-
-  const lines = setCookieHeader.split('\n');
-  let synced = false;
-  for (let i = 0; i < lines.length; i++) {
-    const cookie = lines[i].trim();
-    if (cookie.length === 0) {
-      continue;
-    }
-    try {
-      webview.WebCookieManager.configCookieSync(url, cookie);
-      synced = true;
-    } catch (error) {
-    }
-  }
-
-  if (synced) {
-    try {
-      webview.WebCookieManager.saveCookieSync();
-    } catch (error) {
-    }
   }
 }
 

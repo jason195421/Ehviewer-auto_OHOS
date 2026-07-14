@@ -116,12 +116,19 @@ import {
   themeSurfaceVariant,
   themeTertiaryText
 } from '../shared/EhTheme';
-import { EhBackupBundle, SettingsHeaderItem, SettingsRowItem, SettingsPanel, SETTINGS_HEADERS, uiText, uiValue, uiStatusText, setActiveBackHandler, padTwo, getAbilityContext, downloadSizeText, settingsPanelTitle, settingsRowsForPanel, settingEntryValue, cloneStringOptions, settingMigrationMessage, isValidProxyHostText, isValidProxyPortText, normalizeProxyOption, formatNetworkDiagnostics, normalizeAutoTransferTimeOption, normalizeBrightnessLevelOption, normalizeIdentityAuthenticationOption, normalizeReaderCacheSizeOption } from '../shared/EhShared';
+import { EhBackupBundle, SessionMode, SettingsHeaderItem, SettingsRowItem, SettingsPanel, SETTINGS_HEADERS, uiText, uiValue, uiStatusText, setActiveBackHandler, padTwo, getAbilityContext, downloadSizeText, settingsPanelTitle, settingsRowsForPanel, settingEntryValue, cloneStringOptions, settingMigrationMessage, isValidProxyHostText, isValidProxyPortText, normalizeProxyOption, formatNetworkDiagnostics, normalizeAutoTransferTimeOption, normalizeBrightnessLevelOption, normalizeIdentityAuthenticationOption, normalizeReaderCacheSizeOption } from '../shared/EhShared';
 import { FilterPanel } from './DownloadMigrationScenes';
 import { BlockingBusyOverlay } from './BlockingBusyOverlay';
 import { MyTagsPanel } from './MyTagsPanel';
 import { AppSubToolbar, AppToolbar } from './NavigationComponents';
-import { collectWebCookies, hasLoginCookie, SessionScene, syncCookieHeaderToWebView } from './SessionScene';
+import {
+  clearAllWebCookies,
+  clearWebCookies,
+  collectWebCookies,
+  hasLoginCookie,
+  SessionScene,
+  syncCookieHeaderToWebView
+} from './SessionScene';
 import { UpdatePromptOverlay } from './UpdatePromptOverlay';
 import {
   areaDimensionToVp,
@@ -163,6 +170,7 @@ interface SettingsNavigationCache {
   webViewTitle: string;
   filterNewText: string;
   filterNewMode: number;
+  sessionInitialMode: SessionMode;
 }
 
 let settingsNavigationCache: SettingsNavigationCache | null = null;
@@ -203,6 +211,7 @@ export struct SettingsScene {
   @State updateDialogVisible: boolean = false;
   @State updateCurrentVersion: string = '';
   @State updateRelease: ReleaseInfo | null = null;
+  @State sessionInitialMode: SessionMode = SessionMode.Password;
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
   @StorageProp(SPLIT_PANE_RATIO_REVISION_KEY) @Watch('onSplitPaneRatioRevisionChange') splitPaneRatioRevision: number = 0;
   private client: EhHttpClient = new EhHttpClient();
@@ -283,6 +292,7 @@ export struct SettingsScene {
     this.updateDialogVisible = false;
     this.webViewUrl = '';
     this.webViewTitle = '';
+    this.sessionInitialMode = SessionMode.Password;
     this.panel = SettingsPanel.Main;
     this.activeSplitPane = SPLIT_PANE_FOCUS_LEFT;
     this.panelStack = [SettingsPanel.Main];
@@ -329,6 +339,9 @@ export struct SettingsScene {
   }
 
   private closePanel(): void {
+    if (this.panel === SettingsPanel.WebView || this.panel === SettingsPanel.Session) {
+      clearWebCookies(true);
+    }
     this.restorePanelWithFade = false;
     this.optionPickerOpen = false;
     if (this.panelStack.length <= 1) {
@@ -361,6 +374,7 @@ export struct SettingsScene {
     this.webViewTitle = settingsNavigationCache.webViewTitle;
     this.filterNewText = settingsNavigationCache.filterNewText;
     this.filterNewMode = settingsNavigationCache.filterNewMode;
+    this.sessionInitialMode = settingsNavigationCache.sessionInitialMode;
     this.restorePanelWithFade = this.settingsDetailLayerPanel() !== SettingsPanel.Main && shouldFadeRestoredRightPane();
   }
 
@@ -372,7 +386,8 @@ export struct SettingsScene {
       webViewUrl: this.webViewUrl,
       webViewTitle: this.webViewTitle,
       filterNewText: this.filterNewText,
-      filterNewMode: this.filterNewMode
+      filterNewMode: this.filterNewMode,
+      sessionInitialMode: this.sessionInitialMode
     };
   }
 
@@ -463,6 +478,7 @@ export struct SettingsScene {
   }
 
   private signOut(): void {
+    clearAllWebCookies();
     const context = getAbilityContext();
     if (context === undefined) {
       ehCookieStore.clear();
@@ -816,25 +832,25 @@ export struct SettingsScene {
   }
 
   private prepareAccountWebViewCookies(url: string): void {
+    clearAllWebCookies();
     const cookieHeader = ehCookieStore.getCookieHeader();
     if (cookieHeader.length === 0) {
       return;
     }
 
-    syncCookieHeaderToWebView(url, cookieHeader);
-    syncCookieHeaderToWebView(EhUrl.HOST_E, cookieHeader);
-    syncCookieHeaderToWebView(EhUrl.HOST_EX, cookieHeader);
-    syncCookieHeaderToWebView(EhUrl.FORUM_ORIGIN, cookieHeader);
+    syncCookieHeaderToWebView(url, cookieHeader, true);
+    syncCookieHeaderToWebView(EhUrl.HOST_E, cookieHeader, true);
+    syncCookieHeaderToWebView(EhUrl.HOST_EX, cookieHeader, true);
+    syncCookieHeaderToWebView(EhUrl.FORUM_ORIGIN, cookieHeader, true);
     try {
-      webview.WebCookieManager.configCookieSync(EhUrl.HOST_E, 'nw=1; path=/');
-      webview.WebCookieManager.configCookieSync(EhUrl.HOST_EX, 'nw=1; path=/');
-      webview.WebCookieManager.saveCookieSync();
+      webview.WebCookieManager.configCookieSync(EhUrl.HOST_E, 'nw=1; path=/', true);
+      webview.WebCookieManager.configCookieSync(EhUrl.HOST_EX, 'nw=1; path=/', true);
     } catch (error) {
     }
   }
 
   private captureAccountWebCookies(url: string): void {
-    const cookieHeader = collectWebCookies(url);
+    const cookieHeader = collectWebCookies(url, true);
     if (!hasLoginCookie(cookieHeader)) {
       return;
     }
@@ -993,6 +1009,7 @@ export struct SettingsScene {
 
   private runSettingAction(key: string): boolean {
     if (key === 'identity_cookie') {
+      this.sessionInitialMode = SessionMode.Cookie;
       this.openPanel(SettingsPanel.Session);
       return true;
     }
@@ -1919,6 +1936,7 @@ export struct SettingsScene {
             this.closePanel();
           },
           onOpenSession: () => {
+            this.sessionInitialMode = SessionMode.Password;
             this.openPanel(SettingsPanel.Session);
           },
           onSignOut: () => {
@@ -2066,23 +2084,18 @@ export struct SettingsScene {
           .transition(TransitionEffect.move(TransitionEdge.END)
             .animation({ duration: 300, curve: Curve.EaseOut }))
       } else if (this.panel === SettingsPanel.Session) {
-        Column() {
-          SettingsSubToolbar({
-            title: uiText('Sign in'),
-            onBack: () => {
-              this.closePanel();
-            }
-          })
-          SessionScene({
-            onSignedIn: () => {
-              this.signedIn = ehCookieStore.hasCookies();
-              this.statusText = this.signedIn ? 'Signed in' : 'Guest mode';
-              this.closePanel();
-              this.onSignedIn();
-            }
-          })
-            .layoutWeight(1)
-        }
+        SessionScene({
+          initialMode: this.sessionInitialMode,
+          onBack: () => {
+            this.closePanel();
+          },
+          onSignedIn: () => {
+            this.signedIn = ehCookieStore.hasCookies();
+            this.statusText = this.signedIn ? 'Signed in' : 'Guest mode';
+            this.closePanel();
+            this.onSignedIn();
+          }
+        })
         .width(this.settingsLayerWidth())
         .height('100%')
         .position({ x: this.settingsLayerTranslateX(), y: 0 })
@@ -2585,7 +2598,7 @@ export struct SettingsAccountWebPanel {
         title: uiText(this.title),
         onBack: this.onBack
       })
-      Web({ src: this.url, controller: this.webViewController })
+      Web({ src: this.url, controller: this.webViewController, incognitoMode: true })
         .javaScriptAccess(true)
         .domStorageAccess(true)
         .backgroundColor(Color.Transparent)

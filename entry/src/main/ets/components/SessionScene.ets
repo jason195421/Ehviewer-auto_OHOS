@@ -6,6 +6,7 @@ import { applyAppChromeImmersiveMode } from '../services/EhWindowImmersive';
 import { LANGUAGE_REVISION_KEY } from '../shared/EhShared';
 import { themeFieldBackground, themeOnPrimaryText, themePageBackground, themePrimaryColor, themePrimaryText, themeSecondaryText, themeSuccessText, themeSurface, themeTransparentColor } from '../shared/EhTheme';
 import { SessionMode, uiText, uiStatusText, getAbilityContext } from '../shared/EhShared';
+import { AppSubToolbar } from './NavigationComponents';
 
 @Component
 export struct SessionScene {
@@ -24,10 +25,13 @@ export struct SessionScene {
   @State webUrl: string = EhUrl.URL_SIGN_IN;
   @State statusText: string = 'Sign in with an E-Hentai forum account';
   @StorageProp(LANGUAGE_REVISION_KEY) languageRevision: number = 0;
+  @Prop initialMode: SessionMode = SessionMode.Password;
+  onBack: () => void = () => {};
   onSignedIn: () => void = () => {};
 
   aboutToAppear(): void {
     applyAppChromeImmersiveMode();
+    this.mode = this.initialMode;
     this.cookieInput = ehCookieStore.getEditableCookieHeader();
     const context = getAbilityContext();
     if (context !== undefined) {
@@ -46,11 +50,29 @@ export struct SessionScene {
     if (mode === SessionMode.Password) {
       this.statusText = 'Sign in with an E-Hentai forum account';
     } else if (mode === SessionMode.Cookie) {
-      this.statusText = 'Enter ipb_member_id and ipb_pass_hash, or paste a full Cookie header';
+      this.statusText = 'Enter ipb_member_id, ipb_pass_hash and optional igneous';
     } else {
       this.statusText = 'Finish login in the web page; Cookie will be captured automatically';
       this.webCookieCaptured = false;
     }
+  }
+
+  private modeTitle(): string {
+    if (this.mode === SessionMode.Cookie) {
+      return 'Cookie Sign In';
+    }
+    if (this.mode === SessionMode.Web) {
+      return 'Web Sign In';
+    }
+    return 'Sign in';
+  }
+
+  private handleBack(): void {
+    if (this.mode !== this.initialMode) {
+      this.switchMode(this.initialMode);
+      return;
+    }
+    this.onBack();
   }
 
   private signInWithPassword(): void {
@@ -94,15 +116,29 @@ export struct SessionScene {
   }
 
   private prepareWebSignIn(): void {
+    clearAllWebCookies();
+    this.webCookieCaptured = false;
+    const context = getAbilityContext();
+    if (context === undefined) {
+      ehCookieStore.clear();
+      this.enterWebSignIn();
+      return;
+    }
+    ehCookieStore.clearPersisted(context).then(() => {
+      this.enterWebSignIn();
+    }).catch((error: Error) => {
+      this.statusText = 'Cookie clear failed: ' + error.message;
+    });
+  }
+
+  private enterWebSignIn(): void {
     try {
-      webview.WebCookieManager.configCookieSync(EhUrl.HOST_E, 'nw=1; path=/');
-      webview.WebCookieManager.configCookieSync(EhUrl.HOST_EX, 'nw=1; path=/');
-      webview.WebCookieManager.saveCookieSync();
+      webview.WebCookieManager.configCookieSync(EhUrl.HOST_E, 'nw=1; path=/', true);
+      webview.WebCookieManager.configCookieSync(EhUrl.HOST_EX, 'nw=1; path=/', true);
     } catch (error) {
     }
-    ehCookieStore.clear();
-    this.webCookieCaptured = false;
-    this.statusText = 'Web sign-in is ready; existing browser verification is kept';
+    this.switchMode(SessionMode.Web);
+    this.statusText = 'Finish login in the web page; Cookie will be captured automatically';
   }
 
   private checkWebCookie(url: string): void {
@@ -110,7 +146,7 @@ export struct SessionScene {
       return;
     }
 
-    const cookieHeader = collectWebCookies(url);
+    const cookieHeader = collectWebCookies(url, true);
     if (cookieHeader.length > 0) {
       ehCookieStore.setCookieHeader(cookieHeader);
       this.cookieInput = ehCookieStore.getEditableCookieHeader();
@@ -132,6 +168,7 @@ export struct SessionScene {
     ehCookieStore.save(context).then(() => {
       this.cookieInput = ehCookieStore.getEditableCookieHeader();
       this.statusText = 'Web Cookie captured';
+      clearWebCookies(true);
       this.onSignedIn();
     }).catch((error: Error) => {
       this.webCookieCaptured = false;
@@ -163,42 +200,31 @@ export struct SessionScene {
   }
 
   private buildCookieHeader(): string {
-    const names: string[] = [];
-    const values: string[] = [];
-    absorbCookieHeaderText(this.cookieInput, names, values);
-    if (this.memberId.trim().length > 0) {
-      upsertCookiePair('ipb_member_id', this.memberId.trim(), names, values);
-    }
-    if (this.passHash.trim().length > 0) {
-      upsertCookiePair('ipb_pass_hash', this.passHash.trim(), names, values);
-    }
-    if (this.igneous.trim().length > 0) {
-      upsertCookiePair('igneous', this.igneous.trim(), names, values);
-    }
+    const parsed = parseCookieIdentity(this.cookieInput);
+    const memberId = this.memberId.trim().length > 0 ? this.memberId.trim() : parsed.memberId;
+    const passHash = this.passHash.trim().length > 0 ? this.passHash.trim() : parsed.passHash;
+    const igneous = this.igneous.trim().length > 0 ? this.igneous.trim() : parsed.igneous;
 
     const parts: string[] = [];
-    for (let i = 0; i < names.length; i++) {
-      parts.push(names[i] + '=' + values[i]);
+    if (memberId.length > 0) {
+      parts.push('ipb_member_id=' + memberId);
+    }
+    if (passHash.length > 0) {
+      parts.push('ipb_pass_hash=' + passHash);
+    }
+    if (igneous.length > 0) {
+      parts.push('igneous=' + igneous);
     }
     return parts.join('; ');
   }
 
   private syncCookieFieldsFromInput(value: string, showStatus: boolean): void {
     const parsed = parseCookieIdentity(value);
-    let changed = false;
-    if (parsed.memberId.length > 0) {
-      this.memberId = parsed.memberId;
-      changed = true;
-    }
-    if (parsed.passHash.length > 0) {
-      this.passHash = parsed.passHash;
-      changed = true;
-    }
-    if (parsed.igneous.length > 0) {
-      this.igneous = parsed.igneous;
-      changed = true;
-    }
+    this.memberId = parsed.memberId;
+    this.passHash = parsed.passHash;
+    this.igneous = parsed.igneous;
     if (showStatus) {
+      const changed = parsed.memberId.length > 0 || parsed.passHash.length > 0 || parsed.igneous.length > 0;
       this.statusText = changed ? 'Cookie fields detected' : 'No known Cookie fields detected';
     }
   }
@@ -226,10 +252,14 @@ export struct SessionScene {
   }
 
   private clearCookie(): void {
+    clearAllWebCookies();
     const context = getAbilityContext();
     if (context === undefined) {
       ehCookieStore.clear();
       this.cookieInput = '';
+      this.memberId = '';
+      this.passHash = '';
+      this.igneous = '';
       this.statusText = 'Cookie cleared in memory';
       return;
     }
@@ -247,6 +277,12 @@ export struct SessionScene {
 
   build() {
     Column() {
+      AppSubToolbar({
+        title: uiText(this.modeTitle()),
+        onBack: () => {
+          this.handleBack();
+        }
+      })
       if (this.mode === SessionMode.Web) {
         this.WebSignInPanel()
       } else if (this.mode === SessionMode.Cookie) {
@@ -333,7 +369,6 @@ export struct SessionScene {
             .margin({ top: 8 })
             .onClick(() => {
               this.prepareWebSignIn();
-              this.switchMode(SessionMode.Web);
             })
           Text(uiText('Sign in via Cookies'))
             .fontSize(14)
@@ -366,29 +401,8 @@ export struct SessionScene {
   @Builder
   private CookieSignInPanel() {
     Column() {
-      Row() {
-        Button({ type: ButtonType.Circle, stateEffect: true }) {
-          SymbolGlyph($r('sys.symbol.chevron_left'))
-            .fontSize(20)
-            .fontColor([themeOnPrimaryText()])
-        }
-        .width(36)
-        .height(36)
-        .backgroundColor(themePrimaryColor())
-        .onClick(() => {
-          this.switchMode(SessionMode.Password);
-        })
-        Text(uiText('Cookie Sign In'))
-          .fontSize(18)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(themePrimaryText())
-          .margin({ left: 12 })
-      }
-      .width('100%')
-      .padding({ left: 12, right: 12, top: 12 })
-
       SignInMark({ label: 'CK' })
-        .margin({ top: 6 })
+        .margin({ top: 12 })
 
       Scroll() {
         Column() {
@@ -435,21 +449,6 @@ export struct SessionScene {
             .onChange((value: string) => {
               this.igneous = value;
             })
-          TextArea({ text: this.cookieInput, placeholder: uiText('Full Cookie header') })
-            .height(116)
-            .width('100%')
-            .constraintSize({ maxWidth: 420 })
-            .fontSize(13)
-            .margin({ top: 12 })
-            .fontColor(themePrimaryText())
-            .placeholderColor(themeSecondaryText())
-            .caretColor(themePrimaryColor())
-            .backgroundColor(themeFieldBackground())
-            .onChange((value: string) => {
-              this.cookieInput = value;
-              this.syncCookieFieldsFromInput(value, true);
-            })
-
           Text(uiStatusText(this.statusText))
             .fontSize(13)
             .fontColor(themeSuccessText())
@@ -495,32 +494,17 @@ export struct SessionScene {
   @Builder
   private WebSignInPanel() {
     Column() {
-      Row() {
-        Button({ type: ButtonType.Circle, stateEffect: true }) {
-          SymbolGlyph($r('sys.symbol.chevron_left'))
-            .fontSize(20)
-            .fontColor([themeOnPrimaryText()])
-        }
-        .width(36)
-        .height(36)
-        .backgroundColor(themePrimaryColor())
-        .onClick(() => {
-          this.switchMode(SessionMode.Password);
-        })
-        Text(uiStatusText(this.statusText))
-          .fontSize(13)
-          .fontColor(themeSecondaryText())
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .layoutWeight(1)
-          .margin({ left: 12 })
-      }
+      Text(uiStatusText(this.statusText))
+        .fontSize(13)
+        .fontColor(themeSecondaryText())
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .textAlign(TextAlign.Center)
       .width('100%')
-      .height(44)
-      .padding({ left: 12, right: 12 })
+      .padding({ left: 12, right: 12, top: 8, bottom: 8 })
       .backgroundColor(themeSurface())
 
-      Web({ src: this.webUrl, controller: this.webController })
+      Web({ src: this.webUrl, controller: this.webController, incognitoMode: true })
         .javaScriptAccess(true)
         .domStorageAccess(true)
         .backgroundColor(Color.Transparent)
@@ -548,20 +532,20 @@ export struct SignInMark {
       .textAlign(TextAlign.Center)
       .width(72)
       .height(72)
+      .lineHeight(72)
       .backgroundColor(themePrimaryColor())
       .borderRadius(18)
-      .padding({ top: 18 })
   }
 }
 
-export function collectWebCookies(currentUrl: string): string {
+export function collectWebCookies(currentUrl: string, incognito: boolean = false): string {
   const names: string[] = [];
   const values: string[] = [];
-  absorbCookieHeader(currentUrl, names, values);
-  absorbCookieHeader(EhUrl.HOST_E, names, values);
-  absorbCookieHeader(EhUrl.HOST_EX, names, values);
-  absorbCookieHeader(EhUrl.FORUM_ORIGIN, names, values);
-  absorbCookieHeader(EhUrl.URL_SIGN_IN, names, values);
+  absorbCookieHeader(currentUrl, names, values, incognito);
+  absorbCookieHeader(EhUrl.HOST_E, names, values, incognito);
+  absorbCookieHeader(EhUrl.HOST_EX, names, values, incognito);
+  absorbCookieHeader(EhUrl.FORUM_ORIGIN, names, values, incognito);
+  absorbCookieHeader(EhUrl.URL_SIGN_IN, names, values, incognito);
 
   const parts: string[] = [];
   for (let i = 0; i < names.length; i++) {
@@ -570,7 +554,7 @@ export function collectWebCookies(currentUrl: string): string {
   return parts.join('; ');
 }
 
-export function syncCookieHeaderToWebView(url: string, cookieHeader: string): void {
+export function syncCookieHeaderToWebView(url: string, cookieHeader: string, incognito: boolean = false): void {
   if (url.length === 0 || cookieHeader.trim().length === 0) {
     return;
   }
@@ -583,14 +567,28 @@ export function syncCookieHeaderToWebView(url: string, cookieHeader: string): vo
       continue;
     }
     try {
-      webview.WebCookieManager.configCookieSync(url, names[i] + '=' + values[i] + '; path=/');
+      webview.WebCookieManager.configCookieSync(url, names[i] + '=' + values[i] + '; path=/', incognito);
     } catch (error) {
     }
   }
+  if (!incognito) {
+    try {
+      webview.WebCookieManager.saveCookieSync();
+    } catch (error) {
+    }
+  }
+}
+
+export function clearWebCookies(incognito: boolean): void {
   try {
-    webview.WebCookieManager.saveCookieSync();
+    webview.WebCookieManager.clearAllCookiesSync(incognito);
   } catch (error) {
   }
+}
+
+export function clearAllWebCookies(): void {
+  clearWebCookies(false);
+  clearWebCookies(true);
 }
 
 interface CookieIdentity {
@@ -663,14 +661,14 @@ function findCookieValue(name: string, names: string[], values: string[]): strin
   return '';
 }
 
-function absorbCookieHeader(url: string, names: string[], values: string[]): void {
+function absorbCookieHeader(url: string, names: string[], values: string[], incognito: boolean): void {
   if (url.length === 0) {
     return;
   }
 
   let header = '';
   try {
-    header = webview.WebCookieManager.fetchCookieSync(url);
+    header = webview.WebCookieManager.fetchCookieSync(url, incognito);
   } catch (error) {
     header = '';
   }
