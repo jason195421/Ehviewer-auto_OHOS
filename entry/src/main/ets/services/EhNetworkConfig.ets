@@ -8,6 +8,8 @@ import { ehSettingsStore } from './EhSettingsStore';
 const YANDEX_DOH_URL: string = 'https://common.dot.dns.yandex.net/dns-query';
 const CLOUDFLARE_DOH_URL: string = 'https://cloudflare-dns.com/dns-query';
 const GOOGLE_DOH_URL: string = 'https://dns.google/dns-query';
+const E_HENTAI_SNI_FRONT_HOST: string = 'repo.e-hentai.org';
+const E_HENTAI_REPO_SNI_FRONT_HOST: string = 'forums.e-hentai.org';
 const FRONTING_IP_CACHE_FILE_NAME: string = 'eh_fronting_ip_quality.json';
 const FRONTING_IP_CACHE_VERSION: number = 1;
 const FRONTING_PROBE_CONNECT_TIMEOUT_MS: number = 3000;
@@ -104,6 +106,7 @@ export interface EhRequestPlan {
   url: string;
   host: string;
   fronted: boolean;
+  sniHostName?: string;
 }
 
 export function createEhRequestPlan(url: string): EhRequestPlan {
@@ -146,7 +149,8 @@ export function createEhRequestPlan(url: string): EhRequestPlan {
   return {
     url: replaceUrlHost(url, eFrontingIp),
     host: hostHeader,
-    fronted: true
+    fronted: true,
+    sniHostName: eFrontingSniHost(host)
   };
 }
 
@@ -172,6 +176,11 @@ export function applyEhNetworkOptions(options: http.HttpRequestOptions, plan: Eh
   if (plan.fronted) {
     options.usingProtocol = http.HttpProtocol.HTTP1_1;
     options.remoteValidation = 'skip';
+    if (deviceInfo.apiAvailable(23)) {
+      if (plan.sniHostName !== undefined && plan.sniHostName.length > 0) {
+        options.sniHostName = plan.sniHostName;
+      }
+    }
   }
 }
 
@@ -583,6 +592,12 @@ async function probeFrontingIp(target: HostIpProbeTarget): Promise<HostIpQuality
       connectTimeout: FRONTING_PROBE_CONNECT_TIMEOUT_MS,
       readTimeout: FRONTING_PROBE_READ_TIMEOUT_MS
     };
+    const sniHostName = eFrontingSniHost(target.host);
+    if (deviceInfo.apiAvailable(23)) {
+      if (sniHostName.length > 0) {
+        options.sniHostName = sniHostName;
+      }
+    }
     applyConfiguredNetworkOptions(options);
     await requestProbeToCompletion(request, 'https://' + target.ip + '/', options);
     return {
@@ -994,7 +1009,7 @@ function frontingBenchmarkKey(): string {
   if (ehSettingsStore.getValue('domain_fronting', 'Off') !== 'On') {
     return 'Off';
   }
-  return selectedGalleryHost() + ':' +
+  return 'sni-v2:' + selectedGalleryHost() + ':' +
     proxySettingsKey() + ':' +
     dohSettingsKey();
 }
@@ -1073,6 +1088,17 @@ function supportsDomainFrontingHost(host: string): boolean {
   return normalized === 'ehgt.org' || normalized === 'e-hentai.org' ||
     normalized.endsWith('.e-hentai.org') || normalized === 'exhentai.org' ||
     normalized.endsWith('.exhentai.org');
+}
+
+function eFrontingSniHost(host: string): string {
+  const normalized = host.toLowerCase();
+  if (normalized === 'e-hentai.org' || normalized === 'forums.e-hentai.org') {
+    return E_HENTAI_SNI_FRONT_HOST;
+  }
+  if (normalized === 'repo.e-hentai.org') {
+    return E_HENTAI_REPO_SNI_FRONT_HOST;
+  }
+  return '';
 }
 
 function waitHostRuleTask(task: Promise<void>, timeoutMs: number): Promise<void> {
