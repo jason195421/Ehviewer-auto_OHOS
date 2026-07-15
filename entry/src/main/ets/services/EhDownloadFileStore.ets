@@ -41,6 +41,12 @@ interface RestoredGalleryData {
   total: number;
 }
 
+interface PageImageRenamePlan {
+  temporaryPath: string;
+  pageIndex: number;
+  extension: string;
+}
+
 export interface RestoredDownloadGallery {
   gallery: GalleryInfo;
   directory: string;
@@ -252,9 +258,11 @@ export class EhDownloadFileStore {
   prepareGallery(context: common.UIAbilityContext, detail: GalleryDetail, existingDirectory: string = ''): string {
     const root = this.downloadRoot(context);
     ensureDirectory(root);
-    const directory = existingDirectory.length > 0 && isDirectory(existingDirectory) ?
-      existingDirectory : this.galleryDirectory(context, detail);
+    const target = this.galleryDirectory(context, detail);
+    const source = existingDirectory.length > 0 && isDirectory(existingDirectory) ? existingDirectory : target;
+    const directory = this.moveGalleryToCurrentDirectory(root, detail.gid, source, target);
     ensureDirectory(directory);
+    normalizeKnownGalleryImageNames(directory);
     this.rewriteGalleryMetadataByDirectory(directory, detail);
     return directory;
   }
@@ -422,6 +430,45 @@ export class EhDownloadFileStore {
 
   private downloadRoot(context: common.UIAbilityContext): string {
     return this.rootForLocation(context, ehSettingsStore.getValue('download_location', DOWNLOAD_LOCATION_APP_FILES));
+  }
+
+  private moveGalleryToCurrentDirectory(root: string, gid: number, source: string, target: string): string {
+    const normalizedSource = normalizePath(source);
+    const normalizedTarget = normalizePath(target);
+    if (normalizedSource !== normalizedTarget && isDirectory(normalizedSource)) {
+      normalizeKnownGalleryImageNames(normalizedSource);
+      if (isDirectory(normalizedTarget) && countImageFiles(normalizedTarget) === 0 &&
+        countImageFiles(normalizedSource) > 0) {
+        removeDirectoryTree(normalizedTarget);
+      }
+      if (!isDirectory(normalizedTarget) && !renameDirectory(normalizedSource, normalizedTarget)) {
+        ensureDirectory(normalizedTarget);
+        mergeGalleryDirectory(normalizedSource, normalizedTarget);
+      } else if (isDirectory(normalizedTarget) && isDirectory(normalizedSource)) {
+        mergeGalleryDirectory(normalizedSource, normalizedTarget);
+      }
+    }
+
+    ensureDirectory(normalizedTarget);
+    normalizeKnownGalleryImageNames(normalizedTarget);
+    this.mergeOtherGalleryDirectories(root, gid, normalizedTarget);
+    return normalizedTarget;
+  }
+
+  private mergeOtherGalleryDirectories(root: string, gid: number, target: string): void {
+    const prefix = gid.toString() + '-';
+    try {
+      const names = fs.listFileSync(root);
+      for (let i = 0; i < names.length; i++) {
+        const candidate = normalizePath(root + '/' + names[i]);
+        if (!names[i].startsWith(prefix) || candidate === target || !isDirectory(candidate)) {
+          continue;
+        }
+        normalizeKnownGalleryImageNames(candidate);
+        mergeGalleryDirectory(candidate, target);
+      }
+    } catch (error) {
+    }
   }
 
   private zipExportRoot(context: common.UIAbilityContext): string {
@@ -921,6 +968,220 @@ function appendDirectoryCandidate(candidates: string[], path: string): void {
     }
   }
   candidates.push(path);
+}
+
+function renameDirectory(source: string, target: string): boolean {
+  if (source === target && isDirectory(source)) {
+    return true;
+  }
+  try {
+    fs.renameSync(source, target);
+    return isDirectory(target);
+  } catch (error) {
+    return false;
+  }
+}
+
+function mergeGalleryDirectory(source: string, target: string): boolean {
+  if (source === target || !isDirectory(source)) {
+    return true;
+  }
+  ensureDirectory(target);
+  normalizeKnownGalleryImageNames(source);
+  normalizeKnownGalleryImageNames(target);
+  let complete = true;
+  try {
+    const names = fs.listFileSync(source);
+    for (let i = 0; i < names.length; i++) {
+      const sourcePath = source + '/' + names[i];
+      if (names[i] === ANDROID_SPIDER_INFO_FILENAME || names[i] === OHOS_METADATA_FILENAME) {
+        continue;
+      }
+      if (isDirectory(sourcePath)) {
+        const childTarget = uniqueChildPath(target, names[i]);
+        const sourceScan = scanDirectoryTree(sourcePath);
+        const copied = copyDirectoryTree(sourcePath, childTarget);
+        if (copied.files < sourceScan.files) {
+          complete = false;
+        }
+        continue;
+      }
+      if (isSupportedImageFile(names[i])) {
+        if (!mergeGalleryImageFile(sourcePath, target, names[i])) {
+          complete = false;
+        }
+        continue;
+      }
+      const targetPath = exists(target + '/' + names[i]) ? uniqueChildPath(target, names[i]) : target + '/' + names[i];
+      if (!copyFileVerified(sourcePath, targetPath)) {
+        complete = false;
+      }
+    }
+  } catch (error) {
+    complete = false;
+  }
+  if (complete) {
+    removeDirectoryTree(source);
+  }
+  return complete;
+}
+
+function mergeGalleryImageFile(sourcePath: string, targetDirectory: string, sourceName: string): boolean {
+  const pageIndex = canonicalPageImageIndex(sourceName);
+  let targetPath = targetDirectory + '/' + sourceName;
+  if (pageIndex >= 0) {
+    const existing = findCanonicalPageImage(targetDirectory, pageIndex);
+    if (existing.length > 0) {
+      if (fileSize(sourcePath) <= fileSize(existing)) {
+        return true;
+      }
+      targetPath = targetDirectory + '/' + pageFileName(pageIndex, supportedImageExtension(sourceName));
+      if (!copyFileVerified(sourcePath, targetPath)) {
+        return false;
+      }
+      if (existing !== targetPath) {
+        removeFileQuietly(existing);
+      }
+      return true;
+    }
+  } else if (exists(targetPath) && fileSize(sourcePath) <= fileSize(targetPath)) {
+    return true;
+  }
+  return copyFileVerified(sourcePath, targetPath);
+}
+
+function copyFileVerified(source: string, target: string): boolean {
+  try {
+    fs.copyFileSync(source, target);
+    return exists(target) && fileSize(target) === fileSize(source);
+  } catch (error) {
+    return false;
+  }
+}
+
+function fileSize(path: string): number {
+  try {
+    return fs.statSync(path).size;
+  } catch (error) {
+    return 0;
+  }
+}
+
+function normalizeKnownGalleryImageNames(directory: string): void {
+  try {
+    const names = fs.listFileSync(directory).filter((name: string) => isSupportedImageFile(name));
+    const numericNames: string[] = [];
+    let zeroBasedPadded = false;
+    let zeroBasedUnpadded = false;
+    for (let i = 0; i < names.length; i++) {
+      const number = numericImageFileNumber(names[i]);
+      if (number < 0) {
+        continue;
+      }
+      numericNames.push(names[i]);
+      if (number === 0) {
+        if (numericImageStemLength(names[i]) === 8) {
+          zeroBasedPadded = true;
+        } else {
+          zeroBasedUnpadded = true;
+        }
+      }
+    }
+
+    const plans: PageImageRenamePlan[] = [];
+    const marker = '.__ehviewer_normalize_' + Date.now().toString() + '_';
+    for (let i = 0; i < numericNames.length; i++) {
+      const number = numericImageFileNumber(numericNames[i]);
+      const padded = numericImageStemLength(numericNames[i]) === 8;
+      const zeroBased = padded ? zeroBasedPadded : zeroBasedUnpadded;
+      const pageIndex = zeroBased ? number : number - 1;
+      if (pageIndex < 0) {
+        continue;
+      }
+      const extension = supportedImageExtension(numericNames[i]);
+      const targetName = pageFileName(pageIndex, extension);
+      if (numericNames[i] === targetName) {
+        continue;
+      }
+      const temporaryPath = directory + '/' + marker + i.toString() + extension;
+      try {
+        fs.renameSync(directory + '/' + numericNames[i], temporaryPath);
+        plans.push({ temporaryPath: temporaryPath, pageIndex: pageIndex, extension: extension });
+      } catch (error) {
+      }
+    }
+
+    for (let i = 0; i < plans.length; i++) {
+      storeNormalizedPageImage(directory, plans[i]);
+    }
+  } catch (error) {
+  }
+}
+
+function storeNormalizedPageImage(directory: string, plan: PageImageRenamePlan): void {
+  const existing = findCanonicalPageImage(directory, plan.pageIndex);
+  if (existing.length > 0 && fileSize(existing) >= fileSize(plan.temporaryPath)) {
+    removeFileQuietly(plan.temporaryPath);
+    return;
+  }
+  const target = directory + '/' + pageFileName(plan.pageIndex, plan.extension);
+  try {
+    if (existing === target) {
+      if (copyFileVerified(plan.temporaryPath, target)) {
+        removeFileQuietly(plan.temporaryPath);
+      }
+      return;
+    }
+    if (exists(target)) {
+      removeFileQuietly(target);
+    }
+    fs.renameSync(plan.temporaryPath, target);
+    if (existing.length > 0) {
+      removeFileQuietly(existing);
+    }
+  } catch (error) {
+    if (copyFileVerified(plan.temporaryPath, target)) {
+      removeFileQuietly(plan.temporaryPath);
+      if (existing.length > 0 && existing !== target) {
+        removeFileQuietly(existing);
+      }
+    }
+  }
+}
+
+function numericImageFileNumber(name: string): number {
+  const extension = supportedImageExtension(name);
+  const stem = name.substring(0, name.length - extension.length);
+  if (!/^\d+$/.test(stem)) {
+    return -1;
+  }
+  const value = Number.parseInt(stem, 10);
+  return Number.isFinite(value) ? value : -1;
+}
+
+function numericImageStemLength(name: string): number {
+  const extension = supportedImageExtension(name);
+  return Math.max(0, name.length - extension.length);
+}
+
+function canonicalPageImageIndex(name: string): number {
+  const extension = supportedImageExtension(name);
+  const stem = name.substring(0, name.length - extension.length);
+  if (!/^\d{8}$/.test(stem)) {
+    return -1;
+  }
+  const value = Number.parseInt(stem, 10);
+  return Number.isFinite(value) && value > 0 ? value - 1 : -1;
+}
+
+function findCanonicalPageImage(directory: string, pageIndex: number): string {
+  for (let i = 0; i < SUPPORTED_IMAGE_EXTENSIONS.length; i++) {
+    const path = directory + '/' + pageFileName(pageIndex, SUPPORTED_IMAGE_EXTENSIONS[i]);
+    if (exists(path)) {
+      return path;
+    }
+  }
+  return '';
 }
 
 function normalizeGalleryImageNames(directory: string): void {
