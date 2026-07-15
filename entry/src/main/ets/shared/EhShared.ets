@@ -256,6 +256,12 @@ function simplifiedUiStatusText(text: string): string {
   if (text.indexOf('Device connection error: ') === 0) {
     return '设备连接错误：' + text.substring('Device connection error: '.length);
   }
+  if (text.indexOf('Wi-Fi Direct connection failed: ') === 0) {
+    return 'Wi-Fi 直连失败：' + text.substring('Wi-Fi Direct connection failed: '.length);
+  }
+  if (text.indexOf('Unable to connect with Wi-Fi Direct: ') === 0) {
+    return '无法通过 Wi-Fi 直连连接：' + text.substring('Unable to connect with Wi-Fi Direct: '.length);
+  }
   if (text.indexOf('Send failed: ') === 0) {
     return '发送失败：' + text.substring('Send failed: '.length);
   }
@@ -1529,11 +1535,14 @@ export function zhText(text: string): string {
     case 'Import data': return '导入数据';
     case 'Restore settings and local data from a supported backup file': return '从支持的备份文件恢复设置和本地数据';
     case 'Wi-Fi server/client': return 'Wi-Fi 服务器/客户端';
-    case 'Send or receive bookmarks, local favorites and download records over the local network':
-      return '通过局域网发送或接收搜索书签、本地收藏和下载记录';
+    case 'Wi-Fi Direct transfer': return 'Wi-Fi 直连传输';
+    case 'Transfer bookmarks, local favorites, downloads and image files directly between nearby devices':
+      return '在附近设备间直连传输搜索书签、本地收藏、下载记录和图片文件';
     case 'Send data': return '发送数据';
+    case 'Create a Wi-Fi Direct group': return '创建 Wi-Fi 直连群组';
     case 'Act as the migration server': return '作为迁移发送端';
     case 'Receive data': return '接收数据';
+    case 'Discover the sending device': return '发现并连接发送设备';
     case 'Connect to the sending device': return '连接到发送设备';
     case 'Connection status': return '连接状态';
     case 'Page': return '分页';
@@ -1548,6 +1557,8 @@ export function zhText(text: string): string {
     case 'Local favorites': return '本地收藏';
     case 'Locally saved gallery information': return '保存在本机的画廊信息';
     case 'Download records': return '下载记录';
+    case 'Downloads and images': return '下载记录和图片';
+    case 'Transfer download records and all downloaded image files': return '传输下载记录及全部已下载图片文件';
     case 'Download labels and gallery records; image files are not transferred': return '下载标签和画廊记录；不传输图片文件';
     case 'Server address': return '服务器地址';
     case 'The default gateway is filled automatically. You can also enter the sender IPv4 address.':
@@ -1556,6 +1567,22 @@ export function zhText(text: string): string {
     case 'Stop sending': return '停止发送';
     case 'Connect and receive': return '连接并接收';
     case 'Disconnect': return '断开连接';
+    case 'Stop Wi-Fi Direct': return '停止 Wi-Fi 直连';
+    case 'Scan nearby devices': return '扫描附近设备';
+    case 'Nearby devices': return '附近设备';
+    case 'Nearby device': return '附近设备';
+    case 'Connect': return '连接';
+    case 'Start scanning, then select the sender device from the list': return '开始扫描，然后从列表中选择发送设备';
+    case 'Progress': return '进度';
+    case 'Image files': return '图片文件';
+    case 'This device': return '本机设备';
+    case 'Wi-Fi Direct instructions': return 'Wi-Fi 直连说明';
+    case 'On the sending device, choose the data and start sending. On the receiving device, scan and select the sender.':
+      return '在发送设备选择数据并开始发送；在接收设备扫描并选择发送设备。';
+    case 'Keep both transfer pages open until completion. Download transfer includes metadata and downloaded image files.':
+      return '传输完成前请保持两端页面开启；下载传输包含元数据和已下载图片文件。';
+    case 'The direct group and data server stop automatically when this page is closed.':
+      return '关闭此页面后，直连群组和数据服务器会自动停止。';
     case 'Compatible with the original Android app': return '兼容原 Android 应用';
     case 'Both devices must be on the same local network. The original Android client only connects to the gateway, so use the sending device hotspot when transferring to it.':
       return '两台设备必须处于同一局域网。原 Android 客户端只连接默认网关，因此向其传输时请开启发送设备的热点。';
@@ -1567,6 +1594,15 @@ export function zhText(text: string): string {
     case 'Wi-Fi transfer needs app context': return 'Wi-Fi 传输需要应用上下文';
     case 'Wi-Fi transfer stopped': return 'Wi-Fi 传输已停止';
     case 'No data is available for this transfer': return '没有可传输的数据';
+    case 'Turn on Wi-Fi before using Wi-Fi Direct': return '使用 Wi-Fi 直连前请先打开 WLAN';
+    case 'Preparing transfer data': return '正在准备传输数据';
+    case 'Waiting for a receiving device with Wi-Fi Direct': return '正在等待接收设备通过 Wi-Fi 直连加入';
+    case 'Searching for nearby devices': return '正在搜索附近设备';
+    case 'Select the sending device': return '请选择发送设备';
+    case 'The selected device is no longer available': return '所选设备已不可用';
+    case 'Connecting with Wi-Fi Direct': return '正在通过 Wi-Fi 直连连接';
+    case 'Wi-Fi Direct connection was disconnected': return 'Wi-Fi 直连已断开';
+    case 'Wi-Fi Direct connected; waiting for data channel': return 'Wi-Fi 直连成功，正在等待数据通道';
     case 'Starting Wi-Fi server': return '正在启动 Wi-Fi 服务器';
     case 'Waiting for a receiving device': return '正在等待接收设备';
     case 'Receiving device connected; sending data': return '接收设备已连接，正在发送数据';
@@ -1577,6 +1613,11 @@ export function zhText(text: string): string {
     case 'Enter a valid IPv4 server address': return '请输入有效的服务器 IPv4 地址';
     case 'Sending data': return '正在发送数据';
     case 'Receiving data': return '正在接收数据';
+    case 'Sending data and downloaded images': return '正在发送数据和已下载图片';
+    case 'Sending downloaded images': return '正在发送已下载图片';
+    case 'Receiving downloaded images': return '正在接收已下载图片';
+    case 'Transfer completed': return '传输完成';
+    case 'Received and saved transfer data': return '已接收并保存传输数据';
     case 'Waiting for page confirmation': return '等待接收端确认当前分页';
     case 'The receiving device did not confirm the data in time': return '接收设备未在规定时间内确认数据';
     case 'Received data is not compatible': return '接收的数据格式不兼容';
@@ -3089,8 +3130,9 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
     rows.push(optionSettingsRow('auto_direct_connection', 'Direct connection check', 'Use direct connection when the selected site responds within 5s', entries, ON_OFF_OPTIONS));
     rows.push(staticSettingsRow('export_data', 'Export data', 'Save settings, history, downloads and filter rules to a JSON file', 'Export', 'action'));
     rows.push(staticSettingsRow('import_data', 'Import data', 'Restore settings and local data from a supported backup file', 'Import', 'action'));
-    rows.push(staticSettingsRow('wifi_transfer', 'Wi-Fi server/client',
-      'Send or receive bookmarks, local favorites and download records over the local network', '', 'navigation'));
+    rows.push(staticSettingsRow('wifi_transfer', 'Wi-Fi Direct transfer',
+      'Transfer bookmarks, local favorites, downloads and image files directly between nearby devices', '',
+      'navigation'));
     return rows;
   }
 

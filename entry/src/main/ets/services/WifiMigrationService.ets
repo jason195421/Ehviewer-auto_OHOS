@@ -1,23 +1,27 @@
 import { common } from '@kit.AbilityKit';
-import { BusinessError } from '@kit.BasicServicesKit';
-import { connection, socket } from '@kit.NetworkKit';
 import { util } from '@kit.ArkTS';
-import { GalleryCategory, GalleryInfo } from '../model/GalleryModels';
+import { BusinessError } from '@kit.BasicServicesKit';
+import { wifiManager } from '@kit.ConnectivityKit';
+import { fileIo as fs } from '@kit.CoreFileKit';
+import { socket } from '@kit.NetworkKit';
 import { SearchBookmarkBackupInfo, ehBookmarkStore } from './EhBookmarkStore';
-import { DownloadInfo, DownloadState, ehDownloadStore } from './EhDownloadStore';
-import { ehLocalFavoritesStore } from './EhLocalFavoritesStore';
+import { ehDownloadFileStore } from './EhDownloadFileStore';
+import { DownloadInfo, DownloadLabel, DownloadState, ehDownloadStore } from './EhDownloadStore';
+import { LocalFavoriteBackupInfo, ehLocalFavoritesStore } from './EhLocalFavoritesStore';
 
 export const WIFI_MIGRATION_PORT: number = 54321;
 
-const MESSAGE_RECEIVED: number = 1;
-const MESSAGE_SEND: number = 2;
-const DATA_QUICK_SEARCH: number = 1001;
-const DATA_DOWNLOAD_INFO: number = 1002;
-const DATA_DOWNLOAD_LABEL: number = 1003;
-const DATA_FAVORITE_INFO: number = 1004;
-const PAGE_SIZE: number = 10;
-const FRAME_SUFFIX: string = ':END';
-const ACK_TIMEOUT_MS: number = 20000;
+const TRANSFER_PROTOCOL: string = 'ehviewer-ohos-wifi-direct';
+const TRANSFER_VERSION: number = 2;
+const PACKET_METADATA: string = 'metadata';
+const PACKET_FILE: string = 'file';
+const PACKET_COMPLETE: string = 'complete';
+const PACKET_ACK: string = 'ack';
+const FILE_CHUNK_SIZE: number = 256 * 1024;
+const MAX_HEADER_BYTES: number = 64 * 1024;
+const MAX_PACKET_PAYLOAD_BYTES: number = 32 * 1024 * 1024;
+const ACK_TIMEOUT_MS: number = 60000;
+const DOWNLOAD_PAGE_PROGRESS_SCALE: number = 1000;
 
 export enum WifiMigrationRole {
   Server = 'server',
@@ -40,9 +44,11 @@ export enum WifiMigrationPhase {
   Error = 'error'
 }
 
-export interface WifiMigrationNetworkInfo {
-  localAddress: string;
-  gatewayAddress: string;
+export interface WifiMigrationPeer {
+  name: string;
+  address: string;
+  addressType: wifiManager.DeviceAddressType;
+  status: wifiManager.P2pDeviceStatus;
 }
 
 export interface WifiMigrationSnapshot {
@@ -50,92 +56,63 @@ export interface WifiMigrationSnapshot {
   phase: WifiMigrationPhase;
   status: string;
   peerAddress: string;
+  peerName: string;
+  localDeviceName: string;
+  peers: WifiMigrationPeer[];
   currentPage: number;
   totalPages: number;
   transferredItems: number;
+  transferredFiles: number;
+  totalFiles: number;
+  transferredBytes: number;
+  totalBytes: number;
 }
 
 type WifiMigrationObserver = (snapshot: WifiMigrationSnapshot) => void;
 
-interface WifiMigrationPayload {
-  quick_search?: SearchBookmarkBackupInfo[];
-  favorite_info?: AndroidGalleryInfo[];
-  download_label?: string[];
-  download_info?: AndroidDownloadInfo[];
+interface WifiTransferMetadata {
+  version: number;
+  kind: WifiMigrationDataKind;
+  bookmarks?: SearchBookmarkBackupInfo[];
+  favorites?: LocalFavoriteBackupInfo[];
+  downloadLabels?: DownloadLabel[];
+  downloads?: DownloadInfo[];
 }
 
-interface WifiMigrationFrame {
-  messageType: number;
-  dataType: number;
-  data: WifiMigrationPayload;
-  totalSize: number;
-  part: number;
+interface WifiTransferPacketHeader {
+  protocol: string;
+  version: number;
+  type: string;
+  sequence: number;
+  payloadLength: number;
+  totalPackets: number;
+  totalBytes: number;
+  totalFiles: number;
+  kind?: WifiMigrationDataKind;
+  fileGid?: number;
+  fileName?: string;
+  fileOffset?: number;
+  fileSize?: number;
 }
 
-interface AndroidGalleryInfo {
-  gid?: number;
-  token?: string;
-  title?: string;
-  titleJpn?: string;
-  thumb?: string;
-  category?: number;
-  posted?: string;
-  uploader?: string;
-  rating?: number;
-  rated?: boolean;
-  simpleLanguage?: string;
-  simpleTags?: string[];
-  thumbHeight?: number;
-  thumbWidth?: number;
-  spanSize?: number;
-  spanIndex?: number;
-  spanGroupIndex?: number;
-  favoriteSlot?: number;
-  favoriteName?: string;
-  tgList?: Array<string | string[]>;
-  pages?: number;
+interface OutgoingTransferPacket {
+  header: WifiTransferPacketHeader;
+  payload?: Uint8Array;
+  filePath?: string;
 }
 
-interface AndroidDownloadInfo extends AndroidGalleryInfo {
-  finished?: number;
-  legacy?: number;
-  label?: string;
-  downloaded?: number;
-  remaining?: number;
-  speed?: number;
-  state?: number;
-  time?: number;
-  total?: number;
-  archiveUri?: string;
+interface TransferPlan {
+  packets: OutgoingTransferPacket[];
+  itemCount: number;
+  fileCount: number;
+  totalBytes: number;
 }
 
-export function wifiMigrationNetworkInfo(): WifiMigrationNetworkInfo {
-  const result: WifiMigrationNetworkInfo = { localAddress: '', gatewayAddress: '' };
-  try {
-    const netHandle = connection.getDefaultNetSync();
-    if (netHandle.netId === 0) {
-      return result;
-    }
-    const properties = connection.getConnectionPropertiesSync(netHandle);
-    const links = properties.linkAddresses === undefined ? [] : properties.linkAddresses;
-    for (let i = 0; i < links.length; i++) {
-      const address = links[i].address.address;
-      if (isUsableIpv4(address)) {
-        result.localAddress = address;
-        break;
-      }
-    }
-    const routes = properties.routes === undefined ? [] : properties.routes;
-    for (let i = 0; i < routes.length; i++) {
-      const route = routes[i];
-      if (route.hasGateway && route.isDefaultRoute && isUsableIpv4(route.gateway.address)) {
-        result.gatewayAddress = route.gateway.address;
-        break;
-      }
-    }
-  } catch (error) {
-  }
-  return result;
+interface TransferImageFile {
+  gid: number;
+  path: string;
+  name: string;
+  size: number;
 }
 
 export class WifiMigrationSession {
@@ -145,25 +122,77 @@ export class WifiMigrationSession {
   private phase: WifiMigrationPhase = WifiMigrationPhase.Idle;
   private status: string = 'Wi-Fi transfer is idle';
   private peerAddress: string = '';
+  private peerName: string = '';
+  private localDeviceName: string = '';
+  private peers: WifiMigrationPeer[] = [];
   private currentPage: number = 0;
   private totalPages: number = 0;
   private transferredItems: number = 0;
+  private transferredFiles: number = 0;
+  private totalFiles: number = 0;
+  private transferredBytes: number = 0;
+  private totalBytes: number = 0;
   private server: socket.TCPSocketServer | null = null;
   private serverConnection: socket.TCPSocketConnection | null = null;
   private client: socket.TCPSocket | null = null;
-  private outgoingFrames: WifiMigrationFrame[] = [];
+  private outgoingPackets: OutgoingTransferPacket[] = [];
   private outgoingIndex: number = 0;
   private awaitingAck: boolean = false;
-  private inputBuffer: string = '';
-  private decoder: util.TextDecoder = util.TextDecoder.create('utf-8', { ignoreBOM: true });
+  private receiveBuffer: Uint8Array = new Uint8Array(0);
   private receiveChain: Promise<void> = Promise.resolve();
+  private encoder: util.TextEncoder = util.TextEncoder.create('utf-8');
+  private decoder: util.TextDecoder = util.TextDecoder.create('utf-8', { ignoreBOM: true });
   private ackTimer: number = 0;
   private stopped: boolean = false;
   private sessionVersion: number = 0;
+  private listenersRegistered: boolean = false;
+  private incomingMetadata: WifiTransferMetadata | null = null;
+  private incomingDirectories: Map<number, string> = new Map<number, string>();
+  private senderItemCount: number = 0;
+
+  private peerChangeCallback = (devices: wifiManager.WifiP2pDevice[]): void => {
+    const peers: WifiMigrationPeer[] = [];
+    for (let i = 0; i < devices.length; i++) {
+      const device = devices[i];
+      if (device.deviceAddress.length === 0 || device.deviceStatus === wifiManager.P2pDeviceStatus.UNAVAILABLE) {
+        continue;
+      }
+      peers.push({
+        name: device.deviceName.length > 0 ? device.deviceName : 'Nearby device',
+        address: device.deviceAddress,
+        addressType: device.deviceAddressType === undefined ? wifiManager.DeviceAddressType.RANDOM_DEVICE_ADDRESS :
+          device.deviceAddressType,
+        status: device.deviceStatus
+      });
+    }
+    peers.sort((left: WifiMigrationPeer, right: WifiMigrationPeer): number => left.name.localeCompare(right.name));
+    this.peers = peers;
+    if (this.role === WifiMigrationRole.Client && this.phase === WifiMigrationPhase.Waiting) {
+      this.status = peers.length > 0 ? 'Select the sending device' : 'Searching for nearby devices';
+    }
+    this.emit();
+  };
+
+  private connectionChangeCallback = (info: wifiManager.WifiP2pLinkedInfo): void => {
+    const version = this.sessionVersion;
+    if (info.connectState !== wifiManager.P2pConnectState.CONNECTED) {
+      if (!this.stopped && (this.phase === WifiMigrationPhase.Connected ||
+        this.phase === WifiMigrationPhase.Transferring)) {
+        this.fail('Wi-Fi Direct connection was disconnected');
+      }
+      return;
+    }
+    this.handleP2pConnected(info, version).catch((error: Error) => {
+      if (version === this.sessionVersion && !this.stopped) {
+        this.fail('Wi-Fi Direct connection failed: ' + error.message);
+      }
+    });
+  };
 
   constructor(context: common.UIAbilityContext, observer: WifiMigrationObserver) {
     this.context = context;
     this.observer = observer;
+    this.refreshLocalDevice().catch(() => {});
     this.emit();
   }
 
@@ -173,33 +202,253 @@ export class WifiMigrationSession {
       phase: this.phase,
       status: this.status,
       peerAddress: this.peerAddress,
+      peerName: this.peerName,
+      localDeviceName: this.localDeviceName,
+      peers: clonePeers(this.peers),
       currentPage: this.currentPage,
       totalPages: this.totalPages,
-      transferredItems: this.transferredItems
+      transferredItems: this.transferredItems,
+      transferredFiles: this.transferredFiles,
+      totalFiles: this.totalFiles,
+      transferredBytes: this.transferredBytes,
+      totalBytes: this.totalBytes
     };
   }
 
   async startServer(kind: WifiMigrationDataKind): Promise<void> {
-    const reuseConnection = this.server !== null && this.serverConnection !== null;
-    this.role = WifiMigrationRole.Server;
-    this.stopped = false;
-    this.clearTransferState();
+    await this.resetForStart(WifiMigrationRole.Server);
+    if (!isWifiReady()) {
+      this.fail('Turn on Wi-Fi before using Wi-Fi Direct');
+      return;
+    }
+    this.setState(WifiMigrationPhase.Starting, 'Preparing transfer data');
     await this.prepareStores();
-    this.outgoingFrames = createFrames(kind);
-    this.totalPages = this.outgoingFrames.length;
-    if (this.outgoingFrames.length === 0) {
+    const plan = createTransferPlan(this.context, kind, this.encoder);
+    if (plan.itemCount <= 0 && plan.fileCount <= 0) {
       this.setState(WifiMigrationPhase.Idle, 'No data is available for this transfer');
       return;
     }
-    if (reuseConnection) {
-      this.setState(WifiMigrationPhase.Transferring, 'Sending data');
-      await this.sendCurrentFrame();
+    this.outgoingPackets = plan.packets;
+    this.senderItemCount = plan.itemCount;
+    this.totalPages = plan.packets.length;
+    this.totalFiles = plan.fileCount;
+    this.totalBytes = plan.totalBytes;
+    this.emit();
+    await this.startTcpServer();
+    this.ensureP2pListeners();
+    let local: wifiManager.WifiP2pDevice;
+    try {
+      local = await wifiManager.getP2pLocalDevice();
+    } catch (error) {
+      throw new Error('Unable to read the local Wi-Fi Direct device: ' + cleanError(error));
+    }
+    this.localDeviceName = local.deviceName;
+    const config: wifiManager.WifiP2PConfig = {
+      deviceAddress: local.deviceAddress,
+      deviceAddressType: local.deviceAddressType === undefined ?
+        wifiManager.DeviceAddressType.RANDOM_DEVICE_ADDRESS : local.deviceAddressType,
+      netId: -1,
+      passphrase: 'ehviewer1',
+      groupName: 'EhViewer Transfer',
+      goBand: wifiManager.GroupOwnerBand.GO_BAND_AUTO
+    };
+    try {
+      wifiManager.createGroup(config);
+    } catch (error) {
+      throw new Error('Unable to create the Wi-Fi Direct group: ' + cleanError(error));
+    }
+    this.setState(WifiMigrationPhase.Waiting, 'Waiting for a receiving device with Wi-Fi Direct');
+  }
+
+  async discoverPeers(): Promise<void> {
+    await this.resetForStart(WifiMigrationRole.Client);
+    if (!isWifiReady()) {
+      this.fail('Turn on Wi-Fi before using Wi-Fi Direct');
       return;
     }
+    this.ensureP2pListeners();
+    await this.refreshLocalDevice();
+    this.setState(WifiMigrationPhase.Waiting, 'Searching for nearby devices');
+    try {
+      wifiManager.startDiscoverDevices();
+    } catch (error) {
+      this.fail('Unable to discover Wi-Fi Direct devices: ' + cleanError(error));
+      return;
+    }
+    try {
+      this.peerChangeCallback(await wifiManager.getP2pPeerDevices());
+    } catch (error) {
+    }
+  }
+
+  connectToPeer(address: string): void {
+    if (this.role !== WifiMigrationRole.Client || this.stopped) {
+      return;
+    }
+    let selected: WifiMigrationPeer | null = null;
+    for (let i = 0; i < this.peers.length; i++) {
+      if (this.peers[i].address === address) {
+        selected = this.peers[i];
+        break;
+      }
+    }
+    if (selected === null) {
+      this.fail('The selected device is no longer available');
+      return;
+    }
+    this.peerName = selected.name;
+    this.peerAddress = selected.address;
+    this.setState(WifiMigrationPhase.Starting, 'Connecting with Wi-Fi Direct');
+    try {
+      wifiManager.stopDiscoverDevices();
+    } catch (error) {
+    }
+    const config: wifiManager.WifiP2PConfig = {
+      deviceAddress: selected.address,
+      deviceAddressType: selected.addressType,
+      netId: -2,
+      passphrase: '',
+      groupName: '',
+      goBand: wifiManager.GroupOwnerBand.GO_BAND_AUTO
+    };
+    try {
+      wifiManager.p2pConnect(config);
+    } catch (error) {
+      this.fail('Unable to connect with Wi-Fi Direct: ' + cleanError(error));
+    }
+  }
+
+  async stop(): Promise<void> {
+    this.stopped = true;
+    this.sessionVersion++;
+    this.clearAckTimer();
     await this.closeSockets();
-    this.phase = WifiMigrationPhase.Starting;
-    this.status = 'Starting Wi-Fi server';
+    this.stopP2p();
+    this.unregisterP2pListeners();
+    this.clearTransferState();
+    this.peerAddress = '';
+    this.peerName = '';
+    this.peers = [];
+    this.setState(WifiMigrationPhase.Idle, 'Wi-Fi transfer stopped');
+  }
+
+  private async resetForStart(role: WifiMigrationRole): Promise<void> {
+    this.stopped = true;
+    this.sessionVersion++;
+    this.clearAckTimer();
+    await this.closeSockets();
+    this.stopP2p();
+    this.unregisterP2pListeners();
+    this.clearTransferState();
+    this.role = role;
+    this.peerAddress = '';
+    this.peerName = '';
+    this.peers = [];
+    this.stopped = false;
     this.emit();
+  }
+
+  private async prepareStores(): Promise<void> {
+    await Promise.all([
+      ehBookmarkStore.ensureLoaded(this.context),
+      ehLocalFavoritesStore.ensureLoaded(this.context)
+    ]);
+  }
+
+  private async refreshLocalDevice(): Promise<void> {
+    if (!isWifiReady()) {
+      return;
+    }
+    let local: wifiManager.WifiP2pDevice;
+    try {
+      local = await wifiManager.getP2pLocalDevice();
+    } catch (error) {
+      return;
+    }
+    this.localDeviceName = local.deviceName;
+    this.emit();
+  }
+
+  private ensureP2pListeners(): void {
+    if (this.listenersRegistered) {
+      return;
+    }
+    try {
+      wifiManager.on('p2pPeerDeviceChange', this.peerChangeCallback);
+      wifiManager.on('p2pConnectionChange', this.connectionChangeCallback);
+      this.listenersRegistered = true;
+    } catch (error) {
+      try {
+        wifiManager.off('p2pPeerDeviceChange', this.peerChangeCallback);
+      } catch (offError) {
+      }
+      try {
+        wifiManager.off('p2pConnectionChange', this.connectionChangeCallback);
+      } catch (offError) {
+      }
+      throw new Error('Unable to listen for Wi-Fi Direct state: ' + cleanError(error));
+    }
+  }
+
+  private unregisterP2pListeners(): void {
+    if (!this.listenersRegistered) {
+      return;
+    }
+    try {
+      wifiManager.off('p2pPeerDeviceChange', this.peerChangeCallback);
+    } catch (error) {
+    }
+    try {
+      wifiManager.off('p2pConnectionChange', this.connectionChangeCallback);
+    } catch (error) {
+    }
+    this.listenersRegistered = false;
+  }
+
+  private stopP2p(): void {
+    try {
+      wifiManager.stopDiscoverDevices();
+    } catch (error) {
+    }
+    try {
+      wifiManager.p2pCancelConnect();
+    } catch (error) {
+    }
+    try {
+      wifiManager.removeGroup();
+    } catch (error) {
+    }
+  }
+
+  private async handleP2pConnected(info: wifiManager.WifiP2pLinkedInfo, version: number): Promise<void> {
+    if (version !== this.sessionVersion || this.stopped) {
+      return;
+    }
+    let ownerAddress = info.groupOwnerAddr;
+    try {
+      const group = await wifiManager.getCurrentGroup();
+      if (group.goIpAddress.length > 0) {
+        ownerAddress = group.goIpAddress;
+      }
+      if (this.role === WifiMigrationRole.Server && group.clientDevices.length > 0) {
+        this.peerName = group.clientDevices[0].deviceName;
+      } else if (this.role === WifiMigrationRole.Client) {
+        this.peerName = group.ownerInfo.deviceName;
+      }
+    } catch (error) {
+    }
+    this.peerAddress = ownerAddress;
+    if (this.role === WifiMigrationRole.Server) {
+      this.setState(WifiMigrationPhase.Connected, 'Wi-Fi Direct connected; waiting for data channel');
+      return;
+    }
+    if (!isUsableIpv4(ownerAddress)) {
+      throw new Error('Group owner address is unavailable');
+    }
+    await this.connectTcpClient(ownerAddress, version);
+  }
+
+  private async startTcpServer(): Promise<void> {
     const server = socket.constructTCPSocketServerInstance();
     this.server = server;
     try {
@@ -211,76 +460,14 @@ export class WifiMigrationSession {
         this.acceptServerConnection(client);
       });
       server.on('error', (error: BusinessError) => {
-        if (!this.stopped) {
-          this.fail('Wi-Fi server error: ' + cleanSocketError(error));
+        if (!this.stopped && this.server === server) {
+          this.fail('Wi-Fi server error: ' + cleanError(error));
         }
       });
-      this.setState(WifiMigrationPhase.Waiting, 'Waiting for a receiving device');
     } catch (error) {
-      this.fail('Unable to start Wi-Fi server: ' + cleanSocketError(error));
+      this.server = null;
+      throw new Error('Unable to start Wi-Fi server: ' + cleanError(error));
     }
-  }
-
-  async startClient(host: string): Promise<void> {
-    const normalized = host.trim();
-    if (!isUsableIpv4(normalized)) {
-      this.fail('Enter a valid IPv4 server address');
-      return;
-    }
-    this.role = WifiMigrationRole.Client;
-    this.stopped = false;
-    this.clearTransferState();
-    await this.prepareStores();
-    await this.closeSockets();
-    this.phase = WifiMigrationPhase.Starting;
-    this.status = 'Connecting to sending device';
-    this.emit();
-    const client = socket.constructTCPSocketInstance();
-    this.client = client;
-    client.on('message', (info: socket.SocketMessageInfo) => {
-      this.consumeBytes(info.message);
-    });
-    client.on('close', () => {
-      if (!this.stopped && this.client === client) {
-        this.client = null;
-        this.setState(WifiMigrationPhase.Error, 'The sending device disconnected');
-      }
-    });
-    client.on('error', (error: BusinessError) => {
-      if (!this.stopped && this.client === client) {
-        this.fail('Wi-Fi client error: ' + cleanSocketError(error));
-      }
-    });
-    try {
-      await client.connect({
-        address: { address: normalized, port: WIFI_MIGRATION_PORT, family: 1 },
-        timeout: 6000
-      });
-      if (this.stopped || this.client !== client) {
-        return;
-      }
-      this.peerAddress = normalized;
-      this.setState(WifiMigrationPhase.Connected, 'Connected and ready to receive');
-    } catch (error) {
-      this.fail('Unable to connect: ' + cleanSocketError(error));
-      await this.closeClient(client);
-    }
-  }
-
-  async stop(): Promise<void> {
-    this.stopped = true;
-    this.clearAckTimer();
-    await this.closeSockets();
-    this.clearTransferState();
-    this.peerAddress = '';
-    this.setState(WifiMigrationPhase.Idle, 'Wi-Fi transfer stopped');
-  }
-
-  private async prepareStores(): Promise<void> {
-    await Promise.all([
-      ehBookmarkStore.ensureLoaded(this.context),
-      ehLocalFavoritesStore.ensureLoaded(this.context)
-    ]);
   }
 
   private acceptServerConnection(client: socket.TCPSocketConnection): void {
@@ -288,7 +475,7 @@ export class WifiMigrationSession {
       this.closeServerConnection(this.serverConnection);
     }
     this.serverConnection = client;
-    this.inputBuffer = '';
+    this.receiveBuffer = new Uint8Array(0);
     client.on('message', (info: socket.SocketMessageInfo) => {
       this.consumeBytes(info.message);
     });
@@ -302,7 +489,7 @@ export class WifiMigrationSession {
     });
     client.on('error', (error: BusinessError) => {
       if (!this.stopped && this.serverConnection === client) {
-        this.fail('Device connection error: ' + cleanSocketError(error));
+        this.fail('Device connection error: ' + cleanError(error));
       }
     });
     client.getRemoteAddress().then((address: socket.NetAddress) => {
@@ -310,140 +497,253 @@ export class WifiMigrationSession {
         this.peerAddress = address.address;
         this.emit();
       }
-    }).catch(() => {
-    });
-    this.setState(WifiMigrationPhase.Transferring, 'Receiving device connected; sending data');
-    this.sendCurrentFrame().catch((error: Error) => {
+    }).catch(() => {});
+    this.setState(WifiMigrationPhase.Transferring, 'Sending data and downloaded images');
+    this.sendCurrentPacket().catch((error: Error) => {
       this.fail('Send failed: ' + error.message);
     });
   }
 
-  private consumeBytes(buffer: ArrayBuffer): void {
-    const chunk = this.decoder.decodeToString(new Uint8Array(buffer), { stream: true });
-    this.inputBuffer += chunk;
-    let end = this.inputBuffer.indexOf('}:END');
-    while (end >= 0) {
-      const json = this.inputBuffer.substring(0, end + 1);
-      this.inputBuffer = this.inputBuffer.substring(end + 5);
-      try {
-        const frame = JSON.parse(json) as WifiMigrationFrame;
-        const version = this.sessionVersion;
-        this.receiveChain = this.receiveChain.then(async () => {
-          if (version === this.sessionVersion) {
-            await this.handleFrame(frame, version);
-          }
-        }).catch((error: Error) => {
-          this.fail('Received data is invalid: ' + error.message);
-        });
-      } catch (error) {
-        this.fail('Received data is not compatible');
+  private async connectTcpClient(address: string, version: number): Promise<void> {
+    let lastError = '';
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (version !== this.sessionVersion || this.stopped) {
+        return;
       }
-      end = this.inputBuffer.indexOf('}:END');
+      const client = socket.constructTCPSocketInstance();
+      this.client = client;
+      client.on('message', (info: socket.SocketMessageInfo) => {
+        this.consumeBytes(info.message);
+      });
+      client.on('close', () => {
+        if (!this.stopped && this.client === client && this.phase !== WifiMigrationPhase.Completed) {
+          this.client = null;
+          this.fail('The sending device disconnected');
+        }
+      });
+      client.on('error', (error: BusinessError) => {
+        if (!this.stopped && this.client === client) {
+          lastError = cleanError(error);
+        }
+      });
+      try {
+        await client.connect({
+          address: { address: address, port: WIFI_MIGRATION_PORT, family: 1 },
+          timeout: 8000
+        });
+        if (version !== this.sessionVersion || this.stopped || this.client !== client) {
+          await this.closeClient(client);
+          return;
+        }
+        this.peerAddress = address;
+        this.setState(WifiMigrationPhase.Connected, 'Connected and ready to receive');
+        return;
+      } catch (error) {
+        lastError = cleanError(error);
+        await this.closeClient(client);
+        if (this.client === client) {
+          this.client = null;
+        }
+        await delay(400);
+      }
+    }
+    throw new Error(lastError.length > 0 ? lastError : 'TCP data channel is unavailable');
+  }
+
+  private consumeBytes(buffer: ArrayBuffer): void {
+    this.receiveBuffer = concatBytes(this.receiveBuffer, new Uint8Array(buffer));
+    while (this.receiveBuffer.length >= 4) {
+      const headerLength = readUint32(this.receiveBuffer, 0);
+      if (headerLength <= 0 || headerLength > MAX_HEADER_BYTES) {
+        this.fail('Received transfer header is invalid');
+        this.receiveBuffer = new Uint8Array(0);
+        return;
+      }
+      if (this.receiveBuffer.length < 4 + headerLength) {
+        return;
+      }
+      let header: WifiTransferPacketHeader;
+      try {
+        const headerBytes = this.receiveBuffer.slice(4, 4 + headerLength);
+        header = JSON.parse(this.decoder.decodeToString(headerBytes)) as WifiTransferPacketHeader;
+      } catch (error) {
+        this.fail('Received transfer header is invalid');
+        this.receiveBuffer = new Uint8Array(0);
+        return;
+      }
+      if (!validHeader(header)) {
+        this.fail('Received transfer data is not compatible');
+        this.receiveBuffer = new Uint8Array(0);
+        return;
+      }
+      const packetLength = 4 + headerLength + header.payloadLength;
+      if (this.receiveBuffer.length < packetLength) {
+        return;
+      }
+      const payload = this.receiveBuffer.slice(4 + headerLength, packetLength);
+      this.receiveBuffer = this.receiveBuffer.slice(packetLength);
+      const version = this.sessionVersion;
+      this.receiveChain = this.receiveChain.then(async () => {
+        if (version === this.sessionVersion && !this.stopped) {
+          await this.handlePacket(header, payload, version);
+        }
+      }).catch((error: Error) => {
+        this.fail('Received transfer data is invalid: ' + error.message);
+      });
     }
   }
 
-  private async handleFrame(frame: WifiMigrationFrame, version: number): Promise<void> {
+  private async handlePacket(header: WifiTransferPacketHeader, payload: Uint8Array,
+    version: number): Promise<void> {
     if (this.role === WifiMigrationRole.Server) {
-      if (frame.messageType === MESSAGE_RECEIVED && this.awaitingAck) {
-        this.awaitingAck = false;
-        this.clearAckTimer();
-        this.outgoingIndex++;
-        this.currentPage = this.outgoingIndex;
+      if (header.type !== PACKET_ACK || !this.awaitingAck || header.sequence !== this.outgoingIndex) {
+        return;
+      }
+      this.awaitingAck = false;
+      this.clearAckTimer();
+      const sent = this.outgoingPackets[this.outgoingIndex];
+      this.transferredBytes += sent.header.payloadLength;
+      if (sent.header.type === PACKET_FILE && isLastFileChunk(sent.header)) {
+        this.transferredFiles++;
+      }
+      this.outgoingIndex++;
+      this.currentPage = this.outgoingIndex;
+      if (this.outgoingIndex >= this.outgoingPackets.length) {
+        this.transferredItems = this.senderItemCount;
+        this.setState(WifiMigrationPhase.Completed, 'Transfer completed');
+      } else {
         this.emit();
-        if (this.outgoingIndex >= this.outgoingFrames.length) {
-          this.setState(WifiMigrationPhase.Completed,
-            'Transfer completed: ' + this.transferredItems.toString() + ' items');
-        } else {
-          await this.sendCurrentFrame();
-        }
+        await this.sendCurrentPacket();
       }
       return;
     }
-    if (frame.messageType !== MESSAGE_SEND || frame.data === undefined) {
-      return;
-    }
+
     this.phase = WifiMigrationPhase.Transferring;
-    this.currentPage = normalizePositive(frame.part, 1);
-    this.totalPages = normalizePositive(frame.totalSize, 1);
-    this.status = 'Receiving data';
+    this.currentPage = header.sequence + 1;
+    this.totalPages = header.totalPackets;
+    this.totalBytes = header.totalBytes;
+    this.totalFiles = header.totalFiles;
+    this.status = header.type === PACKET_FILE ? 'Receiving downloaded images' : 'Receiving data';
     this.emit();
-    const imported = await this.importFrame(frame);
+
+    if (header.type === PACKET_METADATA) {
+      this.transferredItems += await this.importMetadata(payload);
+    } else if (header.type === PACKET_FILE) {
+      this.writeIncomingFile(header, payload);
+      if (isLastFileChunk(header)) {
+        this.transferredFiles++;
+      }
+    } else if (header.type === PACKET_COMPLETE) {
+      await this.finishIncomingDownloads();
+    }
+    this.transferredBytes += payload.length;
+    await this.sendAck(header.sequence);
     if (version !== this.sessionVersion || this.stopped) {
       return;
     }
-    this.transferredItems += imported;
-    const ack: WifiMigrationFrame = {
-      messageType: MESSAGE_RECEIVED,
-      dataType: 0,
-      data: frame.data,
-      totalSize: 1,
-      part: 1
-    };
-    await this.sendText(JSON.stringify(ack) + FRAME_SUFFIX);
-    if (this.currentPage >= this.totalPages) {
-      this.setState(WifiMigrationPhase.Completed,
-        'Received and saved: ' + this.transferredItems.toString() + ' items');
+    if (header.type === PACKET_COMPLETE) {
+      this.setState(WifiMigrationPhase.Completed, 'Received and saved transfer data');
     } else {
       this.emit();
     }
   }
 
-  private async importFrame(frame: WifiMigrationFrame): Promise<number> {
-    if (frame.dataType === DATA_QUICK_SEARCH) {
-      const items = frame.data.quick_search === undefined ? [] : frame.data.quick_search;
+  private async importMetadata(payload: Uint8Array): Promise<number> {
+    const metadata = JSON.parse(this.decoder.decodeToString(payload)) as WifiTransferMetadata;
+    if (metadata.version !== TRANSFER_VERSION) {
+      throw new Error('Unsupported transfer version');
+    }
+    this.incomingMetadata = metadata;
+    if (metadata.kind === WifiMigrationDataKind.Bookmarks) {
+      const items = metadata.bookmarks === undefined ? [] : metadata.bookmarks;
       const count = ehBookmarkStore.importBackupItems(items);
       await ehBookmarkStore.save(this.context);
       return count;
     }
-    if (frame.dataType === DATA_FAVORITE_INFO) {
-      const items = frame.data.favorite_info === undefined ? [] : frame.data.favorite_info;
-      let count = 0;
-      for (let i = 0; i < items.length; i++) {
-        const gallery = androidGalleryToGallery(items[i]);
-        if (gallery !== null && ehLocalFavoritesStore.importGallery(gallery, Date.now() + i)) {
-          count++;
-        }
-      }
+    if (metadata.kind === WifiMigrationDataKind.Favorites) {
+      const items = metadata.favorites === undefined ? [] : metadata.favorites;
+      const count = ehLocalFavoritesStore.importBackupItems(items);
       await ehLocalFavoritesStore.save(this.context);
       return count;
     }
-    if (frame.dataType === DATA_DOWNLOAD_LABEL) {
-      const labels = frame.data.download_label === undefined ? [] : frame.data.download_label;
-      let count = 0;
-      for (let i = 0; i < labels.length; i++) {
-        if (ehDownloadStore.addLabel(labels[i])) {
-          count++;
-        }
+    const labels = metadata.downloadLabels === undefined ? [] : metadata.downloadLabels;
+    const downloads = metadata.downloads === undefined ? [] : metadata.downloads;
+    let count = 0;
+    for (let i = 0; i < labels.length; i++) {
+      if (ehDownloadStore.addLabel(labels[i].label)) {
+        count++;
       }
-      await ehDownloadStore.save(this.context);
-      return count;
     }
-    if (frame.dataType === DATA_DOWNLOAD_INFO) {
-      const items = frame.data.download_info === undefined ? [] : frame.data.download_info;
-      let count = 0;
-      for (let i = 0; i < items.length; i++) {
-        const download = androidDownloadToDownload(items[i]);
-        if (download !== null && ehDownloadStore.importDownload(download)) {
-          count++;
-        }
+    const normalizedDownloads: DownloadInfo[] = [];
+    for (let i = 0; i < downloads.length; i++) {
+      const item = normalizeIncomingDownload(downloads[i]);
+      if (item === null) {
+        continue;
       }
-      await ehDownloadStore.save(this.context);
-      return count;
+      normalizedDownloads.push(item);
+      if (ehDownloadStore.importDownload(item)) {
+        count++;
+      }
+      const directory = ehDownloadFileStore.prepareTransferredGallery(this.context, item);
+      this.incomingDirectories.set(item.gid, directory);
     }
-    return 0;
+    metadata.downloads = normalizedDownloads;
+    await ehDownloadStore.save(this.context);
+    return count;
   }
 
-  private async sendCurrentFrame(): Promise<void> {
-    if (this.outgoingIndex >= this.outgoingFrames.length || this.awaitingAck) {
+  private writeIncomingFile(header: WifiTransferPacketHeader, payload: Uint8Array): void {
+    const gid = header.fileGid === undefined ? 0 : header.fileGid;
+    const name = header.fileName === undefined ? '' : header.fileName;
+    const offset = header.fileOffset === undefined ? -1 : header.fileOffset;
+    const size = header.fileSize === undefined ? -1 : header.fileSize;
+    if (gid <= 0 || name.length === 0 || offset < 0 || size < 0 || offset + payload.length > size) {
+      throw new Error('Invalid transferred image information');
+    }
+    const directory = this.incomingDirectories.get(gid);
+    if (directory === undefined || directory.length === 0) {
+      throw new Error('Transferred gallery metadata is missing');
+    }
+    const data = payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength);
+    const written = ehDownloadFileStore.writeTransferredImageChunk(directory, name, offset, data);
+    if (written !== payload.length) {
+      throw new Error('Transferred image was not fully written');
+    }
+  }
+
+  private async finishIncomingDownloads(): Promise<void> {
+    if (this.incomingMetadata === null || this.incomingMetadata.kind !== WifiMigrationDataKind.Downloads) {
       return;
     }
-    const frame = this.outgoingFrames[this.outgoingIndex];
-    await this.sendText(JSON.stringify(frame) + FRAME_SUFFIX);
+    const downloads = this.incomingMetadata.downloads === undefined ? [] : this.incomingMetadata.downloads;
+    for (let i = 0; i < downloads.length; i++) {
+      const item = downloads[i];
+      const directory = this.incomingDirectories.get(item.gid);
+      if (directory === undefined) {
+        continue;
+      }
+      ehDownloadFileStore.rewriteGalleryMetadataForDirectory(directory, item);
+      const images = ehDownloadFileStore.listPageImages(this.context, item);
+      const finished = images.length;
+      const total = Math.max(finished, item.total > 0 ? item.total : item.pages);
+      ehDownloadStore.setProgress(item.gid, finished, total, finished * DOWNLOAD_PAGE_PROGRESS_SCALE);
+      ehDownloadStore.setStorage(item.gid, directory, ehDownloadFileStore.directorySizeByPath(directory));
+      ehDownloadStore.setState(item.gid, total > 0 && finished >= total ? DownloadState.Finish : DownloadState.None);
+    }
+    await ehDownloadStore.save(this.context);
+  }
+
+  private async sendCurrentPacket(): Promise<void> {
+    if (this.outgoingIndex >= this.outgoingPackets.length || this.awaitingAck) {
+      return;
+    }
+    const packet = this.outgoingPackets[this.outgoingIndex];
+    const payload = readPacketPayload(packet);
+    await this.sendPacket(packet.header, payload);
     this.awaitingAck = true;
     this.currentPage = this.outgoingIndex + 1;
-    this.transferredItems = countFrameItems(this.outgoingFrames, this.outgoingIndex + 1);
     this.phase = WifiMigrationPhase.Transferring;
-    this.status = 'Waiting for page confirmation';
+    this.status = packet.header.type === PACKET_FILE ? 'Sending downloaded images' : 'Sending data';
     this.emit();
     this.clearAckTimer();
     this.ackTimer = setTimeout(() => {
@@ -454,8 +754,33 @@ export class WifiMigrationSession {
     }, ACK_TIMEOUT_MS);
   }
 
-  private async sendText(text: string): Promise<void> {
-    const options: socket.TCPSendOptions = { data: text, encoding: 'UTF-8' };
+  private async sendAck(sequence: number): Promise<void> {
+    const header: WifiTransferPacketHeader = {
+      protocol: TRANSFER_PROTOCOL,
+      version: TRANSFER_VERSION,
+      type: PACKET_ACK,
+      sequence: sequence,
+      payloadLength: 0,
+      totalPackets: this.totalPages,
+      totalBytes: this.totalBytes,
+      totalFiles: this.totalFiles
+    };
+    await this.sendPacket(header, new Uint8Array(0));
+  }
+
+  private async sendPacket(header: WifiTransferPacketHeader, payload: Uint8Array): Promise<void> {
+    const headerBytes = this.encoder.encodeInto(JSON.stringify(header));
+    const prefix = new Uint8Array(4 + headerBytes.length);
+    writeUint32(prefix, 0, headerBytes.length);
+    prefix.set(headerBytes, 4);
+    await this.sendRaw(prefix.buffer.slice(prefix.byteOffset, prefix.byteOffset + prefix.byteLength));
+    if (payload.length > 0) {
+      await this.sendRaw(payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength));
+    }
+  }
+
+  private async sendRaw(data: ArrayBuffer): Promise<void> {
+    const options: socket.TCPSendOptions = { data: data };
     try {
       if (this.serverConnection !== null) {
         await this.serverConnection.send(options);
@@ -466,7 +791,7 @@ export class WifiMigrationSession {
         return;
       }
     } catch (error) {
-      throw new Error(cleanSocketError(error));
+      throw new Error(cleanError(error));
     }
     throw new Error('No device is connected');
   }
@@ -488,17 +813,22 @@ export class WifiMigrationSession {
   }
 
   private clearTransferState(): void {
-    this.sessionVersion++;
     this.clearAckTimer();
-    this.outgoingFrames = [];
+    this.outgoingPackets = [];
     this.outgoingIndex = 0;
     this.awaitingAck = false;
-    this.inputBuffer = '';
-    this.decoder = util.TextDecoder.create('utf-8', { ignoreBOM: true });
+    this.receiveBuffer = new Uint8Array(0);
     this.receiveChain = Promise.resolve();
+    this.incomingMetadata = null;
+    this.incomingDirectories.clear();
     this.currentPage = 0;
     this.totalPages = 0;
     this.transferredItems = 0;
+    this.transferredFiles = 0;
+    this.totalFiles = 0;
+    this.transferredBytes = 0;
+    this.totalBytes = 0;
+    this.senderItemCount = 0;
   }
 
   private clearAckTimer(): void {
@@ -552,287 +882,188 @@ export class WifiMigrationSession {
   }
 }
 
-function createFrames(kind: WifiMigrationDataKind): WifiMigrationFrame[] {
+function createTransferPlan(context: common.UIAbilityContext, kind: WifiMigrationDataKind,
+  encoder: util.TextEncoder): TransferPlan {
+  const metadata: WifiTransferMetadata = { version: TRANSFER_VERSION, kind: kind };
+  let itemCount = 0;
+  const files: TransferImageFile[] = [];
   if (kind === WifiMigrationDataKind.Bookmarks) {
-    const items = ehBookmarkStore.getBackupItems();
-    return paginateBookmarks(items);
-  }
-  if (kind === WifiMigrationDataKind.Favorites) {
-    const galleries = ehLocalFavoritesStore.getItems();
-    const items: AndroidGalleryInfo[] = [];
-    for (let i = 0; i < galleries.length; i++) {
-      items.push(galleryToAndroidGallery(galleries[i]));
-    }
-    return paginateFavorites(items);
-  }
-  const frames: WifiMigrationFrame[] = [];
-  const labels = ehDownloadStore.getLabels();
-  const labelNames: string[] = [];
-  for (let i = 0; i < labels.length; i++) {
-    labelNames.push(labels[i].label);
-  }
-  const downloads = ehDownloadStore.getItems();
-  if (labelNames.length === 0 && downloads.length === 0) {
-    return frames;
-  }
-  frames.push({
-    messageType: MESSAGE_SEND,
-    dataType: DATA_DOWNLOAD_LABEL,
-    data: { download_label: labelNames },
-    totalSize: 1,
-    part: 1
-  });
-  const androidDownloads: AndroidDownloadInfo[] = [];
-  for (let i = 0; i < downloads.length; i++) {
-    androidDownloads.push(downloadToAndroidDownload(downloads[i]));
-  }
-  const pages = paginateDownloads(androidDownloads);
-  for (let i = 0; i < pages.length; i++) {
-    frames.push(pages[i]);
-  }
-  return frames;
-}
-
-function paginateBookmarks(items: SearchBookmarkBackupInfo[]): WifiMigrationFrame[] {
-  const frames: WifiMigrationFrame[] = [];
-  const total = pageCount(items.length);
-  for (let page = 0; page < total; page++) {
-    frames.push({
-      messageType: MESSAGE_SEND,
-      dataType: DATA_QUICK_SEARCH,
-      data: { quick_search: items.slice(page * PAGE_SIZE, Math.min(items.length, (page + 1) * PAGE_SIZE)) },
-      totalSize: total,
-      part: page + 1
-    });
-  }
-  return frames;
-}
-
-function paginateFavorites(items: AndroidGalleryInfo[]): WifiMigrationFrame[] {
-  const frames: WifiMigrationFrame[] = [];
-  const total = pageCount(items.length);
-  for (let page = 0; page < total; page++) {
-    frames.push({
-      messageType: MESSAGE_SEND,
-      dataType: DATA_FAVORITE_INFO,
-      data: { favorite_info: items.slice(page * PAGE_SIZE, Math.min(items.length, (page + 1) * PAGE_SIZE)) },
-      totalSize: total,
-      part: page + 1
-    });
-  }
-  return frames;
-}
-
-function paginateDownloads(items: AndroidDownloadInfo[]): WifiMigrationFrame[] {
-  const frames: WifiMigrationFrame[] = [];
-  const total = pageCount(items.length);
-  for (let page = 0; page < total; page++) {
-    frames.push({
-      messageType: MESSAGE_SEND,
-      dataType: DATA_DOWNLOAD_INFO,
-      data: { download_info: items.slice(page * PAGE_SIZE, Math.min(items.length, (page + 1) * PAGE_SIZE)) },
-      totalSize: total,
-      part: page + 1
-    });
-  }
-  return frames;
-}
-
-function pageCount(length: number): number {
-  return length <= 0 ? 0 : Math.ceil(length / PAGE_SIZE);
-}
-
-function galleryToAndroidGallery(gallery: GalleryInfo): AndroidGalleryInfo {
-  return {
-    gid: gallery.gid,
-    token: gallery.token,
-    title: gallery.title,
-    titleJpn: gallery.titleJpn,
-    thumb: gallery.thumb,
-    category: gallery.category,
-    posted: gallery.posted,
-    uploader: gallery.uploader,
-    rating: gallery.rating,
-    rated: gallery.rated,
-    simpleLanguage: gallery.simpleLanguage,
-    simpleTags: gallery.simpleTags,
-    thumbHeight: gallery.thumbHeight,
-    thumbWidth: gallery.thumbWidth,
-    spanSize: 0,
-    spanIndex: 0,
-    spanGroupIndex: 0,
-    favoriteSlot: gallery.favoriteSlot,
-    favoriteName: gallery.favoriteName,
-    tgList: gallery.tagList,
-    pages: gallery.pages
-  };
-}
-
-function downloadToAndroidDownload(download: DownloadInfo): AndroidDownloadInfo {
-  const gallery = galleryToAndroidGallery(download);
-  return {
-    gid: gallery.gid,
-    token: gallery.token,
-    title: gallery.title,
-    titleJpn: gallery.titleJpn,
-    thumb: gallery.thumb,
-    category: gallery.category,
-    posted: gallery.posted,
-    uploader: gallery.uploader,
-    rating: gallery.rating,
-    rated: gallery.rated,
-    simpleLanguage: gallery.simpleLanguage,
-    simpleTags: gallery.simpleTags,
-    thumbHeight: gallery.thumbHeight,
-    thumbWidth: gallery.thumbWidth,
-    spanSize: 0,
-    spanIndex: 0,
-    spanGroupIndex: 0,
-    favoriteSlot: gallery.favoriteSlot,
-    favoriteName: gallery.favoriteName,
-    tgList: gallery.tgList,
-    pages: gallery.pages,
-    finished: download.finished,
-    legacy: download.legacy,
-    label: download.label,
-    downloaded: download.downloaded,
-    remaining: download.remaining,
-    speed: download.speed,
-    state: downloadStateToAndroid(download.state),
-    time: download.time,
-    total: download.total,
-    archiveUri: ''
-  };
-}
-
-function androidGalleryToGallery(item: AndroidGalleryInfo): GalleryInfo | null {
-  const gid = optionalNumber(item.gid, 0);
-  const token = optionalString(item.token, '');
-  if (gid <= 0 || token.length === 0) {
-    return null;
-  }
-  return {
-    gid: gid,
-    token: token,
-    title: optionalString(item.title, ''),
-    titleJpn: item.titleJpn,
-    thumb: item.thumb,
-    category: optionalNumber(item.category, GalleryCategory.Unknown),
-    posted: item.posted,
-    uploader: item.uploader,
-    rating: optionalNumber(item.rating, 0),
-    rated: item.rated === true,
-    simpleLanguage: item.simpleLanguage,
-    simpleTags: item.simpleTags,
-    pages: optionalNumber(item.pages, 0),
-    thumbWidth: optionalNumber(item.thumbWidth, 0),
-    thumbHeight: optionalNumber(item.thumbHeight, 0),
-    favoriteSlot: optionalNumber(item.favoriteSlot, -1),
-    favoriteName: item.favoriteName,
-    tagList: flattenTagList(item.tgList)
-  };
-}
-
-function androidDownloadToDownload(item: AndroidDownloadInfo): DownloadInfo | null {
-  const gallery = androidGalleryToGallery(item);
-  if (gallery === null) {
-    return null;
-  }
-  return {
-    gid: gallery.gid,
-    token: gallery.token,
-    title: gallery.title,
-    titleJpn: gallery.titleJpn,
-    thumb: gallery.thumb,
-    category: gallery.category,
-    posted: gallery.posted,
-    uploader: gallery.uploader,
-    rating: gallery.rating,
-    rated: gallery.rated,
-    simpleLanguage: gallery.simpleLanguage,
-    simpleTags: gallery.simpleTags,
-    pages: gallery.pages,
-    thumbWidth: gallery.thumbWidth,
-    thumbHeight: gallery.thumbHeight,
-    favoriteSlot: gallery.favoriteSlot,
-    favoriteName: gallery.favoriteName,
-    tagList: gallery.tagList,
-    state: androidStateToDownload(optionalNumber(item.state, 0)),
-    legacy: optionalNumber(item.legacy, 0),
-    time: optionalNumber(item.time, Date.now()),
-    label: optionalString(item.label, ''),
-    archiveUri: '',
-    speed: 0,
-    remaining: 0,
-    finished: optionalNumber(item.finished, 0),
-    downloaded: optionalNumber(item.downloaded, 0),
-    total: optionalNumber(item.total, gallery.pages),
-    fileSize: -1
-  };
-}
-
-function downloadStateToAndroid(state: DownloadState): number {
-  if (state === DownloadState.Invalid) return -1;
-  if (state === DownloadState.Wait) return 1;
-  if (state === DownloadState.Downloading) return 2;
-  if (state === DownloadState.Finish) return 3;
-  if (state === DownloadState.Failed) return 4;
-  if (state === DownloadState.Update) return 5;
-  return 0;
-}
-
-function androidStateToDownload(state: number): DownloadState {
-  if (state === -1) return DownloadState.Invalid;
-  if (state === 1) return DownloadState.Wait;
-  if (state === 2) return DownloadState.Downloading;
-  if (state === 3) return DownloadState.Finish;
-  if (state === 4) return DownloadState.Failed;
-  if (state === 5) return DownloadState.Update;
-  return DownloadState.None;
-}
-
-function countFrameItems(frames: WifiMigrationFrame[], endExclusive: number): number {
-  let count = 0;
-  for (let i = 0; i < endExclusive && i < frames.length; i++) {
-    const data = frames[i].data;
-    if (data.quick_search !== undefined) count += data.quick_search.length;
-    if (data.favorite_info !== undefined) count += data.favorite_info.length;
-    if (data.download_label !== undefined) count += data.download_label.length;
-    if (data.download_info !== undefined) count += data.download_info.length;
-  }
-  return count;
-}
-
-function optionalString(value: string | undefined, fallback: string): string {
-  return typeof value === 'string' ? value : fallback;
-}
-
-function optionalNumber(value: number | undefined, fallback: number): number {
-  return typeof value === 'number' && !Number.isNaN(value) ? value : fallback;
-}
-
-function normalizePositive(value: number, fallback: number): number {
-  return typeof value === 'number' && value > 0 ? Math.floor(value) : fallback;
-}
-
-function flattenTagList(value: Array<string | string[]> | undefined): string[] | undefined {
-  if (value === undefined || !Array.isArray(value)) {
-    return undefined;
-  }
-  const result: string[] = [];
-  for (let i = 0; i < value.length; i++) {
-    const item = value[i];
-    if (typeof item === 'string') {
-      result.push(item);
-    } else if (Array.isArray(item)) {
-      for (let j = 0; j < item.length; j++) {
-        if (typeof item[j] === 'string') {
-          result.push(item[j]);
+    metadata.bookmarks = ehBookmarkStore.getBackupItems();
+    itemCount = metadata.bookmarks.length;
+  } else if (kind === WifiMigrationDataKind.Favorites) {
+    metadata.favorites = ehLocalFavoritesStore.getBackupItems();
+    itemCount = metadata.favorites.length;
+  } else {
+    metadata.downloadLabels = ehDownloadStore.getLabels();
+    metadata.downloads = ehDownloadStore.getItems();
+    itemCount = metadata.downloadLabels.length + metadata.downloads.length;
+    for (let i = 0; i < metadata.downloads.length; i++) {
+      const gallery = metadata.downloads[i];
+      const images = ehDownloadFileStore.listPageImages(context, gallery);
+      for (let j = 0; j < images.length; j++) {
+        const size = fileSize(images[j]);
+        if (size > 0) {
+          const image: TransferImageFile = {
+            gid: gallery.gid,
+            path: images[j],
+            name: pathBaseName(images[j]),
+            size: size
+          };
+          files.push(image);
         }
       }
     }
   }
+  const metadataBytes = encoder.encodeInto(JSON.stringify(metadata));
+  const packets: OutgoingTransferPacket[] = [];
+  packets.push({
+    header: baseHeader(PACKET_METADATA, 0, metadataBytes.length),
+    payload: metadataBytes
+  });
+  let totalBytes = metadataBytes.length;
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    totalBytes += file.size;
+    for (let offset = 0; offset < file.size; offset += FILE_CHUNK_SIZE) {
+      const length = Math.min(FILE_CHUNK_SIZE, file.size - offset);
+      const header = baseHeader(PACKET_FILE, packets.length, length);
+      header.fileGid = file.gid;
+      header.fileName = file.name;
+      header.fileOffset = offset;
+      header.fileSize = file.size;
+      packets.push({ header: header, filePath: file.path });
+    }
+  }
+  packets.push({ header: baseHeader(PACKET_COMPLETE, packets.length, 0), payload: new Uint8Array(0) });
+  for (let i = 0; i < packets.length; i++) {
+    packets[i].header.totalPackets = packets.length;
+    packets[i].header.totalBytes = totalBytes;
+    packets[i].header.totalFiles = files.length;
+    packets[i].header.kind = kind;
+  }
+  return { packets: packets, itemCount: itemCount, fileCount: files.length, totalBytes: totalBytes };
+}
+
+function baseHeader(type: string, sequence: number, payloadLength: number): WifiTransferPacketHeader {
+  return {
+    protocol: TRANSFER_PROTOCOL,
+    version: TRANSFER_VERSION,
+    type: type,
+    sequence: sequence,
+    payloadLength: payloadLength,
+    totalPackets: 0,
+    totalBytes: 0,
+    totalFiles: 0
+  };
+}
+
+function readPacketPayload(packet: OutgoingTransferPacket): Uint8Array {
+  if (packet.payload !== undefined) {
+    return packet.payload;
+  }
+  if (packet.filePath === undefined || packet.header.fileOffset === undefined) {
+    return new Uint8Array(0);
+  }
+  const buffer = new ArrayBuffer(packet.header.payloadLength);
+  let fd = -1;
+  try {
+    const file = fs.openSync(packet.filePath, fs.OpenMode.READ_ONLY);
+    fd = file.fd;
+    const count = fs.readSync(fd, buffer, {
+      offset: packet.header.fileOffset,
+      length: packet.header.payloadLength
+    });
+    if (count !== packet.header.payloadLength) {
+      throw new Error('Downloaded image changed during transfer');
+    }
+    return new Uint8Array(buffer);
+  } catch (error) {
+    throw new Error('Unable to read downloaded image: ' + cleanError(error));
+  } finally {
+    if (fd >= 0) {
+      try {
+        fs.closeSync(fd);
+      } catch (error) {
+      }
+    }
+  }
+}
+
+function normalizeIncomingDownload(value: DownloadInfo): DownloadInfo | null {
+  if (value === undefined || value.gid <= 0 || typeof value.token !== 'string' || value.token.length === 0) {
+    return null;
+  }
+  value.archiveUri = '';
+  value.fileSize = -1;
+  value.speed = 0;
+  value.remaining = 0;
+  if (value.state === DownloadState.Wait || value.state === DownloadState.Downloading ||
+    value.state === DownloadState.Update || value.state === DownloadState.Finish) {
+    value.state = DownloadState.None;
+  }
+  return value;
+}
+
+function validHeader(header: WifiTransferPacketHeader): boolean {
+  if (header === undefined || header.protocol !== TRANSFER_PROTOCOL || header.version !== TRANSFER_VERSION) {
+    return false;
+  }
+  if (header.sequence < 0 || header.payloadLength < 0 || header.payloadLength > MAX_PACKET_PAYLOAD_BYTES ||
+    header.totalPackets < 0 || header.totalBytes < 0 || header.totalFiles < 0) {
+    return false;
+  }
+  return header.type === PACKET_METADATA || header.type === PACKET_FILE || header.type === PACKET_COMPLETE ||
+    header.type === PACKET_ACK;
+}
+
+function isLastFileChunk(header: WifiTransferPacketHeader): boolean {
+  return header.type === PACKET_FILE && header.fileOffset !== undefined && header.fileSize !== undefined &&
+    header.fileOffset + header.payloadLength >= header.fileSize;
+}
+
+function clonePeers(peers: WifiMigrationPeer[]): WifiMigrationPeer[] {
+  const cloned: WifiMigrationPeer[] = [];
+  for (let i = 0; i < peers.length; i++) {
+    cloned.push({
+      name: peers[i].name,
+      address: peers[i].address,
+      addressType: peers[i].addressType,
+      status: peers[i].status
+    });
+  }
+  return cloned;
+}
+
+function concatBytes(left: Uint8Array, right: Uint8Array): Uint8Array {
+  const result = new Uint8Array(left.length + right.length);
+  result.set(left, 0);
+  result.set(right, left.length);
   return result;
+}
+
+function readUint32(bytes: Uint8Array, offset: number): number {
+  return (bytes[offset] * 0x1000000) + (bytes[offset + 1] << 16) + (bytes[offset + 2] << 8) +
+    bytes[offset + 3];
+}
+
+function writeUint32(bytes: Uint8Array, offset: number, value: number): void {
+  bytes[offset] = (value >>> 24) & 0xff;
+  bytes[offset + 1] = (value >>> 16) & 0xff;
+  bytes[offset + 2] = (value >>> 8) & 0xff;
+  bytes[offset + 3] = value & 0xff;
+}
+
+function fileSize(path: string): number {
+  try {
+    return fs.statSync(path).size;
+  } catch (error) {
+    return 0;
+  }
+}
+
+function pathBaseName(path: string): string {
+  const slash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+  return slash >= 0 ? path.substring(slash + 1) : path;
 }
 
 function isUsableIpv4(address: string): boolean {
@@ -852,7 +1083,21 @@ function isUsableIpv4(address: string): boolean {
   return true;
 }
 
-function cleanSocketError(error: Object): string {
+function delay(milliseconds: number): Promise<void> {
+  return new Promise<void>((resolve: () => void) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
+function isWifiReady(): boolean {
+  try {
+    return wifiManager.isWifiActive();
+  } catch (error) {
+    return false;
+  }
+}
+
+function cleanError(error: Object): string {
   if (error instanceof Error && error.message.length > 0) {
     return error.message;
   }

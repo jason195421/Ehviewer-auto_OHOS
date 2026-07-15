@@ -342,6 +342,41 @@ export class EhDownloadFileStore {
     return images;
   }
 
+  prepareTransferredGallery(context: common.UIAbilityContext, gallery: GalleryInfo): string {
+    const root = this.downloadRoot(context);
+    ensureDirectory(root);
+    const directory = this.galleryDirectory(context, gallery);
+    ensureDirectory(directory);
+    this.rewriteGalleryMetadataForDirectory(directory, gallery);
+    return directory;
+  }
+
+  writeTransferredImageChunk(directory: string, fileName: string, offset: number, data: ArrayBuffer): number {
+    const safeName = pathBaseName(fileName);
+    if (safeName !== fileName || !isSupportedImageFile(safeName) || offset < 0) {
+      throw new Error('Invalid transferred image path');
+    }
+    ensureDirectory(directory);
+    const mode = offset === 0 ?
+      fs.OpenMode.CREATE | fs.OpenMode.TRUNC | fs.OpenMode.READ_WRITE :
+      fs.OpenMode.CREATE | fs.OpenMode.READ_WRITE;
+    let fd = -1;
+    try {
+      const file = fs.openSync(directory + '/' + safeName, mode);
+      fd = file.fd;
+      return fs.writeSync(fd, data, { offset: offset, length: data.byteLength });
+    } catch (error) {
+      throw new Error('Unable to write transferred image');
+    } finally {
+      if (fd >= 0) {
+        try {
+          fs.closeSync(fd);
+        } catch (error) {
+        }
+      }
+    }
+  }
+
   listPageImageSlots(context: common.UIAbilityContext, gallery: GalleryInfo, total: number): string[] {
     const count = Math.max(0, total);
     const images: string[] = [];

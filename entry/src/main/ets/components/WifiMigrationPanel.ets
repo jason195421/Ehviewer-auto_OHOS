@@ -2,13 +2,12 @@ import { ehBookmarkStore } from '../services/EhBookmarkStore';
 import { ehDownloadStore } from '../services/EhDownloadStore';
 import { ehLocalFavoritesStore } from '../services/EhLocalFavoritesStore';
 import {
-  WIFI_MIGRATION_PORT,
   WifiMigrationDataKind,
+  WifiMigrationPeer,
   WifiMigrationPhase,
   WifiMigrationRole,
   WifiMigrationSession,
-  WifiMigrationSnapshot,
-  wifiMigrationNetworkInfo
+  WifiMigrationSnapshot
 } from '../services/WifiMigrationService';
 import { getAbilityContext, uiStatusText, uiText } from '../shared/EhShared';
 import {
@@ -35,19 +34,22 @@ export struct WifiMigrationPanel {
   @State phase: WifiMigrationPhase = WifiMigrationPhase.Idle;
   @State status: string = 'Wi-Fi transfer is idle';
   @State peerAddress: string = '';
+  @State peerName: string = '';
+  @State localDeviceName: string = '';
+  @State peers: WifiMigrationPeer[] = [];
   @State currentPage: number = 0;
   @State totalPages: number = 0;
   @State transferredItems: number = 0;
-  @State localAddress: string = '';
-  @State gatewayAddress: string = '';
-  @State hostDraft: string = '';
+  @State transferredFiles: number = 0;
+  @State totalFiles: number = 0;
+  @State transferredBytes: number = 0;
+  @State totalBytes: number = 0;
   @State bookmarkCount: number = 0;
   @State favoriteCount: number = 0;
   @State downloadCount: number = 0;
   private session: WifiMigrationSession | null = null;
 
   aboutToAppear(): void {
-    this.refreshNetworkInfo();
     const context = getAbilityContext();
     if (context === undefined) {
       this.status = 'Wi-Fi transfer needs app context';
@@ -69,8 +71,7 @@ export struct WifiMigrationPanel {
 
   aboutToDisappear(): void {
     if (this.session !== null) {
-      this.session.stop().catch(() => {
-      });
+      this.session.stop().catch(() => {});
       this.session = null;
     }
   }
@@ -80,20 +81,18 @@ export struct WifiMigrationPanel {
     this.phase = snapshot.phase;
     this.status = snapshot.status;
     this.peerAddress = snapshot.peerAddress;
+    this.peerName = snapshot.peerName;
+    this.localDeviceName = snapshot.localDeviceName;
+    this.peers = snapshot.peers;
     this.currentPage = snapshot.currentPage;
     this.totalPages = snapshot.totalPages;
     this.transferredItems = snapshot.transferredItems;
+    this.transferredFiles = snapshot.transferredFiles;
+    this.totalFiles = snapshot.totalFiles;
+    this.transferredBytes = snapshot.transferredBytes;
+    this.totalBytes = snapshot.totalBytes;
     if (snapshot.phase === WifiMigrationPhase.Completed) {
       this.refreshCounts();
-    }
-  }
-
-  private refreshNetworkInfo(): void {
-    const info = wifiMigrationNetworkInfo();
-    this.localAddress = info.localAddress;
-    this.gatewayAddress = info.gatewayAddress;
-    if (this.hostDraft.trim().length === 0) {
-      this.hostDraft = info.gatewayAddress.length > 0 ? info.gatewayAddress : '192.168.43.1';
     }
   }
 
@@ -110,10 +109,13 @@ export struct WifiMigrationPanel {
   }
 
   private progressValue(): number {
-    if (this.totalPages <= 0) {
-      return 0;
+    if (this.totalBytes > 0) {
+      return Math.min(100, Math.max(0, Math.floor(this.transferredBytes * 100 / this.totalBytes)));
     }
-    return Math.min(100, Math.max(0, Math.floor(this.currentPage * 100 / this.totalPages)));
+    if (this.totalPages > 0) {
+      return Math.min(100, Math.max(0, Math.floor(this.currentPage * 100 / this.totalPages)));
+    }
+    return 0;
   }
 
   private switchRole(role: WifiMigrationRole): void {
@@ -125,10 +127,15 @@ export struct WifiMigrationPanel {
       this.phase = WifiMigrationPhase.Idle;
       this.status = 'Wi-Fi transfer is idle';
       this.peerAddress = '';
+      this.peerName = '';
+      this.peers = [];
       this.currentPage = 0;
       this.totalPages = 0;
       this.transferredItems = 0;
-      this.refreshNetworkInfo();
+      this.transferredFiles = 0;
+      this.totalFiles = 0;
+      this.transferredBytes = 0;
+      this.totalBytes = 0;
     };
     if (this.session === null) {
       apply();
@@ -148,25 +155,31 @@ export struct WifiMigrationPanel {
       });
       return;
     }
-    this.refreshNetworkInfo();
     if (this.role === WifiMigrationRole.Server) {
       this.session.startServer(this.dataKind).catch((error: Error) => {
         this.status = error.message;
         this.phase = WifiMigrationPhase.Error;
       });
     } else {
-      this.session.startClient(this.hostDraft).catch((error: Error) => {
+      this.session.discoverPeers().catch((error: Error) => {
         this.status = error.message;
         this.phase = WifiMigrationPhase.Error;
       });
     }
   }
 
+  private connectPeer(peer: WifiMigrationPeer): void {
+    if (this.session === null || this.role !== WifiMigrationRole.Client) {
+      return;
+    }
+    this.session.connectToPeer(peer.address);
+  }
+
   private primaryLabel(): string {
     if (this.active()) {
-      return this.role === WifiMigrationRole.Server ? 'Stop sending' : 'Disconnect';
+      return this.role === WifiMigrationRole.Server ? 'Stop sending' : 'Stop Wi-Fi Direct';
     }
-    return this.role === WifiMigrationRole.Server ? 'Start sending' : 'Connect and receive';
+    return this.role === WifiMigrationRole.Server ? 'Start sending' : 'Scan nearby devices';
   }
 
   private selectedCount(): number {
@@ -190,7 +203,7 @@ export struct WifiMigrationPanel {
           Text(uiText(summary))
             .fontSize(11)
             .fontColor(this.role === role ? themeOnPrimaryText() : themeSecondaryText())
-            .maxLines(1)
+            .maxLines(2)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
         .alignItems(HorizontalAlign.Start)
@@ -198,7 +211,7 @@ export struct WifiMigrationPanel {
       }
       .width('100%')
     }
-    .height(62)
+    .height(68)
     .layoutWeight(1)
     .padding({ left: 14, right: 14 })
     .backgroundColor(this.role === role ? themePrimaryColor() : themeSurfaceVariant())
@@ -257,35 +270,65 @@ export struct WifiMigrationPanel {
   }
 
   @Builder
-  private networkValue(label: string, value: string) {
-    Column({ space: 3 }) {
-      Text(uiText(label))
-        .fontSize(11)
-        .fontColor(themeSecondaryText())
-      Text(value.length > 0 ? value : uiText('Unavailable'))
-        .fontSize(14)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(value.length > 0 ? themePrimaryText() : themeTertiaryText())
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
+  private peerCard(peer: WifiMigrationPeer) {
+    Button({ type: ButtonType.Normal, stateEffect: true }) {
+      Row({ space: 12 }) {
+        Stack({ alignContent: Alignment.Center }) {
+          Row()
+            .width(42)
+            .height(42)
+            .backgroundColor(themeSelectedBackground())
+            .borderRadius(21)
+          SymbolGlyph($r('sys.symbol.wifi'))
+            .fontSize(21)
+            .fontColor([themePrimaryColor()])
+        }
+        Column({ space: 3 }) {
+          Text(peer.name)
+            .fontSize(15)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(themePrimaryText())
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text(peer.address)
+            .fontSize(11)
+            .fontColor(themeSecondaryText())
+            .maxLines(1)
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        Text(uiText('Connect'))
+          .fontSize(13)
+          .fontColor(themeOnPrimaryText())
+          .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+          .backgroundColor(themePrimaryColor())
+          .borderRadius(15)
+      }
+      .width('100%')
     }
-    .alignItems(HorizontalAlign.Start)
-    .layoutWeight(1)
+    .width('100%')
+    .height(66)
+    .padding({ left: 12, right: 12 })
+    .backgroundColor(themeSurface())
+    .borderRadius(8)
+    .onClick(() => {
+      this.connectPeer(peer);
+    })
   }
 
   build() {
     Column() {
       AppSubToolbar({
-        title: uiText('Wi-Fi server/client'),
+        title: uiText('Wi-Fi Direct transfer'),
         onBack: this.onBack
       })
 
       Scroll() {
         Column({ space: 12 }) {
           Row({ space: 10 }) {
-            this.roleButton(WifiMigrationRole.Server, 'Send data', 'Act as the migration server',
+            this.roleButton(WifiMigrationRole.Server, 'Send data', 'Create a Wi-Fi Direct group',
               $r('sys.symbol.arrow_up_circle'))
-            this.roleButton(WifiMigrationRole.Client, 'Receive data', 'Connect to the sending device',
+            this.roleButton(WifiMigrationRole.Client, 'Receive data', 'Discover the sending device',
               $r('sys.symbol.arrow_down_circle'))
           }
           .width('100%')
@@ -300,7 +343,7 @@ export struct WifiMigrationPanel {
                     themeSelectedBackground())
                   .borderRadius(22)
                 SymbolGlyph(this.phase === WifiMigrationPhase.Error ? $r('sys.symbol.exclamationmark_triangle') :
-                  $r('sys.symbol.play_arrow_triangle_2_circlepath'))
+                  $r('sys.symbol.wifi'))
                   .fontSize(22)
                   .fontColor([this.phase === WifiMigrationPhase.Error ? themeDangerText() : themePrimaryColor()])
               }
@@ -312,25 +355,36 @@ export struct WifiMigrationPanel {
                   .fontSize(15)
                   .fontWeight(FontWeight.Medium)
                   .fontColor(this.phase === WifiMigrationPhase.Error ? themeDangerText() : themePrimaryText())
-                  .maxLines(2)
+                  .maxLines(3)
               }
               .alignItems(HorizontalAlign.Start)
               .layoutWeight(1)
             }
             .width('100%')
 
-            if (this.totalPages > 0) {
+            if (this.totalPages > 0 || this.totalBytes > 0) {
               Progress({ value: this.progressValue(), total: 100, type: ProgressType.Linear })
                 .width('100%')
                 .height(6)
                 .color(themePrimaryColor())
                 .backgroundColor(themeSurfaceVariant())
               Row() {
-                Text(uiText('Page') + ' ' + this.currentPage.toString() + ' / ' + this.totalPages.toString())
+                Text(uiText('Progress') + ': ' + this.progressValue().toString() + '%')
                   .fontSize(11)
                   .fontColor(themeSecondaryText())
                 Blank()
+                Text(formatTransferBytes(this.transferredBytes) + ' / ' + formatTransferBytes(this.totalBytes))
+                  .fontSize(11)
+                  .fontColor(themeSecondaryText())
+              }
+              .width('100%')
+              Row() {
                 Text(uiText('Items') + ': ' + this.transferredItems.toString())
+                  .fontSize(11)
+                  .fontColor(themeSecondaryText())
+                Blank()
+                Text(uiText('Image files') + ': ' + this.transferredFiles.toString() + ' / ' +
+                  this.totalFiles.toString())
                   .fontSize(11)
                   .fontColor(themeSecondaryText())
               }
@@ -338,26 +392,38 @@ export struct WifiMigrationPanel {
             }
 
             Row() {
-              this.networkValue('Local address', this.localAddress)
-              this.networkValue('Gateway', this.gatewayAddress)
-              this.networkValue('Port', WIFI_MIGRATION_PORT.toString())
+              Column({ space: 3 }) {
+                Text(uiText('This device'))
+                  .fontSize(11)
+                  .fontColor(themeSecondaryText())
+                Text(this.localDeviceName.length > 0 ? this.localDeviceName : uiText('Unavailable'))
+                  .fontSize(14)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(this.localDeviceName.length > 0 ? themePrimaryText() : themeTertiaryText())
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+              }
+              .alignItems(HorizontalAlign.Start)
+              .layoutWeight(1)
+              if (this.peerName.length > 0 || this.peerAddress.length > 0) {
+                Column({ space: 3 }) {
+                  Text(uiText('Connected device'))
+                    .fontSize(11)
+                    .fontColor(themeSecondaryText())
+                  Text(this.peerName.length > 0 ? this.peerName : this.peerAddress)
+                    .fontSize(14)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(themePrimaryColor())
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                }
+                .alignItems(HorizontalAlign.End)
+                .layoutWeight(1)
+              }
             }
             .width('100%')
             .padding({ top: 10 })
             .border({ width: { top: 1 }, color: themeSurfaceVariant() })
-
-            if (this.peerAddress.length > 0) {
-              Row() {
-                Text(uiText('Connected device'))
-                  .fontSize(12)
-                  .fontColor(themeSecondaryText())
-                Blank()
-                Text(this.peerAddress)
-                  .fontSize(13)
-                  .fontColor(themePrimaryColor())
-              }
-              .width('100%')
-            }
           }
           .width('100%')
           .padding(16)
@@ -381,37 +447,40 @@ export struct WifiMigrationPanel {
                 'Saved quick searches and their search options', this.bookmarkCount, $r('sys.symbol.bookmark'))
               this.dataCard(WifiMigrationDataKind.Favorites, 'Local favorites',
                 'Locally saved gallery information', this.favoriteCount, $r('sys.symbol.heart'))
-              this.dataCard(WifiMigrationDataKind.Downloads, 'Download records',
-                'Download labels and gallery records; image files are not transferred', this.downloadCount,
+              this.dataCard(WifiMigrationDataKind.Downloads, 'Downloads and images',
+                'Transfer download records and all downloaded image files', this.downloadCount,
                 $r('sys.symbol.arrow_down_circle'))
             }
             .width('100%')
           } else {
             Column({ space: 8 }) {
-              Text(uiText('Server address'))
-                .fontSize(15)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(themePrimaryText())
-              TextInput({ text: this.hostDraft, placeholder: '192.168.43.1' })
-                .width('100%')
-                .height(44)
-                .fontSize(15)
-                .fontColor(themePrimaryText())
-                .placeholderColor(themeTertiaryText())
-                .backgroundColor(themeFieldBackground())
-                .borderRadius(8)
-                .onChange((value: string) => {
-                  this.hostDraft = value;
-                })
-              Text(uiText('The default gateway is filled automatically. You can also enter the sender IPv4 address.'))
-                .fontSize(11)
-                .lineHeight(17)
-                .fontColor(themeSecondaryText())
+              Row() {
+                Text(uiText('Nearby devices'))
+                  .fontSize(16)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(themePrimaryText())
+                Blank()
+                Text(this.peers.length.toString())
+                  .fontSize(12)
+                  .fontColor(themePrimaryColor())
+              }
+              .width('100%')
+              if (this.peers.length === 0) {
+                Text(uiText('Start scanning, then select the sender device from the list'))
+                  .fontSize(13)
+                  .lineHeight(20)
+                  .fontColor(themeSecondaryText())
+                  .width('100%')
+                  .padding(16)
+                  .backgroundColor(themeSurface())
+                  .borderRadius(8)
+              } else {
+                ForEach(this.peers, (peer: WifiMigrationPeer) => {
+                  this.peerCard(peer)
+                }, (peer: WifiMigrationPeer) => peer.address)
+              }
             }
             .width('100%')
-            .padding(16)
-            .backgroundColor(themeSurface())
-            .borderRadius(8)
           }
 
           Button(uiText(this.primaryLabel()), { type: ButtonType.Normal, stateEffect: true })
@@ -427,19 +496,19 @@ export struct WifiMigrationPanel {
             })
 
           Column({ space: 7 }) {
-            Text(uiText('Compatible with the original Android app'))
+            Text(uiText('Wi-Fi Direct instructions'))
               .fontSize(14)
               .fontWeight(FontWeight.Medium)
               .fontColor(themePrimaryText())
-            Text(uiText('Both devices must be on the same local network. The original Android client only connects to the gateway, so use the sending device hotspot when transferring to it.'))
+            Text(uiText('On the sending device, choose the data and start sending. On the receiving device, scan and select the sender.'))
               .fontSize(12)
               .lineHeight(19)
               .fontColor(themeSecondaryText())
-            Text(uiText('Keep both transfer pages open until every page is confirmed. Wi-Fi transfer sends metadata only and does not copy downloaded images.'))
+            Text(uiText('Keep both transfer pages open until completion. Download transfer includes metadata and downloaded image files.'))
               .fontSize(12)
               .lineHeight(19)
               .fontColor(themeSecondaryText())
-            Text(uiText('Only start the server on a trusted local network. It stops automatically when this page is closed.'))
+            Text(uiText('The direct group and data server stop automatically when this page is closed.'))
               .fontSize(12)
               .lineHeight(19)
               .fontColor(themeSecondaryText())
@@ -462,4 +531,18 @@ export struct WifiMigrationPanel {
     .height('100%')
     .backgroundColor(themePageBackground())
   }
+}
+
+function formatTransferBytes(bytes: number): string {
+  const safe = Math.max(0, bytes);
+  if (safe >= 1024 * 1024 * 1024) {
+    return (safe / (1024 * 1024 * 1024)).toFixed(2) + ' GiB';
+  }
+  if (safe >= 1024 * 1024) {
+    return (safe / (1024 * 1024)).toFixed(1) + ' MiB';
+  }
+  if (safe >= 1024) {
+    return (safe / 1024).toFixed(1) + ' KiB';
+  }
+  return safe.toString() + ' B';
 }
