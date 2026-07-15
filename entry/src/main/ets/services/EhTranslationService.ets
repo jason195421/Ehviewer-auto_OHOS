@@ -102,8 +102,9 @@ interface ChatRequestBody {
   model: string;
   messages: ChatMessage[];
   stream: boolean;
-  temperature: number;
+  temperature?: number;
   thinking?: DeepSeekThinking;
+  reasoning_effort?: string;
   prompt_cache_key?: string;
 }
 
@@ -146,7 +147,13 @@ interface GeminiRequestBody {
 }
 
 interface GeminiGenerationConfig {
-  temperature: number;
+  temperature?: number;
+  thinkingConfig?: GeminiThinkingConfig;
+}
+
+interface GeminiThinkingConfig {
+  thinkingBudget?: number;
+  thinkingLevel?: string;
 }
 
 interface GeminiCandidate {
@@ -369,14 +376,14 @@ export class EhTranslationService {
       return await this.translateWithChatApi(text, target, contentKind, provider,
         'https://api.deepseek.com/chat/completions',
         ehSettingsStore.getValue('translation_deepseek_api_key', ''),
-        ehSettingsStore.getValue('translation_deepseek_model', 'deepseek-v4-flash'), true, false,
+        ehSettingsStore.getValue('translation_deepseek_model', 'deepseek-v4-flash'), false,
         allowWhenDisabled);
     }
     if (provider === 'OpenAI') {
       return await this.translateWithChatApi(text, target, contentKind, provider,
         'https://api.openai.com/v1/chat/completions',
         ehSettingsStore.getValue('translation_official_openai_api_key', ''),
-        ehSettingsStore.getValue('translation_official_openai_model', 'gpt-4.1-mini'), false, true,
+        ehSettingsStore.getValue('translation_official_openai_model', 'gpt-4.1-mini'), true,
         allowWhenDisabled);
     }
     if (provider === 'Custom API') {
@@ -385,7 +392,7 @@ export class EhTranslationService {
         throw new Error('No custom translation API is selected');
       }
       return await this.translateWithChatApi(text, target, contentKind, provider, chatCompletionsUrl(custom.baseUrl),
-        custom.apiKey, custom.model, false, false, allowWhenDisabled);
+        custom.apiKey, custom.model, false, allowWhenDisabled);
     }
     if (provider === 'Gemini') {
       return await this.translateWithGemini(text, target, contentKind, allowWhenDisabled);
@@ -723,8 +730,8 @@ export class EhTranslationService {
   }
 
   private async translateWithChatApi(text: string, target: string, contentKind: string, provider: string, url: string,
-    apiKey: string, model: string, disableThinking: boolean = false,
-    openAiPromptCaching: boolean = false, allowWhenDisabled: boolean = false): Promise<string> {
+    apiKey: string, model: string, openAiPromptCaching: boolean = false,
+    allowWhenDisabled: boolean = false): Promise<string> {
     if (apiKey.trim().length === 0) {
       throw new Error('Translation API key is missing');
     }
@@ -735,13 +742,13 @@ export class EhTranslationService {
     const translated: string[] = [];
     for (let i = 0; i < chunks.length; i++) {
       translated.push(await this.translateChatChunk(chunks[i], target, contentKind, provider, url, apiKey.trim(),
-        model.trim(), disableThinking, openAiPromptCaching, allowWhenDisabled));
+        model.trim(), openAiPromptCaching, allowWhenDisabled));
     }
     return translated.join('\n');
   }
 
   private async translateChatChunk(text: string, target: string, contentKind: string, provider: string, url: string,
-    apiKey: string, model: string, disableThinking: boolean, openAiPromptCaching: boolean,
+    apiKey: string, model: string, openAiPromptCaching: boolean,
     allowWhenDisabled: boolean): Promise<string> {
     let truncated = false;
     let incompleteResponse = false;
@@ -752,11 +759,11 @@ export class EhTranslationService {
           { role: 'system', content: translationRequestSystemPrompt(text, target, contentKind, attempt > 0) },
           { role: 'user', content: text }
         ],
-        stream: false,
-        temperature: attempt > 0 ? 0.2 : 0.1
+        stream: false
       };
-      if (disableThinking) {
-        requestBody.thinking = { type: 'disabled' };
+      const usesReasoningEffort = applyChatThinkingMode(requestBody, provider, model);
+      if (!usesReasoningEffort) {
+        requestBody.temperature = attempt > 0 ? 0.2 : 0.1;
       }
       if (openAiPromptCaching) {
         requestBody.prompt_cache_key = translationPromptCacheKey(text);
@@ -832,10 +839,15 @@ export class EhTranslationService {
     let truncated = false;
     let incompleteResponse = false;
     for (let attempt = 0; attempt < AI_TRANSLATION_MAX_ATTEMPTS; attempt++) {
+      const generationConfig: GeminiGenerationConfig = {};
+      applyGeminiThinkingMode(generationConfig, model);
+      if (!isGemini3Model(model)) {
+        generationConfig.temperature = attempt > 0 ? 0.2 : 0.1;
+      }
       const requestBody: GeminiRequestBody = {
         systemInstruction: { parts: [{ text: translationRequestSystemPrompt(text, target, contentKind, attempt > 0) }] },
         contents: [{ role: 'user', parts: [{ text: text }] }],
-        generationConfig: { temperature: attempt > 0 ? 0.2 : 0.1 }
+        generationConfig: generationConfig
       };
       const serializedBody = JSON.stringify(requestBody);
       const conversationId = aiTranslationConversationLog.recordRequest('Gemini', model, url,
@@ -1144,7 +1156,8 @@ function geminiCandidateText(candidate: GeminiCandidate | undefined): string {
 }
 
 function translationConfigurationKey(provider: string, target: string): string {
-  const promptKey = providerUsesAi(provider) ? '\n' + activePromptConfigurationKey() : '';
+  const promptKey = providerUsesAi(provider) ? '\n' + activePromptConfigurationKey() + '\n' +
+    ehSettingsStore.getValue('translation_ai_thinking_enabled', 'Off') : '';
   if (provider === 'DeepSeek') {
     return provider + '\n' + target + '\n' + ehSettingsStore.getValue('translation_deepseek_model',
       'deepseek-v4-flash') + '\n' + AI_TRANSLATION_PROMPT_VERSION + promptKey;
@@ -1182,6 +1195,55 @@ export function effectiveTranslationProvider(): string {
 
 function providerUsesAi(provider: string): boolean {
   return provider === 'DeepSeek' || provider === 'OpenAI' || provider === 'Gemini' || provider === 'Custom API';
+}
+
+function aiThinkingEnabled(): boolean {
+  return ehSettingsStore.getValue('translation_ai_thinking_enabled', 'Off') === 'On';
+}
+
+function applyChatThinkingMode(requestBody: ChatRequestBody, provider: string, model: string): boolean {
+  const enabled = aiThinkingEnabled();
+  const normalizedModel = model.trim().toLowerCase();
+  if (provider === 'DeepSeek' || (provider === 'Custom API' && normalizedModel.indexOf('deepseek') >= 0)) {
+    requestBody.thinking = { type: enabled ? 'enabled' : 'disabled' };
+    return false;
+  }
+  if (provider === 'OpenAI' && openAiModelSupportsReasoning(model)) {
+    requestBody.reasoning_effort = enabled ? 'medium' : 'low';
+    return true;
+  }
+  if (provider === 'Custom API' && enabled) {
+    requestBody.reasoning_effort = 'medium';
+    return true;
+  }
+  return false;
+}
+
+function openAiModelSupportsReasoning(model: string): boolean {
+  const normalized = model.trim().toLowerCase();
+  return normalized.indexOf('gpt-5') === 0 || normalized.indexOf('o1') === 0 ||
+    normalized.indexOf('o3') === 0 || normalized.indexOf('o4') === 0;
+}
+
+function applyGeminiThinkingMode(config: GeminiGenerationConfig, model: string): void {
+  const normalized = model.trim().toLowerCase();
+  const enabled = aiThinkingEnabled();
+  if (normalized.indexOf('gemini-2.5') === 0) {
+    if (enabled) {
+      config.thinkingConfig = { thinkingBudget: -1 };
+    } else if (normalized.indexOf('pro') < 0) {
+      config.thinkingConfig = { thinkingBudget: 0 };
+    }
+    return;
+  }
+  if (isGemini3Model(normalized)) {
+    config.thinkingConfig = { thinkingLevel: enabled ? 'medium' :
+      (normalized.indexOf('pro') >= 0 ? 'low' : 'minimal') };
+  }
+}
+
+function isGemini3Model(model: string): boolean {
+  return model.trim().toLowerCase().indexOf('gemini-3') === 0;
 }
 
 function isMachineTranslationProvider(provider: string): boolean {

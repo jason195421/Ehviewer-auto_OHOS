@@ -892,6 +892,8 @@ export function zhText(text: string): string {
     case 'Use the selected AI service instead of ordinary machine translation': return '使用所选 AI 服务代替普通机翻';
     case 'AI translation provider': return 'AI 翻译服务';
     case 'Choose the AI service used while AI translation is enabled': return '选择启用 AI 翻译时使用的服务';
+    case 'Thinking mode': return '思考模式';
+    case 'Let supported AI models reason before translating; disabling uses non-thinking or the lowest available level': return '让支持的 AI 模型在翻译前进行思考；关闭时使用非思考模式或最低可用等级';
     case 'Record AI conversations': return '记录 AI 翻译对话';
     case 'Save prompts sent to AI services and their returned text locally; disabling clears all records': return '在本机记录发送给 AI 的提示词及其返回内容；关闭时清空全部记录';
     case 'Export AI conversation records': return '导出 AI 翻译记录';
@@ -3056,6 +3058,9 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
         'Choose the AI translation service', '', 'section'));
       rows.push(optionSettingsRow('translation_ai_provider', 'AI translation provider',
         'Choose the AI service used while AI translation is enabled', entries, aiProviderOptions, aiProviderDescriptions));
+      rows.push(optionSettingsRow('translation_ai_thinking_enabled', 'Thinking mode',
+        'Let supported AI models reason before translating; disabling uses non-thinking or the lowest available level',
+        entries, ON_OFF_OPTIONS));
       rows.push(optionSettingsRow('translation_ai_conversation_log', 'Record AI conversations',
         'Save prompts sent to AI services and their returned text locally; disabling clears all records', entries,
         ON_OFF_OPTIONS));
