@@ -48,6 +48,7 @@ export function defaultSettingEntries(): SettingEntry[] {
     { key: 'show_eh_limits', value: 'On' },
     { key: 'translation_buttons_enabled', value: 'On' },
     { key: 'reader_translation_enabled', value: 'Off' },
+    { key: 'reader_ocr_debug_log', value: 'Off' },
     { key: 'reader_translation_button_side', value: 'Right' },
     { key: 'reader_translation_button_y_ratio', value: '0.35' },
     { key: 'translation_provider', value: 'Google Web' },

@@ -77,6 +77,10 @@ import {
   AI_TRANSLATION_CONVERSATION_LOG_SETTING_KEY,
   aiTranslationConversationLog
 } from '../services/AiTranslationConversationLog';
+import {
+  READER_OCR_DEBUG_LOG_SETTING_KEY,
+  readerOcrDebugLog
+} from '../services/ReaderOcrDebugLog';
 import { galleryPageCache } from '../services/GalleryPageCache';
 import { CacheClearResult, CachePruneResult, readerImageCache } from '../services/ReaderImageCache';
 import { FilterRule, FILTER_MODE_RATING, FILTER_MODE_TITLE, ehFilterStore } from '../services/EhFilterStore';
@@ -545,6 +549,9 @@ export struct SettingsScene {
     ehSettingsStore.setValue(key, normalizedValue);
     if (key === AI_TRANSLATION_CONVERSATION_LOG_SETTING_KEY && normalizedValue !== 'On') {
       aiTranslationConversationLog.clear(getAbilityContext());
+    }
+    if (key === READER_OCR_DEBUG_LOG_SETTING_KEY && normalizedValue !== 'On') {
+      readerOcrDebugLog.clear(getAbilityContext());
     }
     if (key === 'translation_ai_provider' && normalizedValue === 'Custom API') {
       this.ensureCustomTranslationApi();
@@ -1115,6 +1122,10 @@ export struct SettingsScene {
       this.exportAiTranslationRecords();
       return true;
     }
+    if (key === 'reader_ocr_debug_export') {
+      this.exportReaderOcrDebugRecords();
+      return true;
+    }
     if (key === 'translation_prompt_settings') {
       this.openPanel(SettingsPanel.TranslationPrompt);
       return true;
@@ -1632,6 +1643,26 @@ export struct SettingsScene {
       this.showToast('AI translation records exported');
     }).catch((error: Error) => {
       this.showFloatingStatus(uiText('AI translation record export failed') + ': ' + error.message);
+    });
+  }
+
+  private exportReaderOcrDebugRecords(): void {
+    const context = getAbilityContext();
+    if (context === undefined) {
+      this.showFloatingStatus('Comic OCR debug export needs an ability context');
+      return;
+    }
+    const content = readerOcrDebugLog.read(context);
+    if (content.trim().length === 0) {
+      this.showFloatingStatus('No comic OCR debug records yet');
+      return;
+    }
+    const fileName = 'ehviewer_reader_ocr_debug_' + diagnosticTimestamp(new Date()) + '.txt';
+    this.writeTextToDownloads(context, fileName, content).then((path: string) => {
+      this.statusText = uiText('Comic OCR debug data exported') + ': ' + path;
+      this.showToast('Comic OCR debug data exported');
+    }).catch((error: Error) => {
+      this.showFloatingStatus(uiText('Comic OCR debug export failed') + ': ' + error.message);
     });
   }
 

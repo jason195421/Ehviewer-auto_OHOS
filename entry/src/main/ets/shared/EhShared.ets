@@ -879,6 +879,15 @@ export function zhText(text: string): string {
     case 'Show translation buttons on gallery lists, details and comments': return '在画廊列表、详情和评论中显示翻译按钮';
     case 'The translation toggle is in the lower-right toolbar': return '翻译开关在右下角工具栏中';
     case 'Comic translation': return '漫画翻译';
+    case 'Record comic OCR debug data': return '记录漫画 OCR 调试信息';
+    case 'Save OCR lines, estimated font sizes, grouping and overlay coordinates locally':
+      return '在本地记录 OCR 文本行、估算字号、分组及覆盖层坐标';
+    case 'Export comic OCR debug data': return '导出漫画 OCR 调试信息';
+    case 'Export recorded OCR and overlay layout data to public Downloads': return '将记录的 OCR 与覆盖层布局信息导出到公共下载目录';
+    case 'No comic OCR debug records yet': return '暂无漫画 OCR 调试记录';
+    case 'Comic OCR debug data exported': return '漫画 OCR 调试信息已导出';
+    case 'Comic OCR debug export needs an ability context': return '导出漫画 OCR 调试信息需要应用上下文';
+    case 'Comic OCR debug export failed': return '漫画 OCR 调试信息导出失败';
     case 'Show a draggable translation button in the reader': return '在阅读器中显示可拖动的翻译按钮';
     case 'Comic translation started': return '已开始漫画翻译';
     case 'Comic translation hidden': return '已隐藏漫画翻译';
@@ -3049,6 +3058,10 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
         'Show translation buttons on gallery lists, details and comments', entries, ON_OFF_OPTIONS),
       optionSettingsRow('reader_translation_enabled', 'Comic translation',
         'Show a draggable translation button in the reader', entries, ON_OFF_OPTIONS),
+      optionSettingsRow('reader_ocr_debug_log', 'Record comic OCR debug data',
+        'Save OCR lines, estimated font sizes, grouping and overlay coordinates locally', entries, ON_OFF_OPTIONS),
+      staticSettingsRow('reader_ocr_debug_export', 'Export comic OCR debug data',
+        'Export recorded OCR and overlay layout data to public Downloads', 'Export', 'action'),
       optionSettingsRow('translation_ai_enabled', 'AI translation',
         'Use the selected AI service instead of ordinary machine translation', entries, ON_OFF_OPTIONS),
       optionSettingsRow('translation_target_language', 'Target language',

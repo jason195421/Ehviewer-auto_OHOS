@@ -11,6 +11,7 @@ import {
 import { ehDownloadFileStore } from './EhDownloadFileStore';
 import { ehHistoryStore } from './EhHistoryStore';
 import { ehTranslationService } from './EhTranslationService';
+import { readerOcrDebugLog } from './ReaderOcrDebugLog';
 
 interface ReaderComicTranslationTask {
   key: string;
@@ -48,6 +49,7 @@ interface OcrLineCandidate {
   bounds: OcrBounds;
   vertical: boolean;
   blockIndex: number;
+  lineIndex: number;
   fontSize: number;
 }
 
@@ -58,7 +60,7 @@ interface OcrTextGroup {
 }
 
 const MAX_OCR_IMAGE_EDGE: number = 4096;
-const READER_TRANSLATION_LAYOUT_VERSION: number = 4;
+const READER_TRANSLATION_LAYOUT_VERSION: number = 5;
 
 export class ReaderComicTranslationService {
   private queue: ReaderComicTranslationTask[] = [];
@@ -173,7 +175,8 @@ export class ReaderComicTranslationService {
       }
     }
     await this.ensureInitialized();
-    const translation = await this.recognizeAndTranslate(task.imagePath, task.pageIndex, task.priority, task.force);
+    const translation = await this.recognizeAndTranslate(task.context, task.gallery.gid, task.imagePath,
+      task.pageIndex, task.priority, task.force);
     if (!ehDownloadFileStore.setReaderTranslation(task.context, task.gallery, translation)) {
       await ehHistoryStore.ensureLoaded(task.context);
       ehHistoryStore.setReaderTranslation(task.gallery.gid, translation);
@@ -196,14 +199,19 @@ export class ReaderComicTranslationService {
     this.initialized = true;
   }
 
-  private async recognizeAndTranslate(path: string, pageIndex: number,
+  private async recognizeAndTranslate(context: common.UIAbilityContext, gid: number, path: string, pageIndex: number,
     priority: number, forceRefresh: boolean): Promise<ReaderPageTranslation> {
     let imageSource: image.ImageSource | undefined = undefined;
     let pixelMap: image.PixelMap | undefined = undefined;
+    const debug: string[] = [];
+    debug.push('图片路径：' + path);
+    debug.push('强制刷新：' + forceRefresh.toString());
     try {
       imageSource = image.createImageSource(path);
       const info = imageSource.getImageInfoSync();
       const size = ocrDecodeSize(info.size.width, info.size.height);
+      debug.push('原图尺寸：' + info.size.width.toString() + 'x' + info.size.height.toString());
+      debug.push('OCR尺寸：' + size.width.toString() + 'x' + size.height.toString());
       pixelMap = await imageSource.createPixelMap({ desiredSize: { width: size.width, height: size.height } });
       let result: textRecognition.TextRecognitionResult;
       try {
@@ -212,13 +220,21 @@ export class ReaderComicTranslationService {
       } catch (error) {
         throw new Error('OCR recognition failed: ' + String(error));
       }
-      const lines = collectOcrLines(result.blocks);
+      debug.push('OCR块数量：' + result.blocks.length.toString());
+      const lines = collectOcrLines(result.blocks, debug);
       await Promise.all(lines.map(async (line: ReaderTranslationLine) => {
         const contentKind = line.isVertical === true ? 'vertical comic dialogue' : 'comic dialogue';
         line.translatedText = await ehTranslationService.translate(line.sourceText, contentKind, priority, true,
           true, forceRefresh);
       }));
-      return {
+      debug.push('[最终翻译]');
+      for (let i = 0; i < lines.length; i++) {
+        debug.push((i + 1).toString() + '. 原文=' + JSON.stringify(lines[i].sourceText));
+        debug.push('   译文=' + JSON.stringify(lines[i].translatedText));
+        debug.push('   方向=' + (lines[i].isVertical === true ? '竖排' : '横排') + '，框=' +
+          formatOcrPointsBounds(lines[i].cornerPoints));
+      }
+      const translation: ReaderPageTranslation = {
         pageIndex: pageIndex,
         imageWidth: size.width,
         imageHeight: size.height,
@@ -226,6 +242,12 @@ export class ReaderComicTranslationService {
         updatedAt: Date.now(),
         layoutVersion: READER_TRANSLATION_LAYOUT_VERSION
       };
+      readerOcrDebugLog.recordRecognition(context, gid, pageIndex, debug.join('\n'));
+      return translation;
+    } catch (error) {
+      debug.push('[失败] ' + String(error));
+      readerOcrDebugLog.recordRecognition(context, gid, pageIndex, debug.join('\n'));
+      throw error instanceof Error ? error : new Error(String(error));
     } finally {
       if (pixelMap !== undefined) {
         try {
@@ -243,23 +265,37 @@ export class ReaderComicTranslationService {
   }
 }
 
-function collectOcrLines(blocks: textRecognition.TextBlock[]): ReaderTranslationLine[] {
+function collectOcrLines(blocks: textRecognition.TextBlock[], debug: string[]): ReaderTranslationLine[] {
   const groups: OcrTextGroup[] = [];
+  debug.push('[OCR原始行]');
   for (let i = 0; i < blocks.length; i++) {
+    debug.push('块 ' + i.toString() + '：' + JSON.stringify(blocks[i].value));
     for (let j = 0; j < blocks[i].lines.length; j++) {
-      const candidate = createOcrLineCandidate(blocks[i].lines[j], i);
+      const line = blocks[i].lines[j];
+      const candidate = createOcrLineCandidate(line, i, j);
       if (candidate !== null) {
         groups.push(createOcrTextGroup([candidate]));
+        debug.push('  行 ' + j.toString() + '：文本=' + JSON.stringify(candidate.text) + '，框=' +
+          formatOcrBounds(candidate.bounds) + '，方向=' + (candidate.vertical ? '竖排' : '横排') +
+          '，估算字号=' + roundOcrNumber(candidate.fontSize));
+        appendOcrWordDebug(debug, line);
+      } else {
+        debug.push('  行 ' + j.toString() + '：已过滤，原因=' + ocrLineSkipReason(line) + '，文本=' +
+          JSON.stringify(line.value));
       }
     }
   }
   mergeNearbyOcrTextGroups(groups);
+  debug.push('[分组结果]');
   const result: ReaderTranslationLine[] = [];
   for (let i = 0; i < groups.length; i++) {
     const source = groupedOcrSource(groups[i]);
     if (source.length === 0) {
       continue;
     }
+    debug.push('组 ' + i.toString() + '：成员=' + ocrGroupMemberText(groups[i]) + '，框=' +
+      formatOcrBounds(groups[i].bounds) + '，方向=' + (groups[i].vertical ? '竖排' : '横排') +
+      '，原文=' + JSON.stringify(source));
     result.push({
       sourceText: source,
       translatedText: '',
@@ -270,9 +306,10 @@ function collectOcrLines(blocks: textRecognition.TextBlock[]): ReaderTranslation
   return result;
 }
 
-function createOcrLineCandidate(line: textRecognition.TextLine, blockIndex: number): OcrLineCandidate | null {
+function createOcrLineCandidate(line: textRecognition.TextLine, blockIndex: number,
+  lineIndex: number): OcrLineCandidate | null {
   const source = line.value.trim();
-  if (source.length === 0 || line.cornerPoints.length < 2) {
+  if (source.length === 0 || line.cornerPoints.length < 2 || !containsReadableOcrText(source)) {
     return null;
   }
   const points: ReaderTranslationPoint[] = [];
@@ -286,8 +323,56 @@ function createOcrLineCandidate(line: textRecognition.TextLine, blockIndex: numb
     bounds: bounds,
     vertical: vertical,
     blockIndex: blockIndex,
+    lineIndex: lineIndex,
     fontSize: estimateOcrFontSize(line, bounds, vertical)
   };
+}
+
+function containsReadableOcrText(value: string): boolean {
+  return /[A-Za-z0-9\u00c0-\u02af\u0370-\u052f\u0600-\u06ff\u0e00-\u0e7f\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/
+    .test(value);
+}
+
+function ocrLineSkipReason(line: textRecognition.TextLine): string {
+  if (line.value.trim().length === 0) {
+    return '空文本';
+  }
+  if (line.cornerPoints.length < 2) {
+    return '坐标不足';
+  }
+  if (!containsReadableOcrText(line.value)) {
+    return '仅包含符号';
+  }
+  return '无有效内容';
+}
+
+function appendOcrWordDebug(debug: string[], line: textRecognition.TextLine): void {
+  for (let i = 0; i < line.words.length; i++) {
+    const bounds = textWordBounds(line.words[i]);
+    debug.push('    词 ' + i.toString() + '：' + JSON.stringify(line.words[i].value) + '，框=' +
+      (bounds === null ? '(无)' : formatOcrBounds(bounds)));
+  }
+}
+
+function ocrGroupMemberText(group: OcrTextGroup): string {
+  const values: string[] = [];
+  for (let i = 0; i < group.lines.length; i++) {
+    values.push(group.lines[i].blockIndex.toString() + ':' + group.lines[i].lineIndex.toString());
+  }
+  return values.join(',');
+}
+
+function formatOcrPointsBounds(points: ReaderTranslationPoint[]): string {
+  return points.length === 0 ? '(无)' : formatOcrBounds(pointsBounds(points));
+}
+
+function formatOcrBounds(bounds: OcrBounds): string {
+  return '(' + roundOcrNumber(bounds.x) + ',' + roundOcrNumber(bounds.y) + ',' +
+    roundOcrNumber(bounds.width) + ',' + roundOcrNumber(bounds.height) + ')';
+}
+
+function roundOcrNumber(value: number): string {
+  return (Math.round(value * 10) / 10).toString();
 }
 
 function estimateOcrFontSize(line: textRecognition.TextLine, bounds: OcrBounds, vertical: boolean): number {
