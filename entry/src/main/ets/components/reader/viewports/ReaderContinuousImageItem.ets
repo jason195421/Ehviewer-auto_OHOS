@@ -1,4 +1,5 @@
 import { GalleryPage } from '../../../model/GalleryModels';
+import { ReaderPageTranslation } from '../../../model/ReaderTranslationModels';
 import { ImageDownloadProgress, readerImageCache } from '../../../services/ReaderImageCache';
 import {
   createEmptyPage,
@@ -20,6 +21,7 @@ import {
   readerLocalSourceImagePath
 } from '../core/ReaderCore';
 import { ReaderStatusView } from '../status/ReaderStatusView';
+import { ReaderTranslationOverlay } from '../overlays/ReaderTranslationOverlay';
 
 @Component
 export struct ReaderContinuousImageItem {
@@ -30,6 +32,7 @@ export struct ReaderContinuousImageItem {
   @Prop @Watch('onZoomScaleChange') zoomScale: number = READER_BASE_SCALE;
   @Prop sharedOffsetX: number = 0;
   @Prop isActive: boolean = false;
+  @Prop translation: ReaderPageTranslation | null = null;
   onTap: (x: number, y: number, w: number, h: number) => void =
     (_x: number, _y: number, _w: number, _h: number) => {};
   onRetry: () => void = () => {};
@@ -297,6 +300,14 @@ export struct ReaderContinuousImageItem {
             this.failedImageUrl = this.imageUrl();
           })
           .translate({ x: this.sharedOffsetX, y: 0 })
+        if (this.translation !== null) {
+          ReaderTranslationOverlay({
+            translation: this.translation,
+            displayWidth: this.displayWidth(),
+            displayHeight: this.displayHeight()
+          })
+            .translate({ x: this.sharedOffsetX, y: 0 })
+        }
       }
       if (this.imageUrl().length === 0 || this.isImageLoading()) {
         ReaderStatusView({ failed: false, compact: true, progress: this.downloadProgress })

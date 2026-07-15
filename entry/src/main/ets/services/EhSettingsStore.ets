@@ -12,6 +12,7 @@ const VALUES_KEY: string = 'values';
 export const HISTORY_INFO_SIZE_KEY: string = 'history_info_size';
 export const DEFAULT_HISTORY_INFO_SIZE: string = '100';
 export const TRANSLATION_BUTTONS_VISIBLE_KEY: string = 'ehviewer_translation_buttons_visible';
+export const READER_TRANSLATION_BUTTON_VISIBLE_KEY: string = 'ehviewer_reader_translation_button_visible';
 const HISTORY_INFO_SIZE_OPTIONS: string[] = ['100', '500', '1000', '5000', '10000', '20000'];
 
 export interface SettingEntry {
@@ -46,6 +47,9 @@ export function defaultSettingEntries(): SettingEntry[] {
     { key: 'split_screen_ratio', value: '0.42' },
     { key: 'show_eh_limits', value: 'On' },
     { key: 'translation_buttons_enabled', value: 'On' },
+    { key: 'reader_translation_enabled', value: 'Off' },
+    { key: 'reader_translation_button_side', value: 'Right' },
+    { key: 'reader_translation_button_y_ratio', value: '0.35' },
     { key: 'translation_provider', value: 'Google Web' },
     { key: 'translation_machine_provider', value: 'Google Web' },
     { key: 'translation_batch_enabled', value: 'On' },
@@ -158,6 +162,9 @@ export class EhSettingsStore {
     if (key === 'translation_buttons_enabled') {
       this.syncTranslationButtonVisibility();
     }
+    if (key === 'reader_translation_enabled') {
+      this.syncReaderTranslationButtonVisibility();
+    }
   }
 
   private enforceAdaptiveDualPageConstraints(): void {
@@ -186,6 +193,11 @@ export class EhSettingsStore {
   syncTranslationButtonVisibility(): void {
     AppStorage.setOrCreate<boolean>(TRANSLATION_BUTTONS_VISIBLE_KEY,
       this.getValue('translation_buttons_enabled', 'On') === 'On');
+  }
+
+  syncReaderTranslationButtonVisibility(): void {
+    AppStorage.setOrCreate<boolean>(READER_TRANSLATION_BUTTON_VISIBLE_KEY,
+      this.getValue('reader_translation_enabled', 'Off') === 'On');
   }
 
   async ensureLoaded(context: common.UIAbilityContext): Promise<void> {
@@ -309,6 +321,7 @@ export class EhSettingsStore {
       throw new Error(String(error));
     } finally {
       this.syncTranslationButtonVisibility();
+      this.syncReaderTranslationButtonVisibility();
     }
   }
 

@@ -878,6 +878,13 @@ export function zhText(text: string): string {
     case 'Translation feature': return '翻译功能';
     case 'Show translation buttons on gallery lists, details and comments': return '在画廊列表、详情和评论中显示翻译按钮';
     case 'The translation toggle is in the lower-right toolbar': return '翻译开关在右下角工具栏中';
+    case 'Comic translation': return '漫画翻译';
+    case 'Show a draggable translation button in the reader': return '在阅读器中显示可拖动的翻译按钮';
+    case 'Comic translation started': return '已开始漫画翻译';
+    case 'Comic translation hidden': return '已隐藏漫画翻译';
+    case 'Retranslating current page': return '正在重新翻译本页';
+    case 'Comic translation failed': return '漫画翻译失败';
+    case 'No text was recognized on this page': return '本页未识别到文字';
     case 'Translation provider': return '翻译服务';
     case 'Choose a web translation or AI translation service': return '选择网页翻译或 AI 翻译服务';
     case 'Machine translation': return '普通机翻';
@@ -3040,6 +3047,8 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
     const rows: SettingsRowItem[] = [
       optionSettingsRow('translation_buttons_enabled', 'Translation feature',
         'Show translation buttons on gallery lists, details and comments', entries, ON_OFF_OPTIONS),
+      optionSettingsRow('reader_translation_enabled', 'Comic translation',
+        'Show a draggable translation button in the reader', entries, ON_OFF_OPTIONS),
       optionSettingsRow('translation_ai_enabled', 'AI translation',
         'Use the selected AI service instead of ordinary machine translation', entries, ON_OFF_OPTIONS),
       optionSettingsRow('translation_target_language', 'Target language',

@@ -1,4 +1,5 @@
 import { GalleryPage } from '../../../model/GalleryModels';
+import { ReaderPageTranslation } from '../../../model/ReaderTranslationModels';
 import { ImageDownloadProgress, readerImageCache } from '../../../services/ReaderImageCache';
 import {
   createEmptyPage,
@@ -23,6 +24,7 @@ import {
   readerLocalSourceImagePath
 } from '../core/ReaderCore';
 import { ReaderStatusView } from '../status/ReaderStatusView';
+import { ReaderTranslationOverlay } from '../overlays/ReaderTranslationOverlay';
 
 @Component
 export struct ReaderImageViewport {
@@ -33,6 +35,7 @@ export struct ReaderImageViewport {
   @Prop @Watch('onFixedScaleChange') fixedScale: number = READER_BASE_SCALE;
   @Prop startPosition: string = 'Top right';
   @Prop @Watch('onActiveChange') isActive: boolean = false;
+  @Prop translation: ReaderPageTranslation | null = null;
   @Prop allowEdgeSwipe: boolean = true;
   @Prop command: string = '';
   @Prop @Watch('onCommandChange') commandVersion: number = 0;
@@ -405,6 +408,15 @@ export struct ReaderImageViewport {
             })
             .scale({ x: this.imageModel.currentScale, y: this.imageModel.currentScale, centerX: '50%', centerY: '50%' })
             .translate({ x: this.imageModel.currentOffsetX, y: this.imageModel.currentOffsetY })
+          if (this.translation !== null) {
+            ReaderTranslationOverlay({
+              translation: this.translation,
+              displayWidth: this.displayImageWidth,
+              displayHeight: this.displayImageHeight
+            })
+              .scale({ x: this.imageModel.currentScale, y: this.imageModel.currentScale, centerX: '50%', centerY: '50%' })
+              .translate({ x: this.imageModel.currentOffsetX, y: this.imageModel.currentOffsetY })
+          }
         }
         .width('100%')
         .height('100%')

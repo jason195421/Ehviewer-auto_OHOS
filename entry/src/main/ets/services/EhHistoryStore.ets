@@ -2,6 +2,11 @@ import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import { GalleryCategory, GalleryDetail, GalleryInfo, GalleryTagGroup } from '../model/GalleryModels';
+import {
+  ReaderPageTranslation,
+  cloneReaderPageTranslation,
+  cloneReaderPageTranslations
+} from '../model/ReaderTranslationModels';
 import { EhUrl } from './EhUrl';
 
 const PREFERENCES_NAME: string = 'ehviewer_history';
@@ -47,12 +52,14 @@ interface StoredReadPosition {
   gid?: number;
   pageIndex?: number;
   updatedAt?: number;
+  readerTranslations?: ReaderPageTranslation[];
 }
 
 interface ReadPosition {
   gid: number;
   pageIndex: number;
   updatedAt: number;
+  readerTranslations: ReaderPageTranslation[];
 }
 
 interface HistoryBackupFile {
@@ -170,8 +177,66 @@ export class EhHistoryStore {
         return;
       }
     }
-    this.readPositions.push({ gid: gid, pageIndex: pageIndex, updatedAt: Date.now() });
+    this.readPositions.push({
+      gid: gid,
+      pageIndex: pageIndex,
+      updatedAt: Date.now(),
+      readerTranslations: []
+    });
     this.queueSave();
+  }
+
+  getReaderTranslation(gid: number, pageIndex: number): ReaderPageTranslation | null {
+    for (let i = 0; i < this.readPositions.length; i++) {
+      if (this.readPositions[i].gid !== gid) {
+        continue;
+      }
+      for (let j = 0; j < this.readPositions[i].readerTranslations.length; j++) {
+        if (this.readPositions[i].readerTranslations[j].pageIndex === pageIndex) {
+          return cloneReaderPageTranslation(this.readPositions[i].readerTranslations[j]);
+        }
+      }
+    }
+    return null;
+  }
+
+  setReaderTranslation(gid: number, translation: ReaderPageTranslation): void {
+    if (gid <= 0 || translation.pageIndex < 0) {
+      return;
+    }
+    for (let i = 0; i < this.readPositions.length; i++) {
+      if (this.readPositions[i].gid === gid) {
+        this.replaceReaderTranslation(this.readPositions[i], translation);
+        this.readPositions[i].updatedAt = Date.now();
+        this.queueSave();
+        return;
+      }
+    }
+    this.readPositions.push({
+      gid: gid,
+      pageIndex: translation.pageIndex,
+      updatedAt: Date.now(),
+      readerTranslations: [cloneReaderPageTranslation(translation)]
+    });
+    this.queueSave();
+  }
+
+  private replaceReaderTranslation(position: ReadPosition, translation: ReaderPageTranslation): void {
+    const next: ReaderPageTranslation[] = [];
+    let replaced = false;
+    for (let i = 0; i < position.readerTranslations.length; i++) {
+      if (position.readerTranslations[i].pageIndex === translation.pageIndex) {
+        next.push(cloneReaderPageTranslation(translation));
+        replaced = true;
+      } else {
+        next.push(cloneReaderPageTranslation(position.readerTranslations[i]));
+      }
+    }
+    if (!replaced) {
+      next.push(cloneReaderPageTranslation(translation));
+    }
+    next.sort((left: ReaderPageTranslation, right: ReaderPageTranslation) => left.pageIndex - right.pageIndex);
+    position.readerTranslations = next;
   }
 
   async load(context: common.UIAbilityContext): Promise<void> {
@@ -290,7 +355,8 @@ export class EhHistoryStore {
       positions.push({
         gid: this.readPositions[i].gid,
         pageIndex: this.readPositions[i].pageIndex,
-        updatedAt: this.readPositions[i].updatedAt
+        updatedAt: this.readPositions[i].updatedAt,
+        readerTranslations: cloneReaderPageTranslations(this.readPositions[i].readerTranslations)
       });
     }
     return positions;
@@ -459,7 +525,8 @@ function storedToReadPosition(item: StoredReadPosition): ReadPosition {
   return {
     gid: typeof item.gid === 'number' ? item.gid : 0,
     pageIndex: typeof item.pageIndex === 'number' ? item.pageIndex : -1,
-    updatedAt: typeof item.updatedAt === 'number' ? item.updatedAt : 0
+    updatedAt: typeof item.updatedAt === 'number' ? item.updatedAt : 0,
+    readerTranslations: cloneReaderPageTranslations(item.readerTranslations)
   };
 }
 

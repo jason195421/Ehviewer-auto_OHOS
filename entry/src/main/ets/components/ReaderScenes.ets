@@ -9,6 +9,7 @@ import inputConsumer from '@ohos.multimodalInput.inputConsumer';
 import { KeyCode } from '@ohos.multimodalInput.keyCode';
 import { KeyEvent } from '@ohos.multimodalInput.keyEvent';
 import { GalleryPage, GalleryPreview } from '../model/GalleryModels';
+import { ReaderPageTranslation } from '../model/ReaderTranslationModels';
 import {
   applyReaderWindowState,
   applyReaderBrightnessFromSettings,
@@ -23,7 +24,7 @@ import {
   restoreAppWindowState,
   setEmbeddedReaderActive
 } from '../services/EhWindowImmersive';
-import { ehSettingsStore } from '../services/EhSettingsStore';
+import { READER_TRANSLATION_BUTTON_VISIBLE_KEY, ehSettingsStore } from '../services/EhSettingsStore';
 import { galleryPageCache } from '../services/GalleryPageCache';
 import { readerImageCache } from '../services/ReaderImageCache';
 import {
@@ -76,6 +77,8 @@ const SLIDER_AUTO_HIDE_DELAY: number = 3000;
 const READER_SCREEN_TAP_DELAY: number = 220;
 const READER_DUAL_PAGE_OVERFLOW_RATIO: number = 1.15;
 const READER_PAGE_GROUP_REFRESH_DELAY: number = 220;
+const READER_TRANSLATION_BUTTON_SIZE: number = 52;
+const READER_TRANSLATION_BUTTON_EDGE: number = 8;
 
 function mediaAssetTitle(fileName: string): string {
   const dotIndex = fileName.lastIndexOf('.');
@@ -113,6 +116,10 @@ export struct ReaderScene {
   @Prop statusText: string = '';
   @Prop @Watch('onPageIndexChange') pageIndex: number = 0;
   @Prop @Watch('onTotalPagesChange') totalPages: number = 0;
+  @Prop readerTranslations: ReaderPageTranslation[] = [];
+  @Prop comicTranslationActive: boolean = false;
+  @Prop comicTranslationNotice: string = '';
+  @Prop @Watch('onComicTranslationNoticeChange') comicTranslationNoticeRevision: number = 0;
   onBack: () => void = () => {};
   onPrev: () => void = () => {};
   onNext: () => void = () => {};
@@ -120,9 +127,12 @@ export struct ReaderScene {
   onRetry: () => void = () => {};
   onRefreshPage: (index: number) => void = () => {};
   onAdaptiveDualPageChange: (enabled: boolean) => void = (_enabled: boolean) => {};
+  onComicTranslationToggle: (enabled: boolean) => void = (_enabled: boolean) => {};
+  onComicTranslationRefresh: () => void = () => {};
   restoreAppChromeOnExit: boolean = true;
   @StorageProp(STATUS_BAR_HEIGHT_KEY) statusBarHeightPx: number = 0;
   @StorageProp(BOTTOM_AVOID_HEIGHT_KEY) bottomAvoidHeight: number = 0;
+  @StorageProp(READER_TRANSLATION_BUTTON_VISIBLE_KEY) comicTranslationButtonVisible: boolean = false;
 
   @State fitMode: string = 'Fit screen';
   @State adaptiveDualPage: boolean = false;
@@ -146,6 +156,8 @@ export struct ReaderScene {
   @State continuousOffsetX: number = 0;
   @State viewportCommand: string = '';
   @State viewportCommandVersion: number = 0;
+  @State comicTranslationButtonX: number = 0;
+  @State comicTranslationButtonY: number = 160;
   // Swiper direction state (applied from menu)
   @State swiperVertical: boolean = false;
   @State swiperReversed: boolean = false;
@@ -172,6 +184,9 @@ export struct ReaderScene {
   private activeImageWidth: number = 0;
   private activeImageHeight: number = 0;
   private continuousDragStartOffsetX: number = 0;
+  private comicTranslationDragStartX: number = 0;
+  private comicTranslationDragStartY: number = 0;
+  private comicTranslationLongPressHandled: boolean = false;
 
   // Menu settings state (reflects ehSettingsStore, applied on menu close)
   @State menuScreenRotation: string = 'Default';
@@ -1235,6 +1250,103 @@ export struct ReaderScene {
     return '';
   }
 
+  onComicTranslationNoticeChange(): void {
+    if (this.comicTranslationNoticeRevision <= 0 || this.comicTranslationNotice.length === 0) {
+      return;
+    }
+    const failurePrefix = 'Comic translation failed:';
+    if (this.comicTranslationNotice.indexOf(failurePrefix) === 0) {
+      this.showToast(uiText('Comic translation failed') + this.comicTranslationNotice.substring(failurePrefix.length));
+      return;
+    }
+    this.showToast(uiText(this.comicTranslationNotice));
+  }
+
+  private readerTranslationForPage(index: number): ReaderPageTranslation | null {
+    if (!this.comicTranslationActive) {
+      return null;
+    }
+    for (let i = 0; i < this.readerTranslations.length; i++) {
+      if (this.readerTranslations[i].pageIndex === index) {
+        return this.readerTranslations[i];
+      }
+    }
+    return null;
+  }
+
+  private comicTranslationButtonMinY(): number {
+    return Math.max(READER_TRANSLATION_BUTTON_EDGE, this.readerStatusOverlayTop());
+  }
+
+  private comicTranslationButtonMaxY(): number {
+    return Math.max(this.comicTranslationButtonMinY(), this.readerLayoutHeight - READER_TRANSLATION_BUTTON_SIZE -
+      this.readerBottomInset() - READER_TRANSLATION_BUTTON_EDGE);
+  }
+
+  private clampComicTranslationButtonX(value: number): number {
+    return Math.max(READER_TRANSLATION_BUTTON_EDGE,
+      Math.min(Math.max(READER_TRANSLATION_BUTTON_EDGE,
+        this.readerLayoutWidth - READER_TRANSLATION_BUTTON_SIZE - READER_TRANSLATION_BUTTON_EDGE), value));
+  }
+
+  private clampComicTranslationButtonY(value: number): number {
+    return Math.max(this.comicTranslationButtonMinY(), Math.min(this.comicTranslationButtonMaxY(), value));
+  }
+
+  private syncComicTranslationButtonPosition(): void {
+    if (this.readerLayoutWidth <= 0 || this.readerLayoutHeight <= 0) {
+      return;
+    }
+    const side = ehSettingsStore.getValue('reader_translation_button_side', 'Right');
+    const ratio = Number.parseFloat(ehSettingsStore.getValue('reader_translation_button_y_ratio', '0.35'));
+    const safeRatio = Number.isNaN(ratio) ? 0.35 : Math.max(0, Math.min(1, ratio));
+    this.comicTranslationButtonX = side === 'Left' ? READER_TRANSLATION_BUTTON_EDGE :
+      this.readerLayoutWidth - READER_TRANSLATION_BUTTON_SIZE - READER_TRANSLATION_BUTTON_EDGE;
+    const minY = this.comicTranslationButtonMinY();
+    this.comicTranslationButtonY = this.clampComicTranslationButtonY(minY +
+      (this.comicTranslationButtonMaxY() - minY) * safeRatio);
+  }
+
+  private persistComicTranslationButtonPosition(): void {
+    const side = this.comicTranslationButtonX + READER_TRANSLATION_BUTTON_SIZE / 2 <= this.readerLayoutWidth / 2 ?
+      'Left' : 'Right';
+    const minY = this.comicTranslationButtonMinY();
+    const range = Math.max(1, this.comicTranslationButtonMaxY() - minY);
+    const ratio = Math.max(0, Math.min(1, (this.comicTranslationButtonY - minY) / range));
+    ehSettingsStore.setValue('reader_translation_button_side', side);
+    ehSettingsStore.setValue('reader_translation_button_y_ratio', ratio.toString());
+    const context = getAbilityContext();
+    if (context !== undefined) {
+      ehSettingsStore.save(context).catch(() => {});
+    }
+  }
+
+  private snapComicTranslationButtonToEdge(): void {
+    const onLeft = this.comicTranslationButtonX + READER_TRANSLATION_BUTTON_SIZE / 2 <= this.readerLayoutWidth / 2;
+    this.getUIContext().animateTo({ duration: 160, curve: Curve.EaseOut }, () => {
+      this.comicTranslationButtonX = onLeft ? READER_TRANSLATION_BUTTON_EDGE :
+        this.readerLayoutWidth - READER_TRANSLATION_BUTTON_SIZE - READER_TRANSLATION_BUTTON_EDGE;
+      this.comicTranslationButtonY = this.clampComicTranslationButtonY(this.comicTranslationButtonY);
+    });
+    this.persistComicTranslationButtonPosition();
+  }
+
+  private toggleComicTranslationFromButton(): void {
+    if (this.comicTranslationLongPressHandled) {
+      this.comicTranslationLongPressHandled = false;
+      return;
+    }
+    const enabled = !this.comicTranslationActive;
+    this.onComicTranslationToggle(enabled);
+    this.showToast(uiText(enabled ? 'Comic translation started' : 'Comic translation hidden'));
+  }
+
+  private refreshComicTranslationFromButton(): void {
+    this.comicTranslationLongPressHandled = true;
+    this.onComicTranslationRefresh();
+    this.showToast(uiText('Retranslating current page'));
+  }
+
   private async ensureLocalImagePathForPage(page: GalleryPage): Promise<string> {
     const context = getAbilityContext();
     if (context === undefined) {
@@ -1561,6 +1673,7 @@ export struct ReaderScene {
       fixedScale: this.fixedScale,
       startPosition: this.startPosition,
       isActive: this.pageGroupAnchorForPageIndex(index) === this.currentIndex,
+      translation: this.readerTranslationForPage(index),
       allowEdgeSwipe: !this.swiperVertical,
       command: this.viewportCommand,
       commandVersion: this.viewportCommandVersion,
@@ -1653,6 +1766,7 @@ export struct ReaderScene {
                 zoomScale: this.fixedScale,
                 sharedOffsetX: this.continuousOffsetX,
                 isActive: item.index === this.currentIndex,
+                translation: this.readerTranslationForPage(item.index),
                 onTap: () => {},
                 onRetry: () => {
                   this.onJump(item.index);
@@ -1930,6 +2044,51 @@ export struct ReaderScene {
         })
           .zIndex(6)
       }
+      if (this.comicTranslationButtonVisible) {
+        Button({ type: ButtonType.Circle }) {
+          SymbolGlyph($r('sys.symbol.translate'))
+            .fontSize(25)
+            .fontColor([Color.White])
+        }
+        .width(READER_TRANSLATION_BUTTON_SIZE)
+        .height(READER_TRANSLATION_BUTTON_SIZE)
+        .backgroundColor(this.comicTranslationActive ? '#167A9A' : '#34454D')
+        .opacity(0.68)
+        .shadow({ radius: 8, color: 'rgba(0,0,0,0.28)', offsetX: 0, offsetY: 2 })
+        .position({ x: this.comicTranslationButtonX, y: this.comicTranslationButtonY })
+        .accessibilityText(uiText('Comic translation'))
+        .gesture(
+          GestureGroup(GestureMode.Exclusive,
+            LongPressGesture({ repeat: false, duration: 600 })
+              .onAction(() => {
+                this.refreshComicTranslationFromButton();
+              }),
+            PanGesture({ fingers: 1, distance: 4 })
+              .onActionStart(() => {
+                this.comicTranslationLongPressHandled = false;
+                this.comicTranslationDragStartX = this.comicTranslationButtonX;
+                this.comicTranslationDragStartY = this.comicTranslationButtonY;
+              })
+              .onActionUpdate((event: GestureEvent) => {
+                this.comicTranslationButtonX = this.clampComicTranslationButtonX(
+                  this.comicTranslationDragStartX + event.offsetX);
+                this.comicTranslationButtonY = this.clampComicTranslationButtonY(
+                  this.comicTranslationDragStartY + event.offsetY);
+              })
+              .onActionEnd(() => {
+                this.snapComicTranslationButtonToEdge();
+              })
+              .onActionCancel(() => {
+                this.snapComicTranslationButtonToEdge();
+              }),
+            TapGesture({ count: 1 })
+              .onAction(() => {
+                this.toggleComicTranslationFromButton();
+              })
+          )
+        )
+        .zIndex(8)
+      }
     }
     .width('100%')
     .height('100%')
@@ -1948,6 +2107,7 @@ export struct ReaderScene {
       if (layoutChanged) {
         this.normalizeCurrentPageGroup();
         this.syncReaderPageIndexSource();
+        this.syncComicTranslationButtonPosition();
       }
     })
     .backgroundColor(readerBackgroundColor())

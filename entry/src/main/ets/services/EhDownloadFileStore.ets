@@ -2,6 +2,11 @@ import { common } from '@kit.AbilityKit';
 import { zlib } from '@kit.BasicServicesKit';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import { GalleryDetail, GalleryInfo, GalleryPage, GalleryPreview, GalleryTagGroup } from '../model/GalleryModels';
+import {
+  ReaderPageTranslation,
+  cloneReaderPageTranslation,
+  cloneReaderPageTranslations
+} from '../model/ReaderTranslationModels';
 import { parseGalleryPageUrl } from './GalleryPageUrlParser';
 import { ehSettingsStore } from './EhSettingsStore';
 
@@ -26,6 +31,7 @@ interface GalleryMetadata {
   detailLanguage?: string;
   language?: string;
   previewSet?: GalleryPreview[];
+  readerTranslations?: ReaderPageTranslation[];
 }
 
 interface AndroidSpiderInfo {
@@ -281,7 +287,8 @@ export class EhDownloadFileStore {
   }
 
   rewriteGalleryMetadataForDirectory(directory: string, gallery: GalleryInfo): void {
-    const metadata = createMetadata(gallery);
+    const previous = readMetadata(directory + '/' + OHOS_METADATA_FILENAME);
+    const metadata = createMetadata(gallery, previous === null ? undefined : previous.readerTranslations);
     writeTextFile(directory + '/' + OHOS_METADATA_FILENAME, JSON.stringify(metadata));
     const detail = gallery as GalleryDetail;
     if (detail.previewSet !== undefined && Array.isArray(detail.previewSet)) {
@@ -289,6 +296,57 @@ export class EhDownloadFileStore {
     } else {
       writeTextFile(directory + '/' + ANDROID_SPIDER_INFO_FILENAME, createAndroidSpiderInfoFromMetadata(metadata));
     }
+  }
+
+  getReaderTranslation(context: common.UIAbilityContext, gallery: GalleryInfo,
+    pageIndex: number): ReaderPageTranslation | null {
+    const directory = this.findExistingGalleryDirectory(context, gallery);
+    if (directory.length === 0) {
+      return null;
+    }
+    const metadata = readMetadata(directory + '/' + OHOS_METADATA_FILENAME);
+    if (metadata === null || metadata.readerTranslations === undefined) {
+      return null;
+    }
+    const translations = cloneReaderPageTranslations(metadata.readerTranslations);
+    for (let i = 0; i < translations.length; i++) {
+      if (translations[i].pageIndex === pageIndex) {
+        return cloneReaderPageTranslation(translations[i]);
+      }
+    }
+    return null;
+  }
+
+  setReaderTranslation(context: common.UIAbilityContext, gallery: GalleryInfo,
+    translation: ReaderPageTranslation): boolean {
+    const directory = this.findExistingGalleryDirectory(context, gallery);
+    if (directory.length === 0) {
+      return false;
+    }
+    const metadataPath = directory + '/' + OHOS_METADATA_FILENAME;
+    const metadata = readMetadata(metadataPath);
+    if (metadata === null) {
+      return false;
+    }
+    const current = cloneReaderPageTranslations(metadata.readerTranslations);
+    const next: ReaderPageTranslation[] = [];
+    let replaced = false;
+    for (let i = 0; i < current.length; i++) {
+      if (current[i].pageIndex === translation.pageIndex) {
+        next.push(cloneReaderPageTranslation(translation));
+        replaced = true;
+      } else {
+        next.push(cloneReaderPageTranslation(current[i]));
+      }
+    }
+    if (!replaced) {
+      next.push(cloneReaderPageTranslation(translation));
+    }
+    next.sort((left: ReaderPageTranslation, right: ReaderPageTranslation) => left.pageIndex - right.pageIndex);
+    metadata.readerTranslations = next;
+    metadata.savedAt = Date.now();
+    writeTextFile(metadataPath, JSON.stringify(metadata));
+    return true;
   }
 
   savePageImage(context: common.UIAbilityContext, detail: GalleryDetail, page: GalleryPage, index: number,
@@ -690,7 +748,8 @@ function normalizeDownloadLocation(location: string): string {
   return location === DOWNLOAD_LOCATION_DOWNLOADS ? DOWNLOAD_LOCATION_DOWNLOADS : DOWNLOAD_LOCATION_APP_FILES;
 }
 
-function createMetadata(gallery: GalleryInfo): GalleryMetadata {
+function createMetadata(gallery: GalleryInfo,
+  readerTranslations: ReaderPageTranslation[] | undefined = undefined): GalleryMetadata {
   const detail = gallery as GalleryDetail;
   const tags = galleryDetailTags(gallery);
   const language = galleryDetailLanguage(gallery);
@@ -714,7 +773,8 @@ function createMetadata(gallery: GalleryInfo): GalleryMetadata {
     detailTags: cloneGalleryTagGroups(tags),
     detailLanguage: language,
     language: detail.language,
-    previewSet: cloneGalleryPreviews(detail.previewSet)
+    previewSet: cloneGalleryPreviews(detail.previewSet),
+    readerTranslations: cloneReaderPageTranslations(readerTranslations)
   };
 }
 

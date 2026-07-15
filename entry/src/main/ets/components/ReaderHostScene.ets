@@ -1,5 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { GalleryDetail, GalleryPage, GalleryPreview, GallerySite } from '../model/GalleryModels';
+import { ReaderPageTranslation, cloneReaderPageTranslation } from '../model/ReaderTranslationModels';
 import { READER_ABILITY_CONTEXT_KEY } from '../entryability/ReaderAbility';
 import { EhHttpClient, GalleryDetailLoadResult, GalleryPageLoadResult } from '../services/EhHttpClient';
 import { ehDownloadFileStore } from '../services/EhDownloadFileStore';
@@ -11,6 +12,7 @@ import {
   ReaderSessionPageState,
   READER_SESSION_REVISION_KEY
 } from '../services/ReaderSessionStore';
+import { readerComicTranslationService } from '../services/ReaderComicTranslationService';
 import {
   cacheReaderImageForPage,
   cloneGalleryDetail,
@@ -44,11 +46,16 @@ export struct ReaderSessionScene {
   @State pageIndex: number = 0;
   @State renderVersion: number = 0;
   @State readerPages: ReaderPageState[] = [];
+  @State readerTranslations: ReaderPageTranslation[] = [];
+  @State comicTranslationActive: boolean = false;
+  @State comicTranslationNotice: string = '';
+  @State comicTranslationNoticeRevision: number = 0;
   @StorageProp(READER_SESSION_REVISION_KEY) @Watch('onSessionRevisionChange') sessionRevision: number = 0;
   private loadedSessionRevision: number = -1;
   private readerPreviewMap: Map<number, GalleryPreview> = new Map();
   private readerPreviewPageRequests: Map<number, Promise<GalleryPreview | null>> = new Map();
   private readerPreviewPageSize: number = 0;
+  private readerTranslationLoads: string[] = [];
 
   aboutToAppear(): void {
     if (!this.restoreAppChromeOnExit) {
@@ -75,6 +82,9 @@ export struct ReaderSessionScene {
     this.readerPreviewMap.clear();
     this.readerPreviewPageRequests.clear();
     this.readerPreviewPageSize = 0;
+    this.readerTranslationLoads = [];
+    this.readerTranslations = [];
+    this.comicTranslationActive = false;
     this.detail = cloneGalleryDetail(session.detail);
     this.statusText = session.statusText;
     this.detailRequestUrl = session.detailRequestUrl;
@@ -157,6 +167,9 @@ export struct ReaderSessionScene {
     this.page = createReaderLoadingPage(preview.pageUrl);
     this.setReaderPage(preview.index, this.page);
     this.renderVersion++;
+    if (this.comicTranslationActive) {
+      this.requestReaderTranslationWindow(false);
+    }
 
     if (this.tryUseDownloadedPage(preview.index, preview)) {
       this.preloadReaderPages(preview.index);
@@ -262,13 +275,18 @@ export struct ReaderSessionScene {
 
   private async preloadReaderPages(index: number): Promise<void> {
     const configuredCount = readerPreloadCount();
-    const count = ehSettingsStore.getValue('adaptive_dual_page', 'Off') === 'On' ?
+    const dualPageCount = ehSettingsStore.getValue('adaptive_dual_page', 'Off') === 'On' ?
       Math.max(1, configuredCount) : configuredCount;
+    const count = this.comicTranslationActive ? Math.max(2, dualPageCount) : dualPageCount;
     if (count <= 0) {
       return;
     }
     for (let offset = 1; offset <= count; offset++) {
-      const targets: number[] = [index - offset, index + offset];
+      const targets: number[] = [];
+      if (offset <= dualPageCount) {
+        targets.push(index - offset);
+      }
+      targets.push(index + offset);
       for (let i = 0; i < targets.length; i++) {
         const nextIndex = targets[i];
         if (nextIndex < 0 || nextIndex >= this.readerTotalPages()) {
@@ -318,6 +336,9 @@ export struct ReaderSessionScene {
     this.page = createReaderLoadingPage('');
     this.setReaderPage(index, this.page);
     this.renderVersion++;
+    if (this.comicTranslationActive) {
+      this.requestReaderTranslationWindow(false);
+    }
     this.ensureReaderPreview(index, false).then((resolved: GalleryPreview | null) => {
       if (resolved === null) {
         if (this.pageIndex === index) {
@@ -416,6 +437,138 @@ export struct ReaderSessionScene {
     }
     next.sort((left: ReaderPageState, right: ReaderPageState) => left.index - right.index);
     this.readerPages = next;
+    this.queueReaderTranslationIfNeeded(index, page, false);
+  }
+
+  private readerPageForTranslation(index: number): GalleryPage | null {
+    if (index === this.pageIndex) {
+      return this.page;
+    }
+    for (let i = 0; i < this.readerPages.length; i++) {
+      if (this.readerPages[i].index === index) {
+        return this.readerPages[i].page;
+      }
+    }
+    return null;
+  }
+
+  private readerTranslationImagePath(page: GalleryPage): string {
+    if (page.cachedOriginImagePath !== undefined && page.cachedOriginImagePath.length > 0) {
+      return page.cachedOriginImagePath.replace(/^file:\/\//, '');
+    }
+    if (page.cachedImagePath !== undefined && page.cachedImagePath.length > 0) {
+      return page.cachedImagePath.replace(/^file:\/\//, '');
+    }
+    return '';
+  }
+
+  private translationForPage(index: number): ReaderPageTranslation | null {
+    for (let i = 0; i < this.readerTranslations.length; i++) {
+      if (this.readerTranslations[i].pageIndex === index) {
+        return this.readerTranslations[i];
+      }
+    }
+    return null;
+  }
+
+  private setReaderTranslation(value: ReaderPageTranslation): void {
+    const next: ReaderPageTranslation[] = [];
+    let replaced = false;
+    for (let i = 0; i < this.readerTranslations.length; i++) {
+      if (this.readerTranslations[i].pageIndex === value.pageIndex) {
+        next.push(cloneReaderPageTranslation(value));
+        replaced = true;
+      } else {
+        next.push(cloneReaderPageTranslation(this.readerTranslations[i]));
+      }
+    }
+    if (!replaced) {
+      next.push(cloneReaderPageTranslation(value));
+    }
+    next.sort((left: ReaderPageTranslation, right: ReaderPageTranslation) => left.pageIndex - right.pageIndex);
+    this.readerTranslations = next;
+  }
+
+  private setComicTranslationNotice(message: string): void {
+    this.comicTranslationNotice = message;
+    this.comicTranslationNoticeRevision++;
+  }
+
+  private requestReaderTranslationWindow(forceCurrent: boolean = false): void {
+    const last = Math.min(this.readerTotalPages() - 1, this.pageIndex + 2);
+    for (let index = this.pageIndex; index <= last; index++) {
+      const page = this.readerPageForTranslation(index);
+      if (page !== null) {
+        this.queueReaderTranslationIfNeeded(index, page, forceCurrent && index === this.pageIndex);
+      }
+    }
+  }
+
+  private queueReaderTranslationIfNeeded(index: number, page: GalleryPage, force: boolean): void {
+    if (!this.comicTranslationActive || index < this.pageIndex || index > this.pageIndex + 2) {
+      return;
+    }
+    if (!force && this.translationForPage(index) !== null) {
+      return;
+    }
+    const context = this.readerContext();
+    if (context === undefined) {
+      return;
+    }
+    const loadKey = index.toString() + ':' + (force ? 'force' : 'normal');
+    if (!force && this.readerTranslationLoads.indexOf(loadKey) >= 0) {
+      return;
+    }
+    this.readerTranslationLoads.push(loadKey);
+    const priority = Math.max(1, 3 - (index - this.pageIndex));
+    const imagePath = this.readerTranslationImagePath(page);
+    const load = force ? Promise.resolve<ReaderPageTranslation | null>(null) :
+      readerComicTranslationService.loadStored(context, this.detail, index);
+    load.then((stored: ReaderPageTranslation | null) => {
+      if (stored !== null) {
+        this.setReaderTranslation(stored);
+        return;
+      }
+      if (imagePath.length === 0) {
+        return;
+      }
+      return readerComicTranslationService.request(context, this.detail, index, imagePath, priority, force)
+        .then((translation: ReaderPageTranslation) => {
+          this.setReaderTranslation(translation);
+          if (translation.lines.length === 0 && index === this.pageIndex) {
+            this.setComicTranslationNotice('No text was recognized on this page');
+          }
+        });
+    }).catch((_error: Error) => {
+      if (index === this.pageIndex) {
+        this.setComicTranslationNotice('Comic translation failed');
+      }
+    }).finally(() => {
+      const next: string[] = [];
+      for (let i = 0; i < this.readerTranslationLoads.length; i++) {
+        if (this.readerTranslationLoads[i] !== loadKey) {
+          next.push(this.readerTranslationLoads[i]);
+        }
+      }
+      this.readerTranslationLoads = next;
+    });
+  }
+
+  private toggleComicTranslation(enabled: boolean): void {
+    this.comicTranslationActive = enabled;
+    if (!enabled) {
+      return;
+    }
+    this.preloadReaderPages(this.pageIndex);
+    this.requestReaderTranslationWindow(false);
+  }
+
+  private refreshCurrentComicTranslation(): void {
+    this.comicTranslationActive = true;
+    const page = this.readerPageForTranslation(this.pageIndex);
+    if (page !== null) {
+      this.queueReaderTranslationIfNeeded(this.pageIndex, page, true);
+    }
   }
 
   private readerPreviewPageIndex(index: number): number {
@@ -495,6 +648,10 @@ export struct ReaderSessionScene {
       statusText: this.statusText,
       pageIndex: this.pageIndex,
       totalPages: this.readerTotalPages(),
+      readerTranslations: this.readerTranslations,
+      comicTranslationActive: this.comicTranslationActive,
+      comicTranslationNotice: this.comicTranslationNotice,
+      comicTranslationNoticeRevision: this.comicTranslationNoticeRevision,
       restoreAppChromeOnExit: this.restoreAppChromeOnExit,
       onBack: () => {
         this.closeReader();
@@ -518,6 +675,12 @@ export struct ReaderSessionScene {
         if (enabled) {
           this.preloadReaderPages(this.pageIndex);
         }
+      },
+      onComicTranslationToggle: (enabled: boolean) => {
+        this.toggleComicTranslation(enabled);
+      },
+      onComicTranslationRefresh: () => {
+        this.refreshCurrentComicTranslation();
       }
     })
   }
