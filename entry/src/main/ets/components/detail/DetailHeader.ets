@@ -90,22 +90,23 @@ export struct DetailHeader {
           })
             .margin({ top: 12 })
 
-          Row({ space: 12 }) {
+          Row() {
             HeaderActionButton({
               symbolIcon: this.downloadIcon(),
               text: uiText(this.downloadText),
               onTap: this.onDownload
             })
-              .layoutWeight(1)
+              .width('48%')
             HeaderActionButton({
               symbolIcon: $r('sys.symbol.play_fill'),
               text: uiText('Read'),
               accent: true,
               onTap: this.onRead
             })
-              .layoutWeight(1)
+              .width('48%')
           }
           .width('100%')
+          .justifyContent(FlexAlign.SpaceBetween)
           .margin({ top: 16 })
         }
         .layoutWeight(1)

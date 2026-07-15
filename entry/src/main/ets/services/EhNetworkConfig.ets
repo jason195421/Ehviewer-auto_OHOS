@@ -172,9 +172,11 @@ function ensureFrontingQualityCacheLoaded(): void {
 
 export function applyEhNetworkOptions(options: http.HttpRequestOptions, plan: EhRequestPlan): void {
   options.usingCache = false;
+  // 部分 6.1 设备在 HTTP/3 请求超时后移除 curl handle 时会触发系统网络栈崩溃。
+  // EH 站点完整支持 HTTP/1.1，固定协议可以避开该原生路径，同时保留连接复用。
+  options.usingProtocol = http.HttpProtocol.HTTP1_1;
   applyConfiguredNetworkOptions(options);
   if (plan.fronted) {
-    options.usingProtocol = http.HttpProtocol.HTTP1_1;
     options.remoteValidation = 'skip';
     if (deviceInfo.apiAvailable(23)) {
       if (plan.sniHostName !== undefined && plan.sniHostName.length > 0) {
