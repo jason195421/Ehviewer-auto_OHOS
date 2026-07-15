@@ -1963,9 +1963,10 @@ export struct SettingsScene {
         })
         .animation({ duration: this.splitDragging ? 0 : 220, curve: Curve.EaseOut })
 
-      if (this.useSplitLayout()) {
+      if (this.settingsDetailLayerPanel() !== SettingsPanel.Main) {
         SplitPaneDivider({
-          x: this.splitListPaneWidth(),
+          x: this.useSplitLayout() ? this.splitListPaneWidth() : 0,
+          dividerVisible: this.useSplitLayout(),
           dragging: this.splitDragging,
           fadeTransition: this.restorePanelWithFade,
           onSplitDragStart: () => {

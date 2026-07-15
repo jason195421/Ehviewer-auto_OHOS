@@ -525,6 +525,7 @@ export struct WifiMigrationPanel {
       }
       .width('100%')
       .layoutWeight(1)
+      .align(Alignment.TopStart)
       .edgeEffect(EdgeEffect.None)
     }
     .width('100%')

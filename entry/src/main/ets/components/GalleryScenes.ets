@@ -3373,9 +3373,10 @@ export struct GalleryListScene {
               .transition(TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }))
           }
 
-          if (this.useSplitLayout()) {
+          if (this.showDetail && !this.showReader) {
             SplitPaneDivider({
-              x: this.splitListPaneWidth(),
+              x: this.useSplitLayout() ? this.splitListPaneWidth() : 0,
+              dividerVisible: this.useSplitLayout(),
               dragging: this.splitDragging,
               fadeTransition: this.restoreDetailWithFade,
               onSplitDragStart: () => {

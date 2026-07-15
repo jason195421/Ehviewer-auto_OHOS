@@ -119,6 +119,7 @@ function clampSplitPaneRatio(value: number): number {
 @Component
 export struct SplitPaneDivider {
   @Prop x: number = 0;
+  @Prop dividerVisible: boolean = true;
   @Prop dragging: boolean = false;
   @Prop fadeTransition: boolean = false;
   onSplitDragStart: () => void = () => {
@@ -166,6 +167,8 @@ export struct SplitPaneDivider {
     .width(24)
     .height('100%')
     .position({ x: this.x - 12, y: 0 })
+    .opacity(this.dividerVisible ? 1 : 0)
+    .hitTestBehavior(this.dividerVisible ? HitTestMode.Default : HitTestMode.None)
     .zIndex(80)
     .transition(this.fadeTransition ?
       TransitionEffect.OPACITY.animation({ duration: 180, curve: Curve.EaseInOut }) :

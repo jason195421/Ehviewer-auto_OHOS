@@ -758,9 +758,10 @@ export struct TopListScene {
           TransitionEffect.OPACITY.animation({ duration: 160, curve: Curve.EaseOut }),
           TransitionEffect.OPACITY.animation({ duration: 1, delay: 300, curve: Curve.Linear })))
 
-        if (this.useSplitLayout()) {
+        if (this.showDetail) {
           SplitPaneDivider({
-            x: this.splitListPaneWidth(),
+            x: this.useSplitLayout() ? this.splitListPaneWidth() : 0,
+            dividerVisible: this.useSplitLayout(),
             dragging: this.splitDragging,
             fadeTransition: this.restoreDetailWithFade,
             onSplitDragStart: () => {
