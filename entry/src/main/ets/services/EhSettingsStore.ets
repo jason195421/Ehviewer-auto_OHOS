@@ -51,6 +51,7 @@ export function defaultSettingEntries(): SettingEntry[] {
     { key: 'translation_batch_enabled', value: 'On' },
     { key: 'translation_ai_enabled', value: 'Off' },
     { key: 'translation_ai_provider', value: 'DeepSeek' },
+    { key: 'translation_ai_conversation_log', value: 'Off' },
     { key: 'translation_target_language', value: 'Simplified Chinese' },
     { key: 'translation_timeout', value: '15s' },
     { key: 'translation_deepseek_api_key', value: '' },

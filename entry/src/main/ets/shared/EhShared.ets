@@ -892,6 +892,14 @@ export function zhText(text: string): string {
     case 'Use the selected AI service instead of ordinary machine translation': return '使用所选 AI 服务代替普通机翻';
     case 'AI translation provider': return 'AI 翻译服务';
     case 'Choose the AI service used while AI translation is enabled': return '选择启用 AI 翻译时使用的服务';
+    case 'Record AI conversations': return '记录 AI 翻译对话';
+    case 'Save prompts sent to AI services and their returned text locally': return '在本机记录发送给 AI 的提示词及其返回内容';
+    case 'Export AI conversation records': return '导出 AI 翻译记录';
+    case 'Export recorded AI translation conversations to public Downloads': return '将记录的 AI 翻译对话导出到公共下载目录';
+    case 'No AI translation records yet': return '暂无 AI 翻译记录';
+    case 'AI translation records exported': return 'AI 翻译记录已导出';
+    case 'AI translation record export needs an ability context': return '导出 AI 翻译记录需要应用上下文';
+    case 'AI translation record export failed': return 'AI 翻译记录导出失败';
     case 'System prompts': return '系统提示词';
     case 'Choose, edit and save prompts used by AI translation': return '选择、编辑并保存 AI 翻译使用的提示词';
     case 'Prompt preset': return '提示词预设';
@@ -3047,6 +3055,10 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
         'Choose the AI translation service', '', 'section'));
       rows.push(optionSettingsRow('translation_ai_provider', 'AI translation provider',
         'Choose the AI service used while AI translation is enabled', entries, aiProviderOptions, aiProviderDescriptions));
+      rows.push(optionSettingsRow('translation_ai_conversation_log', 'Record AI conversations',
+        'Save prompts sent to AI services and their returned text locally', entries, ON_OFF_OPTIONS));
+      rows.push(staticSettingsRow('translation_ai_log_export', 'Export AI conversation records',
+        'Export recorded AI translation conversations to public Downloads', 'Export', 'action'));
     }
     rows.push(optionSettingsRow('translation_batch_enabled', 'Merge translation requests',
       'Combine pending texts into fewer requests; AI batches contain up to 5 texts', entries, ON_OFF_OPTIONS));

@@ -7,6 +7,7 @@ import {
   parseSavedTranslationApis
 } from './TranslationApiConfigSupport';
 import { activeTranslationPromptProfile } from './TranslationPromptSupport';
+import { aiTranslationConversationLog } from './AiTranslationConversationLog';
 
 export const TRANSLATION_ENABLED_KEY: string = 'ehviewerTranslationEnabled';
 export const TRANSLATION_ERROR_REVISION_KEY: string = 'ehviewerTranslationErrorRevision';
@@ -425,14 +426,14 @@ export class EhTranslationService {
       return await this.translateWithMachineFallback(text, target, provider, allowWhenDisabled);
     }
     if (provider === 'DeepSeek') {
-      return await this.translateWithChatApi(text, target, contentKind,
+      return await this.translateWithChatApi(text, target, contentKind, provider,
         'https://api.deepseek.com/chat/completions',
         ehSettingsStore.getValue('translation_deepseek_api_key', ''),
         ehSettingsStore.getValue('translation_deepseek_model', 'deepseek-v4-flash'), true, false,
         allowWhenDisabled);
     }
     if (provider === 'OpenAI') {
-      return await this.translateWithChatApi(text, target, contentKind,
+      return await this.translateWithChatApi(text, target, contentKind, provider,
         'https://api.openai.com/v1/chat/completions',
         ehSettingsStore.getValue('translation_official_openai_api_key', ''),
         ehSettingsStore.getValue('translation_official_openai_model', 'gpt-4.1-mini'), false, true,
@@ -443,7 +444,7 @@ export class EhTranslationService {
       if (custom === null) {
         throw new Error('No custom translation API is selected');
       }
-      return await this.translateWithChatApi(text, target, contentKind, chatCompletionsUrl(custom.baseUrl),
+      return await this.translateWithChatApi(text, target, contentKind, provider, chatCompletionsUrl(custom.baseUrl),
         custom.apiKey, custom.model, false, false, allowWhenDisabled);
     }
     if (provider === 'Gemini') {
@@ -772,7 +773,7 @@ export class EhTranslationService {
     return translated.join('\n');
   }
 
-  private async translateWithChatApi(text: string, target: string, contentKind: string, url: string,
+  private async translateWithChatApi(text: string, target: string, contentKind: string, provider: string, url: string,
     apiKey: string, model: string, disableThinking: boolean = false,
     openAiPromptCaching: boolean = false, allowWhenDisabled: boolean = false): Promise<string> {
     if (apiKey.trim().length === 0) {
@@ -784,13 +785,13 @@ export class EhTranslationService {
     const chunks = splitTranslationText(text, AI_TRANSLATION_CHUNK_LENGTH);
     const translated: string[] = [];
     for (let i = 0; i < chunks.length; i++) {
-      translated.push(await this.translateChatChunk(chunks[i], target, contentKind, url, apiKey.trim(),
+      translated.push(await this.translateChatChunk(chunks[i], target, contentKind, provider, url, apiKey.trim(),
         model.trim(), disableThinking, openAiPromptCaching, allowWhenDisabled));
     }
     return translated.join('\n');
   }
 
-  private async translateChatChunk(text: string, target: string, contentKind: string, url: string,
+  private async translateChatChunk(text: string, target: string, contentKind: string, provider: string, url: string,
     apiKey: string, model: string, disableThinking: boolean, openAiPromptCaching: boolean,
     allowWhenDisabled: boolean): Promise<string> {
     let truncated = false;
@@ -810,19 +811,37 @@ export class EhTranslationService {
       if (openAiPromptCaching) {
         requestBody.prompt_cache_key = translationPromptCacheKey(text);
       }
-      const body = await requestText(url, http.RequestMethod.POST, JSON.stringify(requestBody), apiKey, '', {}, true,
-        allowWhenDisabled);
-      const parsed = JSON.parse(body) as ChatResponseBody;
-      if (parsed.error?.message !== undefined) {
-        throw new Error(parsed.error.message);
-      }
-      const choice = parsed.choices?.[0];
-      const content = choice?.message?.content;
-      const finishReason = choice?.finish_reason === undefined ? choice?.finishReason : choice.finish_reason;
-      truncated = isTruncatedFinishReason(finishReason) ||
-        (typeof content === 'string' && isSuspiciouslyShortTranslation(text, content));
-      if (typeof content === 'string' && content.trim().length > 0 && !truncated) {
-        return content;
+      const serializedBody = JSON.stringify(requestBody);
+      const conversationId = aiTranslationConversationLog.recordRequest(provider, model, url,
+        JSON.stringify(requestBody, null, 2));
+      let outcomeRecorded = false;
+      try {
+        const body = await requestText(url, http.RequestMethod.POST, serializedBody, apiKey, '', {}, true,
+          allowWhenDisabled);
+        const parsed = JSON.parse(body) as ChatResponseBody;
+        if (parsed.error?.message !== undefined) {
+          aiTranslationConversationLog.recordError(conversationId, parsed.error.message);
+          outcomeRecorded = true;
+          throw new Error(parsed.error.message);
+        }
+        const choice = parsed.choices?.[0];
+        const content = choice?.message?.content;
+        const responseContent = typeof content === 'string' ? content : '';
+        const finishReason = choice?.finish_reason === undefined ? choice?.finishReason : choice.finish_reason;
+        truncated = isTruncatedFinishReason(finishReason) ||
+          (responseContent.length > 0 && isSuspiciouslyShortTranslation(text, responseContent));
+        const responseStatus = truncated ? '返回被截断' :
+          (responseContent.trim().length === 0 ? '未返回内容' : '完成');
+        aiTranslationConversationLog.recordResponse(conversationId, responseContent, responseStatus);
+        outcomeRecorded = true;
+        if (responseContent.trim().length > 0 && !truncated) {
+          return responseContent;
+        }
+      } catch (error) {
+        if (!outcomeRecorded) {
+          aiTranslationConversationLog.recordError(conversationId, error instanceof Error ? error.message : String(error));
+        }
+        throw new Error(error instanceof Error ? error.message : String(error));
       }
     }
     if (truncated) {
@@ -846,13 +865,14 @@ export class EhTranslationService {
     const chunks = splitTranslationText(text, AI_TRANSLATION_CHUNK_LENGTH);
     const translated: string[] = [];
     for (let i = 0; i < chunks.length; i++) {
-      translated.push(await this.translateGeminiChunk(chunks[i], target, contentKind, url, apiKey, allowWhenDisabled));
+      translated.push(await this.translateGeminiChunk(chunks[i], target, contentKind, url, apiKey, model,
+        allowWhenDisabled));
     }
     return translated.join('\n');
   }
 
   private async translateGeminiChunk(text: string, target: string, contentKind: string, url: string,
-    apiKey: string, allowWhenDisabled: boolean): Promise<string> {
+    apiKey: string, model: string, allowWhenDisabled: boolean): Promise<string> {
     let truncated = false;
     for (let attempt = 0; attempt < AI_TRANSLATION_MAX_ATTEMPTS; attempt++) {
       const requestBody: GeminiRequestBody = {
@@ -860,17 +880,34 @@ export class EhTranslationService {
         contents: [{ role: 'user', parts: [{ text: translationUserPrompt(text, target, contentKind, attempt > 0) }] }],
         generationConfig: { temperature: 0.1 }
       };
-      const body = await requestText(url, http.RequestMethod.POST, JSON.stringify(requestBody), '', apiKey, {}, true,
-        allowWhenDisabled);
-      const parsed = JSON.parse(body) as GeminiResponseBody;
-      if (parsed.error?.message !== undefined) {
-        throw new Error(parsed.error.message);
-      }
-      const candidate = parsed.candidates?.[0];
-      const content = geminiCandidateText(candidate);
-      truncated = isTruncatedFinishReason(candidate?.finishReason) || isSuspiciouslyShortTranslation(text, content);
-      if (content.trim().length > 0 && !truncated) {
-        return content;
+      const serializedBody = JSON.stringify(requestBody);
+      const conversationId = aiTranslationConversationLog.recordRequest('Gemini', model, url,
+        JSON.stringify(requestBody, null, 2));
+      let outcomeRecorded = false;
+      try {
+        const body = await requestText(url, http.RequestMethod.POST, serializedBody, '', apiKey, {}, true,
+          allowWhenDisabled);
+        const parsed = JSON.parse(body) as GeminiResponseBody;
+        if (parsed.error?.message !== undefined) {
+          aiTranslationConversationLog.recordError(conversationId, parsed.error.message);
+          outcomeRecorded = true;
+          throw new Error(parsed.error.message);
+        }
+        const candidate = parsed.candidates?.[0];
+        const content = geminiCandidateText(candidate);
+        truncated = isTruncatedFinishReason(candidate?.finishReason) || isSuspiciouslyShortTranslation(text, content);
+        const responseStatus = truncated ? '返回被截断' :
+          (content.trim().length === 0 ? '未返回内容' : '完成');
+        aiTranslationConversationLog.recordResponse(conversationId, content, responseStatus);
+        outcomeRecorded = true;
+        if (content.trim().length > 0 && !truncated) {
+          return content;
+        }
+      } catch (error) {
+        if (!outcomeRecorded) {
+          aiTranslationConversationLog.recordError(conversationId, error instanceof Error ? error.message : String(error));
+        }
+        throw new Error(error instanceof Error ? error.message : String(error));
       }
     }
     if (truncated) {

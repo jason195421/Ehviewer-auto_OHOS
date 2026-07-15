@@ -73,6 +73,10 @@ import {
   effectiveAiTranslationProvider,
   ehTranslationService
 } from '../services/EhTranslationService';
+import {
+  AI_TRANSLATION_CONVERSATION_LOG_SETTING_KEY,
+  aiTranslationConversationLog
+} from '../services/AiTranslationConversationLog';
 import { galleryPageCache } from '../services/GalleryPageCache';
 import { CacheClearResult, CachePruneResult, readerImageCache } from '../services/ReaderImageCache';
 import { FilterRule, FILTER_MODE_RATING, FILTER_MODE_TITLE, ehFilterStore } from '../services/EhFilterStore';
@@ -1104,6 +1108,10 @@ export struct SettingsScene {
       this.testTranslationProvider();
       return true;
     }
+    if (key === 'translation_ai_log_export') {
+      this.exportAiTranslationRecords();
+      return true;
+    }
     if (key === 'translation_prompt_settings') {
       this.openPanel(SettingsPanel.TranslationPrompt);
       return true;
@@ -1601,6 +1609,26 @@ export struct SettingsScene {
     }).catch((error: Error) => {
       this.hideBlockingBusy();
       this.showFloatingStatus('Restore downloads failed: ' + error.message);
+    });
+  }
+
+  private exportAiTranslationRecords(): void {
+    const context = getAbilityContext();
+    if (context === undefined) {
+      this.showFloatingStatus('AI translation record export needs an ability context');
+      return;
+    }
+    const content = aiTranslationConversationLog.read(context);
+    if (content.trim().length === 0) {
+      this.showFloatingStatus('No AI translation records yet');
+      return;
+    }
+    const fileName = 'ehviewer_ai_translation_' + diagnosticTimestamp(new Date()) + '.txt';
+    this.writeTextToDownloads(context, fileName, content).then((path: string) => {
+      this.statusText = uiText('AI translation records exported') + ': ' + path;
+      this.showToast('AI translation records exported');
+    }).catch((error: Error) => {
+      this.showFloatingStatus(uiText('AI translation record export failed') + ': ' + error.message);
     });
   }
 
@@ -3571,7 +3599,7 @@ function isCustomTranslationApiField(key: string): boolean {
 }
 
 function isTranslationSettingKey(key: string): boolean {
-  return key.indexOf('translation_') === 0;
+  return key.indexOf('translation_') === 0 && key !== AI_TRANSLATION_CONVERSATION_LOG_SETTING_KEY;
 }
 
 function settingsSliderNumberValue(row: SettingsRowItem): number {
