@@ -300,7 +300,7 @@ export struct ReaderContinuousImageItem {
             this.failedImageUrl = this.imageUrl();
           })
           .translate({ x: this.sharedOffsetX, y: 0 })
-        if (this.translation !== null) {
+        if (this.translation !== null && this.displayImageWidth > 1 && this.displayImageHeight > 1) {
           ReaderTranslationOverlay({
             translation: this.translation,
             displayWidth: this.displayWidth(),

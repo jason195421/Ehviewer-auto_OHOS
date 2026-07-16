@@ -847,7 +847,6 @@ export struct ReaderScene {
       this.onAdaptiveDualPageChange(this.adaptiveDualPage);
     }
     this.startPosition = normalizeStartPositionOption(this.menuStartPosition);
-    this.readerPageIndexesCount = -1;
     this.currentIndex = this.pageGroupAnchorForPageIndex(this.currentIndex);
     this.syncReaderPageIndexSource();
     this.issueViewportCommand(nextFitMode === 'Fixed scale' ? 'fixed_scale' : 'reset');

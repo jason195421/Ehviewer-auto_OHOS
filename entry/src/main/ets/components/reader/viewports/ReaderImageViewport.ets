@@ -408,7 +408,7 @@ export struct ReaderImageViewport {
             })
             .scale({ x: this.imageModel.currentScale, y: this.imageModel.currentScale, centerX: '50%', centerY: '50%' })
             .translate({ x: this.imageModel.currentOffsetX, y: this.imageModel.currentOffsetY })
-          if (this.translation !== null) {
+          if (this.translation !== null && this.displayImageWidth > 1 && this.displayImageHeight > 1) {
             ReaderTranslationOverlay({
               translation: this.translation,
               displayWidth: this.displayImageWidth,

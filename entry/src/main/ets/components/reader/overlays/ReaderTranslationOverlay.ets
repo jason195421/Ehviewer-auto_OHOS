@@ -123,7 +123,7 @@ export struct ReaderTranslationOverlay {
     const x = Math.max(0, Math.min(canvasWidth - width, anchorX));
     const y = Math.max(0, Math.min(Math.max(0, canvasHeight - height), anchorY));
     return {
-      key: index.toString() + ':' + line.sourceText,
+      key: index.toString() + ':' + line.sourceText + ':' + (this.translation?.updatedAt ?? 0).toString(),
       sourceText: line.sourceText,
       text: line.translatedText,
       x: x,
@@ -177,7 +177,7 @@ export struct ReaderTranslationOverlay {
     const scaleY = this.displayHeight / this.canvasHeight();
     const fontScale = Math.min(scaleX, scaleY);
     return {
-      key: item.key,
+      key: item.key + ':' + layoutNumber(this.displayWidth) + 'x' + layoutNumber(this.displayHeight),
       sourceText: item.sourceText,
       text: item.text,
       x: item.x * scaleX,
@@ -367,7 +367,9 @@ export struct ReaderTranslationOverlay {
             .borderRadius(3)
             .position({ x: box.x, y: box.y })
             .id('reader-translation-background-' + index.toString())
-        }, (_box: ReaderTranslationBounds, index: number) => index.toString())
+        }, (box: ReaderTranslationBounds, index: number) => {
+          return index.toString() + ':' + layoutBoundsKey(box);
+        })
         ForEach(this.translationLayouts(), (item: ReaderTranslationLayout) => {
           Text(item.text)
             .width(item.width)
@@ -456,6 +458,15 @@ function appendUniqueLayoutPosition(result: number[], value: number): void {
     }
   }
   result.push(value);
+}
+
+function layoutNumber(value: number): string {
+  return Math.round(value * 10).toString();
+}
+
+function layoutBoundsKey(value: ReaderTranslationBounds): string {
+  return layoutNumber(value.x) + ':' + layoutNumber(value.y) + ':' +
+    layoutNumber(value.width) + ':' + layoutNumber(value.height);
 }
 
 function rectanglesOverlap(left: ReaderTranslationBounds, right: ReaderTranslationBounds, gap: number): boolean {
