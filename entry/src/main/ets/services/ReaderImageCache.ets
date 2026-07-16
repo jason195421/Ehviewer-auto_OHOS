@@ -8,6 +8,7 @@ import {
   createEhRequestPlan,
   EhRequestPlan,
   ensureEhHostRules,
+  isEhRouteReachableStatus,
   recordEhRequestOutcome
 } from './EhNetworkConfig';
 import { ehSettingsStore } from './EhSettingsStore';
@@ -254,7 +255,7 @@ export class ReaderImageCache {
       const savedPath = result.path;
 
       if (statusCode < 200 || statusCode >= 300) {
-        const routeOk = statusCode > 0 && statusCode < 500;
+        const routeOk = isEhRouteReachableStatus(statusCode);
         recordEhRequestOutcome(plan, routeOk, Date.now() - startedAt);
         if (!routeOk) {
           hathQualityStore.recordFailure(context, imageUrl);

@@ -33,6 +33,7 @@ import {
   createEhRequestPlan,
   EhRequestPlan,
   ensureEhHostRules,
+  isEhRouteReachableStatus,
   recordEhRequestOutcome
 } from './EhNetworkConfig';
 import { TopListParseResult, parseTopList } from './TopListParser';
@@ -297,7 +298,7 @@ export class EhHttpClient {
       applyEhNetworkOptions(options, plan);
       const response = await requestToCompletion(request, plan.url, options);
       const statusCode = Number(response.responseCode);
-      recordEhRequestOutcome(plan, statusCode >= 200 && statusCode < 500, Date.now() - startedAt);
+      recordEhRequestOutcome(plan, isEhRouteReachableStatus(statusCode), Date.now() - startedAt);
       outcomeRecorded = true;
 
       ehCookieStore.absorbSetCookieHeader(response.cookies);
@@ -403,7 +404,7 @@ export class EhHttpClient {
       applyEhNetworkOptions(options, plan);
       const response = await requestToCompletion(request, plan.url, options);
       const statusCode = Number(response.responseCode);
-      recordEhRequestOutcome(plan, statusCode >= 200 && statusCode < 500, Date.now() - startedAt);
+      recordEhRequestOutcome(plan, isEhRouteReachableStatus(statusCode), Date.now() - startedAt);
       outcomeRecorded = true;
 
       ehCookieStore.absorbSetCookieHeader(response.cookies);
@@ -458,7 +459,7 @@ export class EhHttpClient {
       applyEhNetworkOptions(options, plan);
       const response = await requestToCompletion(request, plan.url, options);
       const statusCode = Number(response.responseCode);
-      recordEhRequestOutcome(plan, statusCode >= 200 && statusCode < 500, Date.now() - startedAt);
+      recordEhRequestOutcome(plan, isEhRouteReachableStatus(statusCode), Date.now() - startedAt);
       outcomeRecorded = true;
 
       ehCookieStore.absorbSetCookieHeader(response.cookies);
@@ -1346,7 +1347,7 @@ export class EhHttpClient {
       });
       const response = await requestToCompletion(request, plan.url, options);
       const statusCode = Number(response.responseCode);
-      recordEhRequestOutcome(plan, statusCode >= 200 && statusCode < 500, Date.now() - startedAt);
+      recordEhRequestOutcome(plan, isEhRouteReachableStatus(statusCode), Date.now() - startedAt);
       outcomeRecorded = true;
 
       ehCookieStore.absorbSetCookieHeader(response.cookies);

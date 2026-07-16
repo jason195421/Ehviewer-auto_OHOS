@@ -31,8 +31,8 @@ const IP_SLOW_LATENCY_PENALTY_MS: number = 350;
 const FRONTING_PROBE_USER_AGENT: string =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36';
 const BUILT_IN_RULES: HostRule[] = [
-  { host: 'e-hentai.org', ips: ['104.20.18.168', '104.20.19.168', '172.66.132.196', '172.66.140.62', '172.67.2.238'] },
-  { host: 'repo.e-hentai.org', ips: ['104.20.18.168', '104.20.19.168', '172.66.132.196', '172.66.140.62', '172.67.2.238'] },
+  { host: 'e-hentai.org', ips: ['172.66.132.196', '172.66.140.62'] },
+  { host: 'repo.e-hentai.org', ips: ['172.66.132.196', '172.66.140.62'] },
   { host: 'forums.e-hentai.org', ips: ['172.66.132.196', '172.66.140.62'] },
   { host: 'upld.e-hentai.org', ips: ['89.149.221.236', '95.211.208.236'] },
   { host: 'ehgt.org', ips: ['109.236.85.28', '62.112.8.21', '89.39.106.43', '2a00:7c80:0:123::3a85', '2a00:7c80:0:12d::38a1', '2a00:7c80:0:13b::37a4'] },
@@ -298,6 +298,16 @@ export function recordEhRequestOutcome(plan: EhRequestPlan, ok: boolean, elapsed
   } else {
     saveCachedIpQualities(frontingBenchmarkKey());
   }
+}
+
+export function isEhRouteReachableStatus(statusCode: number): boolean {
+  if (statusCode >= 200 && statusCode < 400) {
+    return true;
+  }
+  // These responses are returned by the intended EH servers and still prove that the route is reachable.
+  // Do not include generic 400/421 responses because they commonly indicate a wrong fronting endpoint.
+  return statusCode === 401 || statusCode === 403 || statusCode === 404 || statusCode === 429 ||
+    statusCode === 509;
 }
 
 function applyIpQualityMeasurement(current: HostIpQuality, ok: boolean, elapsedMs: number,
@@ -616,12 +626,14 @@ async function probeFrontingIp(target: HostIpProbeTarget): Promise<HostIpQuality
       options.reuseConnections = false;
     }
     applyConfiguredNetworkOptions(options);
-    await requestProbeToCompletion(request, 'https://' + target.ip + '/', options);
+    const response = await requestProbeToCompletion(request, 'https://' + target.ip + '/', options);
+    const statusCode = Number(response.responseCode);
+    const ok = isEhRouteReachableStatus(statusCode);
     return {
       host: target.host,
       ip: target.ip,
-      ok: true,
-      latencyMs: Math.max(1, Date.now() - startedAt),
+      ok: ok,
+      latencyMs: ok ? Math.max(1, Date.now() - startedAt) : FRONTING_PROBE_DEADLINE_MS,
       testedAt: Date.now()
     };
   } catch (error) {
@@ -1016,7 +1028,7 @@ async function probeDirectSelectedSite(): Promise<boolean> {
     applyConfiguredNetworkOptions(options);
     const response = await requestProbeToCompletion(request, 'https://' + host + '/', options);
     const statusCode = Number(response.responseCode);
-    return statusCode >= 200 && statusCode < 300;
+    return statusCode >= 200 && statusCode < 400;
   } catch (error) {
     return false;
   } finally {
@@ -1044,7 +1056,7 @@ function frontingBenchmarkKey(): string {
   if (ehSettingsStore.getValue('domain_fronting', 'Off') !== 'On') {
     return 'Off';
   }
-  return 'sni-v3-nosni:' + selectedGalleryHost() + ':' +
+  return 'sni-v4-status-aware:' + selectedGalleryHost() + ':' +
     proxySettingsKey() + ':' +
     dohSettingsKey();
 }
