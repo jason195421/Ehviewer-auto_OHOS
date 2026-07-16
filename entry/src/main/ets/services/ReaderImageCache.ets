@@ -699,7 +699,9 @@ function normalizedRetryLimit(options?: ImageDownloadOptions): number {
 function isTransientImageError(message: string): boolean {
   const lower = message.toLowerCase();
   return lower.indexOf('timeout') >= 0 || lower.indexOf('temporary') >= 0 || lower.indexOf('reset') >= 0 ||
-    lower.indexOf('socket') >= 0 || lower.indexOf('network') >= 0 || lower.indexOf('503') >= 0 ||
+    lower.indexOf('socket') >= 0 || lower.indexOf('network') >= 0 || lower.indexOf('incomplete') >= 0 ||
+    lower.indexOf('partial') >= 0 || lower.indexOf('transfer closed') >= 0 || lower.indexOf('recv') >= 0 ||
+    lower.indexOf('receive') >= 0 || lower.indexOf('503') >= 0 ||
     lower.indexOf('504') >= 0 || lower.indexOf('522') >= 0 || lower.indexOf('524') >= 0 ||
     lower.indexOf('500') >= 0 || lower.indexOf('502') >= 0 || lower.indexOf('520') >= 0 ||
     lower.indexOf('521') >= 0 || lower.indexOf('523') >= 0 || lower.indexOf('525') >= 0 ||
@@ -707,7 +709,9 @@ function isTransientImageError(message: string): boolean {
     lower.indexOf('ssl') >= 0 || lower.indexOf('tls') >= 0 || lower.indexOf('certificate') >= 0 ||
     lower.indexOf('curlcode result 35') >= 0 || lower.indexOf('curl code 35') >= 0 ||
     lower.indexOf('curl_code') >= 0 && lower.indexOf('35') >= 0 ||
-    lower.indexOf('http2') >= 0 || lower.indexOf('2300016') >= 0 || lower.indexOf('2300999') >= 0 ||
+    lower.indexOf('http2') >= 0 || lower.indexOf('2300016') >= 0 || lower.indexOf('2300018') >= 0 ||
+    lower.indexOf('2300028') >= 0 || lower.indexOf('2300056') >= 0 || lower.indexOf('2300999') >= 0 ||
+    lower.indexOf('curl 18') >= 0 || lower.indexOf('curl 28') >= 0 || lower.indexOf('curl 56') >= 0 ||
     lower.indexOf('2300007') >= 0 || lower.indexOf('230350') >= 0;
 }
 
@@ -746,6 +750,19 @@ function imageNetworkErrorMessage(error: Object): string {
   const lower = message.toLowerCase();
   if (lower.indexOf('timeout') >= 0 || lower.indexOf('timed out') >= 0) {
     return 'Image network timeout';
+  }
+  if (lower.indexOf('2300028') >= 0 || lower.indexOf('curlcode result 28') >= 0 ||
+    lower.indexOf('curl code 28') >= 0) {
+    return 'Image network timeout';
+  }
+  if (lower.indexOf('2300018') >= 0 || lower.indexOf('curlcode result 18') >= 0 ||
+    lower.indexOf('curl code 18') >= 0 || lower.indexOf('partial') >= 0 ||
+    lower.indexOf('transfer closed') >= 0) {
+    return 'Image transfer incomplete';
+  }
+  if (lower.indexOf('2300056') >= 0 || lower.indexOf('curlcode result 56') >= 0 ||
+    lower.indexOf('curl code 56') >= 0 || lower.indexOf('recv') >= 0 || lower.indexOf('receive') >= 0) {
+    return 'Image network connection interrupted';
   }
   if (lower.indexOf('ssl') >= 0 || lower.indexOf('tls') >= 0 || lower.indexOf('certificate') >= 0) {
     return 'Image TLS connection failed';
