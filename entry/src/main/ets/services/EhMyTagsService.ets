@@ -385,10 +385,6 @@ function stripTags(html: string): string {
   return html.replace(/<[^>]+>/g, '');
 }
 
-function stringValue(value: Object | undefined): string {
-  return typeof value === 'string' ? value : '';
-}
-
 function originFromUrl(url: string, fallbackSite: GallerySite): string {
   const matched = /^(https?:\/\/[^\/?#]+)/i.exec(url);
   return matched === null ? EhUrl.getReferer(fallbackSite) : matched[1];

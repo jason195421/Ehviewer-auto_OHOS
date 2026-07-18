@@ -262,10 +262,6 @@ function normalizeThemeColorName(colorName: string): string {
   return 'Blue';
 }
 
-function currentThemeAccent(): EhThemeAccent {
-  return themeRuntime().accent;
-}
-
 function accentPrimaryColor(): string {
   return themeRuntime().primary;
 }

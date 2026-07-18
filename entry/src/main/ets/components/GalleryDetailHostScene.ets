@@ -919,28 +919,6 @@ export struct GalleryDetailHostScene {
     });
   }
 
-  private copyDetailLink(url: string, label: string): void {
-    if (url.length === 0) {
-      this.detailStatus = label + ' link is unavailable';
-      this.renderVersion++;
-      return;
-    }
-    try {
-      const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, url);
-      pasteboard.getSystemPasteboard().setData(data).then(() => {
-        this.detailStatus = label + ' link copied to clipboard';
-        this.renderVersion++;
-      }).catch((error: Error) => {
-        this.detailStatus = label + ' copy failed: ' + error.message;
-        this.renderVersion++;
-      });
-      return;
-    } catch (error) {
-      this.detailStatus = label + ' copy failed: ' + String(error);
-    }
-    this.renderVersion++;
-  }
-
   private shareGallery(): void {
     const context = getAbilityContext();
     if (context === undefined || !this.detailLoaded) {

@@ -69,7 +69,6 @@ import {
   EhTagTranslationUpdateResult
 } from '../services/EhTagTranslationStore';
 import {
-  TRANSLATION_ENABLED_KEY,
   effectiveAiTranslationProvider,
   ehTranslationService
 } from '../services/EhTranslationService';
@@ -3316,6 +3315,7 @@ export struct SettingsOptionPanel {
           }, (option: string) => option)
         }
         .width('100%')
+        .height(Math.min(420, Math.max(64, this.options.length * 64)))
         .constraintSize({ maxHeight: 420 })
         .cachedCount(4)
 

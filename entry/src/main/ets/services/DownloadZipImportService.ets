@@ -208,7 +208,7 @@ async function importOneArchive(context: common.UIAbilityContext, zipPath: strin
     if (imageRoot.length === 0) {
       return [];
     }
-    const gallery = await resolveArchiveGallery(context, client, site, gid, pathBaseName(zipPath), seedGallery);
+    const gallery = await resolveArchiveGallery(client, site, gid, pathBaseName(zipPath), seedGallery);
     if (gallery === null || gallery.token.length === 0) {
       return [];
     }
@@ -290,7 +290,7 @@ function collectImageRoots(directory: string, depth: number, roots: string[]): v
   }
 }
 
-async function resolveArchiveGallery(context: common.UIAbilityContext, client: EhHttpClient, site: GallerySite,
+async function resolveArchiveGallery(client: EhHttpClient, site: GallerySite,
   gid: number, archiveName: string, seedGallery?: GalleryInfo): Promise<GalleryInfo | null> {
   if (seedGallery !== undefined && seedGallery.gid === gid && seedGallery.token.length > 0) {
     return seedGallery;

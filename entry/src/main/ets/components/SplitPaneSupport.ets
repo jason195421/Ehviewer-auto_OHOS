@@ -3,7 +3,6 @@ import { getAbilityContext } from '../shared/EhShared';
 import {
   themeDividerColor,
   themePrimaryColor,
-  themeSurface,
   themeSurfaceVariant
 } from '../shared/EhTheme';
 

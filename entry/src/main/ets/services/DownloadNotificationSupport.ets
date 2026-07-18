@@ -24,7 +24,7 @@ export function downloadNotificationText(fileName: string, status: string = 'Dow
   };
 }
 
-export async function publishDownloadResultNotification(context: common.UIAbilityContext, id: number,
+export async function publishDownloadResultNotification(_context: common.UIAbilityContext, id: number,
   fileName: string, status: string, directory: string = ''): Promise<void> {
   try {
     const text = downloadNotificationText(fileName, status);

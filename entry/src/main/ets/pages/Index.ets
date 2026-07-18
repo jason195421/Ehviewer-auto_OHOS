@@ -68,7 +68,7 @@ struct Index {
   @StorageProp(IDENTITY_AUTH_LOCKED_KEY) identityAuthLocked: boolean = false;
   @StorageProp(TRANSLATION_ERROR_REVISION_KEY) @Watch('onTranslationErrorRevision') translationErrorRevision: number = 0;
 
-  private onTranslationErrorRevision(): void {
+  onTranslationErrorRevision(): void {
     const message = AppStorage.get<string>(TRANSLATION_ERROR_MESSAGE_KEY);
     if (message === undefined || message.length === 0) {
       return;

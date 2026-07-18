@@ -2148,6 +2148,7 @@ struct DownloadStatusFilterOverlay {
           }, (status: string) => status)
         }
         .width('100%')
+        .height(0)
         .layoutWeight(1)
         .scrollBar(BarState.Auto)
 
