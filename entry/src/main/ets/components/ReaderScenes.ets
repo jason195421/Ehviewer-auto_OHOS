@@ -373,8 +373,7 @@ export struct ReaderScene {
   private applyReaderWindowSettings(): void {
     const keepOn = ehSettingsStore.getValue('keep_screen_on', 'Off') === 'On';
     const orientation = readerScreenRotationSetting();
-    const fullscreen = ehSettingsStore.getValue('reading_fullscreen', 'On') === 'On' &&
-      !this.readerTransientStatusBarVisible();
+    const fullscreen = this.readerWindowFullscreen();
     const revision = ++this.readerWindowSettingsRevision;
     if (this.readerWindowSettingsTimer !== -1) {
       clearTimeout(this.readerWindowSettingsTimer);
@@ -425,6 +424,11 @@ export struct ReaderScene {
 
   private readerTransientStatusBarVisible(): boolean {
     return this.menuVisible || this.sliderVisible;
+  }
+
+  private readerWindowFullscreen(): boolean {
+    return ehSettingsStore.getValue('reading_fullscreen', 'On') === 'On' &&
+      !this.readerTransientStatusBarVisible();
   }
 
   private syncReaderTransientStatusBar(): void {
@@ -594,7 +598,7 @@ export struct ReaderScene {
       }
       const keepOn = ehSettingsStore.getValue('keep_screen_on', 'Off') === 'On';
       const orientation = readerScreenRotationSetting();
-      const fullscreen = ehSettingsStore.getValue('reading_fullscreen', 'On') === 'On';
+      const fullscreen = this.readerWindowFullscreen();
       this.applyReaderWindowSettingsOnce(keepOn, orientation, fullscreen).catch(() => {});
     }, delay);
   }
