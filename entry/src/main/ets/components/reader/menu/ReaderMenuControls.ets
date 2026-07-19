@@ -161,6 +161,7 @@ export struct ReaderMenuSelect {
           .width('100%')
           .padding({ left: 10, right: 8 })
         }
+        .width('48%')
         .height(32)
         .constraintSize({ minWidth: 136, maxWidth: 188 })
         .backgroundColor(readerSelectColors().buttonBackground)
