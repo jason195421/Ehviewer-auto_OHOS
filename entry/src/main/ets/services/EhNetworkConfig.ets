@@ -15,7 +15,7 @@ const FRONTING_IP_CACHE_VERSION: number = 1;
 const FRONTING_PROBE_CONNECT_TIMEOUT_MS: number = 3000;
 const FRONTING_PROBE_READ_TIMEOUT_MS: number = 3000;
 const FRONTING_PROBE_DEADLINE_MS: number = 4500;
-const FRONTING_PROBE_CONCURRENCY: number = 1;
+const FRONTING_PROBE_CONCURRENCY: number = 2;
 const FRONTING_PREFERRED_IP_LIMIT: number = 3;
 const FRONTING_TAIL_SAMPLE_RATE: number = 0.08;
 const FRONTING_WEIGHT_SCORE_BASE: number = 500;
@@ -34,7 +34,6 @@ const NETWORK_RECOVERY_SETTLE_MS: number = 2000;
 const NETWORK_RECOVERY_IDLE_RETRY_MS: number = 1000;
 const NETWORK_ENVIRONMENT_FALLBACK_INTERVAL_MS: number = 5000;
 const FRESH_CONNECTION_WINDOW_MS: number = 5000;
-const FOREGROUND_FRESH_CONNECTION_WINDOW_MS: number = 30000;
 const FRONTING_PROBE_USER_AGENT: string =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36';
 const BUILT_IN_RULES: HostRule[] = [
@@ -251,12 +250,12 @@ export function applyConfiguredProxyOptions(options: http.HttpRequestOptions): v
 /**
  * Connections can be left in an unusable state while an ability is suspended in background.
  * Do not destroy active requests during the lifecycle callback; make requests started shortly
- * after a real foreground resume use fresh connections instead. The foreground window must
- * outlast an already-running text request's 15-second timeout and its subsequent retry.
+ * after a real foreground resume use fresh connections instead. Keep this window short so normal
+ * requests quickly return to HTTP/1.1 connection reuse after stale background connections are bypassed.
  */
 export function refreshEhConnectionsAfterForeground(): void {
   forceFreshConnectionsUntilMs = Math.max(forceFreshConnectionsUntilMs,
-    Date.now() + FOREGROUND_FRESH_CONNECTION_WINDOW_MS);
+    Date.now() + FRESH_CONNECTION_WINDOW_MS);
 }
 
 export function socks5ProxySupported(): boolean {
