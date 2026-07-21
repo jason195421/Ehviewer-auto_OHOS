@@ -321,9 +321,6 @@ export struct SearchSuggestionList {
   aboutToAppear(): void {
     this.syncContentWidthFromWindow();
     this.resetRenderLimit();
-    setTimeout(() => {
-      this.syncContentWidthFromWindow();
-    }, 0);
   }
 
   onRevisionChanged(): void {
@@ -413,9 +410,6 @@ export struct SearchSuggestionList {
     .height('100%')
     .backgroundColor(themePageBackground())
     .scrollBar(BarState.Auto)
-    .onAppear(() => {
-      this.syncContentWidthFromWindow();
-    })
     .onReachEnd(() => {
       this.loadMoreVisibleSuggestions();
     })
