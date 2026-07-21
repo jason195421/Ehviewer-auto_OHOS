@@ -2986,7 +2986,7 @@ export struct GalleryListScene {
 
   private useSplitLayout(): boolean {
     return splitPaneModeEnabled() && this.sceneContentWidth >= SPLIT_PANE_BREAKPOINT &&
-      this.showDetail && !this.showReader;
+      (this.showDetail || this.showBookmarkManager) && !this.showReader;
   }
 
   private splitListPaneWidth(): number {
@@ -3330,8 +3330,14 @@ export struct GalleryListScene {
                 this.removeSearchBookmark(bookmark);
               }
             })
-              .width('100%')
+              .width(this.useSplitLayout() ? this.splitSidePaneWidth() : '100%')
               .height('100%')
+              .position({ x: this.useSplitLayout() ? this.splitListPaneWidth() + 1 : 0, y: 0 })
+              .onTouch((event: TouchEvent) => {
+                if (shouldUpdateSplitPaneFocus(event)) {
+                  this.activeSplitPane = SPLIT_PANE_FOCUS_RIGHT;
+                }
+              })
               .transition(TransitionEffect.asymmetric(
                 TransitionEffect.move(TransitionEdge.END).animation({ duration: 260, curve: Curve.EaseOut }),
                 TransitionEffect.move(TransitionEdge.END).animation({ duration: 220, curve: Curve.EaseIn })))
