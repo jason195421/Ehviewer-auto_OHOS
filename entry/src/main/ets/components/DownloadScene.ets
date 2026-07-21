@@ -1176,7 +1176,9 @@ export struct DownloadScene {
     ehDownloadManager.resumeGallery(item.gid);
     this.statusText = 'Queued: ' + item.title;
     this.persistDownloads();
-    this.startGlobalDownloadQueue();
+    if (!ehDownloadManager.isQueueProcessing()) {
+      this.startGlobalDownloadQueue();
+    }
   }
 
   private stopItem(item: DownloadInfo): void {
@@ -2507,7 +2509,7 @@ struct DownloadCardStatus {
         .id('download-progress-' + this.item.gid.toString())
     }
     .width('100%')
-    .padding({ left: 8, right: 8, top: 6, bottom: 7 })
+    .padding({ left: 8, right: 8, top: 6, bottom: 6 })
     .backgroundColor(themeSurface())
     .borderRadius(6)
     .onClick(() => {
