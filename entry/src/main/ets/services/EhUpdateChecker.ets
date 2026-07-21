@@ -14,7 +14,7 @@ import {
   ensureEhHostRules,
   recordEhRequestOutcome
 } from './EhNetworkConfig';
-import { acquireHttpRequest, retireHttpRequest } from './HttpRequestLifecycle';
+import { acquireHttpRequest, markHttpRequestVolatile, retireHttpRequest } from './HttpRequestLifecycle';
 
 export interface AppVersionInfo {
   versionName: string;
@@ -141,6 +141,9 @@ async function fetchLatestRelease(): Promise<ReleaseInfo> {
       readTimeout: REQUEST_TIMEOUT_MS
     };
     applyEhNetworkOptions(options, plan);
+    if (plan.fronted) {
+      markHttpRequestVolatile(request);
+    }
     const response = await request.request(plan.url, options);
     const statusCode = Number(response.responseCode);
     recordEhRequestOutcome(plan, statusCode >= 200 && statusCode < 500, Date.now() - startedAt);

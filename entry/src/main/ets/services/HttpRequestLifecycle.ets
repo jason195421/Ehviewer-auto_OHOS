@@ -3,6 +3,7 @@ import { http } from '@kit.NetworkKit';
 const ACTIVE_HTTP_REQUESTS: http.HttpRequest[] = [];
 const RETIRED_HTTP_REQUESTS: http.HttpRequest[] = [];
 const IDLE_HTTP_REQUESTS: http.HttpRequest[] = [];
+const VOLATILE_HTTP_REQUESTS: http.HttpRequest[] = [];
 const HTTP_REQUEST_CLEANUP_QUIET_MS: number = 30000;
 const HTTP_REQUEST_CLEANUP_STEP_MS: number = 500;
 const MAX_IDLE_HTTP_REQUESTS: number = 6;
@@ -15,6 +16,7 @@ export function acquireHttpRequest(): http.HttpRequest {
   while (IDLE_HTTP_REQUESTS.length > 0) {
     const recycled = IDLE_HTTP_REQUESTS.pop();
     if (recycled !== undefined) {
+      removeRequest(VOLATILE_HTTP_REQUESTS, recycled);
       activityGeneration++;
       lastActivityAt = Date.now();
       cancelCleanupTimer();
@@ -35,11 +37,18 @@ export function acquireHttpRequest(): http.HttpRequest {
   return request;
 }
 
+export function markHttpRequestVolatile(request: http.HttpRequest): void {
+  if (VOLATILE_HTTP_REQUESTS.indexOf(request) < 0) {
+    VOLATILE_HTTP_REQUESTS.push(request);
+  }
+}
+
 export function releaseHttpRequest(request: http.HttpRequest): void {
   activityGeneration++;
   lastActivityAt = Date.now();
   removeRequest(ACTIVE_HTTP_REQUESTS, request);
-  if (IDLE_HTTP_REQUESTS.length < MAX_IDLE_HTTP_REQUESTS) {
+  const isVolatile = removeRequest(VOLATILE_HTTP_REQUESTS, request);
+  if (!isVolatile && IDLE_HTTP_REQUESTS.length < MAX_IDLE_HTTP_REQUESTS) {
     IDLE_HTTP_REQUESTS.push(request);
     scheduleCleanup(IDLE_HTTP_REQUEST_TTL_MS);
     return;
@@ -80,11 +89,13 @@ export function hasActiveHttpRequests(): boolean {
   return ACTIVE_HTTP_REQUESTS.length > 0;
 }
 
-function removeRequest(items: http.HttpRequest[], request: http.HttpRequest): void {
+function removeRequest(items: http.HttpRequest[], request: http.HttpRequest): boolean {
   const index = items.indexOf(request);
   if (index >= 0) {
     items.splice(index, 1);
+    return true;
   }
+  return false;
 }
 
 function cancelCleanupTimer(): void {

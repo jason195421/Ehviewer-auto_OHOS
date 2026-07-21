@@ -10,7 +10,7 @@ import {
   ensureEhHostRules,
   recordEhRequestOutcome
 } from './EhNetworkConfig';
-import { acquireHttpRequest, retireHttpRequest } from './HttpRequestLifecycle';
+import { acquireHttpRequest, markHttpRequestVolatile, retireHttpRequest } from './HttpRequestLifecycle';
 
 export interface EhTagSuggestion {
   namespace: string;
@@ -418,6 +418,9 @@ async function requestTagDatabaseText(url: string, accept: string): Promise<stri
       readTimeout: TAG_DATABASE_REQUEST_TIMEOUT_MS
     };
     applyEhNetworkOptions(options, plan);
+    if (plan.fronted) {
+      markHttpRequestVolatile(request);
+    }
     const response = await request.request(plan.url, options);
     const statusCode = Number(response.responseCode);
     recordEhRequestOutcome(plan, statusCode >= 200 && statusCode < 500, Date.now() - startedAt);

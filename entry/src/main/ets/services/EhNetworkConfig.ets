@@ -5,7 +5,7 @@ import { http } from '@kit.NetworkKit';
 import { connection } from '@kit.NetworkKit';
 import { ehAppLog } from './EhAppLog';
 import { ehSettingsStore } from './EhSettingsStore';
-import { acquireHttpRequest, hasActiveHttpRequests, retireHttpRequest } from './HttpRequestLifecycle';
+import { acquireHttpRequest, hasActiveHttpRequests, markHttpRequestVolatile, retireHttpRequest } from './HttpRequestLifecycle';
 
 const YANDEX_DOH_URL: string = 'https://common.dot.dns.yandex.net/dns-query';
 const CLOUDFLARE_DOH_URL: string = 'https://cloudflare-dns.com/dns-query';
@@ -715,6 +715,7 @@ export function unregisterEhNetworkChangeListener(): void {
 
 async function probeFrontingIp(target: HostIpProbeTarget): Promise<HostIpQuality> {
   const request = acquireHttpRequest();
+  markHttpRequestVolatile(request);
   const startedAt = Date.now();
   try {
     const options: http.HttpRequestOptions = {
@@ -1121,6 +1122,7 @@ function selectedGalleryHost(): string {
 
 async function probeDirectSelectedSite(): Promise<boolean> {
   const request = acquireHttpRequest();
+  markHttpRequestVolatile(request);
   try {
     const host = selectedGalleryHost();
     const options: http.HttpRequestOptions = {

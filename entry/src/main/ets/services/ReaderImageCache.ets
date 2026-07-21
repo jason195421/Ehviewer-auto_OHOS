@@ -14,7 +14,7 @@ import {
 } from './EhNetworkConfig';
 import { ehSettingsStore } from './EhSettingsStore';
 import { hathQualityStore } from './HathQualityStore';
-import { cancelHttpRequest, retireHttpRequest, acquireHttpRequest } from './HttpRequestLifecycle';
+import { cancelHttpRequest, retireHttpRequest, acquireHttpRequest, markHttpRequestVolatile } from './HttpRequestLifecycle';
 
 interface PendingImageDownload {
   url: string;
@@ -302,6 +302,9 @@ export class ReaderImageCache {
         readTimeout: imageRequestDeadlineMs(plan, attempt)
       };
       applyEhNetworkOptions(options, plan, useDnsOverHttps);
+      if (plan.fronted) {
+        markHttpRequestVolatile(request);
+      }
       request.on('dataReceiveProgress', (progress: http.DataReceiveProgressInfo): void => {
         if (onProgress !== undefined) {
           onProgress({

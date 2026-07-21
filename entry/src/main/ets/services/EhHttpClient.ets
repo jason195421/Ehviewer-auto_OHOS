@@ -38,7 +38,7 @@ import {
 } from './EhNetworkConfig';
 import { TopListParseResult, parseTopList } from './TopListParser';
 import { parseTorrentList } from './TorrentParser';
-import { acquireHttpRequest, retireHttpRequest } from './HttpRequestLifecycle';
+import { acquireHttpRequest, retireHttpRequest, markHttpRequestVolatile } from './HttpRequestLifecycle';
 
 export interface EhHttpResponse {
   statusCode: number;
@@ -295,6 +295,9 @@ export class EhHttpClient {
         readTimeout: requestOptions?.readTimeoutMs ?? TEXT_READ_TIMEOUT_MS
       };
       applyEhNetworkOptions(options, plan);
+      if (plan.fronted) {
+        markHttpRequestVolatile(request);
+      }
       const response = await requestToCompletion(request, plan.url, options);
       const statusCode = Number(response.responseCode);
       recordEhRequestOutcome(plan, isEhRouteReachableStatus(statusCode), Date.now() - startedAt);
@@ -400,6 +403,9 @@ export class EhHttpClient {
         readTimeout: TEXT_READ_TIMEOUT_MS
       };
       applyEhNetworkOptions(options, plan);
+      if (plan.fronted) {
+        markHttpRequestVolatile(request);
+      }
       const response = await requestToCompletion(request, plan.url, options);
       const statusCode = Number(response.responseCode);
       recordEhRequestOutcome(plan, isEhRouteReachableStatus(statusCode), Date.now() - startedAt);
@@ -454,6 +460,9 @@ export class EhHttpClient {
         readTimeout: API_TIMEOUT_MS
       };
       applyEhNetworkOptions(options, plan);
+      if (plan.fronted) {
+        markHttpRequestVolatile(request);
+      }
       const response = await requestToCompletion(request, plan.url, options);
       const statusCode = Number(response.responseCode);
       recordEhRequestOutcome(plan, isEhRouteReachableStatus(statusCode), Date.now() - startedAt);
@@ -1343,6 +1352,9 @@ export class EhHttpClient {
         maxRedirects: 0
       };
       applyEhNetworkOptions(options, plan);
+      if (plan.fronted) {
+        markHttpRequestVolatile(request);
+      }
       request.on('headersReceive', (header: Object) => {
         responseHeaders = header as Record<string, Object>;
       });
