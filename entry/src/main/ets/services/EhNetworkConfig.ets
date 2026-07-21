@@ -78,6 +78,7 @@ let networkChangeTimer: number = -1;
 let networkRecoveryTimer: number = -1;
 let forceFreshConnectionsUntilMs: number = 0;
 let lastIpQualitySaveAt: number = 0;
+let previousFrontedHost: string = '';
 const DIRECT_HOST_FAILURES: DirectHostFailure[] = [];
 
 interface HostRule {
@@ -194,17 +195,14 @@ export function applyEhNetworkOptions(options: http.HttpRequestOptions, plan: Eh
   applyConfiguredNetworkOptions(options, useDnsOverHttps);
   if (plan.fronted) {
     options.remoteValidation = 'skip';
-    // Keep sniHostName unset deliberately. The original implementation opens TLS by IP so the blocked gallery
-    // hostname is absent from ClientHello, then routes the HTTP request with the original Host header.
-    // API 26 can explicitly prevent the system HTTP/2 pool from reusing an IP connection for another Host/SNI
-    // combination. Connection: close alone is not sufficient on affected HarmonyOS 6.1 builds.
     if (deviceInfo.apiAvailable('26.0.0')) {
-      options.reuseConnections = false;
+      const currentHost = requestHost(plan.url);
+      if (currentHost !== previousFrontedHost) {
+        options.reuseConnections = false;
+        previousFrontedHost = currentHost;
+      }
     }
   } else if (Date.now() < forceFreshConnectionsUntilMs) {
-    // The system clears its DNS cache on network disconnect/switch, but an existing HTTP/1.1
-    // connection can still bypass a newly restored app-scoped DNS rule. Use fresh EH connections
-    // briefly after a network or Hosts transition, then return to normal connection reuse.
     if (deviceInfo.apiAvailable('26.0.0')) {
       options.reuseConnections = false;
     }
@@ -1264,6 +1262,7 @@ function readCurrentNetworkEnvironmentKey(): string {
 
 function markFreshEhConnectionsRequired(): void {
   forceFreshConnectionsUntilMs = Date.now() + FRESH_CONNECTION_WINDOW_MS;
+  previousFrontedHost = '';
 }
 
 function scheduleNetworkRuntimeRefresh(): void {

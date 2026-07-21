@@ -674,6 +674,7 @@ export class EhHttpClient {
       }
 
       const parsed: GalleryListParseResult = parseGalleryList(response.body);
+      await yieldToEventLoop();
       await this.fillGalleryListByApi(parsed.galleries, url, site);
       const parseMessage = parsed.warning.length > 0 ? parsed.warning + '; ' + galleryListBodyDiagnostic(response.body) :
         'Parsed ' + parsed.galleries.length.toString() + ' galleries';
@@ -719,6 +720,7 @@ export class EhHttpClient {
       return;
     }
     const maxBatchSize = 25;
+    const batchPromises: Promise<void>[] = [];
     for (let start = 0; start < galleries.length; start += maxBatchSize) {
       const batch = galleries.slice(start, Math.min(start + maxBatchSize, galleries.length));
       const gidlist: (number | string)[][] = [];
@@ -730,14 +732,16 @@ export class EhHttpClient {
         gidlist: gidlist,
         namespace: 1
       });
-      try {
-        const response = await this.postJson(EhUrl.getApiUrl(site), payload, referer, EhUrl.getReferer(site));
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          mergeGalleryApiMetadata(response.body, galleries);
-        }
-      } catch (error) {
-        return;
-      }
+      batchPromises.push(this.postJson(EhUrl.getApiUrl(site), payload, referer, EhUrl.getReferer(site))
+        .then((response: EhHttpResponse) => {
+          if (response.statusCode >= 200 && response.statusCode < 300) {
+            mergeGalleryApiMetadata(response.body, galleries);
+          }
+        }));
+    }
+    try {
+      await Promise.all(batchPromises);
+    } catch (error) {
     }
   }
 
@@ -757,6 +761,7 @@ export class EhHttpClient {
       }
 
       const parsed: GalleryDetailParseResult = parseGalleryDetail(response.body);
+      await yieldToEventLoop();
       this.saveParseErrorBodyIfNeeded('gallery_detail', url, response.statusCode, parsed.warning, parsed.detail === null,
         response.body);
       return {
@@ -1465,6 +1470,14 @@ function sleepRetry(attempt: number): Promise<void> {
     setTimeout(() => {
       resolve();
     }, delay);
+  });
+}
+
+function yieldToEventLoop(): Promise<void> {
+  return new Promise<void>((resolve: (value: void | PromiseLike<void>) => void) => {
+    setTimeout(() => {
+      resolve();
+    }, 0);
   });
 }
 
