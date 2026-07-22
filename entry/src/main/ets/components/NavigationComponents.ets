@@ -117,6 +117,7 @@ export struct EhDrawer {
       .height('100%')
       .layoutWeight(1)
       .cachedCount(4)
+      .scrollBar(BarState.Off)
       .divider({ strokeWidth: 0.5, color: themeDividerColor(), startMargin: 56, endMargin: 0 })
 
       if (this.signedIn && ehSettingsStore.getValue('show_eh_limits', 'On') === 'On') {
