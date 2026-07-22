@@ -83,6 +83,7 @@ import {
 import { galleryPageCache } from '../services/GalleryPageCache';
 import { CacheClearResult, CachePruneResult, readerImageCache } from '../services/ReaderImageCache';
 import { FilterRule, FILTER_MODE_RATING, FILTER_MODE_TITLE, ehFilterStore } from '../services/EhFilterStore';
+import { ehCommentBlacklistStore } from '../services/EhCommentBlacklistStore';
 import {
   applyAppChromeImmersiveMode,
   mainContentWidthFallbackVp,
@@ -145,6 +146,7 @@ import {
 } from './SessionScene';
 import { UpdatePromptOverlay } from './UpdatePromptOverlay';
 import { WifiMigrationPanel } from './WifiMigrationPanel';
+import { CommentBlacklistPanel } from './CommentBlacklistPanel';
 import {
   areaDimensionToVp,
   markCurrentRouteRightPane,
@@ -1165,6 +1167,20 @@ export struct SettingsScene {
       }
       return true;
     }
+    if (key === 'comment_blacklist') {
+      const context = getAbilityContext();
+      if (context === undefined) {
+        this.openPanel(SettingsPanel.CommentBlacklist);
+        return true;
+      }
+      ehCommentBlacklistStore.ensureLoaded(context).then(() => {
+        this.openPanel(SettingsPanel.CommentBlacklist);
+      }).catch((error: Error) => {
+        this.openPanel(SettingsPanel.CommentBlacklist);
+        this.statusText = 'Comment blacklist load warning: ' + error.message;
+      });
+      return true;
+    }
     if (key === 'export_data') {
       this.exportData();
       return true;
@@ -1245,7 +1261,8 @@ export struct SettingsScene {
       ehDownloadStore.load(context),
       ehFilterStore.ensureLoaded(context),
       ehLocalFavoritesStore.ensureLoaded(context),
-      ehBookmarkStore.ensureLoaded(context)
+      ehBookmarkStore.ensureLoaded(context),
+      ehCommentBlacklistStore.ensureLoaded(context)
     ]).then(() => {
       const bundle: EhBackupBundle = {
         version: 1,
@@ -1257,7 +1274,8 @@ export struct SettingsScene {
         downloadLabels: ehDownloadStore.getLabels(),
         filterRules: ehFilterStore.getRules(),
         localFavorites: ehLocalFavoritesStore.getBackupItems(),
-        bookmarks: ehBookmarkStore.getBackupItems()
+        bookmarks: ehBookmarkStore.getBackupItems(),
+        commentBlacklist: ehCommentBlacklistStore.getBackupItems()
       };
       const json = JSON.stringify(bundle, null, 2);
 
@@ -1402,7 +1420,8 @@ export struct SettingsScene {
             this.showFloatingStatus('Import complete: Android data (history ' + summary.history +
               ', history metadata ' + summary.historyMetadata + ', fetched ' + summary.historyMetadataFetched +
               ', downloads ' + summary.downloads + ', local favorites ' + summary.localFavorites +
-              ', labels ' + summary.labels + ', filters ' + summary.filters + ', bookmarks ' + summary.bookmarks + ')');
+              ', labels ' + summary.labels + ', filters ' + summary.filters + ', bookmarks ' + summary.bookmarks +
+              ', comment blacklist ' + summary.blacklist + ')');
           }).catch((error: Error) => {
             this.hideBlockingBusy();
             this.showFloatingStatus('Import failed: Android data ' + error.message);
@@ -1544,6 +1563,14 @@ export struct SettingsScene {
           saves.push(ehBookmarkStore.ensureLoaded(context).then(() => {
             ehBookmarkStore.importBackupItems(bookmarks);
             return ehBookmarkStore.save(context);
+          }));
+        }
+
+        if (Array.isArray(bundle.commentBlacklist)) {
+          const commentBlacklist = bundle.commentBlacklist;
+          saves.push(ehCommentBlacklistStore.ensureLoaded(context).then(() => {
+            ehCommentBlacklistStore.importBackupItems(commentBlacklist);
+            return ehCommentBlacklistStore.save(context);
           }));
         }
 
@@ -2084,7 +2111,25 @@ export struct SettingsScene {
       }
 
       // Deeper panels slide over the ordinary settings panel instead of replacing it.
-      if (this.panel === SettingsPanel.Filter) {
+      if (this.panel === SettingsPanel.CommentBlacklist) {
+        CommentBlacklistPanel({
+          onBack: () => {
+            this.closePanel();
+          }
+        })
+          .width(this.settingsLayerWidth())
+          .height('100%')
+          .position({ x: this.settingsLayerTranslateX(), y: 0 })
+          .onTouch((event: TouchEvent) => {
+            if (shouldUpdateSplitPaneFocus(event)) {
+              this.activeSplitPane = SPLIT_PANE_FOCUS_RIGHT;
+            }
+          })
+          .zIndex(10)
+          .animation({ duration: this.splitDragging ? 0 : 220, curve: Curve.EaseOut })
+          .transition(TransitionEffect.move(TransitionEdge.END)
+            .animation({ duration: 300, curve: Curve.EaseOut }))
+      } else if (this.panel === SettingsPanel.Filter) {
         FilterPanel({
           rules: this.filterRules,
           newText: this.filterNewText,

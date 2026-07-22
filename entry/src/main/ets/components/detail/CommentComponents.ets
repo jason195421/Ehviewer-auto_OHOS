@@ -1,5 +1,6 @@
 import { GalleryComment } from '../../model/GalleryModels';
 import { ehTranslationService } from '../../services/EhTranslationService';
+import { ehCommentBlacklistStore } from '../../services/EhCommentBlacklistStore';
 import { getAbilityContext, plainTextFromHtml, uiText } from '../../shared/EhShared';
 import {
   themeInactiveActionText,
@@ -255,6 +256,21 @@ export struct GalleryCommentRow {
     return this.comment.id !== '0' && this.comment.voteDownAble === true;
   }
 
+  private blockCommentUser(): void {
+    if (!ehCommentBlacklistStore.addFromComment(this.comment)) {
+      this.showToast('This user is already blocked');
+      return;
+    }
+    this.showToast('User added to comment blacklist');
+  }
+
+  private showToast(message: string): void {
+    try {
+      this.getUIContext().getPromptAction().showToast({ message: uiText(message) });
+    } catch (error) {
+    }
+  }
+
   build() {
     Column() {
       Row({ space: 8 }) {
@@ -282,6 +298,22 @@ export struct GalleryCommentRow {
           .fontWeight(FontWeight.Medium)
           .fontColor(scoreColor(this.comment.score))
           .margin({ right: 2 })
+        if (!this.compact && this.comment.user.trim().length > 0) {
+          Button({ type: ButtonType.Normal, stateEffect: true }) {
+            SymbolGlyph($r('sys.symbol.xmark_circle'))
+              .fontSize(21)
+              .fontColor([themeSecondaryText()])
+          }
+          .height(36)
+          .width(40)
+          .padding(0)
+          .borderRadius(5)
+          .backgroundColor(themeSurfaceVariant())
+          .accessibilityDescription(uiText('Block user'))
+          .onClick(() => {
+            this.blockCommentUser();
+          })
+        }
         CommentVoteButton({
           symbolIcon: $r('sys.symbol.arrow_up_circle'),
           enabledValue: this.canVoteUp(),

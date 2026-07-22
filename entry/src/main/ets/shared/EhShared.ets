@@ -23,6 +23,7 @@ import {
 } from '../services/ReaderImageCache';
 import { previewThumbnailCache } from '../services/PreviewThumbnailCache';
 import { FilterRule, ehFilterStore } from '../services/EhFilterStore';
+import { CommentBlacklistBackupEntry } from '../services/EhCommentBlacklistStore';
 import { LocalFavoriteBackupInfo } from '../services/EhLocalFavoritesStore';
 import { SearchBookmarkBackupInfo } from '../services/EhBookmarkStore';
 import { EH_AUTHOR_NAME, EH_RELEASE_TAG } from '../services/EhBuildInfo';
@@ -69,6 +70,7 @@ export interface EhBackupBundle {
   filterRules: FilterRule[];
   localFavorites?: LocalFavoriteBackupInfo[];
   bookmarks?: SearchBookmarkBackupInfo[];
+  commentBlacklist?: CommentBlacklistBackupEntry[];
 }
 
 export const LANGUAGE_REVISION_KEY: string = 'ehviewer_language_revision';
@@ -136,6 +138,7 @@ export enum SettingsPanel {
   Session = 'session',
   WebView = 'webview',
   Filter = 'filter',
+  CommentBlacklist = 'comment_blacklist',
   MyTags = 'mytags'
 }
 
@@ -1093,6 +1096,26 @@ export function zhText(text: string): string {
     case 'Ignore': return '忽略';
     case 'View': return '查看';
     case 'Filter': return '过滤';
+    case 'Comment blacklist': return '评论黑名单';
+    case 'Block comments from selected user names': return '屏蔽指定用户的评论';
+    case 'Block comments by user name': return '按用户名屏蔽评论';
+    case 'User name': return '用户名';
+    case 'Reason (optional)': return '原因（可选）';
+    case 'Blocked users are hidden from gallery comments.': return '黑名单用户的评论会在画廊评论中隐藏。';
+    case 'App data import, export and Wi-Fi Direct transfer include this blacklist.':
+      return '应用数据导入、导出和 Wi-Fi 直连传输均包含此黑名单。';
+    case 'Blocked users': return '已屏蔽用户';
+    case 'No blocked users': return '暂无屏蔽用户';
+    case 'Add a user name here or block a user from the full comments page.':
+      return '可在此添加用户名，也可在完整评论页直接屏蔽用户。';
+    case 'Enter a user name first': return '请先输入用户名';
+    case 'This user is already blocked': return '该用户已在黑名单中';
+    case 'User added to comment blacklist': return '已将用户加入评论黑名单';
+    case 'User removed from comment blacklist': return '已将用户移出评论黑名单';
+    case 'Remove blocked user': return '移除黑名单用户';
+    case 'Stop blocking comments from this user?': return '是否停止屏蔽该用户的评论？';
+    case 'Block user': return '屏蔽用户';
+    case 'Blocked comment user names and saved reasons': return '已屏蔽的评论用户名及保存的原因';
     case 'Filter On': return '过滤已开';
     case 'Filter mode': return '过滤模式';
     case 'Jump': return '跳转';
@@ -1584,13 +1607,14 @@ export function zhText(text: string): string {
     case 'Bypass SNI blocking using built-in host fronting': return '使用内置 hosts 绕过 SNI 封锁';
     case 'Use direct connection when the selected site responds within 5s': return '所选站点 5 秒内可直连时不使用 hosts 和域名前置';
     case 'Export data': return '导出数据';
-    case 'Save settings, history, downloads and filter rules to a JSON file': return '将设置、历史记录、下载和过滤规则保存为 JSON 文件';
+    case 'Save settings, history, downloads, filters and comment blacklist to a JSON file':
+      return '将设置、历史记录、下载、过滤规则和评论黑名单保存为 JSON 文件';
     case 'Import data': return '导入数据';
     case 'Restore settings and local data from a supported backup file': return '从支持的备份文件恢复设置和本地数据';
     case 'Wi-Fi server/client': return 'Wi-Fi 服务器/客户端';
     case 'Wi-Fi Direct transfer': return 'Wi-Fi 直连传输';
-    case 'Transfer bookmarks, local favorites, downloads and image files directly between nearby devices':
-      return '在附近设备间直连传输搜索书签、本地收藏、下载记录和图片文件';
+    case 'Transfer bookmarks, local favorites, comment blacklist, downloads and image files directly between nearby devices':
+      return '在附近设备间直连传输搜索书签、本地收藏、评论黑名单、下载记录和图片文件';
     case 'Send data': return '发送数据';
     case 'Create a Wi-Fi Direct group': return '创建 Wi-Fi 直连群组';
     case 'Act as the migration server': return '作为迁移发送端';
@@ -2948,6 +2972,9 @@ export function settingsPanelTitle(panel: SettingsPanel): string {
   if (panel === SettingsPanel.TranslationPrompt) {
     return 'System prompts';
   }
+  if (panel === SettingsPanel.CommentBlacklist) {
+    return 'Comment blacklist';
+  }
   return 'Settings';
 }
 
@@ -2961,6 +2988,8 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
       staticSettingsRow('u_config', 'UConfig', 'Account configuration page, requires sign in', '', 'navigation'),
       optionSettingsRow('use_account_default_filter', 'Use account filters', 'Use filtering options captured from UConfig', entries, ON_OFF_OPTIONS),
       staticSettingsRow('my_tags', 'My Tags', 'Manage watched and hidden tags, requires sign in', '', 'navigation'),
+      staticSettingsRow('comment_blacklist', 'Comment blacklist',
+        'Block comments from selected user names', '', 'navigation'),
       optionSettingsRow('launch_page', 'Launch page', 'Default start scene after warnings and sign-in checks', entries, ['Homepage', 'Subscription', 'What\'s Hot', 'Favorites']),
       optionSettingsRow('list_mode', 'List mode', 'Choose detail, thumbnail or extended gallery cards', entries, ['Detail', 'Thumb', 'Extended'])
     ];
@@ -3197,10 +3226,11 @@ export function settingsRowsForPanel(panel: SettingsPanel, themeName: string, en
     }
     rows.push(optionSettingsRow('domain_fronting', 'Domain fronting', 'Bypass SNI blocking using built-in host fronting', entries, ON_OFF_OPTIONS));
     rows.push(optionSettingsRow('auto_direct_connection', 'Direct connection check', 'Use direct connection when the selected site responds within 5s', entries, ON_OFF_OPTIONS));
-    rows.push(staticSettingsRow('export_data', 'Export data', 'Save settings, history, downloads and filter rules to a JSON file', 'Export', 'action'));
+    rows.push(staticSettingsRow('export_data', 'Export data',
+      'Save settings, history, downloads, filters and comment blacklist to a JSON file', 'Export', 'action'));
     rows.push(staticSettingsRow('import_data', 'Import data', 'Restore settings and local data from a supported backup file', 'Import', 'action'));
     rows.push(staticSettingsRow('wifi_transfer', 'Wi-Fi Direct transfer',
-      'Transfer bookmarks, local favorites, downloads and image files directly between nearby devices', '',
+      'Transfer bookmarks, local favorites, comment blacklist, downloads and image files directly between nearby devices', '',
       'navigation'));
     return rows;
   }

@@ -16,9 +16,14 @@ import {
 import { EhSubNavBar } from '../../NavigationComponents';
 import { GalleryCommentRow } from '../../detail/CommentComponents';
 import { TranslationText } from '../../TranslationComponents';
+import {
+  COMMENT_BLACKLIST_REVISION_KEY,
+  ehCommentBlacklistStore
+} from '../../../services/EhCommentBlacklistStore';
 
 @Component
 export struct CommentsScene {
+  @StorageProp(COMMENT_BLACKLIST_REVISION_KEY) blacklistRevision: number = 0;
   @Prop renderVersion: number = 0;
   @Prop comments: GalleryComment[] = [];
   @Prop galleryTitle: string = '';
@@ -40,6 +45,10 @@ export struct CommentsScene {
 
   private statusBarVp(): number {
     return this.getUIContext().px2vp(this.statusBarHeightPx);
+  }
+
+  private visibleComments(): GalleryComment[] {
+    return ehCommentBlacklistStore.filterComments(this.comments);
   }
 
   build() {
@@ -65,7 +74,7 @@ export struct CommentsScene {
           maxLinesValue: 1
         })
           .layoutWeight(1)
-        Text(this.comments.length.toString() + ' ' + uiText('total'))
+        Text(this.visibleComments().length.toString() + ' ' + uiText('total'))
           .fontSize(12)
           .fontColor(themeSecondaryText())
           .margin({ left: 12 })
@@ -74,14 +83,14 @@ export struct CommentsScene {
       .padding({ left: 16, right: 16, top: 8, bottom: 8 })
       .backgroundColor(themeSurface())
 
-      if (this.comments.length === 0) {
+      if (this.visibleComments().length === 0) {
         PlaceholderScene({
           title: 'Comments',
           detail: 'No comments for this gallery.'
         })
       } else {
         List({ space: 0 }) {
-          ForEach(this.comments, (comment: GalleryComment, index: number) => {
+          ForEach(this.visibleComments(), (comment: GalleryComment, index: number) => {
             ListItem() {
               GalleryCommentRow({
                 comment: comment,
@@ -110,7 +119,7 @@ export struct CommentsScene {
         .cachedCount(4)
         .onScrollIndex((first: number, last: number) => {
           this.translationVisibleStart = first;
-          this.translationVisibleEnd = Math.min(last, this.comments.length - 1);
+          this.translationVisibleEnd = Math.min(last, this.visibleComments().length - 1);
         })
       }
     }

@@ -8,6 +8,7 @@ import { SearchBookmarkBackupInfo, ehBookmarkStore } from './EhBookmarkStore';
 import { ehDownloadFileStore } from './EhDownloadFileStore';
 import { DownloadInfo, DownloadLabel, DownloadState, ehDownloadStore } from './EhDownloadStore';
 import { LocalFavoriteBackupInfo, ehLocalFavoritesStore } from './EhLocalFavoritesStore';
+import { CommentBlacklistBackupEntry, ehCommentBlacklistStore } from './EhCommentBlacklistStore';
 
 export const WIFI_MIGRATION_PORT: number = 54321;
 
@@ -31,6 +32,7 @@ export enum WifiMigrationRole {
 export enum WifiMigrationDataKind {
   Bookmarks = 'bookmarks',
   Favorites = 'favorites',
+  Blacklist = 'blacklist',
   Downloads = 'downloads'
 }
 
@@ -75,6 +77,7 @@ interface WifiTransferMetadata {
   kind: WifiMigrationDataKind;
   bookmarks?: SearchBookmarkBackupInfo[];
   favorites?: LocalFavoriteBackupInfo[];
+  blacklist?: CommentBlacklistBackupEntry[];
   downloadLabels?: DownloadLabel[];
   downloads?: DownloadInfo[];
 }
@@ -666,6 +669,12 @@ export class WifiMigrationSession {
       await ehLocalFavoritesStore.save(this.context);
       return count;
     }
+    if (metadata.kind === WifiMigrationDataKind.Blacklist) {
+      const items = metadata.blacklist === undefined ? [] : metadata.blacklist;
+      const count = ehCommentBlacklistStore.importBackupItems(items);
+      await ehCommentBlacklistStore.save(this.context);
+      return count;
+    }
     const labels = metadata.downloadLabels === undefined ? [] : metadata.downloadLabels;
     const downloads = metadata.downloads === undefined ? [] : metadata.downloads;
     let count = 0;
@@ -893,6 +902,9 @@ function createTransferPlan(context: common.UIAbilityContext, kind: WifiMigratio
   } else if (kind === WifiMigrationDataKind.Favorites) {
     metadata.favorites = ehLocalFavoritesStore.getBackupItems();
     itemCount = metadata.favorites.length;
+  } else if (kind === WifiMigrationDataKind.Blacklist) {
+    metadata.blacklist = ehCommentBlacklistStore.getBackupItems();
+    itemCount = metadata.blacklist.length;
   } else {
     metadata.downloadLabels = ehDownloadStore.getLabels();
     metadata.downloads = ehDownloadStore.getItems();

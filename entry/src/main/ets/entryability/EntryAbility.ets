@@ -13,6 +13,10 @@ import {
 } from '../services/EhWindowImmersive';
 import { applyWindowPrivacyMode, WINDOW_PRIVACY_STATUS_KEY } from '../services/EhWindowPrivacy';
 import { ehSettingsStore } from '../services/EhSettingsStore';
+import {
+  COMMENT_BLACKLIST_REVISION_KEY,
+  ehCommentBlacklistStore
+} from '../services/EhCommentBlacklistStore';
 import { ehAppLog } from '../services/EhAppLog';
 import { DOWNLOAD_NOTIFICATION_OPEN_DIRECTORY_KEY } from '../services/DownloadNotificationSupport';
 import {
@@ -93,6 +97,7 @@ export default class EntryAbility extends UIAbility {
     AppStorage.setOrCreate<window.Window | undefined>(MAIN_WINDOW_KEY, undefined);
     AppStorage.setOrCreate<number>(LANGUAGE_REVISION_KEY, 0);
     AppStorage.setOrCreate<number>(THEME_REVISION_KEY, 0);
+    AppStorage.setOrCreate<number>(COMMENT_BLACKLIST_REVISION_KEY, 0);
     AppStorage.setOrCreate<string>(WINDOW_PRIVACY_STATUS_KEY, '');
     AppStorage.setOrCreate<boolean>(IDENTITY_AUTH_LOCKED_KEY, false);
     AppStorage.setOrCreate<boolean>(EMBEDDED_READER_ACTIVE_KEY, false);
@@ -113,7 +118,10 @@ export default class EntryAbility extends UIAbility {
         this.applyPersistedSecureScreen();
       });
     }).catch(() => {});
-    const settingsReady = ehSettingsStore.ensureLoaded(this.context).then(() => {
+    const settingsReady = Promise.all([
+      ehSettingsStore.ensureLoaded(this.context),
+      ehCommentBlacklistStore.ensureLoaded(this.context)
+    ]).then(() => {
       this.setIdentityAuthLocked(this.identityAuthEnabledInMemory());
       registerEhNetworkChangeListener(this.context);
       this.initializeNetworkRuntime();

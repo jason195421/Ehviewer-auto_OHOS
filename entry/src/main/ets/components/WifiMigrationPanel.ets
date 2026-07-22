@@ -1,6 +1,7 @@
 import { ehBookmarkStore } from '../services/EhBookmarkStore';
 import { ehDownloadStore } from '../services/EhDownloadStore';
 import { ehLocalFavoritesStore } from '../services/EhLocalFavoritesStore';
+import { ehCommentBlacklistStore } from '../services/EhCommentBlacklistStore';
 import {
   WifiMigrationDataKind,
   WifiMigrationPeer,
@@ -47,6 +48,7 @@ export struct WifiMigrationPanel {
   @State bookmarkCount: number = 0;
   @State favoriteCount: number = 0;
   @State downloadCount: number = 0;
+  @State blacklistCount: number = 0;
   private session: WifiMigrationSession | null = null;
 
   aboutToAppear(): void {
@@ -61,7 +63,8 @@ export struct WifiMigrationPanel {
     });
     Promise.all([
       ehBookmarkStore.ensureLoaded(context),
-      ehLocalFavoritesStore.ensureLoaded(context)
+      ehLocalFavoritesStore.ensureLoaded(context),
+      ehCommentBlacklistStore.ensureLoaded(context)
     ]).then(() => {
       this.refreshCounts();
     }).catch(() => {
@@ -100,6 +103,7 @@ export struct WifiMigrationPanel {
     this.bookmarkCount = ehBookmarkStore.getItems().length;
     this.favoriteCount = ehLocalFavoritesStore.count();
     this.downloadCount = ehDownloadStore.getItems().length;
+    this.blacklistCount = ehCommentBlacklistStore.count();
   }
 
   private active(): boolean {
@@ -185,6 +189,7 @@ export struct WifiMigrationPanel {
   private selectedCount(): number {
     if (this.dataKind === WifiMigrationDataKind.Bookmarks) return this.bookmarkCount;
     if (this.dataKind === WifiMigrationDataKind.Favorites) return this.favoriteCount;
+    if (this.dataKind === WifiMigrationDataKind.Blacklist) return this.blacklistCount;
     return this.downloadCount;
   }
 
@@ -447,6 +452,9 @@ export struct WifiMigrationPanel {
                 'Saved quick searches and their search options', this.bookmarkCount, $r('sys.symbol.bookmark'))
               this.dataCard(WifiMigrationDataKind.Favorites, 'Local favorites',
                 'Locally saved gallery information', this.favoriteCount, $r('sys.symbol.heart'))
+              this.dataCard(WifiMigrationDataKind.Blacklist, 'Comment blacklist',
+                'Blocked comment user names and saved reasons', this.blacklistCount,
+                $r('sys.symbol.xmark_circle'))
               this.dataCard(WifiMigrationDataKind.Downloads, 'Downloads and images',
                 'Transfer download records and all downloaded image files', this.downloadCount,
                 $r('sys.symbol.arrow_down_circle'))

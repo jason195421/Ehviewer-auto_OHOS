@@ -2,15 +2,24 @@ import { GalleryComment } from '../../model/GalleryModels';
 import { uiText } from '../../shared/EhShared';
 import { themePrimaryColor, themePrimaryText, themeSecondaryText, themeSurface } from '../../shared/EhTheme';
 import { GalleryCommentRow } from './CommentComponents';
+import {
+  COMMENT_BLACKLIST_REVISION_KEY,
+  ehCommentBlacklistStore
+} from '../../services/EhCommentBlacklistStore';
 
 @Component
 export struct DetailComments {
+  @StorageProp(COMMENT_BLACKLIST_REVISION_KEY) blacklistRevision: number = 0;
   @Prop comments: GalleryComment[] = [];
   @Prop isDetailLoaded: boolean = false;
   @Prop translateComments: boolean = false;
   onComments: () => void = () => {};
   onVoteComment: (comment: GalleryComment, vote: number) => void = (_comment: GalleryComment, _vote: number) => {};
   onOpenGalleryLink: (url: string) => void = (_url: string) => {};
+
+  private visibleComments(): GalleryComment[] {
+    return ehCommentBlacklistStore.filterComments(this.comments);
+  }
 
   build() {
     Column() {
@@ -24,8 +33,8 @@ export struct DetailComments {
           Text(uiText('Loading...'))
             .fontSize(13)
             .fontColor(themeSecondaryText())
-        } else if (this.comments.length > 0) {
-          Text(uiText('See all') + ' (' + this.comments.length.toString() + ')')
+        } else if (this.visibleComments().length > 0) {
+          Text(uiText('See all') + ' (' + this.visibleComments().length.toString() + ')')
             .fontSize(13)
             .fontColor(themePrimaryColor())
             .onClick(() => {
@@ -40,7 +49,7 @@ export struct DetailComments {
       .width('100%')
       .margin({ bottom: 10 })
       .onClick(() => {
-        if (this.isDetailLoaded && this.comments.length > 0) {
+        if (this.isDetailLoaded && this.visibleComments().length > 0) {
           this.onComments();
         }
       })
@@ -49,12 +58,12 @@ export struct DetailComments {
         Text(uiText('Loading comments...'))
           .fontSize(13)
           .fontColor(themeSecondaryText())
-      } else if (this.comments.length === 0) {
+      } else if (this.visibleComments().length === 0) {
         Text(uiText('No comments'))
           .fontSize(13)
           .fontColor(themeSecondaryText())
       } else {
-        ForEach(this.comments.slice(0, 2), (comment: GalleryComment) => {
+        ForEach(this.visibleComments().slice(0, 2), (comment: GalleryComment) => {
           GalleryCommentRow({
             comment: comment,
             maxLines: 4,

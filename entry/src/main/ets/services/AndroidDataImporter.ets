@@ -10,6 +10,10 @@ import { ehHistoryStore } from './EhHistoryStore';
 import { ehLocalFavoritesStore } from './EhLocalFavoritesStore';
 import { HISTORY_INFO_SIZE_KEY, ehSettingsStore, historyInfoSizeLimitFromValue } from './EhSettingsStore';
 import { ehSearchHistoryStore } from './EhSearchHistoryStore';
+import {
+  CommentBlacklistBackupEntry,
+  ehCommentBlacklistStore
+} from './EhCommentBlacklistStore';
 
 const SQLITE_HEADER: string = 'SQLite format 3';
 const ANDROID_IMPORT_DB_NAME: string = 'ehviewer_android_import.db';
@@ -31,6 +35,7 @@ export interface AndroidDataImportSummary {
   filters: number;
   searches: number;
   bookmarks: number;
+  blacklist: number;
 }
 
 interface AndroidHistoryImportResult {
@@ -69,6 +74,7 @@ export async function importAndroidDatabaseBackup(context: common.UIAbilityConte
     await ehBookmarkStore.ensureLoaded(context);
     await ehSettingsStore.load(context);
     await ehSearchHistoryStore.load(context);
+    await ehCommentBlacklistStore.ensureLoaded(context);
 
     const historyResult = await importHistory(store);
     const labels = await importDownloadLabels(store);
@@ -84,7 +90,8 @@ export async function importAndroidDatabaseBackup(context: common.UIAbilityConte
       localFavorites: localFavorites,
       filters: await importFilters(store),
       searches: 0,
-      bookmarks: await importQuickSearch(store)
+      bookmarks: await importQuickSearch(store),
+      blacklist: await importCommentBlacklist(store)
     };
     summary.searches = summary.bookmarks;
 
@@ -93,7 +100,8 @@ export async function importAndroidDatabaseBackup(context: common.UIAbilityConte
       ehDownloadStore.save(context),
       ehFilterStore.save(context),
       ehLocalFavoritesStore.save(context),
-      ehBookmarkStore.save(context)
+      ehBookmarkStore.save(context),
+      ehCommentBlacklistStore.save(context)
     ]);
     return summary;
   } catch (error) {
@@ -279,6 +287,30 @@ async function importQuickSearch(store: relationalStore.RdbStore): Promise<numbe
     }
   });
   return count;
+}
+
+async function importCommentBlacklist(store: relationalStore.RdbStore): Promise<number> {
+  if (!await tableExists(store, 'Black_List')) {
+    return 0;
+  }
+  const items: CommentBlacklistBackupEntry[] = [];
+  await queryEach(store, 'SELECT * FROM "Black_List" ORDER BY "_id" ASC',
+    (row: relationalStore.ResultSet) => {
+      const user = getStringColumn(row, 'BADGAYNAME', '').trim();
+      if (user.length === 0) {
+        return;
+      }
+      const sourceComment = getStringColumn(row, 'ANGRYWITH', '').trim();
+      const addTime = getStringColumn(row, 'ADD_TIME', '').trim();
+      const parsedTime = Date.parse(addTime);
+      items.push({
+        user: user,
+        reason: getStringColumn(row, 'REASON', '').trim(),
+        sourceComment: sourceComment === '/手动添加/' ? '' : sourceComment,
+        addedAt: Number.isFinite(parsedTime) ? parsedTime : Date.now()
+      });
+    });
+  return ehCommentBlacklistStore.importBackupItems(items);
 }
 
 function currentImportGallerySite(): GallerySite {
