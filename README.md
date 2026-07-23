@@ -3,7 +3,7 @@
 <p align="center">
   <img src="entry/src/main/resources/base/media/app_icon.png" width="120" alt="EhViewer HarmonyOS 应用图标" />
 </p>
-
+[![Build HAP](https://github.com/jason195421/Ehviewer-auto_OHOS/actions/workflows/main.yml/badge.svg)](https://github.com/jason195421/Ehviewer-auto_OHOS/actions/workflows/main.yml)
 这是 [Ehviewer_CN_SXJ](https://github.com/xiaojieonly/Ehviewer_CN_SXJ) 的 HarmonyOS 移植版本，面向手机、平板、折叠屏和电脑提供画廊浏览、搜索、阅读、下载、翻译与数据迁移功能。
 
 ## 下载与安装
