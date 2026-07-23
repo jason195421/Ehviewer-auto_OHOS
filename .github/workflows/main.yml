@@ -29,10 +29,9 @@ jobs:
 
     env:
       BUILD_MODE: ${{ github.event.inputs.build_mode || 'debug' }}
-      # 容器内 SDK 路径（根据实际镜像调整）
       OHOS_SDK_HOME: /opt/ohos-sdk
-      # Node 路径（镜像内置）
-      PATH: /opt/harmonyos-tools/command-line-tools/tool/node/bin:/opt/harmonyos-tools/command-line-tools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      # 确保 oh_modules/.bin 被包含在 PATH 中，以便直接调用本地 hvigor
+      PATH: ./oh_modules/.bin:/opt/harmonyos-tools/command-line-tools/tool/node/bin:/opt/harmonyos-tools/command-line-tools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/bin:/sbin
 
     steps:
       - name: Checkout code
@@ -64,7 +63,6 @@ jobs:
 
       - name: Configure SDK path
         run: |
-          # 自动检测 SDK 路径
           SDK_PATH=""
           if [ -d "/opt/ohos-sdk" ]; then
             SDK_PATH="/opt/ohos-sdk"
@@ -73,7 +71,6 @@ jobs:
           elif [ -d "/opt/sdk" ]; then
             SDK_PATH="/opt/sdk"
           else
-            # 尝试查找
             SDK_PATH=$(find /opt -maxdepth 3 -name "openharmony" -type d 2>/dev/null | head -1)
             if [ -z "$SDK_PATH" ]; then
               SDK_PATH=$(find /opt -maxdepth 3 -name "sdk" -type d 2>/dev/null | head -1)
@@ -92,54 +89,62 @@ jobs:
 
       - name: Install ohpm dependencies
         run: |
-          # 配置 ohpm 仓库
           ohpm config set registry https://ohpm.openharmony.cn/ohpm/ || true
-          
-          # 安装项目依赖
-          echo "=== Running ohpm install ==="
           ohpm install --all
           
           echo "=== Installed packages ==="
           ls -la oh_modules/ 2>/dev/null || echo "oh_modules not in root"
           ls -la entry/oh_modules/ 2>/dev/null || echo "oh_modules not in entry"
 
-      - name: Locate hvigor executable
+      - name: Validate and prepare hvigor executable
+        run: |
+          HVIGOR_BIN="./oh_modules/.bin/hvigor"
+          if [ ! -f "$HVIGOR_BIN" ]; then
+            echo "ERROR: hvigor not found at $HVIGOR_BIN after ohpm install"
+            echo "Available in .bin directory:"
+            ls -la ./oh_modules/.bin/ 2>/dev/null || echo "No bin directory or permission denied"
+            exit 1
+          fi
+          
+          # 确保 hvigor 具有可执行权限
+          chmod +x "$HVIGOR_BIN"
+          echo "Successfully set execute permission for $HVIGOR_BIN"
+          
+          # 验证是否可通过 PATH 直接调用（因已加入环境变量）
+          if ! command -v hvigor &> /dev/null; then
+            echo "WARNING: hvigor is not accessible via PATH despite being in ./oh_modules/.bin"
+          else
+            echo "hvigor is now available via PATH: $(which hvigor)"
+          fi
+
+      - name: Locate hvigor executable (Prioritize hvigorw if present)
         id: find_hvigor
         run: |
           HVIGOR_CMD=""
           
-          # 1. 尝试项目中的 hvigorw
+          # 优先使用项目根目录或 entry 目录下的 hvigorw 包装脚本
           if [ -f "./hvigorw" ]; then
+            chmod +x ./hvigorw
             HVIGOR_CMD="./hvigorw"
           elif [ -f "./entry/hvigorw" ]; then
+            chmod +x ./entry/hvigorw
             HVIGOR_CMD="./entry/hvigorw"
           fi
           
-          # 2. 尝试全局 hvigor 命令
-          if [ -z "$HVIGOR_CMD" ]; then
-            if command -v hvigor &> /dev/null; then
-              HVIGOR_CMD="hvigor"
-            fi
+          # 回退到本地安装的 hvigor
+          if [ -z "$HVIGOR_CMD" ] && [ -f "./oh_modules/.bin/hvigor" ]; then
+            HVIGOR_CMD="hvigor"  # 已通过 PATH 配置可直接访问
+          elif [ -z "$HVIGOR_CMD" ] && [ -f "./node_modules/.bin/hvigor" ]; then
+            HVIGOR_CMD="./node_modules/.bin/hvigor"
           fi
           
-          # 3. 尝试 oh_modules 中的 hvigor
-          if [ -z "$HVIGOR_CMD" ]; then
-            if [ -f "./oh_modules/.bin/hvigor" ]; then
-              HVIGOR_CMD="./oh_modules/.bin/hvigor"
-            elif [ -f "./node_modules/.bin/hvigor" ]; then
-              HVIGOR_CMD="./node_modules/.bin/hvigor"
-            fi
-          fi
-          
-          # 4. 尝试 npx
-          if [ -z "$HVIGOR_CMD" ]; then
-            if command -v npx &> /dev/null; then
-              HVIGOR_CMD="npx hvigor"
-            fi
+          # 最后尝试 npx
+          if [ -z "$HVIGOR_CMD" ] && command -v npx &> /dev/null; then
+            HVIGOR_CMD="npx hvigor"
           fi
           
           if [ -z "$HVIGOR_CMD" ]; then
-            echo "ERROR: hvigor not found in any location"
+            echo "ERROR: No hvigor executable found in any known location"
             exit 1
           fi
           
@@ -182,13 +187,8 @@ jobs:
         if: always()
         run: |
           mkdir -p artifacts/
-          
-          # 复制所有 HAP 产物
-          find . -name "*.hap" -type f -exec cp {} artifacts/ \; 2>/dev/null || true
-          
-          # 复制构建日志
-          find . -path "*/build/*" -name "*.log" -type f -exec cp {} artifacts/ \; 2>/dev/null || true
-          
+          find . -name "*.hap" -type f -exec cp {} artifacts/ \\; 2>/dev/null || true
+          find . -path "*/build/*" -name "*.log" -type f -exec cp {} artifacts/ \\; 2>/dev/null || true
           echo "=== Artifacts ==="
           ls -lh artifacts/ || echo "No artifacts found"
 
