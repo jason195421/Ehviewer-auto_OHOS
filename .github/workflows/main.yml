@@ -26,15 +26,13 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/sanchuanhehe/harmony-next-pipeline-docker/harmonyos-ci-image:latest
-      volumes:
-        - ${{ github.workspace }}:/workspace
 
     env:
-      # SDK 版本配置（与 build-profile.json5 保持一致）
-      COMPILE_SDK_VERSION: "26.0.0"
-      COMPATIBLE_SDK_VERSION: "6.0.0(20)"
-      # 构建模式
       BUILD_MODE: ${{ github.event.inputs.build_mode || 'debug' }}
+      # 容器内 SDK 路径（根据实际镜像调整）
+      OHOS_SDK_HOME: /opt/ohos-sdk
+      # Node 路径（镜像内置）
+      PATH: /opt/harmonyos-tools/command-line-tools/tool/node/bin:/opt/harmonyos-tools/command-line-tools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
     steps:
       - name: Checkout code
@@ -43,73 +41,142 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: |
-            oh-package.json5
-            **/oh-package.json5
+      - name: Verify build environment
+        run: |
+          echo "=== Node.js ==="
+          node -v || echo "node not found in PATH"
+          
+          echo "=== ohpm ==="
+          ohpm -v || echo "ohpm not found in PATH"
+          
+          echo "=== hvigor ==="
+          which hvigor || echo "hvigor not found in PATH"
+          hvigor -v || echo "hvigor command failed"
+          
+          echo "=== hvigorw ==="
+          ls -la hvigorw 2>/dev/null || echo "hvigorw not in project root"
+          ls -la entry/hvigorw 2>/dev/null || echo "hvigorw not in entry/"
+          
+          echo "=== SDK path ==="
+          ls -la /opt/ 2>/dev/null || true
+          find /opt -maxdepth 2 -name "sdk" -type d 2>/dev/null || true
+          find /opt -maxdepth 3 -name "command-line-tools" -type d 2>/dev/null || true
 
       - name: Configure SDK path
         run: |
-          # 更新 local.properties 中的 SDK 路径为容器内路径
-          echo "sdk.dir=/opt/harmonyos-sdk" > local.properties
+          # 自动检测 SDK 路径
+          SDK_PATH=""
+          if [ -d "/opt/ohos-sdk" ]; then
+            SDK_PATH="/opt/ohos-sdk"
+          elif [ -d "/opt/harmonyos-sdk" ]; then
+            SDK_PATH="/opt/harmonyos-sdk"
+          elif [ -d "/opt/sdk" ]; then
+            SDK_PATH="/opt/sdk"
+          else
+            # 尝试查找
+            SDK_PATH=$(find /opt -maxdepth 3 -name "openharmony" -type d 2>/dev/null | head -1)
+            if [ -z "$SDK_PATH" ]; then
+              SDK_PATH=$(find /opt -maxdepth 3 -name "sdk" -type d 2>/dev/null | head -1)
+            fi
+          fi
+          
+          if [ -n "$SDK_PATH" ]; then
+            echo "sdk.dir=$SDK_PATH" > local.properties
+            echo "SDK path set to: $SDK_PATH"
+          else
+            echo "WARNING: SDK path not found, using default"
+            echo "sdk.dir=/opt/ohos-sdk" > local.properties
+          fi
+          
           cat local.properties
 
       - name: Install ohpm dependencies
         run: |
           # 配置 ohpm 仓库
-          ohpm config set registry https://ohpm.openharmony.cn/ohpm/
+          ohpm config set registry https://ohpm.openharmony.cn/ohpm/ || true
           
           # 安装项目依赖
+          echo "=== Running ohpm install ==="
           ohpm install --all
           
-          # 验证 hvigorw 可执行
-          chmod +x hvigorw 2>/dev/null || true
-          ls -la hvigorw 2>/dev/null || echo "hvigorw not found in root, checking entry/"
-          ls -la entry/hvigorw 2>/dev/null || true
+          echo "=== Installed packages ==="
+          ls -la oh_modules/ 2>/dev/null || echo "oh_modules not in root"
+          ls -la entry/oh_modules/ 2>/dev/null || echo "oh_modules not in entry"
 
-      - name: Cache hvigor build
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.hvigor
-            **/.cxx
-            **/build
-            !entry/build/outputs
-          key: ${{ runner.os }}-hvigor-${{ hashFiles('build-profile.json5', 'hvigorfile.ts', 'oh-package.json5') }}
-          restore-keys: |
-            ${{ runner.os }}-hvigor-
+      - name: Locate hvigor executable
+        id: find_hvigor
+        run: |
+          HVIGOR_CMD=""
+          
+          # 1. 尝试项目中的 hvigorw
+          if [ -f "./hvigorw" ]; then
+            HVIGOR_CMD="./hvigorw"
+          elif [ -f "./entry/hvigorw" ]; then
+            HVIGOR_CMD="./entry/hvigorw"
+          fi
+          
+          # 2. 尝试全局 hvigor 命令
+          if [ -z "$HVIGOR_CMD" ]; then
+            if command -v hvigor &> /dev/null; then
+              HVIGOR_CMD="hvigor"
+            fi
+          fi
+          
+          # 3. 尝试 oh_modules 中的 hvigor
+          if [ -z "$HVIGOR_CMD" ]; then
+            if [ -f "./oh_modules/.bin/hvigor" ]; then
+              HVIGOR_CMD="./oh_modules/.bin/hvigor"
+            elif [ -f "./node_modules/.bin/hvigor" ]; then
+              HVIGOR_CMD="./node_modules/.bin/hvigor"
+            fi
+          fi
+          
+          # 4. 尝试 npx
+          if [ -z "$HVIGOR_CMD" ]; then
+            if command -v npx &> /dev/null; then
+              HVIGOR_CMD="npx hvigor"
+            fi
+          fi
+          
+          if [ -z "$HVIGOR_CMD" ]; then
+            echo "ERROR: hvigor not found in any location"
+            exit 1
+          fi
+          
+          echo "hvigor_cmd=$HVIGOR_CMD" >> $GITHUB_OUTPUT
+          echo "Using hvigor command: $HVIGOR_CMD"
 
       - name: Build HAP (Debug)
         if: env.BUILD_MODE == 'debug'
         run: |
-          echo "=== Building Debug HAP ==="
-          ./hvigorw clean assembleHap \
+          HVIGOR="${{ steps.find_hvigor.outputs.hvigor_cmd }}"
+          echo "=== Building Debug HAP with: $HVIGOR ==="
+          
+          $HVIGOR clean assembleHap \
             --mode module \
             -p product=default \
             -p buildMode=debug \
             --no-daemon
           
           echo "=== Build Output ==="
-          find entry/build -name "*.hap" -type f 2>/dev/null || true
-          find entry/build -name "*.app" -type f 2>/dev/null || true
+          find . -name "*.hap" -type f 2>/dev/null || echo "No .hap files found"
+          find . -name "*.app" -type f 2>/dev/null || echo "No .app files found"
 
       - name: Build HAP (Release)
         if: env.BUILD_MODE == 'release'
         run: |
-          echo "=== Building Release HAP ==="
-          ./hvigorw clean assembleHap \
+          HVIGOR="${{ steps.find_hvigor.outputs.hvigor_cmd }}"
+          echo "=== Building Release HAP with: $HVIGOR ==="
+          
+          $HVIGOR clean assembleHap \
             --mode module \
             -p product=default \
             -p buildMode=release \
             --no-daemon
           
           echo "=== Build Output ==="
-          find entry/build -name "*.hap" -type f 2>/dev/null || true
-          find entry/build -name "*.app" -type f 2>/dev/null || true
+          find . -name "*.hap" -type f 2>/dev/null || echo "No .hap files found"
+          find . -name "*.app" -type f 2>/dev/null || echo "No .app files found"
 
       - name: Collect build artifacts
         if: always()
@@ -117,14 +184,11 @@ jobs:
           mkdir -p artifacts/
           
           # 复制所有 HAP 产物
-          find entry/build -name "*.hap" -type f -exec cp {} artifacts/ \; 2>/dev/null || true
+          find . -name "*.hap" -type f -exec cp {} artifacts/ \; 2>/dev/null || true
           
           # 复制构建日志
-          if [ -d "entry/build" ]; then
-            find entry/build -name "*.log" -type f -exec cp {} artifacts/ \; 2>/dev/null || true
-          fi
+          find . -path "*/build/*" -name "*.log" -type f -exec cp {} artifacts/ \; 2>/dev/null || true
           
-          # 列出产物
           echo "=== Artifacts ==="
           ls -lh artifacts/ || echo "No artifacts found"
 
@@ -143,13 +207,5 @@ jobs:
           name: build-logs-${{ github.sha }}
           path: |
             artifacts/*.log
-            entry/build/reports/
             **/build/reports/
           retention-days: 7
-
-      - name: Get version info
-        id: version
-        run: |
-          VERSION=$(grep -oP '"version"\s*:\s*"\K[^"]+' oh-package.json5)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "App version: $VERSION"
