@@ -4,6 +4,8 @@
   <img src="entry/src/main/resources/base/media/app_icon.png" width="120" alt="EhViewer HarmonyOS 应用图标" />
 </p>
 
+[![Build HAP](https://github.com/jason195421/Ehviewer-auto_OHOS/actions/workflows/main.yml/badge.svg)](https://github.com/jason195421/Ehviewer-auto_OHOS/actions/workflows/main.yml)
+
 这是 [Ehviewer_CN_SXJ](https://github.com/xiaojieonly/Ehviewer_CN_SXJ) 的 HarmonyOS 移植版本，面向手机、平板、折叠屏和电脑提供画廊浏览、搜索、阅读、下载、翻译与数据迁移功能。
 
 ## 下载与安装
@@ -24,7 +26,7 @@ API 20 起可安装；低于 API 23 的设备会自动跳过不兼容的 SNI 域
 ### [EhViewer HarmonyOS 完整使用教程](docs/USER_GUIDE.md)
 
 教程包含目录、分章节步骤、真实界面截图、常见问题和日志导出说明。
-[![Build HAP](https://github.com/jason195421/Ehviewer-auto_OHOS/actions/workflows/main.yml/badge.svg)](https://github.com/jason195421/Ehviewer-auto_OHOS/actions/workflows/main.yml)
+
 ## 功能特色
 
 - 浏览：支持 E-Hentai/ExHentai、主页、订阅、热门、排行、云端收藏、本地收藏、历史和下载列表。
